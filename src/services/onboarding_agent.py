@@ -9,7 +9,7 @@ import re
 import json
 import logging
 import requests
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Iterator, List, Optional
 
 from src.config import CONFIG
 from src.db.connection import get_db
@@ -39,9 +39,9 @@ CONHECIMENTO COMPLETO DA ARQUITETURA E RECURSOS DO CAPIAU-TALHO:
      * Timeline Diff & Safety Gatekeeper: Mutações propostas pelo agente geram prévias em trilhas fantasmas translúcidas (ghostTrack) e resumo visual de diff no chat. Nenhuma alteração é gravada no MLT XML sem confirmação explícita do editor.
 
 3. Os 3 Perfis de Intenção Conversacionais (2026 SOTA):
-   - "🍃 Documentário Offline Econômico" (doc_offline_eco): 100% local, offline, custo $0.00 de API. Roda na CPU com ONNX Runtime (Laya + ArcFace 512-d + Nemotron 3 Diarization / Whisper-Turbo local). Ideal para dezenas ou centenas de horas de cartões de câmera sem gastar créditos.
-   - "⚡ Entrevista Ágil" (entrevista_agil): Prioriza vazão rápida de transcrição, busca textual imediata e decupagem veloz de depoimentos e diálogos.
-   - "🎬 Cinema Nuvem SOTA" (cinema_nuvem_sota): Máxima fidelidade estética e raciocínio dramático profundo com modelos em nuvem de fronteira (Gemini 3.8 Flash, DeepSeek V4.1, Claude Sonnet).
+   - "Documentário Offline Econômico" (doc_offline_eco): 100% local, offline, custo $0.00 de API. Roda na CPU com ONNX Runtime (Laya + ArcFace 512-d + Nemotron 3 Diarization / Whisper-Turbo local). Ideal para dezenas ou centenas de horas de cartões de câmera sem gastar créditos.
+   - "Entrevista Ágil" (entrevista_agil): Prioriza vazão rápida de transcrição, busca textual imediata e decupagem veloz de depoimentos e diálogos.
+   - "Cinema Nuvem SOTA" (cinema_nuvem_sota): Máxima fidelidade estética e raciocínio dramático profundo com modelos em nuvem de fronteira (Gemini 3.8 Flash, DeepSeek V4.1, Claude Sonnet).
 
 SUA MISSÃO NO CHAT GUIADOR DE ENTRADA (ONBOARDING):
 1. SE O USUÁRIO FIZER PERGUNTAS, PEDIR EXPLICAÇÃO OU DEMONSTRAR DÚVIDAS (ex: "me explique melhor isso aqui", "o que é isso?", "como funciona?", "o que é perfil de intenção?", "quais formatos aceita?"):
@@ -52,8 +52,15 @@ SUA MISSÃO NO CHAT GUIADOR DE ENTRADA (ONBOARDING):
 3. Sugira e explique os 3 perfis de intenção quando apropriado.
 4. Quando o usuário definir ou aprovar um nome e perfil, convide-o a arrastar as pastas ou arquivos de vídeo para a dropzone, ou avançar direto para a ilha de edição.
 
+ESTILO (a resposta aparece numa coluna estreita, palavra por palavra enquanto você escreve):
+- Curta: até 80 palavras, salvo quando o usuário pedir detalhe. Uma ideia por parágrafo.
+- Sem emojis, sem títulos (#), sem tabelas. No máximo uma lista curta de até 4 itens.
+- Negrito só no que o usuário precisa decidir ou escrever. Linguagem de montador, sem jargão técnico
+  de modelo (não cite ONNX, embeddings, latência em ms) a menos que perguntem.
+- Rótulos dos chips: até 4 palavras, sem emoji.
+
 ESTRUTURA DE RESPOSTA OBRIGATÓRIA:
-Responda em linguagem natural clara, acolhedora e cinematográfica.
+Responda em linguagem natural clara e acolhedora.
 Ao final de toda resposta, inclua OBRIGATORIAMENTE um bloco estruturado no formato:
 ```json:action
 {
@@ -324,12 +331,29 @@ class OnboardingAgentService:
             ]
         }
 
+    OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
+    # Espera pela primeira palavra do modelo; depois disso o texto já está chegando na tela
+    FIRST_TOKEN_TIMEOUT_S = 12
+    ACTION_MARKER = "```json:action"
+
+    @staticmethod
+    def _sanitize_secrets(t: str) -> str:
+        if not t:
+            return ""
+        t = re.sub(r'sk-or-v1-[a-zA-Z0-9_\-]+', '[CHAVE_API_REDACTED]', t)
+        t = re.sub(r'sk-[a-zA-Z0-9_\-]{20,}', '[CHAVE_API_REDACTED]', t)
+        t = re.sub(r'AIzaSy[a-zA-Z0-9_\-]{30,}', '[CHAVE_API_REDACTED]', t)
+        return t
+
     @classmethod
-    def chat(cls, message: str, history: List[Dict[str, str]] = None,
-             current_project_name: Optional[str] = None,
-             current_profile: Optional[str] = None,
-             custom_api_key: Optional[str] = None) -> Dict[str, Any]:
-        """Ponto de entrada do chat guiador com resolução de chave de API e inteligência profunda."""
+    def _prepare(cls, message: str, history: Optional[List[Dict[str, str]]],
+                 current_project_name: Optional[str], current_profile: Optional[str],
+                 custom_api_key: Optional[str]) -> Dict[str, Any]:
+        """Resolve tudo o que não depende da rede.
+
+        Devolve {"final": resposta} quando não há chamada ao modelo (chave colada no chat, sem chave)
+        ou {"request": ...} com o que é preciso para chamar a OpenRouter e montar o fallback.
+        """
         history = history or []
         msg_str = (message or "").strip()
 
@@ -339,26 +363,25 @@ class OnboardingAgentService:
             provider, api_token = key_detected
             saved = cls._save_api_key(provider, api_token)
             if saved:
-                return {
+                return {"final": {
                     "reply": (
-                        f"🔒 **Chave de API ({provider.capitalize()}) configurada com sucesso no banco local!**\n\n"
-                        f"Por proteção de privacidade, a chave foi gravada diretamente nas configurações globais locais e "
-                        f"mascarada no chat, não sendo salva no histórico de mensagens nem enviada a outros modelos. "
-                        f"Agora o CapIAu-Talho está conectado à inteligência em nuvem.\n\n"
-                        f"Você também pode gerenciar suas chaves com segurança no botão **Chaves de API** no topo do Welcome Hub.\n\n"
-                        f"Qual o título ou tema do seu projeto?"
+                        f"**Chave de API ({provider.capitalize()}) configurada** e guardada no banco local.\n\n"
+                        f"Ela foi escondida aqui e não fica no histórico da conversa nem é enviada a outros modelos. "
+                        f"Para ver ou trocar as chaves, use **Chaves e modelos** no topo.\n\n"
+                        f"Qual o nome do projeto?"
                     ),
                     "suggested_project_name": current_project_name,
                     "detected_profile": current_profile or "cinema_nuvem_sota",
                     "step": "discussing",
                     "ready_to_create": False,
                     "api_status": "ok",
+                    "model": None,
                     "chips": [
-                        {"label": "🔑 Gerenciar Chaves de API", "action": "open_api_keys"},
-                        {"label": "🍃 Usar Modo Offline", "value": "Documentário Offline Econômico"},
-                        {"label": "🎬 Usar Cinema Nuvem", "value": "Cinema Nuvem SOTA"}
+                        {"label": "Chaves e modelos", "action": "open_api_keys"},
+                        {"label": "Usar modo offline", "value": "Documentário Offline Econômico"},
+                        {"label": "Usar Cinema Nuvem", "value": "Cinema Nuvem SOTA"}
                     ]
-                }
+                }}
 
         # 2. Resolução da chave de API configurada. A chamada vai para a OpenRouter, então só a
         # chave da OpenRouter serve: a do Gemini voltaria 401 e cairia sempre no motor local.
@@ -366,7 +389,7 @@ class OnboardingAgentService:
         api_key = (custom_api_key or S.api_key("openrouter") or "").strip()
         model_name = S.get("llm.text_model") or CONFIG.TEXT_MODEL
 
-        def _local(status: str, note: str = "") -> Dict[str, Any]:
+        def local(status: str, note: str = "") -> Dict[str, Any]:
             fb = cls._build_intelligent_fallback(msg_str, history, current_project_name, current_profile)
             fb["api_status"] = status
             fb["model"] = None
@@ -377,7 +400,7 @@ class OnboardingAgentService:
 
         if not api_key or api_key == "your_openrouter_api_key_here":
             # Sem chave ativa: executa o motor nativo especializado de conhecimento
-            return _local("missing_key")
+            return {"final": local("missing_key")}
 
         # 3. Execução via LLM em Nuvem com System Prompt de Especialista
         system_content = CAPIAU_TALHO_KNOWLEDGE
@@ -386,111 +409,208 @@ class OnboardingAgentService:
         if current_profile:
             system_content += f"\n[ESTADO ATUAL]: O perfil de intenção já selecionado é: '{current_profile}'."
 
-        def _sanitize_secrets(t: str) -> str:
-            if not t:
-                return ""
-            t = re.sub(r'sk-or-v1-[a-zA-Z0-9_\-]+', '[CHAVE_API_REDACTED]', t)
-            t = re.sub(r'sk-[a-zA-Z0-9_\-]{20,}', '[CHAVE_API_REDACTED]', t)
-            t = re.sub(r'AIzaSy[a-zA-Z0-9_\-]{30,}', '[CHAVE_API_REDACTED]', t)
-            return t
-
         messages = [{"role": "system", "content": system_content}]
         # Histórico recente para continuidade com higienização estrita de segredos
         for h in history[-8:]:
             messages.append({
                 "role": h.get("role", "user"),
-                "content": _sanitize_secrets(h.get("content", ""))
+                "content": cls._sanitize_secrets(h.get("content", ""))
             })
-        messages.append({"role": "user", "content": _sanitize_secrets(msg_str)})
+        messages.append({"role": "user", "content": cls._sanitize_secrets(msg_str)})
 
-        # Endpoint e modelo
-        url = "https://openrouter.ai/api/v1/chat/completions"
-        headers = {
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-            "HTTP-Referer": "https://github.com/capiau/talho",
-            "X-Title": "CapIAu-Talho NLE"
+        return {"request": {
+            "headers": {
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+                "HTTP-Referer": "https://github.com/capiau/talho",
+                "X-Title": "CapIAu-Talho NLE"
+            },
+            "payload": {
+                "model": model_name,
+                "messages": messages,
+                "temperature": 0.4,
+                "max_tokens": 1200
+            },
+            "model_name": model_name,
+            "local": local,
+            "current_project_name": current_project_name,
+            "current_profile": current_profile,
+        }}
+
+    @classmethod
+    def _finish(cls, raw_text: str, served_model: Optional[str], req: Dict[str, Any]) -> Dict[str, Any]:
+        """Separa o texto do bloco json:action e monta a resposta final."""
+        current_project_name = req["current_project_name"]
+        current_profile = req["current_profile"]
+        raw_text = (raw_text or "").strip()
+
+        action_data = {}
+        clean_reply = raw_text
+        action_match = re.search(r"```json:action\s*([\s\S]*?)\s*```", raw_text)
+        if action_match:
+            try:
+                action_data = json.loads(action_match.group(1))
+            except Exception as json_err:
+                logger.warning(f"[OnboardingAgent] Falha ao parsear json:action da IA: {json_err}")
+        # O texto mostrado nunca leva o bloco, nem quando ele veio incompleto
+        marker = raw_text.find(cls.ACTION_MARKER)
+        if marker >= 0:
+            clean_reply = raw_text[:marker].strip()
+
+        suggested_name = action_data.get("suggested_project_name") or current_project_name
+        detected_prof = action_data.get("detected_profile") or current_profile
+        chips = action_data.get("chips") or []
+        step = action_data.get("step") or "discussing"
+        ready_to_create = bool(action_data.get("ready_to_create"))
+
+        # Fallback de chips se a IA não gerou
+        if not chips:
+            if not current_project_name and not suggested_name:
+                chips = [
+                    {"label": "Como o Talho me ajuda?", "value": "me explique melhor como o programa funciona"},
+                    {"label": "Usar modo offline", "value": "Quero o perfil Documentário Offline Econômico"},
+                    {"label": "Pular para o editor", "action": "skip_nle"}
+                ]
+            elif not current_profile and not detected_prof:
+                chips = [
+                    {"label": "Documentário Offline Econômico", "value": "Documentário Offline Econômico"},
+                    {"label": "Entrevista Ágil", "value": "Entrevista Ágil"},
+                    {"label": "Cinema Nuvem SOTA", "value": "Cinema Nuvem SOTA"}
+                ]
+
+        return {
+            "reply": clean_reply,
+            "suggested_project_name": suggested_name,
+            "detected_profile": detected_prof,
+            "step": step,
+            "chips": chips,
+            "ready_to_create": ready_to_create,
+            "api_status": "ok",
+            # Modelo que de fato respondeu (a OpenRouter devolve o ID resolvido, útil com aliases ~…-latest)
+            "model": served_model or req["model_name"],
+            "requested_model": req["model_name"],
         }
-        payload = {
-            "model": model_name,
-            "messages": messages,
-            "temperature": 0.4,
-            "max_tokens": 1200
-        }
+
+    @classmethod
+    def _http_error(cls, status_code: int, body: str, req: Dict[str, Any]) -> Dict[str, Any]:
+        model_name = req["model_name"]
+        if status_code == 401:
+            logger.warning("[OnboardingAgent] Chave OpenRouter expirada ou inválida (401). Recorrendo ao motor nativo.")
+            return req["local"](
+                "expired_key",
+                "**A chave da OpenRouter foi recusada** (expirada ou inválida), então quem responde é o assistente local. "
+                "Cole uma chave nova aqui na conversa ou em Chaves e modelos."
+            )
+        logger.warning(f"[OnboardingAgent] Erro na API OpenRouter ({status_code}) com {model_name}: {body[:120]}")
+        return req["local"](
+            "model_error",
+            f"**O modelo {model_name} não respondeu** (erro {status_code} da OpenRouter), então quem responde é o assistente local. "
+            "Confira o modelo de texto em Chaves e modelos."
+        )
+
+    @classmethod
+    def _timeout(cls, req: Dict[str, Any]) -> Dict[str, Any]:
+        logger.error(f"[OnboardingAgent] {req['model_name']} passou de {cls.FIRST_TOKEN_TIMEOUT_S} s sem responder.")
+        return req["local"](
+            "timeout",
+            f"**O modelo {req['model_name']} demorou mais de {cls.FIRST_TOKEN_TIMEOUT_S} s**, então quem responde é o assistente local."
+        )
+
+    @classmethod
+    def chat(cls, message: str, history: List[Dict[str, str]] = None,
+             current_project_name: Optional[str] = None,
+             current_profile: Optional[str] = None,
+             custom_api_key: Optional[str] = None) -> Dict[str, Any]:
+        """Ponto de entrada do chat guiador com resolução de chave de API e inteligência profunda."""
+        prep = cls._prepare(message, history, current_project_name, current_profile, custom_api_key)
+        if "final" in prep:
+            return prep["final"]
+        req = prep["request"]
 
         try:
-            resp = requests.post(url, headers=headers, json=payload, timeout=12)
-            if resp.status_code == 200:
-                res_data = resp.json()
-                raw_text = res_data.get("choices", [{}])[0].get("message", {}).get("content", "").strip()
-
-                # Extrai o bloco JSON estruturado se presente
-                action_data = {}
-                action_match = re.search(r"```json:action\s*([\s\S]*?)\s*```", raw_text)
-                clean_reply = raw_text
-
-                if action_match:
-                    try:
-                        action_data = json.loads(action_match.group(1))
-                        clean_reply = raw_text[:action_match.start()].strip()
-                    except Exception as json_err:
-                        logger.warning(f"[OnboardingAgent] Falha ao parsear json:action da IA: {json_err}")
-
-                suggested_name = action_data.get("suggested_project_name") or current_project_name
-                detected_prof = action_data.get("detected_profile") or current_profile
-                chips = action_data.get("chips") or []
-                step = action_data.get("step") or "discussing"
-                ready_to_create = bool(action_data.get("ready_to_create"))
-
-                # Fallback de chips se a IA não gerou
-                if not chips:
-                    if not current_project_name and not suggested_name:
-                        chips = [
-                            {"label": "Como o Talho me ajuda?", "value": "me explique melhor como o programa funciona"},
-                            {"label": "🍃 Usar Modo Offline", "value": "Quero o perfil Documentário Offline Econômico"},
-                            {"label": "⏭️ Pular para o Editor", "action": "skip_nle"}
-                        ]
-                    elif not current_profile and not detected_prof:
-                        chips = [
-                            {"label": "🍃 Documentário Offline Econômico", "value": "Documentário Offline Econômico"},
-                            {"label": "⚡ Entrevista Ágil", "value": "Entrevista Ágil"},
-                            {"label": "🎬 Cinema Nuvem SOTA", "value": "Cinema Nuvem SOTA"}
-                        ]
-
-                return {
-                    "reply": clean_reply,
-                    "suggested_project_name": suggested_name,
-                    "detected_profile": detected_prof,
-                    "step": step,
-                    "chips": chips,
-                    "ready_to_create": ready_to_create,
-                    "api_status": "ok",
-                    # Modelo que de fato respondeu (a OpenRouter devolve o ID resolvido, útil com aliases ~…-latest)
-                    "model": res_data.get("model") or model_name,
-                    "requested_model": model_name,
-                }
-
-            elif resp.status_code == 401:
-                logger.warning("[OnboardingAgent] Chave OpenRouter expirada ou inválida (401). Recorrendo ao motor nativo.")
-                return _local(
-                    "expired_key",
-                    "**A chave da OpenRouter foi recusada** (expirada ou inválida), então quem responde é o assistente local. "
-                    "Cole uma chave nova aqui na conversa ou em Chaves e modelos."
-                )
-            else:
-                logger.warning(f"[OnboardingAgent] Erro na API OpenRouter ({resp.status_code}) com {model_name}: {resp.text[:120]}")
-                return _local(
-                    "model_error",
-                    f"**O modelo {model_name} não respondeu** (erro {resp.status_code} da OpenRouter), então quem responde é o assistente local. "
-                    "Confira o modelo de texto em Chaves e modelos."
-                )
-
+            resp = requests.post(cls.OPENROUTER_URL, headers=req["headers"], json=req["payload"],
+                                 timeout=cls.FIRST_TOKEN_TIMEOUT_S)
+            if resp.status_code != 200:
+                return cls._http_error(resp.status_code, resp.text, req)
+            res_data = resp.json()
+            raw_text = res_data.get("choices", [{}])[0].get("message", {}).get("content", "")
+            return cls._finish(raw_text, res_data.get("model"), req)
         except requests.Timeout:
-            logger.error(f"[OnboardingAgent] {model_name} passou de 12 s sem responder.")
-            return _local(
-                "timeout",
-                f"**O modelo {model_name} demorou mais de 12 s**, então quem responde é o assistente local."
-            )
+            return cls._timeout(req)
         except Exception as e:
             logger.error(f"[OnboardingAgent] Exceção na chamada LLM: {e}")
-            return _local("offline_mode")
+            return req["local"]("offline_mode")
+
+    @classmethod
+    def chat_stream(cls, message: str, history: List[Dict[str, str]] = None,
+                    current_project_name: Optional[str] = None,
+                    current_profile: Optional[str] = None,
+                    custom_api_key: Optional[str] = None) -> Iterator[Dict[str, Any]]:
+        """Mesma conversa de chat(), mas o texto sai aos poucos.
+
+        Eventos: {"type": "start", "model"} quando a chamada sai; {"type": "delta", "text"} a cada
+        trecho novo; {"type": "done", **resposta} no fim (mesmo formato de chat()). Quando não há
+        chamada ao modelo, ou ela falha antes da primeira palavra, sai só o "done" com o fallback.
+        O bloco json:action nunca vai nos deltas.
+        """
+        prep = cls._prepare(message, history, current_project_name, current_profile, custom_api_key)
+        if "final" in prep:
+            yield {"type": "done", **prep["final"]}
+            return
+        req = prep["request"]
+        yield {"type": "start", "model": req["model_name"]}
+
+        raw = ""
+        sent = 0          # quantos caracteres de raw já foram mandados como delta
+        served_model = None
+        try:
+            payload = dict(req["payload"], stream=True)
+            with requests.post(cls.OPENROUTER_URL, headers=req["headers"], json=payload,
+                               stream=True, timeout=cls.FIRST_TOKEN_TIMEOUT_S) as resp:
+                if resp.status_code != 200:
+                    yield {"type": "done", **cls._http_error(resp.status_code, resp.text, req)}
+                    return
+                # SSE sem charset no cabeçalho: o requests assumiria Latin-1 e quebraria os acentos
+                resp.encoding = "utf-8"
+                for line in resp.iter_lines(decode_unicode=True):
+                    if not line or not line.startswith("data:"):
+                        continue  # linhas ": OPENROUTER PROCESSING" mantêm a conexão viva
+                    data = line[5:].strip()
+                    if data == "[DONE]":
+                        break
+                    try:
+                        chunk = json.loads(data)
+                    except ValueError:
+                        continue
+                    if chunk.get("error"):
+                        raise RuntimeError(chunk["error"].get("message", "erro no meio da resposta"))
+                    served_model = served_model or chunk.get("model")
+                    piece = (chunk.get("choices") or [{}])[0].get("delta", {}).get("content") or ""
+                    if not piece:
+                        continue
+                    raw += piece
+                    # Segura o fim do texto enquanto ele puder ser o começo do bloco json:action
+                    marker = raw.find(cls.ACTION_MARKER)
+                    if marker >= 0:
+                        safe_end = marker
+                    else:
+                        safe_end = len(raw)
+                        for k in range(min(len(cls.ACTION_MARKER) - 1, len(raw)), 0, -1):
+                            if cls.ACTION_MARKER.startswith(raw[-k:]):
+                                safe_end = len(raw) - k
+                                break
+                    if safe_end > sent:
+                        yield {"type": "delta", "text": raw[sent:safe_end]}
+                        sent = safe_end
+        except requests.Timeout:
+            if not raw:
+                yield {"type": "done", **cls._timeout(req)}
+                return
+            logger.warning(f"[OnboardingAgent] {req['model_name']} parou no meio da resposta (timeout).")
+        except Exception as e:
+            logger.error(f"[OnboardingAgent] Exceção no streaming: {e}")
+            if not raw:
+                yield {"type": "done", **req["local"]("offline_mode")}
+                return
+
+        yield {"type": "done", **cls._finish(raw, served_model, req)}

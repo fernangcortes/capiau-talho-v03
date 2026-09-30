@@ -668,6 +668,50 @@ export class CapIAuAPI {
         });
     }
 
+    /**
+     * Chat do Welcome Hub com o texto chegando aos poucos (SSE em /api/onboarding/chat/stream).
+     * Chama onEvent({type: "start"|"delta"|"done", ...}) a cada evento e resolve com o "done"
+     * (mesmo formato de onboardingChat). `signal` (AbortController) interrompe a leitura.
+     */
+    static async onboardingChatStream(message, history = [], currentProjectName = null, currentProfile = null, { onEvent, signal } = {}) {
+        const response = await fetch("/api/onboarding/chat/stream", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                message,
+                history,
+                current_project_name: currentProjectName,
+                current_profile: currentProfile
+            }),
+            signal
+        });
+        if (!response.ok || !response.body) {
+            throw new Error((await response.text().catch(() => "")) || `HTTP ${response.status}`);
+        }
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+        let done = null;
+        for (;;) {
+            const { value, done: ended } = await reader.read();
+            if (ended) break;
+            buffer += decoder.decode(value, { stream: true });
+            let cut;
+            while ((cut = buffer.indexOf("\n\n")) >= 0) {
+                const block = buffer.slice(0, cut);
+                buffer = buffer.slice(cut + 2);
+                const line = block.split("\n").find(l => l.startsWith("data:"));
+                if (!line) continue;
+                const ev = JSON.parse(line.slice(5));
+                if (ev.type === "error") throw new Error(ev.detail || "Falha no chat");
+                if (ev.type === "done") done = ev;
+                onEvent?.(ev);
+            }
+        }
+        if (!done) throw new Error("A conversa terminou sem resposta completa");
+        return done;
+    }
+
     static saveOnboardingApiKey(provider, apiKey) {
         return this.request("/api/onboarding/api-key", {
             method: "POST",

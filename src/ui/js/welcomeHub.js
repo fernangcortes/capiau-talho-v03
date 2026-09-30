@@ -77,6 +77,14 @@ export const WELCOME_HUB_PROFILES = Object.freeze({
     }
 });
 
+/** Tira emojis (o modelo e o assistente local ainda mandam alguns); a conversa do Hub é só texto.
+ * Símbolos de texto abaixo de U+2300 (©, ™, setas) ficam. */
+function stripEmoji(text) {
+    return String(text)
+        .replace(/((?![\u0000-⋿])\p{Extended_Pictographic}|\p{Regional_Indicator})(️|‍|(?![\u0000-⋿])\p{Extended_Pictographic}|\p{Regional_Indicator})*[ \t]?/gu, "")
+        .replace(/[️‍]/g, "");
+}
+
 function escapeHtml(text) {
     return String(text)
         .replace(/&/g, "&amp;")
@@ -123,7 +131,7 @@ export function formatMessageContent(text) {
         }
     };
 
-    for (const raw of String(text).replace(/\r\n?/g, "\n").split("\n")) {
+    for (const raw of stripEmoji(String(text)).replace(/\r\n?/g, "\n").split("\n")) {
         const line = raw.trim();
         let m;
         if (!line || /^```/.test(line) || /^([-*_])\1{2,}$/.test(line)) {
@@ -323,7 +331,7 @@ export class WelcomeHub {
     attachEventListeners() {
         // Envio no chat (botão e Enter)
         if (this.btnChatSend) {
-            this.btnChatSend.addEventListener("click", () => this.submitFromInput());
+            this.btnChatSend.addEventListener("click", () => (this.abortCtrl ? this.stopResponse() : this.submitFromInput()));
         }
         if (this.chatInput) {
             this.chatInput.addEventListener("keydown", (e) => {
@@ -620,7 +628,8 @@ export class WelcomeHub {
         const timer = this.document.getElementById("welcome-wait-timer");
         if (timer) timer.textContent = `${secs.toFixed(1).replace(".", ",")} s`;
         const label = this.document.getElementById("welcome-wait-label");
-        if (label) label.textContent = secs < 1 ? "Enviando sua mensagem" : "A IA está pensando";
+        const who = this.waitModel ? this.waitModel.split("/").pop() : "A IA";
+        if (label) label.textContent = secs < 1 ? "Enviando sua mensagem" : `${who} está pensando`;
         const slow = this.document.getElementById("welcome-wait-slow");
         if (slow && secs > 8 && slow.style.display === "none") {
             slow.style.display = "block";
@@ -634,6 +643,44 @@ export class WelcomeHub {
         const was = Boolean(this.waitStartedAt);
         this.waitStartedAt = 0;
         if (was) this.renderMessages();
+    }
+
+    /** Botão de enviar vira Parar enquanto a resposta chega */
+    setSendMode(mode) {
+        const btn = this.btnChatSend;
+        if (!btn) return;
+        const stop = mode === "stop";
+        btn.disabled = false;
+        btn.classList?.toggle?.("wh-send-stop", stop);
+        btn.setAttribute?.("aria-label", stop ? "Parar resposta" : "Enviar");
+        btn.setAttribute?.("data-tooltip", stop ? "Parar a resposta" : "Enviar (Enter)");
+        btn.innerHTML = stop ? '<i class="fa-solid fa-stop"></i>' : '<i class="fa-solid fa-paper-plane"></i>';
+    }
+
+    /** Interrompe a resposta em andamento (o que já chegou fica na conversa) */
+    stopResponse() {
+        this.abortCtrl?.abort();
+    }
+
+    finishStreaming() {
+        if (!this.abortCtrl) return;
+        this.abortCtrl = null;
+        this.setSendMode("send");
+    }
+
+    /** Atualiza só a última bolha (streaming), sem redesenhar a conversa inteira */
+    updateLastBubble(content, streaming = false) {
+        const bubbles = this.chatMessagesContainer?.querySelectorAll?.(".welcome-bubble.assistant");
+        const last = bubbles?.[bubbles.length - 1];
+        if (!last) {
+            this.renderMessages();
+            return;
+        }
+        last.innerHTML = formatMessageContent(content);
+        last.classList.toggle("wh-streaming", streaming);
+        const box = this.chatMessagesContainer;
+        // Só acompanha o fim se o usuário não rolou para cima para reler
+        if (box.scrollHeight - box.scrollTop - box.clientHeight < 80) box.scrollTop = box.scrollHeight;
     }
 
     /** Adiciona mensagem ao histórico e atualiza a visualização */
@@ -701,27 +748,59 @@ export class WelcomeHub {
             }
         }
 
-        // 2. Integração com a API OnboardingChat (Backend inteligente com conhecimento do Talho)
-        if (this.api && typeof this.api.onboardingChat === "function") {
+        // 2. Integração com a API OnboardingChat (Backend inteligente com conhecimento do Talho).
+        // Com streaming o texto aparece enquanto o modelo escreve; sem ele (mocks), chega inteiro.
+        const canStream = typeof this.api?.onboardingChatStream === "function";
+        if (this.api && (canStream || typeof this.api.onboardingChat === "function")) {
             this.isTransitioning = true;
             const userMsg = { role: "user", content: text };
+            // O backend acrescenta a mensagem nova; o histórico vai sem ela para não duplicar
+            const history = this.conversationHistory.map(({ role, content }) => ({ role, content }));
             this.appendMessage(userMsg);
             this.setInputBusy(true);
             this.startWaiting();
             let answered = false;
+            let liveMsg = null;
+            if (canStream && typeof AbortController !== "undefined") {
+                this.abortCtrl = new AbortController();
+                this.setSendMode("stop");
+            }
             try {
-                const chatRes = await this.api.onboardingChat(
-                    text,
-                    this.conversationHistory,
-                    this.projectName || null,
-                    this.selectedProfile?.id || null
-                );
+                const chatRes = canStream
+                    ? await this.api.onboardingChatStream(text, history, this.projectName || null, this.selectedProfile?.id || null, {
+                        signal: this.abortCtrl?.signal,
+                        onEvent: (ev) => {
+                            if (ev.type === "start") {
+                                this.waitModel = ev.model || "";
+                                this.updateWaiting();
+                            } else if (ev.type === "delta" && ev.text) {
+                                if (!liveMsg) {
+                                    this.stopWaiting();
+                                    liveMsg = { role: "assistant", content: "" };
+                                    this.appendMessage(liveMsg);
+                                }
+                                liveMsg.content += ev.text;
+                                this.updateLastBubble(liveMsg.content, true);
+                            }
+                        }
+                    })
+                    : await this.api.onboardingChat(
+                        text,
+                        history,
+                        this.projectName || null,
+                        this.selectedProfile?.id || null
+                    );
                 this.stopWaiting();
 
                 if (chatRes && chatRes.reply) {
                     answered = true;
                     if (chatRes.api_status) this.setModelLine(chatRes);
-                    this.appendMessage({ role: "assistant", content: chatRes.reply });
+                    if (liveMsg) {
+                        liveMsg.content = chatRes.reply;
+                        this.renderMessages();
+                    } else {
+                        this.appendMessage({ role: "assistant", content: chatRes.reply });
+                    }
 
                     if (chatRes.suggested_project_name && !this.projectName) {
                         this.projectName = chatRes.suggested_project_name;
@@ -738,6 +817,7 @@ export class WelcomeHub {
                     }
 
                     if (chatRes.ready_to_create || chatRes.step === "ready") {
+                        this.finishStreaming();
                         await this.createProjectAndFinalize();
                     } else if (this.projectName && !this.selectedProfile) {
                         this.state = WelcomeHub.STATES.AWAITING_PROFILE;
@@ -753,8 +833,25 @@ export class WelcomeHub {
                     return true;
                 }
             } catch (err) {
+                if (err?.name === "AbortError") {
+                    // O usuário apertou Parar: fica o que já chegou
+                    answered = true;
+                    if (liveMsg && liveMsg.content.trim()) {
+                        liveMsg.content += "\n\n(resposta interrompida)";
+                    } else {
+                        this.appendMessage({ role: "assistant", content: "Parei. Pode escrever de novo quando quiser." });
+                    }
+                    this.stopWaiting();
+                    this.renderMessages();
+                    return false;
+                }
                 console.warn("[WelcomeHub] Falha na API OnboardingChat, recorrendo ao motor local:", err);
+                // Conexão caiu no meio: o trecho que chegou fica, a resposta local vem embaixo
+                if (liveMsg && !liveMsg.content.trim()) {
+                    this.conversationHistory.splice(this.conversationHistory.indexOf(liveMsg), 1);
+                }
             } finally {
+                this.finishStreaming();
                 this.stopWaiting();
                 this.setInputBusy(false);
                 this.isTransitioning = false;
@@ -1350,7 +1447,7 @@ export class WelcomeHub {
             wait.className = "wh-wait";
             wait.innerHTML = '<div class="wh-who">Assistente</div>' +
                 '<div class="wh-wait-line"><span class="wh-pulse"></span><span id="welcome-wait-label">Enviando sua mensagem</span><span id="welcome-wait-timer" class="wh-timer">0,0 s</span></div>' +
-                '<div id="welcome-wait-slow" class="wh-wait-slow" style="display: none;">Está demorando mais que o normal. Espero até 12 s; depois respondo com o assistente local.</div>';
+                '<div id="welcome-wait-slow" class="wh-wait-slow" style="display: none;">Está demorando mais que o normal. Espero até 12 s pela primeira palavra; depois respondo com o assistente local.</div>';
             this.chatMessagesContainer.appendChild(wait);
         }
 
@@ -1371,7 +1468,8 @@ export class WelcomeHub {
     /** Trava o campo de texto enquanto a IA responde */
     setInputBusy(busy) {
         if (this.chatInput) this.chatInput.disabled = busy;
-        if (this.btnChatSend) this.btnChatSend.disabled = busy;
+        // Durante o streaming o botão continua ativo como Parar
+        if (this.btnChatSend && !this.abortCtrl) this.btnChatSend.disabled = busy;
         if (!busy) this.chatInput?.focus?.();
     }
 
@@ -1390,7 +1488,7 @@ export class WelcomeHub {
             const btn = this.document.createElement("button");
             btn.type = "button";
             btn.className = "welcome-chip";
-            btn.textContent = chip.label;
+            btn.textContent = stripEmoji(chip.label).trim();
             btn.addEventListener("click", () => this.handleChipClick(chip));
             this.chipsContainer.appendChild(btn);
         });

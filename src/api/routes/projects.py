@@ -389,6 +389,33 @@ def onboarding_chat(payload: OnboardingChatPayload):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.post("/api/onboarding/chat/stream")
+def onboarding_chat_stream(payload: OnboardingChatPayload):
+    """Mesmo chat de /api/onboarding/chat, com o texto chegando aos poucos (Server-Sent Events).
+
+    Cada evento é uma linha `data: {json}`: start (modelo chamado), delta (trecho de texto) e
+    done (resposta completa, no mesmo formato da rota sem streaming).
+    """
+    from fastapi.responses import StreamingResponse
+    from src.services.onboarding_agent import OnboardingAgentService
+
+    def events():
+        try:
+            for ev in OnboardingAgentService.chat_stream(
+                message=payload.message,
+                history=payload.history,
+                current_project_name=payload.current_project_name,
+                current_profile=payload.current_profile,
+                custom_api_key=payload.custom_api_key,
+            ):
+                yield f"data: {json.dumps(ev, ensure_ascii=False)}\n\n"
+        except Exception as e:
+            yield f"data: {json.dumps({'type': 'error', 'detail': str(e)}, ensure_ascii=False)}\n\n"
+
+    return StreamingResponse(events(), media_type="text/event-stream",
+                             headers={"X-Accel-Buffering": "no"})
+
+
 @router.post("/api/onboarding/api-key")
 def save_onboarding_api_key(payload: OnboardingApiKeyPayload, conn: sqlite3.Connection = Depends(get_db_conn)):
     """Salva a chave de API fornecida no onboarding nas configurações globais."""
