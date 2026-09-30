@@ -28,6 +28,11 @@ RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/wh
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Navegador dos titulos no render (src/export/video_render/titulos.py). No Windows o
+# render usa o Edge instalado; aqui nao ha Edge/Chrome, entao baixa o Chromium do
+# playwright com as bibliotecas e fontes de sistema que ele precisa.
+RUN python -m playwright install --with-deps chromium
+
 # Criar estrutura básica de diretórios persistentes
 RUN mkdir -p /app/data/originals \
              /app/data/proxies/thumbnails \
