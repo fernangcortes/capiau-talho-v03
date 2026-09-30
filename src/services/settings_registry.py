@@ -639,6 +639,13 @@ SETTINGS_REGISTRY: List[Dict[str, Any]] = [
         "category": "agent_chat", "level": "pro", "scope": "both", "requires_reprocess": False,
     },
     {
+        "key": "agent.jev_audit", "type": "bool", "default": False,
+        "label": "Agente: segunda opinião do Jev nos cortes",
+        "help": "Antes de mostrar uma proposta que remove ou substitui trechos, pergunta ao Jev (TypeSafe) se sai fala importante. Só pode subir o alerta, nunca baixar. Gasta crédito do TypeSafe.",
+        "help_tech": "System1Service.auditar_cortes_jev; resultado em safety_audit['jev'].",
+        "category": "agent_chat", "level": "pro", "scope": "both", "requires_reprocess": False,
+    },
+    {
         "key": "chat.temperature", "type": "float", "default": 0.5, "min": 0.0, "max": 2.0, "step": 0.05,
         "label": "Chat: criatividade (temperature)",
         "help": "Criatividade das respostas do assistente de chat (RAG).",

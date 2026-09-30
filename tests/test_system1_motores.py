@@ -163,3 +163,61 @@ def test_laya_real_responde_categoria_valida():
     assert dec.category is not None
     assert 0.0 <= dec.confidence <= 1.0
     assert dec.inference_time_ms > 0
+
+
+def resposta_corte(p_fala=0.8, p_just=0.3):
+    return {"model": "jev-1.13.0", "answers": {
+        "remove_fala_importante": {"type": "noul", "noul": p_fala},
+        "corte_justificado": {"type": "noul", "noul": p_just}}}
+
+
+def test_auditoria_de_corte_manda_a_fala_do_trecho(banco_memoria, monkeypatch):
+    banco_memoria.execute("INSERT INTO project (id, name) VALUES (1, 'p')")
+    banco_memoria.execute("INSERT INTO video (id, project_id, filename, filepath, hash) VALUES (9, 1, 'a.mp4', '/a.mp4', 'h')")
+    for i, w in enumerate(["minha", "avó", "cantava", "fora"]):
+        banco_memoria.execute("INSERT INTO transcript (video_id, word, start_time, end_time, speaker_id) "
+                              "VALUES (9, ?, ?, ?, 'A')", (w, 10 + i, 10.5 + i))
+    monkeypatch.setattr(SettingsService, "get_settings", _config(**{"agent.jev_audit": True}))
+    http = HttpFalso(RespostaFalsa(200, resposta_corte()))
+    svc = System1Service(laya=laya_falsa(), jev=System1JevClient(api_key=CHAVE, http=http))
+
+    ops = [{"action": "DELETE", "video_id": 9, "in_s": 10.0, "out_s": 12.9},
+           {"action": "INSERT", "video_id": 9, "in_s": 0.0, "out_s": 5.0}]
+    r = svc.auditar_cortes_jev(1, ops, "tirar gagueira")
+    assert r["p_fala_importante"] == 0.8 and r["p_justificado"] == 0.3
+    estado = http.pedidos[0]["json"]["state"]
+    assert "minha avó cantava" in estado and "fora" not in estado
+    assert "tirar gagueira" in estado
+    assert set(http.pedidos[0]["json"]["questions"]) == {"remove_fala_importante", "corte_justificado"}
+
+
+def test_auditoria_desligada_ou_so_insercao_nao_chama_o_jev(banco_memoria, monkeypatch):
+    http = HttpFalso(RespostaFalsa(200, resposta_corte()))
+    svc = System1Service(laya=laya_falsa(), jev=System1JevClient(api_key=CHAVE, http=http))
+    delete = [{"action": "DELETE", "video_id": 9, "in_s": 0, "out_s": 1}]
+
+    monkeypatch.setattr(SettingsService, "get_settings", _config(**{"agent.jev_audit": False}))
+    assert svc.auditar_cortes_jev(1, delete, "x") is None
+    monkeypatch.setattr(SettingsService, "get_settings", _config(**{"agent.jev_audit": True}))
+    assert svc.auditar_cortes_jev(1, [{"action": "INSERT", "video_id": 9}], "x") is None
+    assert http.pedidos == []
+
+
+def test_segunda_opiniao_entra_no_resumo_e_so_sobe_o_risco(monkeypatch):
+    from src.services.chat_agent import ChatAgentService
+    monkeypatch.setattr(System1Service, "auditar_cortes_jev",
+                        lambda self, *a: {"modelo": "jev-1.13.0", "p_fala_importante": 0.7, "p_justificado": 0.2})
+    audit = {"risk_level": "safe", "reason": "Base."}
+    ChatAgentService.segunda_opiniao_jev(1, audit, [], "")
+    assert audit["risk_level"] == "warning" and "70%" in audit["reason"]
+
+    audit = {"risk_level": "destructive", "reason": "Base."}
+    monkeypatch.setattr(System1Service, "auditar_cortes_jev",
+                        lambda self, *a: {"modelo": "j", "p_fala_importante": 0.1, "p_justificado": 0.9})
+    ChatAgentService.segunda_opiniao_jev(1, audit, [], "")
+    assert audit["risk_level"] == "destructive"
+
+    monkeypatch.setattr(System1Service, "auditar_cortes_jev", lambda self, *a: {"erro": "sem chave do TypeSafe"})
+    audit = {"risk_level": "warning", "reason": "Base."}
+    ChatAgentService.segunda_opiniao_jev(1, audit, [], "")
+    assert "indisponível" in audit["reason"] and audit["risk_level"] == "warning"

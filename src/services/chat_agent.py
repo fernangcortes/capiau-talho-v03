@@ -1490,6 +1490,27 @@ class ChatAgentService:
         }
 
     @staticmethod
+    def segunda_opiniao_jev(project_id: int, safety_audit: Dict[str, Any],
+                            operations: List[Dict[str, Any]], justificativa: str) -> None:
+        """Acrescenta a opinião do Jev ao safety_audit (agent.jev_audit). Só sobe o risco, nunca baixa."""
+        try:
+            from src.services.system1_service import System1Service
+            jev = System1Service().auditar_cortes_jev(project_id, operations, justificativa)
+        except Exception as e:
+            jev = {"erro": f"falha inesperada: {e}"}
+        if not jev:
+            return
+        safety_audit["jev"] = jev
+        if jev.get("erro"):
+            safety_audit["reason"] += f" (Segunda opinião do Jev indisponível: {jev['erro']})"
+            return
+        p_fala, p_just = jev["p_fala_importante"], jev["p_justificado"]
+        safety_audit["reason"] += (f" Jev: {p_fala:.0%} de chance de tirar fala importante; "
+                                   f"justificativa convincente {p_just:.0%}.")
+        if p_fala >= 0.5 and safety_audit.get("risk_level") == "safe":
+            safety_audit["risk_level"] = "warning"
+
+    @staticmethod
     def render_diff_summary_card(safety_audit: Dict[str, Any], operations: List[Dict[str, Any]], rationale: str = "") -> str:
         diff_id = f"diff_{int(time.time())}"
         diff_sum = safety_audit.get("diff_summary", {})
@@ -2254,9 +2275,14 @@ class ChatAgentService:
             op for op in accumulated_ops if op.get("action") in ("INSERT", "DELETE", "REPLACE", "TRIM", "SPLIT", "MOVE")
         ]
 
-        # Avaliação obrigatória do Sistema 1 Safety Gatekeeper (15-45ms)
+        # Porteiro determinístico: classifica o risco e sempre exige o clique do editor
         safety_audit = ChatAgentService.evaluate_safety_gatekeeper(shadow_timeline, all_mutation_ops)
         is_preview = len(all_mutation_ops) > 0
+        if is_preview:
+            ultima_fala = next((m.get("content") for m in reversed(messages)
+                                if m.get("role") == "assistant" and m.get("content")), "")
+            justificativa = " ".join(filter(None, [op.get("rationale") for op in all_mutation_ops] + [ultima_fala]))
+            ChatAgentService.segunda_opiniao_jev(project_id, safety_audit, all_mutation_ops, justificativa)
 
         # Prepara a resposta final de operações
         ops_output = []

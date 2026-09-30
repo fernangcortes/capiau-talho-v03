@@ -109,6 +109,31 @@ def estado_triagem(media_state: Dict[str, Any]) -> str:
     return "\n".join(linhas)
 
 
+PERGUNTAS_CORTE: Dict[str, Any] = {
+    "remove_fala_importante": {
+        "type": "noul",
+        "instructions": "Algum dos trechos removidos contém fala com informação ou emoção importante para o filme?",
+    },
+    "corte_justificado": {
+        "type": "noul",
+        "instructions": "A justificativa do assistente de edição explica bem por que estes trechos devem sair?",
+    },
+}
+
+TRECHO_MAX_CHARS = 400
+TRECHOS_MAX = 10
+
+
+def estado_corte(trechos: list, justificativa: str) -> str:
+    """Texto de estado da auditoria: justificativa + fala de cada trecho que sai."""
+    linhas = [f"justificativa: {(justificativa or '(nenhuma)').strip()[:600]}", "trechos que saem:"]
+    for t in trechos[:TRECHOS_MAX]:
+        fala = (t.get("fala") or "").strip()[:TRECHO_MAX_CHARS] or "(sem fala transcrita)"
+        linhas.append(f"- {t.get('acao', 'DELETE')} vídeo {t.get('video_id')}, "
+                      f"{float(t.get('in_s') or 0):.1f}-{float(t.get('out_s') or 0):.1f} s: {fala}")
+    return "\n".join(linhas)
+
+
 def _decisao_de_resposta(resposta: Dict[str, Any], motor: str, latencia_ms: float,
                          limiar: float) -> TriageDecision:
     ans = (resposta.get("answers") or {}).get("categoria") or {}
@@ -228,10 +253,24 @@ class System1JevClient:
             decisao.reason += f" [{resposta['model']}]"
         return decisao
 
+    def auditar_cortes(self, trechos: list, justificativa: str, project_id: Optional[int] = None) -> Dict[str, Any]:
+        """Segunda opinião sobre trechos que sairão da timeline (probabilidades do Jev)."""
+        t0 = time.perf_counter()
+        resposta = self.system_one(estado_corte(trechos, justificativa), PERGUNTAS_CORTE, project_id)
+        answers = resposta.get("answers") or {}
+        try:
+            p_fala = float(answers["remove_fala_importante"]["noul"])
+            p_just = float(answers["corte_justificado"]["noul"])
+        except (KeyError, TypeError, ValueError) as e:
+            raise System1Indisponivel("Jev devolveu resposta sem as probabilidades pedidas") from e
+        return {"modelo": resposta.get("model") or MOTOR_JEV, "p_fala_importante": p_fala,
+                "p_justificado": p_just, "latencia_ms": round((time.perf_counter() - t0) * 1000.0, 1)}
+
     def audit_timeline_mutation(self, mutation_request: Dict[str, Any]) -> SafetyAuditDecision:
         """Regras locais de risco da proposta de edição (contagem de exclusões/substituições).
 
-        Ainda não consulta o Jev: é o piso determinístico que vale com ou sem chave.
+        É o piso determinístico que vale com ou sem chave; a opinião do Jev
+        vem à parte, em ``System1Service.auditar_cortes_jev``.
         """
         t0 = time.perf_counter()
         operations = mutation_request.get("operations", [])
@@ -342,6 +381,37 @@ class System1Service:
 
     def audit_timeline_mutation(self, mutation_request: Dict[str, Any], project_id: Optional[int] = None) -> SafetyAuditDecision:
         return self.jev.audit_timeline_mutation(mutation_request)
+
+    def auditar_cortes_jev(self, project_id: Optional[int], operations: list,
+                           justificativa: str) -> Optional[Dict[str, Any]]:
+        """Segunda opinião do Jev para propostas que tiram material (DELETE/REPLACE).
+
+        None quando ``agent.jev_audit`` está desligado ou nada sai da timeline.
+        Com o Jev indisponível devolve {"erro": motivo} -- quem chama avisa.
+        """
+        from src.services.settings_service import SettingsService
+        if not SettingsService.get_settings(project_id).get("agent.jev_audit"):
+            return None
+        saem = [op for op in operations
+                if str(op.get("action", "")).upper() in ("DELETE", "REPLACE") and op.get("video_id")]
+        if not saem:
+            return None
+
+        from src.db.connection import get_db
+        trechos = []
+        with get_db() as conn:
+            for op in saem[:TRECHOS_MAX]:
+                in_s, out_s = float(op.get("in_s") or 0.0), float(op.get("out_s") or 0.0)
+                palavras = conn.execute(
+                    "SELECT word FROM transcript WHERE video_id = ? AND end_time > ? AND start_time < ? "
+                    "ORDER BY start_time", (op["video_id"], in_s, out_s)).fetchall()
+                trechos.append({"acao": str(op.get("action")).upper(), "video_id": op["video_id"],
+                                "in_s": in_s, "out_s": out_s, "fala": " ".join(p[0] for p in palavras)})
+        try:
+            return self.jev.auditar_cortes(trechos, justificativa, project_id)
+        except System1Indisponivel as e:
+            print(f"[SYSTEM1] AVISO: segunda opinião do Jev indisponível ({e}).")
+            return {"erro": str(e)}
 
     def route_rag_query(self, query: str) -> RAGRoutingDecision:
         """Roteia a busca por palavras-chave (regra local, não é modelo)."""
