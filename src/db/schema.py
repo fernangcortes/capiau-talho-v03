@@ -274,6 +274,28 @@ CREATE TABLE IF NOT EXISTS triage_feedback (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Decisoes do Sistema 1 (Laya local, Jev em nuvem), gravadas para comparar os
+-- motores entre si, com a triagem por visao e com a correcao humana
+-- (triage_feedback), e para virar dado de treino. Uma linha por motor por midia.
+CREATE TABLE IF NOT EXISTS system1_decisao (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER REFERENCES project(id) ON DELETE CASCADE,
+    media_kind TEXT CHECK(media_kind IN ('video', 'photo')) NOT NULL,
+    media_id INTEGER NOT NULL,
+    tarefa TEXT NOT NULL,          -- 'triagem'
+    motor TEXT NOT NULL,           -- 'laya-multilingual', 'jev-latest'
+    modo TEXT NOT NULL,            -- 'sombra' (so registra), 'decide' (valeu como categoria), 'avaliacao' (script)
+    modelo_resposta TEXT,          -- versao que o motor informou (ex.: jev-1.13.0)
+    estado_json TEXT NOT NULL,
+    perguntas_json TEXT NOT NULL,
+    resposta_json TEXT,
+    categoria TEXT,
+    confianca REAL,
+    latencia_ms REAL,              -- medida de verdade; NULL quando o motor nao rodou
+    erro TEXT,                     -- motivo quando o motor nao respondeu
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Cenas extraidas de um roteiro (P2). O numero NAO vem do LLM: e atribuido
 -- deterministicamente pela posicao da cena no documento (script_format.py), porque
 -- roteiros reais frequentemente nao tem numeracao no texto e headings se repetem.
@@ -348,6 +370,7 @@ CREATE INDEX IF NOT EXISTS idx_mention_photo ON entity_mention(photo_id);
 CREATE INDEX IF NOT EXISTS idx_theme_segment_theme ON theme_segment(theme_id);
 CREATE INDEX IF NOT EXISTS idx_theme_segment_video ON theme_segment(video_id);
 CREATE INDEX IF NOT EXISTS idx_triage_feedback_project ON triage_feedback(project_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_system1_decisao_media ON system1_decisao(project_id, media_kind, media_id, motor);
 CREATE INDEX IF NOT EXISTS idx_scene_project ON scene(project_id, doc_id, number);
 CREATE INDEX IF NOT EXISTS idx_script_extraction_cache ON script_extraction(doc_id, content_hash, status);
 

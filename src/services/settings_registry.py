@@ -277,16 +277,35 @@ SETTINGS_REGISTRY: List[Dict[str, Any]] = [
     # -- Visão & Resumos ------------------------------------------------------
     {
         "key": "triage.system1_enabled", "type": "bool", "default": True,
-        "label": "Triagem Instantânea Local (Sistema 1 - Laya)",
-        "help": "Usa o modelo de decisão ONNX ultrarrápido para classificar mídias na ingestão em <40ms sem gastar tokens.",
-        "help_tech": "Ativa System1LayaEngine na ingestão.",
+        "label": "Triagem Local (Sistema 1 - Laya)",
+        "help": "Roda a Laya na CPU (~0,2 s por mídia, sem gastar crédito) antes da triagem por visão. No primeiro uso baixa ~680 MB.",
+        "help_tech": "System1Service.evaluate_triage em analyze_video_vision; decisões em system1_decisao.",
         "category": "vision", "level": "simple", "scope": "both", "requires_reprocess": True,
     },
     {
+        "key": "triage.system1_mode", "type": "enum", "default": "sombra",
+        "enum": ["sombra", "decide"],
+        "enum_labels": {
+            "sombra": "Sombra: só registra, a visão decide",
+            "decide": "Decide: confiança acima do limiar pula a visão",
+        },
+        "label": "Modo da Triagem Local",
+        "help": "Em sombra a Laya só é registrada para comparar e treinar. Em decide, quando ela está segura, a triagem por visão (que gasta crédito) não roda.",
+        "help_tech": "modo gravado em system1_decisao.",
+        "category": "vision", "level": "pro", "scope": "both", "requires_reprocess": False,
+    },
+    {
+        "key": "triage.system1_compare_jev", "type": "bool", "default": False,
+        "label": "Comparar com o Jev (TypeSafe)",
+        "help": "Manda a mesma pergunta ao Jev em nuvem e registra as duas respostas lado a lado. Gasta crédito do TypeSafe; precisa da chave.",
+        "help_tech": "POST https://api.typesafe.ai/v1/systemone, modelo jev-latest.",
+        "category": "vision", "level": "pro", "scope": "both", "requires_reprocess": False,
+    },
+    {
         "key": "triage.escalation_threshold", "type": "float", "default": 0.88, "min": 0.50, "max": 0.98, "step": 0.02,
-        "label": "Limiar de Escalação para Sistema 2",
-        "help": "Se a confiança calibrada do Sistema 1 for menor que este limiar, escala para o Gemini 3.8 Flash.",
-        "help_tech": "Limiar RLCD de escalação deliberativa.",
+        "label": "Limiar de Confiança da Triagem Local",
+        "help": "No modo decide, abaixo deste valor a triagem por visão decide. A Laya sem treino costuma ficar abaixo.",
+        "help_tech": "Compara com answers.categoria.confidence da Laya.",
         "category": "vision", "level": "pro", "scope": "both", "requires_reprocess": False,
     },
     {

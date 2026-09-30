@@ -8,6 +8,7 @@ opencv-python-headless>=4.8.0
 pillow>=10.0.0
 sentence-transformers>=3.0.0
 torch>=2.2.0
+laya>=0.3.22  # Sistema 1 local (triagem); pesos baixados no 1o uso, ~680 MB
 scikit-learn>=1.4.0
 python-dotenv>=1.0.0
 requests>=2.31.0

@@ -1,297 +1,369 @@
-"""src/services/system1_service.py — Motor de Decisão Rápida Sistema 1 (Laya & Jev).
+"""src/services/system1_service.py — Sistema 1: decisões rápidas tipadas (Laya local, Jev em nuvem).
 
-Implementa arquitetura cognitiva dual:
-- receptron/laya (ModernBERT-large ONNX CPU local, 15-45ms de latência, custo $0.00)
-- TypeSafe AI Jev (nuvem calibrada RLCD para safety gatekeeper e auditoria)
-- Escalação para o Sistema 2 (Gemini 3.8 Flash / DeepSeek V4.1) quando a confiança < 0.88.
+- Laya (``pip install laya``, pesos convaiinnovations/laya, Apache-2.0): roda na
+  CPU, checkpoint ``multilingual`` (~680 MB, baixado no primeiro uso para o
+  cache do Hugging Face). ~200 ms por decisão depois de carregado.
+- Jev (TypeSafe, ``POST https://api.typesafe.ai/v1/systemone``): mesmo formato
+  de pergunta da Laya; chave em ``api.typesafe_key`` ou ``TYPESAFE_API_KEY``.
+
+Os dois recebem o MESMO estado e as MESMAS perguntas; cada decisão vai para a
+tabela ``system1_decisao`` para comparar entre si, com a triagem por visão e
+com a correção humana (``triage_feedback``), e para virar dado de treino.
+
+Regra da casa: nada aqui inventa resultado. Motor que não roda (pacote ausente,
+modelo não baixado, sem chave, erro de rede) levanta ``System1Indisponivel``
+com o motivo; quem chama escala para a triagem por visão e registra o motivo.
+Latência é sempre a medida.
 """
 from __future__ import annotations
 
+import json
 import os
+import threading
 import time
-from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
+
 from pydantic import BaseModel, Field
 
-try:
-    import onnxruntime as ort
-    import numpy as np
-    ONNX_AVAILABLE = True
-except ImportError:
-    ONNX_AVAILABLE = False
+from src.nlp.prompt_registry import TRIAGE_CATEGORIES
+
+MOTOR_LAYA = "laya-multilingual"
+MOTOR_JEV = "jev-latest"
+
+JEV_ENDPOINT_PADRAO = "https://api.typesafe.ai/v1/systemone"
+JEV_MODELO = "jev-latest"
+JEV_TIMEOUT_S = 20.0
+
+# Trecho de fala mandado como contexto: o bastante para decidir, curto para o
+# limite de 1.024 tokens do checkpoint multilíngue.
+FALA_MAX_CHARS = 1200
+
+
+class System1Indisponivel(RuntimeError):
+    """O motor pedido não pode responder agora. A mensagem diz por quê."""
 
 
 class TriageDecision(BaseModel):
-    """Decisão de triagem rápida emitida pelo Sistema 1."""
-    category: str = Field(..., description="Categoria Eixo A decidida pelo Sistema 1")
-    confidence: float = Field(..., ge=0.0, le=1.0, description="Probabilidade calibrada")
-    escalate_to_system2: bool = Field(..., description="Se True, deve despachar para LLM deliberativo de Sistema 2")
-    inference_time_ms: float = Field(..., description="Latência de inferência medida em ms")
-    model: str = Field(default="receptron/laya", description="Identificador do modelo que tomou a decisão")
-    reason: str = Field(default="", description="Justificativa técnica da classificação rápida")
+    """Decisão de triagem emitida pelo Sistema 1."""
+    category: Optional[str] = Field(None, description="Categoria Eixo A; None quando o motor não respondeu")
+    confidence: float = Field(0.0, ge=0.0, le=1.0, description="Confiança calibrada informada pelo motor")
+    escalate_to_system2: bool = Field(..., description="Se True, a triagem por visão decide")
+    inference_time_ms: Optional[float] = Field(None, description="Latência medida; None quando não rodou")
+    model: str = Field(..., description="Motor que decidiu (ou tentou)")
+    reason: str = Field(default="", description="Motivo da escalação ou da decisão")
+    probabilities: Dict[str, float] = Field(default_factory=dict)
 
 
 class SafetyAuditDecision(BaseModel):
-    """Decisão do Timeline Safety Gatekeeper emitida antes de mutações no MLT XML."""
+    """Decisão do porteiro de segurança antes de mutações na timeline."""
     allow_execution: bool = Field(..., description="Se a operação pode prosseguir sem bloqueio")
-    requires_confirmation: bool = Field(..., description="Se deve exibir modal/ghost preview no NLE")
+    requires_confirmation: bool = Field(..., description="Se deve exibir ghost preview no NLE")
     risk_level: str = Field(..., description="'safe', 'warning', 'destructive'")
-    reason: str = Field(..., description="Justificativa da auditoria de segurança")
-    audit_time_ms: float = Field(default=0.0, description="Latência da auditoria em ms")
+    reason: str = Field(..., description="Justificativa da auditoria")
+    audit_time_ms: float = Field(default=0.0, description="Latência medida da auditoria em ms")
+    model: str = Field(default="regras_locais", description="Quem auditou")
 
 
 class RAGRoutingDecision(BaseModel):
-    """Roteamento semântico ultra-rápido de intenção para coleções vetoriais."""
-    target_collection: str = Field(..., description="Nome da coleção alvo no Qdrant: capiau_making_of ou capiau_images")
+    """Roteamento de intenção de busca para coleções vetoriais."""
+    target_collection: str = Field(..., description="capiau_making_of ou capiau_images")
     intent: str = Field(..., description="'textual', 'visual_clip' ou 'hybrid'")
-    confidence: float = Field(..., ge=0.0, le=1.0, description="Confiança na classificação da intenção")
-    routing_time_ms: float = Field(default=0.0, description="Latência de roteamento em ms")
+    confidence: float = Field(..., ge=0.0, le=1.0)
+    routing_time_ms: float = Field(default=0.0, description="Latência medida em ms")
 
+
+# -- Estado e perguntas da triagem ------------------------------------------------
+
+def perguntas_triagem() -> Dict[str, Any]:
+    """Pergunta única de escolha com as categorias do Eixo A (as mesmas da visão)."""
+    return {
+        "categoria": {
+            "type": "choice",
+            "instructions": ("Que tipo de material é este arquivo, dentro do acervo de uma produção "
+                             "audiovisual (filme, making of, documentário)?"),
+            "criteria": dict(TRIAGE_CATEGORIES),
+        }
+    }
+
+
+def estado_triagem(media_state: Dict[str, Any]) -> str:
+    """Texto de estado mandado igual aos dois motores.
+
+    Só o que a ingestão sabe sem olhar frames: nome, pasta, duração, se tem
+    áudio e o começo da fala (quando já existe transcrição).
+    """
+    linhas = []
+    nome = media_state.get("filename") or ""
+    pasta = media_state.get("folder") or ""
+    if nome:
+        linhas.append(f"arquivo: {nome}")
+    if pasta:
+        linhas.append(f"pasta: {pasta}")
+    duracao = media_state.get("duration_s")
+    if duracao:
+        linhas.append(f"duração: {float(duracao):.0f} s")
+    if "has_audio" in media_state:
+        linhas.append(f"tem áudio: {'sim' if media_state.get('has_audio') else 'não'}")
+    fala = (media_state.get("speech") or "").strip()
+    linhas.append(f"fala: {fala[:FALA_MAX_CHARS]}" if fala else "fala: (sem transcrição)")
+    return "\n".join(linhas)
+
+
+def _decisao_de_resposta(resposta: Dict[str, Any], motor: str, latencia_ms: float,
+                         limiar: float) -> TriageDecision:
+    ans = (resposta.get("answers") or {}).get("categoria") or {}
+    categoria = ans.get("choice")
+    if categoria not in TRIAGE_CATEGORIES:
+        raise System1Indisponivel(f"{motor} devolveu categoria fora da lista: {categoria!r}")
+    confianca = float(ans.get("confidence") or 0.0)
+    return TriageDecision(
+        category=categoria,
+        confidence=confianca,
+        escalate_to_system2=confianca < limiar,
+        inference_time_ms=round(latencia_ms, 1),
+        model=motor,
+        reason=f"{motor}: '{categoria}' com confiança {confianca:.2f} (limiar {limiar:.2f})",
+        probabilities={k: float(v) for k, v in (ans.get("probabilities") or {}).items()},
+    )
+
+
+# -- Laya (local) ---------------------------------------------------------------------
 
 class System1LayaEngine:
-    """Motor local offline baseado em Receptron Laya (ModernBERT-large ONNX CPU).
-    
-    Projetado para rodar em CPU pura com latência entre 15ms e 45ms e footprint leve.
-    """
+    """Laya local na CPU. O Router é carregado uma vez por processo, sob trava."""
 
+    CHECKPOINT = "multilingual"
     DEFAULT_THRESHOLD: float = 0.88
 
-    def __init__(self, model_path: Optional[Path] = None, escalation_threshold: float = DEFAULT_THRESHOLD):
-        self.escalation_threshold = escalation_threshold
-        self.model_path = model_path or Path("data/models/laya_triage_modernbert.onnx")
-        self.session: Optional[Any] = None
-        self._init_session()
+    _router_compartilhado: Any = None
+    _trava = threading.Lock()
 
-    def _init_session(self) -> None:
-        if not ONNX_AVAILABLE or not self.model_path.exists():
-            return
+    def __init__(self, escalation_threshold: float = DEFAULT_THRESHOLD, router: Any = None):
+        self.escalation_threshold = escalation_threshold
+        self._router = router  # injetável nos testes
+
+    def _obter_router(self) -> Any:
+        if self._router is not None:
+            return self._router
+        cls = System1LayaEngine
+        with cls._trava:
+            if cls._router_compartilhado is None:
+                try:
+                    from laya import Router
+                except ImportError as e:
+                    raise System1Indisponivel("pacote 'laya' não instalado (uv pip install laya)") from e
+                try:
+                    cls._router_compartilhado = Router(device="cpu", max_loaded=1)
+                except Exception as e:
+                    raise System1Indisponivel(f"falha ao carregar a Laya: {e}") from e
+            return cls._router_compartilhado
+
+    def system_one(self, state: Any, questions: Dict[str, Any]) -> Dict[str, Any]:
+        router = self._obter_router()
         try:
-            opts = ort.SessionOptions()
-            opts.intra_op_num_threads = 2
-            opts.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
-            self.session = ort.InferenceSession(str(self.model_path), sess_options=opts, providers=["CPUExecutionProvider"])
+            return router.predict(state, questions, model=self.CHECKPOINT)
         except Exception as e:
-            print(f"[SYSTEM1_LAYA] Aviso: falha ao inicializar sessão ONNX: {e}. Usando fallback calibrado.")
-            self.session = None
+            raise System1Indisponivel(f"erro na inferência da Laya: {e}") from e
 
     def evaluate_media_triage(self, media_state: Dict[str, Any]) -> TriageDecision:
-        """Avalia um arquivo audiovisual e emite classificação rápida Eixo A calibrada."""
+        self._obter_router()  # carga (dezenas de segundos na 1a vez) fica fora da latência medida
         t0 = time.perf_counter()
-
-        # Se houver sessão ONNX carregada em disco, executa inferência pelo modelo
-        if self.session is not None and ONNX_AVAILABLE:
-            try:
-                # Features input vector
-                inputs = {self.session.get_inputs()[0].name: np.zeros((1, 64), dtype=np.float32)}
-                outputs = self.session.run(None, inputs)
-                logits = outputs[0][0]
-                exp_logits = np.exp(logits - np.max(logits))
-                probs = exp_logits / np.sum(exp_logits)
-                top_idx = int(np.argmax(probs))
-                conf = float(probs[top_idx])
-                categories = ["obra", "processo", "depoimento", "cotidiano", "evento", "tecnico", "arquivo", "pessoal", "documento"]
-                cat = categories[top_idx % len(categories)]
-                latency = round((time.perf_counter() - t0) * 1000.0, 2)
-                return TriageDecision(
-                    category=cat,
-                    confidence=conf,
-                    escalate_to_system2=(conf < self.escalation_threshold),
-                    inference_time_ms=latency,
-                    model="receptron/laya-onnx",
-                    reason="Inferência via Receptron Laya ModernBERT ONNX CPU"
-                )
-            except Exception as ex:
-                print(f"[SYSTEM1_LAYA] Erro na inferência ONNX: {ex}. Recorrendo ao motor calibrado.")
-
-        # Motor Heurístico Calibrado (RLCD emulation de alta precisão e baixíssima latência)
-        ext = str(media_state.get("extension") or media_state.get("ext") or "").lower()
-        duration = float(media_state.get("duration_s") or media_state.get("duration") or 0.0)
-        has_video = bool(media_state.get("has_video", True))
-        speech_ratio = float(media_state.get("speech_ratio") or 0.0)
-        folder = str(media_state.get("folder") or media_state.get("folder_name") or media_state.get("path") or "").lower()
-        filename = str(media_state.get("filename") or "").lower()
-        audio_rms = float(media_state.get("audio_rms") or 0.0)
-
-        # Regras calibradas com distribuição de probabilidade e threshold
-        if not has_video or ext in [".wav", ".mp3", ".aac", ".flac", ".m4a"]:
-            cat, conf, reason = "tecnico", 0.96, "Arquivo exclusivamente sonoro/áudio direto"
-        elif any(k in folder or k in filename for k in ["making_of", "makingof", "bastidores", "set_broll", "equipe"]):
-            cat, conf, reason = "processo", 0.94, "Pasta ou nome de arquivo explicitamente classificado como processo/bastidores"
-        elif any(k in folder or k in filename for k in ["roteiro", "doc", "documento", "fountain", "fdx", "pdf"]):
-            cat, conf, reason = "documento", 0.95, "Arquivo de texto ou documentação de produção"
-        elif any(k in folder or k in filename for k in ["cena_", "take_", "plano_", "roll_"]):
-            cat, conf, reason = "obra", 0.93, "Convenção de nomenclatura de take de cena da obra principal"
-        elif duration > 120.0 and speech_ratio > 0.45:
-            cat, conf, reason = "depoimento", 0.92, "Gravação longa com alta densidade contínua de fala"
-        elif duration < 45.0 and speech_ratio < 0.10 and audio_rms > 0.01:
-            cat, conf, reason = "processo", 0.89, "Plano curto e dinâmico de cobertura sem fala preponderante"
-        elif any(k in folder or k in filename for k in ["festa", "almoco", "viagem", "conversa"]):
-            cat, conf, reason = "cotidiano", 0.90, "Registro informal e social de equipe"
-        elif any(k in folder or k in filename for k in ["teste", "calibra", "bars", "slate", "cartela"]):
-            cat, conf, reason = "tecnico", 0.95, "Material de calibração ou teste técnico"
-        else:
-            # Situação ambígua: probabilidade calibrada inferior ao threshold para exigir escalação
-            cat, conf, reason = "processo", 0.72, "Material com características mistas — necessita deliberação Sistema 2"
-
-        latency = round((time.perf_counter() - t0) * 1000.0, 2)
-        # Garantir latência realista na faixa de 15-45ms
-        if latency < 1.0:
-            latency = 18.5
-
-        return TriageDecision(
-            category=cat,
-            confidence=conf,
-            escalate_to_system2=(conf < self.escalation_threshold),
-            inference_time_ms=latency,
-            model="receptron/laya-cpu",
-            reason=reason
-        )
+        resposta = self.system_one(estado_triagem(media_state), perguntas_triagem())
+        return _decisao_de_resposta(resposta, MOTOR_LAYA, (time.perf_counter() - t0) * 1000.0,
+                                    self.escalation_threshold)
 
     def classify_triage(self, media_state: Dict[str, Any]) -> TriageDecision:
-        """Alias para evaluate_media_triage."""
         return self.evaluate_media_triage(media_state)
 
 
-class System1JevClient:
-    """Cliente para TypeSafe AI Jev (motor calibrado em nuvem para auditoria de timeline e safety gatekeeper)."""
+# -- Jev (nuvem) ----------------------------------------------------------------------
 
-    def __init__(self, api_key: Optional[str] = None, endpoint: Optional[str] = None):
-        self.api_key = api_key or os.getenv("TYPESAFE_API_KEY", "")
-        self.endpoint = endpoint or os.getenv("TYPESAFE_ENDPOINT", "https://api.typesafe.ai/v1/jev")
+class System1JevClient:
+    """Cliente do Jev (TypeSafe). A chave nunca vai para log nem para mensagem de erro."""
+
+    def __init__(self, api_key: Optional[str] = None, endpoint: Optional[str] = None,
+                 escalation_threshold: float = System1LayaEngine.DEFAULT_THRESHOLD, http: Any = None):
+        self._api_key = api_key
+        self.endpoint = endpoint or os.getenv("TYPESAFE_ENDPOINT") or JEV_ENDPOINT_PADRAO
+        self.escalation_threshold = escalation_threshold
+        self._http = http  # injetável nos testes (precisa de .post)
+
+    def _chave(self, project_id: Optional[int] = None) -> str:
+        if self._api_key:
+            return self._api_key
+        try:
+            from src.services.settings_service import SettingsService
+            chave = SettingsService.get_settings(project_id).api_key("typesafe")
+        except Exception:
+            chave = os.getenv("TYPESAFE_API_KEY", "")
+        if not chave:
+            raise System1Indisponivel("sem chave do TypeSafe (Configurações > api.typesafe_key ou TYPESAFE_API_KEY)")
+        return chave
+
+    def system_one(self, state: Any, questions: Dict[str, Any], project_id: Optional[int] = None) -> Dict[str, Any]:
+        chave = self._chave(project_id)
+        http = self._http
+        if http is None:
+            import requests as http
+        corpo = {"state": state, "model": JEV_MODELO, "questions": questions}
+        try:
+            r = http.post(self.endpoint, json=corpo, timeout=JEV_TIMEOUT_S,
+                          headers={"Authorization": f"Bearer {chave}", "Content-Type": "application/json"})
+        except Exception as e:
+            raise System1Indisponivel(f"Jev fora do ar ou sem rede: {type(e).__name__}") from e
+        if r.status_code != 200:
+            detalhe = (getattr(r, "text", "") or "")[:200].replace(chave, "***")
+            raise System1Indisponivel(f"Jev respondeu HTTP {r.status_code}: {detalhe}")
+        try:
+            return r.json()
+        except Exception as e:
+            raise System1Indisponivel("Jev devolveu resposta que não é JSON") from e
+
+    def evaluate_media_triage(self, media_state: Dict[str, Any], project_id: Optional[int] = None) -> TriageDecision:
+        t0 = time.perf_counter()
+        resposta = self.system_one(estado_triagem(media_state), perguntas_triagem(), project_id)
+        decisao = _decisao_de_resposta(resposta, MOTOR_JEV, (time.perf_counter() - t0) * 1000.0,
+                                       self.escalation_threshold)
+        if resposta.get("model"):
+            decisao.reason += f" [{resposta['model']}]"
+        return decisao
 
     def audit_timeline_mutation(self, mutation_request: Dict[str, Any]) -> SafetyAuditDecision:
-        """Inspeciona proposta de mutação na timeline multipista antes de execução destrutiva."""
+        """Regras locais de risco da proposta de edição (contagem de exclusões/substituições).
+
+        Ainda não consulta o Jev: é o piso determinístico que vale com ou sem chave.
+        """
         t0 = time.perf_counter()
         operations = mutation_request.get("operations", [])
         rationale = str(mutation_request.get("rationale", "")).strip()
 
+        def pronto(**kw) -> SafetyAuditDecision:
+            return SafetyAuditDecision(audit_time_ms=round((time.perf_counter() - t0) * 1000.0, 3), **kw)
+
         if not operations:
-            latency = round((time.perf_counter() - t0) * 1000.0, 2)
-            return SafetyAuditDecision(
-                allow_execution=True,
-                requires_confirmation=False,
-                risk_level="safe",
-                reason="Nenhuma operação solicitada.",
-                audit_time_ms=latency
-            )
+            return pronto(allow_execution=True, requires_confirmation=False, risk_level="safe",
+                          reason="Nenhuma operação solicitada.")
 
-        # Regras de auditoria estrutural
-        delete_count = sum(1 for op in operations if str(op.get("action", "")).upper() == "DELETE")
-        replace_count = sum(1 for op in operations if str(op.get("action", "")).upper() == "REPLACE")
-        insert_count = sum(1 for op in operations if str(op.get("action", "")).upper() == "INSERT")
+        acoes = [str(op.get("action", "")).upper() for op in operations]
+        delete_count, replace_count, insert_count = acoes.count("DELETE"), acoes.count("REPLACE"), acoes.count("INSERT")
 
-        # Risco destrutivo: remoção massiva de múltiplos clipes ou ausência de justificativa
         if delete_count >= 3 or (delete_count > 0 and len(rationale) < 10):
-            latency = round((time.perf_counter() - t0) * 1000.0, 2)
-            return SafetyAuditDecision(
-                allow_execution=False,
-                requires_confirmation=True,
-                risk_level="destructive",
-                reason=f"Operação contém {delete_count} exclusões potencialmente destrutivas na timeline sem justificativa suficiente.",
-                audit_time_ms=latency
-            )
-
-        # Risco de atenção / warning: substituição de clipes existentes ou grandes inserções
+            return pronto(allow_execution=False, requires_confirmation=True, risk_level="destructive",
+                          reason=f"Operação contém {delete_count} exclusões potencialmente destrutivas na timeline sem justificativa suficiente.")
         if replace_count > 0 or insert_count >= 4 or delete_count > 0:
-            latency = round((time.perf_counter() - t0) * 1000.0, 2)
-            return SafetyAuditDecision(
-                allow_execution=True,
-                requires_confirmation=True,
-                risk_level="warning",
-                reason=f"Proposta com {replace_count} substituições e {insert_count} inserções requer visualização na ghost track antes do corte real.",
-                audit_time_ms=latency
-            )
+            return pronto(allow_execution=True, requires_confirmation=True, risk_level="warning",
+                          reason=f"Proposta com {replace_count} substituições e {insert_count} inserções requer visualização na ghost track antes do corte real.")
+        return pronto(allow_execution=True, requires_confirmation=False, risk_level="safe",
+                      reason="Edição pontual com baixo risco estrutural para a timeline.")
 
-        # Operação limpa / segura
-        latency = round((time.perf_counter() - t0) * 1000.0, 2)
-        return SafetyAuditDecision(
-            allow_execution=True,
-            requires_confirmation=False,
-            risk_level="safe",
-            reason="Edição pontual com baixo risco estrutural para a timeline.",
-            audit_time_ms=latency
-        )
 
+# -- Registro das decisões ----------------------------------------------------------
+
+def registrar_decisao(conn, *, project_id: Optional[int], media_kind: str, media_id: int, motor: str,
+                      modo: str, estado: str, perguntas: Dict[str, Any],
+                      decisao: Optional[TriageDecision] = None, erro: Optional[str] = None,
+                      modelo_resposta: Optional[str] = None) -> None:
+    conn.execute(
+        "INSERT INTO system1_decisao (project_id, media_kind, media_id, tarefa, motor, modo, modelo_resposta, "
+        "estado_json, perguntas_json, resposta_json, categoria, confianca, latencia_ms, erro) "
+        "VALUES (?, ?, ?, 'triagem', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (project_id, media_kind, media_id, motor, modo, modelo_resposta,
+         json.dumps(estado, ensure_ascii=False), json.dumps(perguntas, ensure_ascii=False),
+         json.dumps(decisao.probabilities, ensure_ascii=False) if decisao else None,
+         decisao.category if decisao else None,
+         decisao.confidence if decisao else None,
+         decisao.inference_time_ms if decisao else None,
+         erro),
+    )
+
+
+# -- Orquestrador -------------------------------------------------------------------
 
 class System1Service:
-    """Orquestrador unificado de Sistema 1: gerencia Laya local, Jev em nuvem e políticas de escalação."""
+    """Lê as Configurações, roda a Laya (e o Jev, se a comparação estiver ligada) e registra."""
 
-    def __init__(self, escalation_threshold: float = 0.88):
+    def __init__(self, escalation_threshold: float = 0.88, laya: Optional[System1LayaEngine] = None,
+                 jev: Optional[System1JevClient] = None):
         self.escalation_threshold = escalation_threshold
-        self.laya = System1LayaEngine(escalation_threshold=escalation_threshold)
-        self.jev = System1JevClient()
+        self.laya = laya or System1LayaEngine(escalation_threshold=escalation_threshold)
+        self.jev = jev or System1JevClient(escalation_threshold=escalation_threshold)
 
-    def evaluate_triage(self, media_state: Dict[str, Any], project_id: Optional[int] = None) -> TriageDecision:
-        """Executa triagem rápida via Laya, aplicando limiar de escalação configurado."""
-        # Se houver configuração persistida de threshold, aplica
-        threshold = self.escalation_threshold
+    def evaluate_triage(self, media_state: Dict[str, Any], project_id: Optional[int] = None,
+                        media_kind: str = "video", media_id: Optional[int] = None,
+                        modo: Optional[str] = None, comparar_jev: Optional[bool] = None,
+                        registrar: bool = True) -> Optional[TriageDecision]:
+        """Decisão da Laya para a mídia. None quando o Sistema 1 está desligado.
+
+        ``modo``/``comparar_jev`` explícitos valem sobre as Configurações (script de avaliação).
+        Com ``media_id`` e ``registrar``, cada motor que rodou (ou falhou) vira uma linha.
+        """
+        from src.services.settings_service import SettingsService
+        S = SettingsService.get_settings(project_id)
+        if not S.get("triage.system1_enabled"):
+            return None
+        limiar = float(S.get("triage.escalation_threshold"))
+        modo = modo or S.get("triage.system1_mode")
+        if comparar_jev is None:
+            comparar_jev = bool(S.get("triage.system1_compare_jev"))
+
+        self.laya.escalation_threshold = limiar
+        self.jev.escalation_threshold = limiar
+        estado, perguntas = estado_triagem(media_state), perguntas_triagem()
+
         try:
-            from src.services.settings_service import SettingsService
-            S = SettingsService.get_settings(project_id)
-            if not S.get("triage.system1_enabled"):
-                # Se Sistema 1 estiver desativado pelo usuário, força escalação direta para Sistema 2
-                return TriageDecision(
-                    category="processo",
-                    confidence=0.50,
-                    escalate_to_system2=True,
-                    inference_time_ms=0.5,
-                    model="system1_disabled",
-                    reason="Sistema 1 desativado nas configurações; escalando para Sistema 2."
-                )
-            threshold = float(S.get("triage.escalation_threshold"))
-        except Exception:
-            pass
+            decisao = self.laya.evaluate_media_triage(media_state)
+            erro_laya = None
+        except System1Indisponivel as e:
+            erro_laya = str(e)
+            decisao = TriageDecision(escalate_to_system2=True, model=MOTOR_LAYA,
+                                     reason=f"Laya indisponível: {e}")
+            print(f"[SYSTEM1] AVISO: Laya indisponível ({e}); a triagem por visão decide.")
 
-        self.laya.escalation_threshold = threshold
-        decision = self.laya.evaluate_media_triage(media_state)
-        # Recalibra decisão frente ao threshold ativo
-        decision.escalate_to_system2 = bool(decision.confidence < threshold)
-        return decision
+        jev_decisao, erro_jev = None, None
+        if comparar_jev:
+            try:
+                jev_decisao = self.jev.evaluate_media_triage(media_state, project_id)
+            except System1Indisponivel as e:
+                erro_jev = str(e)
+                print(f"[SYSTEM1] AVISO: comparação com o Jev pulada ({e}).")
+
+        if registrar and media_id is not None:
+            from src.db.connection import get_db
+            with get_db() as conn:
+                registrar_decisao(conn, project_id=project_id, media_kind=media_kind, media_id=media_id,
+                                  motor=MOTOR_LAYA, modo=modo, estado=estado, perguntas=perguntas,
+                                  decisao=None if erro_laya else decisao, erro=erro_laya)
+                if comparar_jev:
+                    registrar_decisao(conn, project_id=project_id, media_kind=media_kind, media_id=media_id,
+                                      motor=MOTOR_JEV, modo=modo, estado=estado, perguntas=perguntas,
+                                      decisao=jev_decisao, erro=erro_jev)
+                conn.commit()
+        return decisao
 
     def audit_timeline_mutation(self, mutation_request: Dict[str, Any], project_id: Optional[int] = None) -> SafetyAuditDecision:
-        """Audita uma proposta de edição através do Jev Safety Gatekeeper."""
         return self.jev.audit_timeline_mutation(mutation_request)
 
     def route_rag_query(self, query: str) -> RAGRoutingDecision:
-        """Classifica a intenção da busca textual para despacho ultra-rápido de coleção no Qdrant (<15ms)."""
+        """Roteia a busca por palavras-chave (regra local, não é modelo)."""
         t0 = time.perf_counter()
         q = query.lower().strip()
-
-        # Palavras-chave visuais / CLIP
         visual_keywords = [
             "foto", "imagem", "enquadramento", "plano geral", "close", "luz", "cor",
             "enquadrado", "câmera", "tripé", "figurino", "adereço", "prop", "composição"
         ]
-        # Palavras-chave de áudio / transcrição / depoimento
         textual_keywords = [
             "falou", "disse", "entrevista", "depoimento", "conversa", "tema", "opinião",
             "explicou", "comentou", "áudio", "transcrição", "frase", "citação"
         ]
-
         visual_score = sum(1 for k in visual_keywords if k in q)
         textual_score = sum(1 for k in textual_keywords if k in q)
 
         if visual_score > textual_score and visual_score >= 1:
-            target = "capiau_images"
-            intent = "visual_clip"
-            conf = min(0.98, 0.75 + 0.1 * visual_score)
+            target, intent, conf = "capiau_images", "visual_clip", min(0.98, 0.75 + 0.1 * visual_score)
         elif textual_score > visual_score and textual_score >= 1:
-            target = "capiau_making_of"
-            intent = "textual"
-            conf = min(0.98, 0.75 + 0.1 * textual_score)
+            target, intent, conf = "capiau_making_of", "textual", min(0.98, 0.75 + 0.1 * textual_score)
         else:
-            # Default para a coleção de transcrição/making of (mais rica)
-            target = "capiau_making_of"
-            intent = "hybrid"
-            conf = 0.85
+            target, intent, conf = "capiau_making_of", "hybrid", 0.85
 
-        latency = round((time.perf_counter() - t0) * 1000.0, 2)
-        if latency < 0.5:
-            latency = 12.0  # Latência realista CPU ModernBERT
-
-        return RAGRoutingDecision(
-            target_collection=target,
-            intent=intent,
-            confidence=conf,
-            routing_time_ms=latency
-        )
+        return RAGRoutingDecision(target_collection=target, intent=intent, confidence=conf,
+                                  routing_time_ms=round((time.perf_counter() - t0) * 1000.0, 3))

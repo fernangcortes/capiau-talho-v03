@@ -23,6 +23,7 @@ import pytest
 from src.db.schema import SCHEMA_SQL, migrate_storage_schema
 from src.services.chat_agent import ChatAgentService, TimelineShadowCopy
 from src.services.settings_service import SettingsService, ResolvedSettings
+from tests.laya_falsa import laya_falsa
 from src.services.system1_service import (
     RAGRoutingDecision,
     SafetyAuditDecision,
@@ -59,42 +60,26 @@ class TestSystem1StressAndEscalation:
     def system1(self) -> System1Service:
         return System1Service(escalation_threshold=0.88)
 
-    def test_high_throughput_batch_latency_under_45ms(self, system1: System1Service):
-        """Processes 200 items in batch and verifies every item stays under 45ms."""
-        total_items = 200
-        latencies_wall: List[float] = []
-        latencies_reported: List[float] = []
+    def test_laya_indisponivel_escala_e_diz_o_motivo(self, monkeypatch):
+        """Sem a Laya (pacote/modelo ausente) a decisão escala para a visão com o motivo, sem categoria inventada."""
+        from src.services.system1_service import System1Indisponivel
 
-        for i in range(total_items):
-            state_variants = [
-                {"filename": f"take_{i:03d}_cena_01.mov", "duration_s": 15.0 + (i % 60), "has_video": True, "speech_ratio": 0.05, "folder": "takes/camA"},
-                {"filename": f"entrevista_{i:03d}.mp4", "duration_s": 180.0, "has_video": True, "speech_ratio": 0.65, "folder": "entrevistas"},
-                {"filename": f"audio_direto_{i:03d}.wav", "extension": ".wav", "duration_s": 240.0, "has_video": False, "speech_ratio": 0.0},
-                {"filename": f"bastidores_makingof_{i:03d}.mp4", "duration_s": 30.0, "has_video": True, "speech_ratio": 0.02, "folder": "making_of"},
-                {"filename": f"roteiro_versao_{i}.pdf", "duration_s": 0.0, "has_video": False, "folder": "docs"},
-                {"filename": f"festa_equipe_{i}.mp4", "duration_s": 45.0, "has_video": True, "folder": "social"},
-                {"filename": f"teste_cartela_{i}.mov", "duration_s": 10.0, "has_video": True, "folder": "calibracao"},
-                {"filename": f"ambiguo_indefinido_{i}.mp4", "duration_s": 80.0, "has_video": True, "speech_ratio": 0.20, "folder": "diversos"},
-            ]
-            state = state_variants[i % len(state_variants)]
-            t0 = time.perf_counter()
-            decision = system1.evaluate_triage(state)
-            wall_ms = (time.perf_counter() - t0) * 1000.0
+        class RouterQuebrado:
+            def predict(self, *a, **k):
+                raise RuntimeError("modelo não baixado")
 
-            latencies_wall.append(wall_ms)
-            latencies_reported.append(decision.inference_time_ms)
+        monkeypatch.setattr(SettingsService, "get_settings", lambda project_id=None: ResolvedSettings({
+            "triage.system1_enabled": True, "triage.escalation_threshold": 0.88,
+            "triage.system1_mode": "sombra", "triage.system1_compare_jev": False}))
+        service = System1Service(laya=System1LayaEngine(router=RouterQuebrado()))
+        dec = service.evaluate_triage({"filename": "qualquer.mp4"})
+        assert dec.category is None
+        assert dec.escalate_to_system2 is True
+        assert dec.inference_time_ms is None
+        assert "modelo não baixado" in dec.reason
 
-            # Assert individual item latency requirement (< 45ms)
-            assert decision.inference_time_ms <= 45.0, f"Reported latency {decision.inference_time_ms}ms exceeded 45ms at item {i}"
-            assert wall_ms <= 45.0, f"Wall-clock latency {wall_ms:.2f}ms exceeded 45ms at item {i}"
-
-        mean_wall = sum(latencies_wall) / len(latencies_wall)
-        p95_wall = sorted(latencies_wall)[int(0.95 * len(latencies_wall))]
-        p99_wall = sorted(latencies_wall)[int(0.99 * len(latencies_wall))]
-
-        print(f"\n[LATENCY STRESS] 200 items evaluated: Mean={mean_wall:.2f}ms, P95={p95_wall:.2f}ms, P99={p99_wall:.2f}ms, Max={max(latencies_wall):.2f}ms")
-        assert mean_wall <= 35.0, f"Mean latency {mean_wall:.2f}ms was too high"
-        assert p99_wall <= 45.0, f"P99 latency {p99_wall:.2f}ms exceeded 45ms ceiling"
+        with pytest.raises(System1Indisponivel):
+            System1LayaEngine(router=RouterQuebrado()).evaluate_media_triage({"filename": "x.mp4"})
 
     def test_strict_borderline_escalation_trigger(self, system1: System1Service):
         """Verifies strict threshold enforcement around 0.88 (e.g. 0.879 vs 0.881)."""
@@ -127,65 +112,29 @@ class TestSystem1StressAndEscalation:
             assert decision.escalate_to_system2 is False, f"Confidence {conf} should NOT have triggered escalation"
 
     def test_system1_laya_engine_custom_threshold_recalibration(self):
-        """Verifies System1LayaEngine respects custom thresholds directly."""
-        strict_engine = System1LayaEngine(escalation_threshold=0.95)
-        lenient_engine = System1LayaEngine(escalation_threshold=0.70)
+        """O mesmo 0.72 da Laya escala num limiar estrito e passa num tolerante."""
+        ambiguous = {"filename": "clip_sem_padrao.mp4", "duration_s": 70.0, "folder": "outros"}
 
-        # Ambiguous item normally has confidence ~0.72
-        ambiguous = {
-            "filename": "clip_sem_padrao.mp4",
-            "duration_s": 70.0,
-            "has_video": True,
-            "speech_ratio": 0.20,
-            "folder": "outros"
-        }
+        dec_strict = laya_falsa(padrao=("processo", 0.72), escalation_threshold=0.95).evaluate_media_triage(ambiguous)
+        assert dec_strict.confidence == 0.72 and dec_strict.escalate_to_system2 is True
 
-        # Strict engine (threshold 0.95) -> must escalate (0.72 < 0.95)
-        dec_strict = strict_engine.evaluate_media_triage(ambiguous)
-        assert dec_strict.confidence == 0.72
-        assert dec_strict.escalate_to_system2 is True
-
-        # Lenient engine (threshold 0.70) -> must not escalate (0.72 >= 0.70)
-        dec_lenient = lenient_engine.evaluate_media_triage(ambiguous)
-        assert dec_lenient.confidence == 0.72
-        assert dec_lenient.escalate_to_system2 is False
+        dec_lenient = laya_falsa(padrao=("processo", 0.72), escalation_threshold=0.70).evaluate_media_triage(ambiguous)
+        assert dec_lenient.confidence == 0.72 and dec_lenient.escalate_to_system2 is False
 
     def test_system1_service_settings_override(self, monkeypatch):
-        """Verifies System1Service dynamically reads escalation_threshold from SettingsService."""
-        service = System1Service()
-
-        # Monkeypatch SettingsService.get_settings to simulate project setting threshold = 0.65
-        def mock_get_settings(project_id=None):
-            return ResolvedSettings({
-                "triage.system1_enabled": True,
-                "triage.escalation_threshold": 0.65
-            })
-
-        monkeypatch.setattr(SettingsService, "get_settings", mock_get_settings)
-
-        ambiguous = {
-            "filename": "clip_ambiguo.mp4",
-            "duration_s": 70.0,
-            "has_video": True,
-            "speech_ratio": 0.20,
-            "folder": "outros"
-        }
+        """O limiar vem das Configurações do projeto; Sistema 1 desligado não decide nada."""
+        base = {"triage.system1_mode": "sombra", "triage.system1_compare_jev": False}
+        monkeypatch.setattr(SettingsService, "get_settings", lambda project_id=None: ResolvedSettings({
+            **base, "triage.system1_enabled": True, "triage.escalation_threshold": 0.65}))
+        service = System1Service(laya=laya_falsa(padrao=("processo", 0.72)))
+        ambiguous = {"filename": "clip_ambiguo.mp4", "duration_s": 70.0, "folder": "outros"}
         dec = service.evaluate_triage(ambiguous, project_id=123)
         assert dec.confidence == 0.72
-        # With threshold 0.65, 0.72 should NOT escalate
-        assert dec.escalate_to_system2 is False
+        assert dec.escalate_to_system2 is False  # 0.72 >= 0.65
 
-        # When system1 is disabled in settings, must immediately escalate to System 2
-        def mock_disabled_settings(project_id=None):
-            return ResolvedSettings({
-                "triage.system1_enabled": False,
-                "triage.escalation_threshold": 0.88
-            })
-
-        monkeypatch.setattr(SettingsService, "get_settings", mock_disabled_settings)
-        dec_disabled = service.evaluate_triage(ambiguous, project_id=123)
-        assert dec_disabled.escalate_to_system2 is True
-        assert dec_disabled.model == "system1_disabled"
+        monkeypatch.setattr(SettingsService, "get_settings", lambda project_id=None: ResolvedSettings({
+            **base, "triage.system1_enabled": False, "triage.escalation_threshold": 0.88}))
+        assert service.evaluate_triage(ambiguous, project_id=123) is None
 
 
 # ══════════════════════════════════════════════════════════════════════════════

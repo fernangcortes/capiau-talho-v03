@@ -30,6 +30,7 @@ from src.nlp.prompt_registry import (
 )
 from src.services.settings_registry import CATEGORIES, SETTINGS_REGISTRY, get_registry_map
 from src.services.settings_service import SettingsService
+from tests.laya_falsa import laya_falsa
 from src.services.system1_service import (
     RAGRoutingDecision,
     SafetyAuditDecision,
@@ -63,67 +64,29 @@ class TestSystem1CognitiveArchitecture:
     def service(self) -> System1Service:
         return System1Service(escalation_threshold=0.88)
 
-    def test_laya_triage_latency_under_50ms(self, service: System1Service):
-        """Verifica se a triagem de mídia pelo Sistema 1 executa em menos de 50ms por arquivo."""
-        media_state = {
-            "filename": "take_04_cena_02.mov",
-            "duration_s": 35.0,
-            "has_video": True,
-            "speech_ratio": 0.05,
-            "folder": "material_bruto/takes",
-            "audio_rms": 0.02
-        }
-        t0 = time.perf_counter()
-        decision = service.evaluate_triage(media_state)
-        elapsed_ms = (time.perf_counter() - t0) * 1000.0
-
-        assert elapsed_ms < 50.0, f"Latência de triagem excedeu 50ms: {elapsed_ms:.2f}ms"
+    def test_laya_triage_devolve_decisao_com_latencia_medida(self):
+        """A decisão vem da resposta do motor e a latência é a medida (nada fixo)."""
+        service = System1Service(escalation_threshold=0.88, laya=laya_falsa({"take_04": ("obra", 0.93)}))
+        decision = service.evaluate_triage({"filename": "take_04_cena_02.mov", "duration_s": 35.0,
+                                            "folder": "material_bruto/takes"})
         assert isinstance(decision, TriageDecision)
-        assert decision.category in [
-            "obra", "processo", "depoimento", "cotidiano", "evento", "tecnico", "arquivo", "pessoal", "documento"
-        ]
-        assert 0.0 <= decision.confidence <= 1.0
+        assert decision.category == "obra"
+        assert decision.model == "laya-multilingual"
+        assert decision.inference_time_ms is not None and decision.inference_time_ms < 1000
+        estado = service.laya._router.chamadas[0][0]
+        assert "take_04_cena_02.mov" in estado and "material_bruto/takes" in estado
 
-    def test_laya_triage_escalation_logic(self, service: System1Service):
-        """Testa a regra de escalação para Sistema 2 quando confidence < 0.88."""
-        # 1. Caso de alta confiança: Depoimento longo com muita fala (não escala)
-        clear_interview = {
-            "filename": "entrevista_diretora.mp4",
-            "duration_s": 450.0,
-            "has_video": True,
-            "speech_ratio": 0.75,
-            "folder": "entrevistas/dia1"
-        }
-        res_clear = service.evaluate_triage(clear_interview)
-        assert res_clear.category == "depoimento"
-        assert res_clear.confidence >= 0.88
-        assert res_clear.escalate_to_system2 is False
+    def test_laya_triage_escalation_logic(self):
+        """Escala para a visão quando a confiança informada pela Laya fica abaixo do limiar."""
+        service = System1Service(escalation_threshold=0.88, laya=laya_falsa({
+            "entrevista_diretora": ("depoimento", 0.95),
+            "clip_indefinido": ("processo", 0.72),
+        }))
+        clara = service.evaluate_triage({"filename": "entrevista_diretora.mp4", "duration_s": 450.0})
+        assert clara.category == "depoimento" and clara.escalate_to_system2 is False
 
-        # 2. Caso de áudio puro (não escala)
-        audio_only = {
-            "filename": "som_direto_take1.wav",
-            "extension": ".wav",
-            "duration_s": 120.0,
-            "has_video": False,
-            "speech_ratio": 0.0
-        }
-        res_audio = service.evaluate_triage(audio_only)
-        assert res_audio.category == "tecnico"
-        assert res_audio.confidence >= 0.88
-        assert res_audio.escalate_to_system2 is False
-
-        # 3. Caso ambíguo (deve escalar obrigatoriamente para Sistema 2)
-        ambiguous_clip = {
-            "filename": "clip_indefinido_092.mp4",
-            "duration_s": 65.0,
-            "has_video": True,
-            "speech_ratio": 0.22,
-            "folder": "diversos"
-        }
-        res_ambiguous = service.evaluate_triage(ambiguous_clip)
-        assert res_ambiguous.confidence < 0.88
-        assert res_ambiguous.escalate_to_system2 is True
-        assert "necessita deliberação" in res_ambiguous.reason.lower() or "sistema 2" in res_ambiguous.reason.lower()
+        ambigua = service.evaluate_triage({"filename": "clip_indefinido_092.mp4", "duration_s": 65.0})
+        assert ambigua.confidence == 0.72 and ambigua.escalate_to_system2 is True
 
     def test_timeline_safety_gatekeeper(self, service: System1Service):
         """Testa o Jev Safety Gatekeeper inspecionando propostas de mutação na timeline."""

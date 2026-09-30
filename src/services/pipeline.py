@@ -236,6 +236,47 @@ class PipelineService:
                 pass
 
     @staticmethod
+    def triage_system1(video_id: int, filepath: Path, duration: float, project_id: int) -> Optional[str]:
+        """Triagem local (Laya) antes da visão. Devolve a categoria SÓ no modo 'decide' com confiança
+        acima do limiar; em sombra, desligada ou indisponível devolve None e a visão decide.
+        A decisão (ou o motivo da falha) fica em system1_decisao de qualquer jeito."""
+        try:
+            from src.services.system1_service import System1Service
+            S = SettingsService.get_settings(project_id)
+            if not S.get("triage.system1_enabled"):
+                return None
+            with get_db() as conn:
+                try:
+                    dialogues = NarrativeRepository.get_transcript_dialogues(conn, video_id)
+                except Exception:
+                    dialogues = []
+            media_state = {
+                "filename": filepath.name,
+                "folder": filepath.parent.name,
+                "duration_s": duration,
+                "has_audio": has_audio_stream(filepath),
+                "speech": " ".join(d["text"] for d in (dialogues or [])[:12]),
+            }
+            decisao = System1Service().evaluate_triage(media_state, project_id=project_id,
+                                                       media_kind="video", media_id=video_id)
+            if decisao is None or decisao.category is None:
+                return None
+            print(f"[System1] Vídeo {video_id}: {decisao.reason} ({decisao.inference_time_ms} ms)")
+            if S.get("triage.system1_mode") != "decide" or decisao.escalate_to_system2:
+                return None
+            with get_db() as conn:
+                conn.execute("UPDATE video SET category = ?, category_confidence = ? WHERE id = ?",
+                             (decisao.category, decisao.confidence, video_id))
+                # Mesma derivação da triagem por visão, só para tipo ainda desconhecido
+                conn.execute("UPDATE video SET video_type = ? WHERE id = ? AND video_type = 'unknown'",
+                             ("interview" if decisao.category == "depoimento" else "broll", video_id))
+                conn.commit()
+            return decisao.category
+        except Exception as e:
+            print(f"[System1] AVISO: triagem local falhou no vídeo {video_id} ({e}); a visão decide.")
+            return None
+
+    @staticmethod
     def detect_voice_activity_offline(video_path: Path, video_id: int, project_id: Optional[int] = None) -> bool:
         """Detecção local de voz (VAD) em CPU para pular ASR em B-rolls mudos."""
         temp_wav_path = CONFIG.CACHE_DIR / f"vad_temp_{video_id}.wav"
@@ -672,6 +713,8 @@ class PipelineService:
         frame_source = PipelineService._resolve_analysis_source(video_id, filepath, duration)
 
         # Triagem antes da varredura: categoria (Eixo A) + título curto + video_type por conteúdo
+        if not category:
+            category = PipelineService.triage_system1(video_id, filepath, duration, project_id)
         if not category:
             triage = PipelineService.triage_video(video_id, frame_source, duration, project_id)
             category = triage.get("categoria") or None

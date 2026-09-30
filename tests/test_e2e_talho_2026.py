@@ -50,6 +50,7 @@ from src.vision.spatial_grounding import (
     format_qdrant_detected_objects,
     format_qdrant_image_facets,
 )
+from tests.laya_falsa import laya_falsa
 from src.services.system1_service import (
     System1Service,
     System1LayaEngine,
@@ -246,26 +247,20 @@ class TestTier1FeatureCoverage:
 
     # ── Feature 7: Sistema 1 Dual (Laya + Jev) ──────────────────────────────
     def test_f07_system1_dual_cognitive_engine_triage(self):
-        """Testa o motor de Sistema 1: triagem rápida (<45ms) e escalação inteligente para o Sistema 2 se conf < 0.88."""
-        svc = System1Service(escalation_threshold=0.88)
+        """Sistema 1: a Laya decide com a confiança dela e escala para a visão abaixo de 0.88."""
+        svc = System1Service(escalation_threshold=0.88, laya=laya_falsa({
+            "som_direto": ("tecnico", 0.96),
+            "entrevista": ("depoimento", 0.93),
+        }, padrao=("processo", 0.61)))
 
-        # 1. Caso com alta confiança (áudio direto) -> Fica no Sistema 1
-        res_audio = svc.evaluate_triage({"extension": ".wav", "has_video": False, "duration_s": 60.0})
-        assert res_audio.category == "tecnico"
-        assert res_audio.confidence >= 0.88
-        assert res_audio.escalate_to_system2 is False
-        assert res_audio.inference_time_ms < 50.0
+        res_audio = svc.evaluate_triage({"filename": "som_direto.wav", "has_audio": True, "duration_s": 60.0})
+        assert res_audio.category == "tecnico" and res_audio.escalate_to_system2 is False
 
-        # 2. Caso com alta confiança (depoimento longo com fala densa) -> Fica no Sistema 1
-        res_dep = svc.evaluate_triage({"duration_s": 240.0, "speech_ratio": 0.75, "has_video": True})
-        assert res_dep.category == "depoimento"
-        assert res_dep.confidence >= 0.88
-        assert res_dep.escalate_to_system2 is False
+        res_dep = svc.evaluate_triage({"filename": "entrevista_01.mp4", "duration_s": 240.0})
+        assert res_dep.category == "depoimento" and res_dep.escalate_to_system2 is False
 
-        # 3. Caso ambíguo (câmera na mão mista) -> Escala para Sistema 2
-        res_ambiguo = svc.evaluate_triage({"duration_s": 60.0, "speech_ratio": 0.25, "has_video": True})
-        assert res_ambiguo.confidence < 0.88
-        assert res_ambiguo.escalate_to_system2 is True
+        res_ambiguo = svc.evaluate_triage({"filename": "camera_mao.mp4", "duration_s": 60.0})
+        assert res_ambiguo.confidence < 0.88 and res_ambiguo.escalate_to_system2 is True
 
     # ── Feature 8: Grounding Canônico Gemini [0-1000] ───────────────────────
     def test_f08_canonical_gemini_bounding_box_conversions(self, db_conn):
@@ -590,10 +585,10 @@ class TestTier2BoundaryAndCornerCases:
         engine = System1LayaEngine(escalation_threshold=0.88)
         
         # Simulação direta de decisão com threshold
-        d_exact = TriageDecision(category="processo", confidence=0.88000, escalate_to_system2=(0.88000 < 0.88), inference_time_ms=20.0)
+        d_exact = TriageDecision(category="processo", confidence=0.88000, escalate_to_system2=(0.88000 < 0.88), inference_time_ms=20.0, model="teste")
         assert d_exact.escalate_to_system2 is False  # 0.88000 NÃO escalona
 
-        d_sub = TriageDecision(category="processo", confidence=0.87999, escalate_to_system2=(0.87999 < 0.88), inference_time_ms=20.0)
+        d_sub = TriageDecision(category="processo", confidence=0.87999, escalate_to_system2=(0.87999 < 0.88), inference_time_ms=20.0, model="teste")
         assert d_sub.escalate_to_system2 is True   # 0.87999 DEVE escalonar
 
     def test_boundary_overlapping_speakers_concurrency_max8(self, db_conn):
@@ -673,16 +668,16 @@ class TestTier3CrossFeatureCombinations:
             SettingsRepository.upsert_global(conn, "llm.text_model", "deepseek/deepseek-v4-flash")
         SettingsService.invalidate()
 
-        svc = System1Service()
-        decision = svc.evaluate_triage({"extension": ".wav", "has_video": False})
+        svc = System1Service(laya=laya_falsa(padrao=("tecnico", 0.95)))
+        decision = svc.evaluate_triage({"filename": "som.wav", "has_audio": True})
         assert decision.escalate_to_system2 is False
         assert decision.category == "tecnico"
 
     def test_cross_c02_dnd_ingest_triage_to_canonical_bbox(self, db_conn):
         """C02: Ingestão de clipe -> Triagem Sistema 1 -> Detecção espacial gravada em detected_object."""
         proj_id, vid_id, _ = seed_test_project_and_media(db_conn)
-        svc = System1Service()
-        
+        svc = System1Service(laya=laya_falsa({"cena_01_take_02": ("obra", 0.93)}))
+
         # 1. Triagem Eixo A
         triage = svc.evaluate_triage({"filename": "cena_01_take_02.mp4", "folder": "obra", "has_video": True})
         assert triage.category == "obra"
@@ -866,15 +861,13 @@ class TestTier4RealWorldApplicationScenarios:
             ("danca_ritual.mp4", 40.0, 0.05, "processo"),
             ("cantos_gravador.wav", 120.0, 0.90, "tecnico"),
         ]
-        svc = System1Service()
+        svc = System1Service(laya=laya_falsa({f: (cat, 0.92) for f, _, _, cat in takes}))
         inserted_ids = []
         for fname, dur, sp_ratio, expected_cat in takes:
             triage = svc.evaluate_triage({
                 "filename": fname,
                 "duration_s": dur,
-                "speech_ratio": sp_ratio,
-                "audio_rms": 0.05,
-                "has_video": not fname.endswith(".wav")
+                "has_audio": True,
             })
             assert triage.category == expected_cat
             assert triage.escalate_to_system2 is False
