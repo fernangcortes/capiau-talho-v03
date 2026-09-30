@@ -1048,6 +1048,14 @@ SETTINGS_REGISTRY: List[Dict[str, Any]] = [
         "help_tech": "Redefine --text-muted: padrão #6E6C7A (3,7:1 sobre #101010), médio #7D7B88 (4,6:1), alto #8C8A96 (5,6:1). Paleta em js/themeManager.js (TEXT_CONTRASTS).",
         "category": "appearance", "level": "simple", "scope": "both", "requires_reprocess": False,
     },
+    {
+        "key": "ui.tabs_mode", "type": "enum", "default": "linha",
+        "enum": ["linha", "pe"],
+        "label": "Abas dos painéis",
+        "help": "Em linha: as abas ficam no topo do painel aberto, como sempre. Em pé: o painel aberto usa a mesma barra de ícones do estado recolhido, ao lado; recolher só esconde o conteúdo e os ícones não mudam de lugar.",
+        "help_tech": "--t-tabs-mode lido por js/panelRail.js; vale para Biblioteca e Painel Lateral numa coluna do editor.",
+        "category": "appearance", "level": "simple", "scope": "both", "requires_reprocess": False,
+    },
 
     # -- Áudio: limiares da pré-análise (docs/PLANO_AJUSTES_DE_AUDIO.md, seção 7) --
     {

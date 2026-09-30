@@ -3,7 +3,7 @@
 // aberto, conforme "Aplicar em". Projeto com aparência própria vence o global, e a janela avisa.
 // As mesmas chaves ui.* aparecem, completas, em Configurações → Aparência.
 
-import { THEME_DEFAULTS, ACCENTS, BACKGROUNDS, backgroundOf, TRACK_MODES, TEXT_CONTRASTS } from "./themeManager.js";
+import { THEME_DEFAULTS, ACCENTS, BACKGROUNDS, backgroundOf, TRACK_MODES, TEXT_CONTRASTS, TABS_MODES } from "./themeManager.js";
 
 const POS_KEY = "capiau_appearance_pos";
 const SAVE_DELAY = 450;
@@ -19,6 +19,7 @@ const FONTS = [
     ["inter", "Inter em tudo", "'Inter', sans-serif"],
 ];
 const CONTRAST_NAMES = { padrao: "Padrão", medio: "Médio", alto: "Alto" };
+const TABS_NAMES = { linha: "Em linha", pe: "Em pé" };
 const SCOPE_NAMES = { global: "Todos os projetos", project: "Só este projeto" };
 
 /** Peso arredondado ao passo da régua (10) e preso entre 300 e 500. Pura. */
@@ -152,6 +153,10 @@ export class AppearanceWindow {
                     <div class="apw-seg" data-group="tracks"></div>
                 </div>
                 <div class="apw-sec">
+                    <div class="apw-label">Abas dos painéis</div>
+                    <div class="apw-seg" data-group="tabs"></div>
+                </div>
+                <div class="apw-sec">
                     <div class="apw-label">Fonte</div>
                     <div class="apw-fonts" data-group="font"></div>
                 </div>
@@ -225,6 +230,7 @@ export class AppearanceWindow {
         else if (group === "tracks") this.set({ "ui.track_mode": value });
         else if (group === "font") this.set({ "ui.font_family": value });
         else if (group === "contrast") this.set({ "ui.text_contrast": value });
+        else if (group === "tabs") this.set({ "ui.tabs_mode": value });
     }
 
     stepScale(dir) {
@@ -261,6 +267,7 @@ export class AppearanceWindow {
             + (bg ? "" : btn("", "Personalizado", true, "disabled"));
 
         q('[data-group="tracks"]').innerHTML = TRACK_MODES.map(k => btn(k, TRACK_NAMES[k], v["ui.track_mode"] === k)).join("");
+        q('[data-group="tabs"]').innerHTML = TABS_MODES.map(k => btn(k, TABS_NAMES[k], v["ui.tabs_mode"] === k)).join("");
 
         q('[data-group="font"]').innerHTML = FONTS.map(([k, label, css]) =>
             btn(k, `<span style="font-family:${css.replace(/"/g, "&quot;")}">${label}</span>`, v["ui.font_family"] === k)).join("");

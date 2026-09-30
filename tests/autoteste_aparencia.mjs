@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { computeThemeState, ACCENTS, BACKGROUNDS, backgroundOf, TRACK_MODES, THEME_DEFAULTS, TEXT_CONTRASTS, ACCENT_INK, themeOriginsFromSettings, projectOverrides, ThemeManager } from "../src/ui/js/themeManager.js";
+import { computeThemeState, ACCENTS, BACKGROUNDS, backgroundOf, TRACK_MODES, THEME_DEFAULTS, TEXT_CONTRASTS, TABS_MODES, ACCENT_INK, themeOriginsFromSettings, projectOverrides, ThemeManager } from "../src/ui/js/themeManager.js";
 import { convertColor, applyTrackMode, parseRgba } from "../src/ui/js/trackColors.js";
 import { clampPosition, snapWeight } from "../src/ui/js/appearanceWindow.js";
 
@@ -76,6 +76,10 @@ console.log("✔ 4 passou: a janela não se perde fora da tela.");
     assert.equal(THEME_DEFAULTS["ui.accent"], "padrao");
     assert.equal(THEME_DEFAULTS["ui.track_mode"], "coloridas");
     assert.deepEqual(enumOf("ui.text_contrast"), Object.keys(TEXT_CONTRASTS));
+    assert.deepEqual(enumOf("ui.tabs_mode"), TABS_MODES);
+    assert.equal(THEME_DEFAULTS["ui.tabs_mode"], "linha", "padrão: abas em linha, como sempre");
+    assert.equal(computeThemeState({}).vars["--t-tabs-mode"], undefined);
+    assert.equal(computeThemeState({ "ui.tabs_mode": "pe" }).vars["--t-tabs-mode"], "pe");
     assert.equal(THEME_DEFAULTS["ui.text_contrast"], "padrao");
 }
 console.log("✔ 5 passou: chaves novas iguais no registry do backend.");

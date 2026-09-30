@@ -1280,6 +1280,11 @@ button {
 .panel-rail-down {
     font-size: var(--fs-10);
 }
+/* Abas em pé (Aparência): a barra ao lado substitui as abas do topo do painel. */
+#sidebar-left.tabs-upright #left-tabs,
+#sidebar-right.tabs-upright #right-tabs {
+    display: none !important;
+}
 /* Barra deitada: na pilha (no lugar do painel, entre os vizinhos) e na faixa com todos na barra. */
 .panel-rail.panel-rail-h {
     width: auto;

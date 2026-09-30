@@ -15,6 +15,10 @@
 // do painel, entre os vizinhos de cima e de baixo) e faixa (barra em pé entre os vizinhos; com
 // todos da faixa na barra, a faixa encolhe e as barras deitam). Na janela destacada a seta
 // continua recolhendo para a linha.
+//
+// Abas em pé (Aparência → "Abas dos painéis: Em pé", --t-tabs-mode): numa coluna, o painel aberto
+// já usa a barra ao lado no lugar das abas do topo. Clicar num ícone troca de aba; a seta da barra
+// leva à barra. Recolher só esconde o conteúdo: os ícones não mudam de lugar.
 
 export const RAIL_PANELS = {
     "sidebar-left": { strip: "left-tabs", toggle: "toggle-left", icon: "fa-solid fa-folder-open", label: "Biblioteca" },
@@ -37,6 +41,11 @@ export function railLying(kind, bandAllRail = false) {
 export function railArrowIcon(edge, right = false) {
     const icons = { left: "fa-chevron-left", right: "fa-chevron-right", up: "fa-chevron-up", down: "fa-chevron-down" };
     return icons[edge] || (right ? icons.right : icons.left);
+}
+
+/** Abas em pé valem para o painel aberto numa coluna, se ele tem faixa de abas. Pura. */
+export function uprightTabs(mode, state, kind, hasStrip) {
+    return mode === "pe" && state === "aberta" && kind === "column" && !!hasStrip;
 }
 
 /** Próximo estado ao clicar na seta: aberta → barra → linha. Sem barra possível, aberta → linha. */
@@ -107,6 +116,8 @@ export class PanelRail {
         }
 
         window.addEventListener("resize", () => this.scheduleApply());
+        // Aparência mudou (abas em linha / em pé): redesenha.
+        window.addEventListener("capiau:theme-applied", () => this.applyAll());
 
         // Linha de expandir: duplo clique leva direto para "aberta".
         for (const id of Object.keys(RAIL_PANELS)) {
@@ -127,6 +138,12 @@ export class PanelRail {
     canRail(id) {
         const place = this.wm?.panelPlacement?.(id);
         return !!place && RAIL_PLACES.includes(place.kind) && place.el.ownerDocument === document;
+    }
+
+    /** "pe" quando a Aparência pede abas em pé. */
+    tabsMode() {
+        try { return getComputedStyle(document.documentElement).getPropertyValue("--t-tabs-mode").trim() || "linha"; }
+        catch (e) { return "linha"; }
     }
 
     stateOf(id) {
@@ -176,13 +193,17 @@ export class PanelRail {
         if (!panel || !nav) return;
         const state = this.stateOf(id);
         const railOn = state === "barra";
-        const place = railOn ? this.wm?.panelPlacement?.(id) : null;
+        const hasStrip = !!RAIL_PANELS[id].strip;
+        const pe = this.tabsMode() === "pe";
+        const place = railOn || (pe && state === "aberta") ? this.wm?.panelPlacement?.(id) : null;
         const kind = place?.kind || "column";
+        const upright = uprightTabs(this.tabsMode(), state, place ? kind : null, hasStrip && place?.el?.ownerDocument === document);
+        const showNav = railOn || upright;
         // Anfitrião da pilha é também a caixa dos de baixo: não some, só esconde o próprio conteúdo.
         const isHost = kind === "stack" && place.host === panel;
         const right = panel.classList.contains("dock-right");
 
-        if (railOn) {
+        if (showNav) {
             if (kind === "column") {
                 // Coluna: colada ao painel, do lado de fora do editor.
                 if (right) { if (panel.nextElementSibling !== nav) panel.after(nav); }
@@ -194,18 +215,21 @@ export class PanelRail {
                 panel.before(nav);
             }
         }
-        nav.hidden = !railOn;
-        nav.dataset.place = railOn ? kind : "";
-        nav.classList.toggle("panel-rail-right", railOn && kind === "column" && right);
+        nav.hidden = !showNav;
+        nav.dataset.place = showNav ? kind : "";
+        nav.dataset.mode = upright ? "aberta" : "barra";
+        nav.classList.toggle("panel-rail-right", showNav && kind === "column" && right);
         nav.classList.toggle("panel-rail-h", railOn && railLying(kind));
         panel.classList.toggle("rail-mode", railOn && !isHost);
         panel.classList.toggle("rail-open", railOn && !isHost && this.openIds.has(id));
         panel.classList.toggle("dock-stack-self-rail", railOn && isHost && !this.openIds.has(id));
+        // Em pé, as abas do topo somem (aberto ou aberto pela barra): a barra ao lado faz o papel delas.
+        panel.classList.toggle("tabs-upright", hasStrip && pe && (upright || railOn));
         if (!railOn) {
             panel.classList.remove("dock-stack-self-rail");
             this.closeFlyout(id);
         }
-        if (railOn) this.renderButtons(id);
+        if (showNav) this.renderButtons(id);
         this.applyBands();
         this.wm?.refreshEdgeSplitters?.();
     }
@@ -243,13 +267,16 @@ export class PanelRail {
         nav.setAttribute("aria-label", cfg.label);
         nav.innerHTML = `<div class="panel-rail-tabs"></div><div class="panel-rail-spacer"></div>
             <button type="button" class="panel-rail-btn panel-rail-down" data-tooltip="Recolher para linha" aria-label="Recolher ${cfg.label} para linha"><i class="fa-solid fa-chevron-left"></i></button>`;
-        nav.querySelector(".panel-rail-down").addEventListener("click", () => this.setState(id, "linha"));
+        nav.querySelector(".panel-rail-down").addEventListener("click", () =>
+            this.setState(id, nav.dataset.mode === "aberta" ? "barra" : "linha"));
         nav.querySelector(".panel-rail-tabs").addEventListener("click", (e) => {
             const b = e.target.closest(".panel-rail-btn");
             if (!b) return;
             const tab = this._tabs?.[id]?.[Number(b.dataset.index)];
             const sameTab = !tab || tab.active;
             if (tab && !tab.active) tab.button.click();
+            // Aberto com abas em pé: o ícone só troca de aba.
+            if (nav.dataset.mode === "aberta") return;
             if (this.openIds.has(id) && sameTab) this.closeFlyout(id);
             else this.openFlyout(id);
         });
@@ -272,12 +299,16 @@ export class PanelRail {
         const list = tabs.length ? tabs : [{ button: null, icon: cfg.icon, label: cfg.label, active: true }];
         this._tabs = this._tabs || {};
         this._tabs[id] = list;
-        const open = this.openIds.has(id);
+        const open = this.openIds.has(id) || nav.dataset.mode === "aberta";
         const html = list.map((t, i) =>
             `<button type="button" class="panel-rail-btn${t.active ? " active" : ""}${t.active && open ? " open" : ""}" data-index="${i}" data-tooltip="${escapeAttr(t.label)}" aria-label="${escapeAttr(t.label)}" aria-expanded="${t.active && open}"><i class="${escapeAttr(t.icon)}"></i></button>`
         ).join("");
         const box = nav.querySelector(".panel-rail-tabs");
         if (box.innerHTML !== html) box.innerHTML = html;
+        const downBtn = nav.querySelector(".panel-rail-down");
+        const downTip = nav.dataset.mode === "aberta" ? "Recolher para barra" : "Recolher para linha";
+        downBtn.setAttribute("data-tooltip", downTip);
+        downBtn.setAttribute("aria-label", `${downTip} (${cfg.label})`);
         const down = nav.querySelector(".panel-rail-down i");
         const edge = nav.dataset.place === "column" ? null : this.wm?.collapseEdge?.(id);
         down.className = `fa-solid ${railArrowIcon(edge, nav.classList.contains("panel-rail-right"))}`;

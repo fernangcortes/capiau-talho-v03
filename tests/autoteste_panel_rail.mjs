@@ -7,7 +7,7 @@
 // ======================================================================
 
 import assert from "node:assert/strict";
-import { nextOnArrow, loadRail, saveRail, stripTabs, RAIL_PANELS, RAIL_STORAGE_KEY, RAIL_PLACES, railLying, railArrowIcon, PanelRail } from "../src/ui/js/panelRail.js";
+import { nextOnArrow, loadRail, saveRail, stripTabs, RAIL_PANELS, RAIL_STORAGE_KEY, RAIL_PLACES, railLying, railArrowIcon, uprightTabs, PanelRail } from "../src/ui/js/panelRail.js";
 
 console.log("=== INICIANDO AUTOTESTE: BARRA FINA ===\n");
 
@@ -84,5 +84,15 @@ console.log("✔ 4 passou: painéis com barra configurados.");
     assert.equal(rail({ panelPlacement: () => null }).canRail("sidebar-left"), false, "sem lugar");
 }
 console.log("✔ 5 passou: barra em coluna, pilha e faixa; deitada na pilha e na faixa toda na barra.");
+
+{
+    // Abas em pé: só no painel aberto numa coluna, com faixa de abas.
+    assert.equal(uprightTabs("pe", "aberta", "column", true), true);
+    assert.equal(uprightTabs("linha", "aberta", "column", true), false, "padrão: abas em linha");
+    assert.equal(uprightTabs("pe", "barra", "column", true), false, "na barra já é a barra");
+    assert.equal(uprightTabs("pe", "aberta", "stack", true), false, "na pilha a barra deita: seria outra faixa de abas");
+    assert.equal(uprightTabs("pe", "aberta", "column", false), false, "Ajustes não tem faixa de abas");
+}
+console.log("✔ 6 passou: abas em pé no painel aberto numa coluna.");
 
 console.log("\n=== AUTOTESTE BARRA FINA CONCLUÍDO COM SUCESSO ===");

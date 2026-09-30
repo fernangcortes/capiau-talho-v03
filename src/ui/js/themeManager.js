@@ -16,6 +16,7 @@ export const THEME_DEFAULTS = {
     "ui.accent": "padrao",
     "ui.track_mode": "coloridas",
     "ui.text_contrast": "padrao",
+    "ui.tabs_mode": "linha",
 };
 
 export const THEME_KEYS = Object.keys(THEME_DEFAULTS);
@@ -50,6 +51,10 @@ export const TEXT_CONTRASTS = {
     medio: "#7d7b88",   // 4,6:1
     alto: "#8c8a96",    // 5,6:1
 };
+
+// Abas dos painéis abertos: "linha" (no topo, como sempre) ou "pe" (a barra de ícones ao lado, a mesma
+// do estado Barra: recolher só esconde o conteúdo). js/panelRail.js lê --t-tabs-mode.
+export const TABS_MODES = ["linha", "pe"];
 
 // Cor das trilhas na timeline (js/trackColors.js aplica no canvas).
 export const TRACK_MODES = ["coloridas", "dessaturadas", "mono"];
@@ -129,6 +134,7 @@ export function computeThemeState(values = {}) {
     }
     const muted = TEXT_CONTRASTS[v["ui.text_contrast"]];
     if (muted) vars["--text-muted"] = muted;
+    if (v["ui.tabs_mode"] === "pe") vars["--t-tabs-mode"] = "pe";
     if (TRACK_MODES.includes(v["ui.track_mode"]) && v["ui.track_mode"] !== "coloridas") {
         vars["--t-track-mode"] = v["ui.track_mode"];
     }
