@@ -3,7 +3,7 @@
 // Execução: node tests/autoteste_panel_rail.mjs
 //
 // Três estados: aberta → barra → linha. A linha volta ao estado de antes. Vale em coluna,
-// pilha e faixa do editor; numa janela destacada a seta recolhe direto para a linha.
+// pilha e faixa do editor e na janela de um painel; janela dupla ou de grupo recolhe direto para a linha.
 // ======================================================================
 
 import assert from "node:assert/strict";
@@ -14,7 +14,7 @@ console.log("=== INICIANDO AUTOTESTE: BARRA FINA ===\n");
 {
     assert.equal(nextOnArrow("aberta", true), "barra", "numa coluna, a seta vai para a barra");
     assert.equal(nextOnArrow("barra", true), "linha", "da barra, para a linha");
-    assert.equal(nextOnArrow("aberta", false), "linha", "janela destacada: direto para a linha, como antes");
+    assert.equal(nextOnArrow("aberta", false), "linha", "janela dupla ou de grupo: direto para a linha, como antes");
     assert.equal(nextOnArrow("linha", true), "linha");
 }
 console.log("✔ 1 passou: aberta → barra → linha.");
@@ -79,7 +79,10 @@ console.log("✔ 4 passou: painéis com barra configurados.");
     const mk = (kind, ownerDocument = doc) => ({ panelPlacement: () => ({ kind, el: { ownerDocument } }) });
     const rail = (wm) => Object.assign(Object.create(PanelRail.prototype), { wm });
     for (const kind of ["column", "stack", "band"]) assert.equal(rail(mk(kind)).canRail("sidebar-left"), true, kind);
-    assert.equal(rail(mk("single", {})).canRail("sidebar-left"), false, "janela destacada");
+    assert.equal(rail({ panelPlacement: () => ({ kind: "single", el: { ownerDocument: {} }, win: { capiauSetPanelRail() {} } }) }).canRail("sidebar-left"),
+        true, "janela de um painel: a janela encolhe para a barra");
+    assert.equal(rail(mk("single", {})).canRail("sidebar-left"), false, "janela sem suporte (página antiga): direto para a linha");
+    assert.equal(rail(mk("dual", {})).canRail("sidebar-left"), false, "janela dupla");
     assert.equal(rail(mk("group", {})).canRail("sidebar-left"), false, "janela com vários painéis");
     assert.equal(rail({ panelPlacement: () => null }).canRail("sidebar-left"), false, "sem lugar");
 }

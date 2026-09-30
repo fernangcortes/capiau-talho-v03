@@ -13,8 +13,10 @@
 //
 // Vale em qualquer lugar do editor: coluna (barra em pé ao lado), pilha (barra deitada no lugar
 // do painel, entre os vizinhos de cima e de baixo) e faixa (barra em pé entre os vizinhos; com
-// todos da faixa na barra, a faixa encolhe e as barras deitam). Na janela destacada a seta
-// continua recolhendo para a linha.
+// todos da faixa na barra, a faixa encolhe e as barras deitam). Na janela destacada de um painel
+// (panel.html) a janela encolhe para a coluna de ícones e volta ao tamanho de antes ao abrir; se
+// o navegador não deixar redimensionar, a coluna fica na janela do tamanho que ela está. Janela
+// dupla ou de grupo recolhe direto para a linha.
 //
 // Abas em pé (Aparência → "Abas dos painéis: Em pé", --t-tabs-mode): numa coluna, o painel aberto
 // já usa a barra ao lado no lugar das abas do topo. Clicar num ícone troca de aba; a seta da barra
@@ -134,10 +136,19 @@ export class PanelRail {
         return this.rail.has(id);
     }
 
-    /** Pode virar barra agora: painel no editor (coluna, pilha ou faixa), nesta janela. */
+    /** Pode virar barra agora: painel no editor (coluna, pilha ou faixa) ou sozinho numa janela. */
     canRail(id) {
         const place = this.wm?.panelPlacement?.(id);
-        return !!place && RAIL_PLACES.includes(place.kind) && place.el.ownerDocument === document;
+        if (!place) return false;
+        if (place.kind === "single") return typeof place.win?.capiauSetPanelRail === "function";
+        return RAIL_PLACES.includes(place.kind) && place.el.ownerDocument === document;
+    }
+
+    /** Ícone clicado na barra da janela destacada: vai para a aba e a janela volta a abrir. */
+    popoutPick(id, index) {
+        const tab = this._tabs?.[id]?.[index];
+        if (tab && !tab.active) tab.button?.click();
+        this.setState(id, "aberta");
     }
 
     /** "pe" quando a Aparência pede abas em pé. */
@@ -195,8 +206,24 @@ export class PanelRail {
         const railOn = state === "barra";
         const hasStrip = !!RAIL_PANELS[id].strip;
         const pe = this.tabsMode() === "pe";
-        const place = railOn || (pe && state === "aberta") ? this.wm?.panelPlacement?.(id) : null;
+        const place = this.wm?.panelPlacement?.(id) || null;
         const kind = place?.kind || "column";
+
+        // Janela destacada de um painel: quem desenha a barra é a própria janela (panel.html).
+        if (kind === "single") {
+            nav.hidden = true;
+            const strip = RAIL_PANELS[id].strip && place.el.querySelector(`#${RAIL_PANELS[id].strip}`);
+            const tabs = strip ? stripTabs(strip) : [];
+            const list = tabs.length ? tabs : [{ button: null, icon: RAIL_PANELS[id].icon, label: RAIL_PANELS[id].label, active: true }];
+            this._tabs = this._tabs || {};
+            this._tabs[id] = list;
+            try {
+                place.win.capiauSetPanelRail?.(id, railOn, list.map(({ icon, label, active }) => ({ icon, label, active })),
+                    place.el.classList.contains("dock-right"));
+            } catch (e) {}
+            if (!railOn) this.closeFlyout(id);
+            return;
+        }
         const upright = uprightTabs(this.tabsMode(), state, place ? kind : null, hasStrip && place?.el?.ownerDocument === document);
         const showNav = railOn || upright;
         // Anfitrião da pilha é também a caixa dos de baixo: não some, só esconde o próprio conteúdo.

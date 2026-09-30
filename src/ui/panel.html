@@ -289,6 +289,10 @@
             background: #090d16;
         }
         .single-restore.edge-right { flex-direction: row-reverse; }
+        /* Barra fina na janela: só a coluna de ícones (js/panelRail.js pede, capiauSetPanelRail desenha). */
+        body.popout-rail > *:not(.popout-rail-nav) { display: none !important; }
+        .popout-rail-nav { position: fixed; top: 0; bottom: 0; left: 0; height: 100vh; }
+        .popout-rail-nav.panel-rail-right { left: auto; right: 0; }
         .single-restore-line {
             flex: 0 0 4px;
             background: rgba(6, 182, 212, 0.18);
@@ -896,6 +900,64 @@
                 const panel = singleContainer.firstElementChild;
                 return panel && panel.classList.contains("dock-right") ? "right" : "left";
             };
+            // ── Barra fina: a janela encolhe para a coluna de ícones ──
+            // O editor (PanelRail) decide o estado e manda as abas; aqui só desenha e redimensiona.
+            // Se o navegador ou o Windows não deixarem redimensionar, a coluna fica na janela do
+            // tamanho de antes, funcionando igual.
+            const RAIL_W = 36;
+            let railSaved = null;
+            let railNav = null;
+            const editorRail = () => { try { return window.opener && !window.opener.closed ? window.opener.panelRail : null; } catch (e) { return null; } };
+            const railEsc = (s) => String(s).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+            window.capiauSetPanelRail = (panelId, on, tabs = [], right = false) => {
+                if (panelId !== panel1Name) return false;
+                if (!on) {
+                    if (!railNav) return false;
+                    railNav.remove();
+                    railNav = null;
+                    document.body.classList.remove("popout-rail");
+                    if (railSaved) {
+                        const s = railSaved;
+                        railSaved = null;
+                        try { window.resizeTo(s.w, s.h); window.moveTo(s.x, s.y); } catch (e) {}
+                    }
+                    window.dispatchEvent(new Event("resize"));
+                    return true;
+                }
+                if (!railNav) {
+                    railNav = document.createElement("nav");
+                    railNav.className = "panel-rail popout-rail-nav";
+                    railNav.setAttribute("aria-label", TITLE_MAP[panel1Name] || panel1Name);
+                    railNav.innerHTML = `<div class="panel-rail-tabs"></div><div class="panel-rail-spacer"></div>
+                        <button type="button" class="panel-rail-btn panel-rail-down" data-tooltip="Recolher para linha" aria-label="Recolher para linha"><i class="fa-solid fa-chevron-left"></i></button>`;
+                    railNav.addEventListener("click", (e) => {
+                        const b = e.target.closest(".panel-rail-btn");
+                        if (!b) return;
+                        const rail = editorRail();
+                        if (b.classList.contains("panel-rail-down")) rail?.setState(panel1Name, "linha");
+                        else rail?.popoutPick(panel1Name, Number(b.dataset.index));
+                    });
+                    document.body.appendChild(railNav);
+                    document.body.classList.add("popout-rail");
+                }
+                railNav.classList.toggle("panel-rail-right", !!right);
+                railNav.querySelector(".panel-rail-down i").className = `fa-solid ${right ? "fa-chevron-right" : "fa-chevron-left"}`;
+                const html = tabs.map((t, i) =>
+                    `<button type="button" class="panel-rail-btn${t.active ? " active" : ""}" data-index="${i}" data-tooltip="${railEsc(t.label)}" aria-label="${railEsc(t.label)}"><i class="${railEsc(t.icon)}"></i></button>`).join("");
+                const box = railNav.querySelector(".panel-rail-tabs");
+                if (box.innerHTML !== html) box.innerHTML = html;
+                if (!railSaved) {
+                    railSaved = { w: window.outerWidth, h: window.outerHeight, x: window.screenX, y: window.screenY };
+                    const w = RAIL_W + Math.max(0, window.outerWidth - window.innerWidth);
+                    try {
+                        window.resizeTo(w, window.outerHeight);
+                        // À direita, a borda direita fica onde estava.
+                        if (right) window.moveTo(railSaved.x + railSaved.w - w, railSaved.y);
+                    } catch (e) {}
+                }
+                return true;
+            };
+
             singleRestore.addEventListener("click", () => {
                 try {
                     if (window.opener && !window.opener.closed && window.opener.workspaceManager?.setPanelCollapsed) {
