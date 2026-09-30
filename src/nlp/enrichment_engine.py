@@ -63,7 +63,7 @@ def rewrite_description_llm(
         fallback,
         "google/gemini-2.5-flash",
         "openrouter/free",
-        "meta-llama/llama-3.3-70b-instruct:free"
+        "meta-llama/llama-3.3-70b-instruct"
     ]
     models_to_try = []
     for m in cascade:

@@ -360,15 +360,24 @@ class OnboardingAgentService:
                     ]
                 }
 
-        # 2. Resolução da chave de API configurada
+        # 2. Resolução da chave de API configurada. A chamada vai para a OpenRouter, então só a
+        # chave da OpenRouter serve: a do Gemini voltaria 401 e cairia sempre no motor local.
         S = SettingsService.get_settings()
-        api_key = (custom_api_key or S.api_key("openrouter") or S.api_key("gemini") or "").strip()
+        api_key = (custom_api_key or S.api_key("openrouter") or "").strip()
+        model_name = S.get("llm.text_model") or CONFIG.TEXT_MODEL
+
+        def _local(status: str, note: str = "") -> Dict[str, Any]:
+            fb = cls._build_intelligent_fallback(msg_str, history, current_project_name, current_profile)
+            fb["api_status"] = status
+            fb["model"] = None
+            fb["requested_model"] = model_name
+            if note:
+                fb["reply"] = note + "\n\n" + fb["reply"]
+            return fb
 
         if not api_key or api_key == "your_openrouter_api_key_here":
             # Sem chave ativa: executa o motor nativo especializado de conhecimento
-            fb = cls._build_intelligent_fallback(msg_str, history, current_project_name, current_profile)
-            fb["api_status"] = "missing_key"
-            return fb
+            return _local("missing_key")
 
         # 3. Execução via LLM em Nuvem com System Prompt de Especialista
         system_content = CAPIAU_TALHO_KNOWLEDGE
@@ -402,7 +411,6 @@ class OnboardingAgentService:
             "HTTP-Referer": "https://github.com/capiau/talho",
             "X-Title": "CapIAu-Talho NLE"
         }
-        model_name = S.get("llm.text_model") or CONFIG.TEXT_MODEL or "deepseek/deepseek-v4-flash"
         payload = {
             "model": model_name,
             "messages": messages,
@@ -456,27 +464,33 @@ class OnboardingAgentService:
                     "step": step,
                     "chips": chips,
                     "ready_to_create": ready_to_create,
-                    "api_status": "ok"
+                    "api_status": "ok",
+                    # Modelo que de fato respondeu (a OpenRouter devolve o ID resolvido, útil com aliases ~…-latest)
+                    "model": res_data.get("model") or model_name,
+                    "requested_model": model_name,
                 }
 
             elif resp.status_code == 401:
                 logger.warning("[OnboardingAgent] Chave OpenRouter expirada ou inválida (401). Recorrendo ao motor nativo.")
-                fb = cls._build_intelligent_fallback(msg_str, history, current_project_name, current_profile)
-                fb["api_status"] = "expired_key"
-                fb["reply"] = (
-                    "⚠️ **Nota sobre IA em Nuvem:** A chave OpenRouter configurada está expirada ou inválida. "
-                    "Você pode colar um novo token válido diretamente aqui no chat para ativá-lo, ou configurar no painel de configurações.\n\n"
-                    + fb["reply"]
+                return _local(
+                    "expired_key",
+                    "**A chave da OpenRouter foi recusada** (expirada ou inválida), então quem responde é o assistente local. "
+                    "Cole uma chave nova aqui na conversa ou em Chaves e modelos."
                 )
-                return fb
             else:
-                logger.warning(f"[OnboardingAgent] Erro na API OpenRouter ({resp.status_code}): {resp.text[:120]}")
-                fb = cls._build_intelligent_fallback(msg_str, history, current_project_name, current_profile)
-                fb["api_status"] = "offline_mode"
-                return fb
+                logger.warning(f"[OnboardingAgent] Erro na API OpenRouter ({resp.status_code}) com {model_name}: {resp.text[:120]}")
+                return _local(
+                    "model_error",
+                    f"**O modelo {model_name} não respondeu** (erro {resp.status_code} da OpenRouter), então quem responde é o assistente local. "
+                    "Confira o modelo de texto em Chaves e modelos."
+                )
 
+        except requests.Timeout:
+            logger.error(f"[OnboardingAgent] {model_name} passou de 12 s sem responder.")
+            return _local(
+                "timeout",
+                f"**O modelo {model_name} demorou mais de 12 s**, então quem responde é o assistente local."
+            )
         except Exception as e:
             logger.error(f"[OnboardingAgent] Exceção na chamada LLM: {e}")
-            fb = cls._build_intelligent_fallback(msg_str, history, current_project_name, current_profile)
-            fb["api_status"] = "offline_mode"
-            return fb
+            return _local("offline_mode")

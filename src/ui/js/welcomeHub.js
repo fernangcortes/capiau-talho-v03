@@ -26,9 +26,9 @@ export const WELCOME_HUB_PROFILES = Object.freeze({
         badge: "Offline / Custo $0.00",
         icon: "fa-leaf",
         themeColor: "var(--color-emerald)",
-        desc: "Triagem com Laya ONNX CPU local (22ms), visão YOLO-World v2, biometria SCRFD 512-d CPU e DeepSeek-V4.1 Flash. Custo zero de nuvem e privacidade máxima.",
+        desc: "Triagem com Laya ONNX CPU local (22ms), visão YOLO-World v2, biometria SCRFD 512-d CPU e DeepSeek V4.1 Flash. Custo zero de nuvem e privacidade máxima.",
         settings: {
-            "llm.text_model": "deepseek/deepseek-v4-flash",
+            "llm.text_model": "deepseek/deepseek-v4.1-flash",
             "llm.vision_model": "google/gemini-2.5-flash",
             "vision.frame_interval": 20,
             "timeline.max_suggestions": 3,
@@ -44,10 +44,10 @@ export const WELCOME_HUB_PROFILES = Object.freeze({
         badge: "Equilibrado / Rápido",
         icon: "fa-bolt",
         themeColor: "var(--color-cyan)",
-        desc: "Triagem dual (Laya local + escalação Sistema 2), Gemini 3.8 Flash, Nemotron 3 com fala sobreposta e DeepSeek-V4.1 Flash. Otimizado para agilidade jornalística.",
+        desc: "Triagem dual (Laya local + escalação Sistema 2), Gemini 3.8 Flash, Nemotron 3 com fala sobreposta e DeepSeek V4.1 Flash. Otimizado para agilidade jornalística.",
         settings: {
-            "llm.text_model": "deepseek/deepseek-v4-flash",
-            "llm.vision_model": "google/gemini-2.5-flash",
+            "llm.text_model": "deepseek/deepseek-v4.1-flash",
+            "llm.vision_model": "google/gemini-3.8-flash",
             "vision.frame_interval": 10,
             "timeline.max_suggestions": 5,
             "timeline.max_candidate_videos": 30,
@@ -62,10 +62,10 @@ export const WELCOME_HUB_PROFILES = Object.freeze({
         badge: "Alta Fidelidade 2026",
         icon: "fa-film",
         themeColor: "var(--color-violet)",
-        desc: "Triagem nuvem Jev RLCD, Gemini 3.8 Pro com bboxes canônicos, biometria Buffalo_l 512-d, áudio AssemblyAI 3.5 e Claude Sonnet 5.5. Máxima precisão cinematográfica.",
+        desc: "Triagem nuvem Jev RLCD, Gemini 3.1 Pro com bboxes canônicos, biometria Buffalo_l 512-d, áudio AssemblyAI 3.5 e Claude Sonnet 5.5. Máxima precisão cinematográfica.",
         settings: {
-            "llm.text_model": "anthropic/claude-3.7-sonnet",
-            "llm.vision_model": "google/gemini-2.5-pro",
+            "llm.text_model": "anthropic/claude-sonnet-5.5",
+            "llm.vision_model": "google/gemini-3.1-pro-preview",
             "vision.frame_interval": 5,
             "timeline.max_suggestions": 6,
             "timeline.max_candidate_videos": 45,
@@ -219,6 +219,12 @@ function formatDuration(secs) {
     const m = Math.floor((secs % 3600) / 60);
     const s = Math.floor(secs % 60);
     return (h ? `${h}:${String(m).padStart(2, "0")}` : `${m}`) + `:${String(s).padStart(2, "0")}`;
+}
+
+/** Lê um valor de GET /api/settings ({values: {k: {value}}}); aceita também o formato antigo {global: {k}} */
+function settingValue(settings, key) {
+    const v = settings?.values?.[key]?.value ?? settings?.global?.[key];
+    return v === "your_openrouter_api_key_here" ? "" : v;
 }
 
 function baseName(path) {
@@ -559,17 +565,42 @@ export class WelcomeHub {
         if (this.crumbName) this.crumbName.textContent = name || "novo projeto";
     }
 
-    /** Ponto de status das chaves no cabeçalho (verde: há chave; âmbar: nenhuma) */
+    /** Ponto de status das chaves e modelo da conversa no cabeçalho */
     async refreshKeyStatus() {
-        if (!this.keyDot || typeof this.api?.fetchSettings !== "function") return;
+        if (typeof this.api?.fetchSettings !== "function") return;
         try {
-            const g = (await this.api.fetchSettings())?.global || {};
-            const hasOr = Boolean(g["api.openrouter_key"] && g["api.openrouter_key"] !== "your_openrouter_api_key_here");
-            const hasGem = Boolean(g["api.gemini_key"]);
-            this.keyDot.className = `wh-dot ${hasOr || hasGem ? "ok" : "missing"}`;
-            this.keyDot.title = hasOr || hasGem ? "Há chave de API configurada" : "Nenhuma chave de API: a conversa usa o assistente local";
+            const settings = await this.api.fetchSettings();
+            const hasOr = Boolean(settingValue(settings, "api.openrouter_key"));
+            this.textModel = settingValue(settings, "llm.text_model") || this.textModel;
+            if (this.keyDot) {
+                // A conversa usa só a OpenRouter: é essa chave que decide se a IA responde
+                this.keyDot.className = `wh-dot ${hasOr ? "ok" : "missing"}`;
+                this.keyDot.title = hasOr ? "Chave da OpenRouter configurada" : "Sem chave da OpenRouter: a conversa usa o assistente local";
+            }
+            this.setModelLine(hasOr ? { api_status: "ok", model: this.textModel } : { api_status: "missing_key" });
         } catch (err) {
             console.warn("[WelcomeHub] Falha ao ler status das chaves:", err);
+        }
+    }
+
+    /** Diz embaixo do título da conversa quem está respondendo (modelo da OpenRouter ou assistente local) */
+    setModelLine(res = {}) {
+        const line = this.document?.getElementById?.("welcome-chat-sub");
+        if (!line) return;
+        const model = res.model || res.requested_model || this.textModel;
+        const reasons = {
+            missing_key: "sem chave da OpenRouter",
+            expired_key: "chave da OpenRouter recusada",
+            model_error: `${model} não respondeu`,
+            timeout: `${model} passou de 12 s`,
+            offline_mode: "OpenRouter fora do ar"
+        };
+        if (res.api_status === "ok" && model) {
+            line.textContent = `Respondendo com ${model} via OpenRouter`;
+            line.classList?.remove?.("wh-warn");
+        } else {
+            line.textContent = `Assistente local (${reasons[res.api_status] || "sem IA em nuvem"})`;
+            line.classList?.add?.("wh-warn");
         }
     }
 
@@ -689,6 +720,7 @@ export class WelcomeHub {
 
                 if (chatRes && chatRes.reply) {
                     answered = true;
+                    if (chatRes.api_status) this.setModelLine(chatRes);
                     this.appendMessage({ role: "assistant", content: chatRes.reply });
 
                     if (chatRes.suggested_project_name && !this.projectName) {
@@ -1446,9 +1478,7 @@ export class WelcomeHub {
         try {
             if (this.api && typeof this.api.fetchSettings === "function") {
                 const settings = await this.api.fetchSettings();
-                const g = settings?.global || {};
-
-                const hasOr = Boolean(g["api.openrouter_key"] && g["api.openrouter_key"] !== "your_openrouter_api_key_here");
+                const hasOr = Boolean(settingValue(settings, "api.openrouter_key"));
                 if (this.badgeOpenRouter) {
                     this.badgeOpenRouter.textContent = hasOr ? "Configurada" : "Não configurada";
                     this.badgeOpenRouter.className = `key-status-badge ${hasOr ? "configured" : "missing"}`;
@@ -1457,7 +1487,7 @@ export class WelcomeHub {
                     this.inputOpenRouter.placeholder = "sk-or-v1-•••••••••••• (Chave ativa no banco)";
                 }
 
-                const hasGem = Boolean(g["api.gemini_key"]);
+                const hasGem = Boolean(settingValue(settings, "api.gemini_key"));
                 if (this.badgeGemini) {
                     this.badgeGemini.textContent = hasGem ? "Configurada" : "Não configurada";
                     this.badgeGemini.className = `key-status-badge ${hasGem ? "configured" : "missing"}`;

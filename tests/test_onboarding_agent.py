@@ -15,6 +15,32 @@ from src.api.server import app
 
 
 @pytest.fixture(autouse=True)
+def preserve_real_api_keys():
+    """Os testes gravam chaves falsas no banco de verdade; guarda as do usuário e devolve no fim.
+
+    Sem isso a suíte trocava a chave da OpenRouter por "sk-or-v1-test-http-key-0123456789",
+    e o chat do Welcome Hub passava a responder sempre com o assistente local (401).
+    """
+    from src.db.connection import get_db
+    from src.db.repositories.settings import SettingsRepository
+    from src.services.settings_service import SettingsService
+
+    keys = ("api.openrouter_key", "api.gemini_key")
+    with get_db() as conn:
+        saved = SettingsRepository.get_all_global(conn)
+    before = {k: saved[k] for k in keys if k in saved}
+    yield
+    with get_db() as conn:
+        for k in keys:
+            if k in before:
+                SettingsRepository.upsert_global(conn, k, before[k])
+            else:
+                SettingsRepository.delete_global(conn, k)
+        conn.commit()
+    SettingsService.invalidate()
+
+
+@pytest.fixture(autouse=True)
 def mock_external_requests(monkeypatch):
     """Evita chamadas de rede externas para OpenRouter durante a execução dos testes."""
     class MockResp:

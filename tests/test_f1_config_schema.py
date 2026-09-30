@@ -16,7 +16,8 @@ class TestF1Component1(unittest.TestCase):
         self.assertIsInstance(CONFIG.AGENT_MODELS, list)
         self.assertIn("deepseek/deepseek-v4-flash", CONFIG.AGENT_MODELS)
         self.assertIn("google/gemini-3.5-flash", CONFIG.AGENT_MODELS)
-        self.assertIn("anthropic/claude-5-sonnet", CONFIG.AGENT_MODELS)
+        self.assertIn("deepseek/deepseek-v4.1-flash", CONFIG.AGENT_MODELS)
+        self.assertIn("anthropic/claude-sonnet-5.5", CONFIG.AGENT_MODELS)
 
     def test_chat_payload_schema_expansion(self):
         # Validar que o payload do chat aceita as novas chaves

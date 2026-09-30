@@ -14868,6 +14868,9 @@ body.layout-monitors-split .btn-swap-player {
     font-size: var(--fs-10);
     color: var(--text-muted);
 }
+.wh-chat-sub.wh-warn {
+    color: var(--color-amber, #f59e0b);
+}
 .wh-msgs {
     flex: 1;
     overflow-y: auto;

@@ -521,10 +521,17 @@ export class SettingsPanelManager {
             const select = document.createElement("select");
             select.className = "nle-select";
             select.disabled = disabled;
-            (entry.enum || []).forEach(opt => {
+            const options = [...(entry.enum || [])];
+            // Valor salvo que saiu da lista (ex.: modelo aposentado): aparece marcado em vez de sumir
+            const stale = value != null && value !== "" && !options.includes(value);
+            if (stale) options.unshift(value);
+            options.forEach(opt => {
                 const o = document.createElement("option");
                 o.value = opt;
-                o.textContent = this.enumLabel(entry.key, opt);
+                const label = entry.enum_labels?.[opt];
+                o.textContent = stale && opt === value
+                    ? `${opt} (fora da lista atual)`
+                    : label ? `${label} · ${opt}` : this.enumLabel(entry.key, opt);
                 select.appendChild(o);
             });
             select.value = value;

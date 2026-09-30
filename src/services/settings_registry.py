@@ -62,7 +62,7 @@ SETTINGS_REGISTRY: List[Dict[str, Any]] = [
     {
         "key": "api.gemini_key", "type": "secret", "default": "",
         "label": "Chave Google Gemini",
-        "help": "Chave direta para Gemini 3.8 Flash, 3.8 Pro e Spatial Grounding.",
+        "help": "Chave direta para Gemini 3.8 Flash, 3.1 Pro e Spatial Grounding.",
         "help_tech": "Usado nas chamadas da API Gemini e Grounding Espacial nativo.",
         "category": "models_keys", "level": "simple", "scope": "global", "requires_reprocess": False,
     },
@@ -102,15 +102,16 @@ SETTINGS_REGISTRY: List[Dict[str, Any]] = [
         "category": "models_keys", "level": "pro", "scope": "global", "requires_reprocess": False,
     },
     {
-        "key": "llm.text_model", "type": "string", "default": CONFIG.TEXT_MODEL,
+        "key": "llm.text_model", "type": "enum", "default": CONFIG.TEXT_MODEL,
+        "enum": list(CONFIG.TEXT_MODELS), "enum_labels": CONFIG.MODEL_LABELS,
         "label": "Modelo de texto",
-        "help": "Modelo de IA usado para resumos, temas, sugestões de timeline e chat. Formato OpenRouter. Padrão: deepseek/deepseek-v4-flash (rápido e barato); deepseek/deepseek-v4-pro entrega melhor qualidade a um custo maior.",
+        "help": "Modelo de IA usado para resumos, temas, sugestões de timeline e a conversa do Welcome Hub, via OpenRouter. Padrão: DeepSeek V4.1 Flash (rápido e barato); DeepSeek V4 Pro entrega mais qualidade a um custo maior.",
         "help_tech": "Substitui CONFIG.TEXT_MODEL nas chamadas de rag, timeline_ai, summary, theme_engine e enrichment.",
         "category": "models_keys", "level": "simple", "scope": "both", "requires_reprocess": False,
     },
     {
         "key": "llm.vision_model", "type": "enum", "default": CONFIG.VISION_MODEL,
-        "enum": list(CONFIG.VISION_MODELS),
+        "enum": list(CONFIG.VISION_MODELS), "enum_labels": CONFIG.MODEL_LABELS,
         "label": "Modelo de visão",
         "help": "Modelo de IA que descreve imagens (frames de B-roll e fotos de set). "
                 "As opções ':free' não custam nada, mas têm limite de pedidos por dia "
@@ -122,7 +123,7 @@ SETTINGS_REGISTRY: List[Dict[str, Any]] = [
     },
     {
         "key": "llm.vision_model_fallback", "type": "enum", "default": CONFIG.VISION_MODEL_FALLBACK,
-        "enum": list(CONFIG.VISION_MODELS),
+        "enum": list(CONFIG.VISION_MODELS), "enum_labels": CONFIG.MODEL_LABELS,
         "label": "Modelo de visão: reserva",
         "help": "Entra em ação só depois que o modelo principal falhar 'Tentativas antes "
                 "da reserva' vezes seguidas. Pensado para um modelo grátis como principal "
@@ -139,7 +140,7 @@ SETTINGS_REGISTRY: List[Dict[str, Any]] = [
     },
     {
         "key": "agent.model", "type": "enum", "default": CONFIG.AGENT_MODEL,
-        "enum": list(CONFIG.AGENT_MODELS),
+        "enum": list(CONFIG.AGENT_MODELS), "enum_labels": CONFIG.MODEL_LABELS,
         "label": "Modelo do Agente de Edição",
         "help": "Modelo de IA usado pelo agente que edita a timeline por comandos de chat.",
         "help_tech": "Default do payload do agente; pode ser sobreposto por requisição (agent_model).",

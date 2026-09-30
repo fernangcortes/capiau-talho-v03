@@ -64,18 +64,18 @@ assert(WELCOME_HUB_PROFILES.cinema_nuvem_sota, "Perfil cinema_nuvem_sota deve ex
 
 // Verificação detalhada das calibrações de IA de cada perfil
 const pDoc = WELCOME_HUB_PROFILES.doc_offline_eco;
-assert.equal(pDoc.settings["llm.text_model"], "deepseek/deepseek-v4-flash");
+assert.equal(pDoc.settings["llm.text_model"], "deepseek/deepseek-v4.1-flash");
 assert.equal(pDoc.settings["vision.frame_interval"], 20);
 assert.equal(pDoc.settings["timeline.max_suggestions"], 3);
 
 const pEntrevista = WELCOME_HUB_PROFILES.entrevista_agil;
-assert.equal(pEntrevista.settings["llm.text_model"], "deepseek/deepseek-v4-flash");
+assert.equal(pEntrevista.settings["llm.text_model"], "deepseek/deepseek-v4.1-flash");
 assert.equal(pEntrevista.settings["vision.frame_interval"], 10);
 assert.equal(pEntrevista.settings["timeline.max_suggestions"], 5);
 
 const pCinema = WELCOME_HUB_PROFILES.cinema_nuvem_sota;
-assert.equal(pCinema.settings["llm.text_model"], "anthropic/claude-3.7-sonnet");
-assert.equal(pCinema.settings["llm.vision_model"], "google/gemini-2.5-pro");
+assert.equal(pCinema.settings["llm.text_model"], "anthropic/claude-sonnet-5.5");
+assert.equal(pCinema.settings["llm.vision_model"], "google/gemini-3.1-pro-preview");
 assert.equal(pCinema.settings["vision.frame_interval"], 5);
 assert.equal(pCinema.settings["timeline.max_suggestions"], 6);
 
@@ -293,7 +293,7 @@ console.log("\n--- 3. Fluxo Principal da FSM e Onboarding Conversacional ---");
     // Verifica que as configurações de IA do perfil foram gravadas
     assert.equal(env.updatedSettings.length, 1);
     assert.equal(env.updatedSettings[0].projectId, hub.createdProjectId);
-    assert.equal(env.updatedSettings[0].values["llm.text_model"], "deepseek/deepseek-v4-flash");
+    assert.equal(env.updatedSettings[0].values["llm.text_model"], "deepseek/deepseek-v4.1-flash");
     assert.equal(env.updatedSettings[0].values["vision.frame_interval"], 20);
 
     // Transição para o NLE
