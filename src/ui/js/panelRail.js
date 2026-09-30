@@ -30,9 +30,13 @@ export function nextOnArrow(state, railAllowed) {
     return "linha";
 }
 
+// Sem escolha salva: Ajustes começa na barra (a coluna menos usada sem clipe selecionado).
+export const DEFAULT_RAIL = ["inspector-panel"];
+
 export function loadRail(storage) {
     try {
-        const list = JSON.parse(storage.getItem(RAIL_STORAGE_KEY) || "[]");
+        const saved = storage.getItem(RAIL_STORAGE_KEY);
+        const list = saved === null ? DEFAULT_RAIL : JSON.parse(saved || "[]");
         return new Set((Array.isArray(list) ? list : []).filter(id => id in RAIL_PANELS));
     } catch (e) {
         return new Set();

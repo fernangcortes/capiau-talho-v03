@@ -3056,6 +3056,10 @@ export class WorkspaceManager {
             monitorsContainer.style.removeProperty("height");
         }
 
+        // Largura inicial (sem valor salvo) proporcional à tela, dentro do mínimo/máximo do divisor.
+        const viewportW = window.innerWidth || 1600;
+        const initialWidth = (ratio, min, max) => Math.round(Math.max(min, Math.min(max, viewportW * ratio)));
+
         const getColSplitterConfig = (targetCol) => {
             let minVal = 200;
             let maxVal = 800;
@@ -3065,17 +3069,17 @@ export class WorkspaceManager {
             if (targetCol === "sidebar-left") {
                 minVal = 200;
                 maxVal = 900;
-                defaultVal = 350;
+                defaultVal = initialWidth(0.2, minVal, 420);
                 className = expandedLeft ? "splitter-studio-lib splitter-sidebar-left" : "splitter-sidebar-left";
             } else if (targetCol === "inspector-panel") {
                 minVal = 240;
                 maxVal = 800;
-                defaultVal = 340;
+                defaultVal = initialWidth(0.18, minVal, 380);
                 className = "splitter-inspector";
             } else if (targetCol === "sidebar-right") {
                 minVal = 220;
                 maxVal = 800;
-                defaultVal = 320;
+                defaultVal = initialWidth(0.18, minVal, 380);
                 className = expandedRight ? "splitter-studio-right splitter-sidebar-right" : "splitter-sidebar-right";
             } else if (targetCol === TIMELINE_ID) {
                 // Timeline como coluna (F2c parte 2): chave própria, larga por padrão.

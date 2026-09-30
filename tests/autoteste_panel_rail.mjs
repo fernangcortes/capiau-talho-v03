@@ -22,7 +22,9 @@ console.log("✔ 1 passou: aberta → barra → linha.");
 {
     const mem = new Map();
     const storage = { getItem: k => mem.get(k) ?? null, setItem: (k, v) => mem.set(k, v) };
-    assert.deepEqual([...loadRail(storage)], [], "nada salvo: nenhuma barra");
+    assert.deepEqual([...loadRail(storage)], ["inspector-panel"], "nada salvo: Ajustes começa na barra");
+    saveRail(storage, new Set());
+    assert.deepEqual([...loadRail(storage)], [], "escolha salva (nenhuma barra) vale mais que o padrão");
     saveRail(storage, new Set(["sidebar-left", "timeline-panel", "sidebar-right"]));
     assert.deepEqual(JSON.parse(mem.get(RAIL_STORAGE_KEY)), ["sidebar-left", "sidebar-right"], "só painéis com barra");
     assert.deepEqual([...loadRail(storage)], ["sidebar-left", "sidebar-right"]);
