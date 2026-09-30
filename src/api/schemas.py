@@ -369,3 +369,17 @@ def pedido_render_do_payload(timeline_id: int, payload: RenderPedidoPayload) -> 
     )
 
 
+class OnboardingChatPayload(BaseModel):
+    message: str
+    history: List[Dict[str, str]] = Field(default_factory=list)
+    current_project_name: Optional[str] = None
+    current_profile: Optional[str] = None
+    custom_api_key: Optional[str] = None
+
+
+class OnboardingApiKeyPayload(BaseModel):
+    provider: str = "openrouter"
+    api_key: str
+
+
+

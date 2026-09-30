@@ -14,7 +14,13 @@ import sqlite3
 
 from src.config import CONFIG
 from src.api.dependencies import get_db_conn
-from src.api.schemas import ProjectCreate, ProjectDriveLinkUpdate, ProjectExportOptions
+from src.api.schemas import (
+    ProjectCreate,
+    ProjectDriveLinkUpdate,
+    ProjectExportOptions,
+    OnboardingChatPayload,
+    OnboardingApiKeyPayload,
+)
 from src.db.repositories.projects import ProjectRepository
 from src.services.sync import SyncService
 from src.services.settings_service import SettingsService
@@ -365,3 +371,35 @@ def get_project_speakers(project_id: int, conn: sqlite3.Connection = Depends(get
         return MediaRepository.get_project_speakers_and_labeled_faces(conn, project_id)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/api/onboarding/chat")
+def onboarding_chat(payload: OnboardingChatPayload):
+    """Chat inteligente de onboarding com IA em nuvem ou inteligência especializada nativa."""
+    from src.services.onboarding_agent import OnboardingAgentService
+    try:
+        return OnboardingAgentService.chat(
+            message=payload.message,
+            history=payload.history,
+            current_project_name=payload.current_project_name,
+            current_profile=payload.current_profile,
+            custom_api_key=payload.custom_api_key,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/api/onboarding/api-key")
+def save_onboarding_api_key(payload: OnboardingApiKeyPayload, conn: sqlite3.Connection = Depends(get_db_conn)):
+    """Salva a chave de API fornecida no onboarding nas configurações globais."""
+    from src.db.repositories.settings import SettingsRepository
+    from src.services.settings_service import SettingsService
+    target_key = "api.openrouter_key" if payload.provider.lower() == "openrouter" else "api.gemini_key"
+    try:
+        SettingsRepository.upsert_global(conn, target_key, payload.api_key.strip())
+        conn.commit()
+        SettingsService.invalidate()
+        return {"ok": True, "status": "success", "provider": payload.provider, "message": f"Chave de API ({payload.provider}) salva com sucesso."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
