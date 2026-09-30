@@ -7,7 +7,8 @@
 // "Barra" é novo: o painel sai do fluxo e fica uma coluna de 36 px com um botão por aba. Clicar
 // num botão ativa a aba de verdade (o mesmo botão da faixa) e abre o painel ao lado da barra, no
 // lugar dele na coluna: empurra monitores e timeline e se redimensiona pelo divisor de sempre.
-// Clicar de novo no botão da aba aberta fecha. As abas continuam as mesmas: destacar e trocar de
+// Clicar de novo no botão da aba aberta fecha. Cada painel abre e fecha sozinho: abrir a Biblioteca
+// não fecha o Painel Lateral. As abas continuam as mesmas: destacar e trocar de
 // menu seguem pelos botões da faixa, que aparecem no painel aberto.
 //
 // Só vale para o painel numa coluna do editor. Numa pilha, faixa ou janela destacada a seta
@@ -69,7 +70,7 @@ export class PanelRail {
         this.storage = storage;
         this.rail = loadRail(storage);
         this.rails = {};      // panelId -> <nav>
-        this.openId = null;   // painel aberto ao lado da barra agora
+        this.openIds = new Set(); // painéis abertos pela barra agora (cada um independe dos outros)
         this._raf = 0;
     }
 
@@ -125,7 +126,7 @@ export class PanelRail {
         if (state === "barra") this.rail.add(id);
         // "linha" guarda a barra (se havia) para a linha devolver ao estado de antes.
         saveRail(this.storage, this.rail);
-        if (this.openId === id) this.closeFlyout();
+        this.closeFlyout(id);
         if (state !== "aberta") this.beforeHide?.(id);
         if (state === "linha" && this.collapse) this.collapse(id);
         else this.wm?.setPanelCollapsed(id, state === "linha");
@@ -165,7 +166,7 @@ export class PanelRail {
         nav.hidden = !railOn;
         nav.classList.toggle("panel-rail-right", right);
         panel.classList.toggle("rail-mode", railOn);
-        if (!railOn && this.openId === id) this.closeFlyout();
+        if (!railOn) this.closeFlyout(id);
         if (railOn) this.renderButtons(id);
         this.wm?.refreshEdgeSplitters?.();
     }
@@ -186,7 +187,7 @@ export class PanelRail {
             const tab = this._tabs?.[id]?.[Number(b.dataset.index)];
             const sameTab = !tab || tab.active;
             if (tab && !tab.active) tab.button.click();
-            if (this.openId === id && sameTab) this.closeFlyout();
+            if (this.openIds.has(id) && sameTab) this.closeFlyout(id);
             else this.openFlyout(id);
         });
         nav.querySelector(".panel-rail-tabs").addEventListener("dblclick", (e) => {
@@ -208,7 +209,7 @@ export class PanelRail {
         const list = tabs.length ? tabs : [{ button: null, icon: cfg.icon, label: cfg.label, active: true }];
         this._tabs = this._tabs || {};
         this._tabs[id] = list;
-        const open = this.openId === id;
+        const open = this.openIds.has(id);
         const html = list.map((t, i) =>
             `<button type="button" class="panel-rail-btn${t.active ? " active" : ""}${t.active && open ? " open" : ""}" data-index="${i}" data-tooltip="${escapeAttr(t.label)}" aria-label="${escapeAttr(t.label)}" aria-expanded="${t.active && open}"><i class="${escapeAttr(t.icon)}"></i></button>`
         ).join("");
@@ -222,20 +223,18 @@ export class PanelRail {
 
     openFlyout(id) {
         if (this.stateOf(id) !== "barra") return;
-        if (this.openId && this.openId !== id) this.closeFlyout();
         const panel = document.getElementById(id);
-        if (!panel) return;
-        this.openId = id;
+        if (!panel || this.openIds.has(id)) return;
+        this.openIds.add(id);
         panel.classList.add("rail-open");
         this.renderButtons(id);
         this.wm?.refreshEdgeSplitters?.();
         window.dispatchEvent(new Event("resize")); // monitores, timeline e listas remedem
     }
 
-    closeFlyout() {
-        const id = this.openId;
-        if (!id) return;
-        this.openId = null;
+    closeFlyout(id) {
+        if (!this.openIds.has(id)) return;
+        this.openIds.delete(id);
         document.getElementById(id)?.classList.remove("rail-open");
         this.renderButtons(id);
         this.wm?.refreshEdgeSplitters?.();
