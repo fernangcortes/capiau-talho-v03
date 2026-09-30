@@ -43,7 +43,7 @@ from src.search.semantic import SemanticSearch
 from src.vision.face_engine import process_video_frame_faces, process_photo_faces
 from src.core.tasks import TASK_MANAGER
 from src.services.settings_service import SettingsService
-from src.transcription.motores import resolver_motores, montar_config_assemblyai, aviso_modelo_usado
+from src.transcription.motores import CHAVE_DO_MOTOR, ErroASR, OpcoesASR, resolver_motores, transcrever
 
 class PipelineService:
     @staticmethod
@@ -369,11 +369,13 @@ class PipelineService:
             video_type = video['video_type']
             project_id = video['project_id']
 
-        # Configurações resolvidas do projeto (chave, idioma, diarização, VAD)
+        # Configurações resolvidas do projeto (motor, chave, idioma, diarização, VAD)
         S = SettingsService.get_settings(project_id)
-        api_key = S.api_key("assemblyai")
-        if not api_key or api_key == "your_assemblyai_api_key_here":
-            err_msg = "AssemblyAI API Key não configurada (painel de configurações da IA ou .env)"
+        plano = resolver_motores(S.get("transcription.engine"), S.get("diarization.engine"))
+        provedor = CHAVE_DO_MOTOR.get(plano.transcricao)
+        api_key = S.api_key(provedor) if provedor else None
+        if provedor and (not api_key or api_key.startswith("your_")):
+            err_msg = f"Chave '{provedor}' não configurada (painel de configurações da IA ou .env)"
             with get_db() as conn:
                 MediaRepository.update_video_status(conn, video_id, 'error', error_message=err_msg)
             return False
@@ -405,60 +407,24 @@ class PipelineService:
             upload_path = temp_audio_path
 
         try:
-            plano = resolver_motores(S.get("transcription.engine"), S.get("diarization.engine"))
-            for aviso in plano.avisos:
-                print(f"[ASR] AVISO: {aviso}")
-                TASK_MANAGER.update_progress(str(video_id), 0.0, "running", task_type="transcription",
-                                             log_message=f"Aviso: {aviso}")
-
-            cfg = montar_config_assemblyai(
-                plano,
+            opcoes = OpcoesASR(
                 idioma=S.get("asr.language"),
-                separar_falantes=S.get("asr.speaker_labels"),
-                detectar_entidades=S.get("asr.entity_detection"),
+                diarizar=S.get("asr.speaker_labels"),
                 max_falantes=S.get("diarization.max_speakers"),
+                detectar_entidades=S.get("asr.entity_detection"),
             )
-            if "speaker_options" in cfg:
-                cfg["speaker_options"] = aai.SpeakerOptions(**cfg["speaker_options"])
+            try:
+                resultado = transcrever(upload_path, plano, opcoes, api_key)
+            except ErroASR as e:
+                raise PipelineError(str(e)) from e
 
-            aai.settings.api_key = api_key
-            config = aai.TranscriptionConfig(**cfg)
-
-            transcriber = aai.Transcriber()
-            transcript = transcriber.transcribe(str(upload_path), config=config)
-
-            if transcript.status == aai.TranscriptStatus.error:
-                raise PipelineError(f"Falha na API AssemblyAI: {transcript.error}")
-
-            modelo_usado = getattr(transcript, "speech_model_used", None)
-            print(f"[ASR] Vídeo {video_id}: modelo AssemblyAI usado = {modelo_usado or 'não informado'}")
-            aviso_modelo = aviso_modelo_usado(modelo_usado)
-            if aviso_modelo:
-                print(f"[ASR] AVISO: {aviso_modelo}")
+            print(f"[ASR] Vídeo {video_id}: motor {resultado.motor}, modelo {resultado.modelo_usado or 'não informado'}")
+            for aviso in resultado.avisos:
+                print(f"[ASR] AVISO: {aviso}")
                 TASK_MANAGER.update_progress(str(video_id), 50.0, "running", task_type="transcription",
-                                             log_message=f"Aviso: {aviso_modelo}")
-
-            words = []
-            for word in transcript.words:
-                words.append({
-                    "word": word.text,
-                    "start_time": word.start / 1000.0,
-                    "end_time": word.end / 1000.0,
-                    "speaker_id": f"Falante {word.speaker}" if word.speaker else "Desconhecido",
-                    "confidence": getattr(word, "confidence", 1.0)
-                })
-                
-            # Entidades faladas (nomes, lugares, organizacoes) quando a deteccao esta ligada.
-            # A AssemblyAI entrega timestamps em milissegundos, igual as palavras.
-            entidades = []
-            for ent in (getattr(transcript, "entities", None) or []):
-                tipo = getattr(ent, "entity_type", None)
-                entidades.append({
-                    "entity_type": getattr(tipo, "value", None) or str(tipo),
-                    "text": getattr(ent, "text", ""),
-                    "start_time": (ent.start / 1000.0) if getattr(ent, "start", None) is not None else None,
-                    "end_time": (ent.end / 1000.0) if getattr(ent, "end", None) is not None else None,
-                })
+                                             log_message=f"Aviso: {aviso}")
+            words = resultado.palavras
+            entidades = resultado.entidades
 
             with get_db() as conn:
                 NarrativeRepository.save_transcript_words(conn, video_id, words)

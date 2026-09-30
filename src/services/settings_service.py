@@ -48,6 +48,7 @@ class ResolvedSettings:
             "nvidia_nim": "api.nvidia_nim_key",
             "openrouter": "api.openrouter_key",
             "auphonic": "api.auphonic_key",
+            "deepgram": "api.deepgram_key",
         }
         env_fallback_map = {
             "gemini": "GEMINI_API_KEY",
@@ -58,6 +59,7 @@ class ResolvedSettings:
             "nvidia_nim": "NVIDIA_NIM_KEY",
             "openrouter": "OPENROUTER_API_KEY",
             "auphonic": "AUPHONIC_API_KEY",
+            "deepgram": "DEEPGRAM_API_KEY",
         }
 
         prov = provider.lower().strip()
