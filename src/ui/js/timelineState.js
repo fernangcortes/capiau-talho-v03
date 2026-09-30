@@ -305,6 +305,8 @@ export class CapiauTimelineState {
         this.selectedGap = null; // Gap selecionado: { trackId, startFrame, endFrame, durationFrames }
         this.snappingEnabled = true; // Encaixe magnético global ativo por padrão
         this.selectionFollowsPlayhead = this.loadSelectionFollowsPlayhead(); // Modo 'Seleção Acompanha a Agulha' (Toggle - ativo por padrão)
+        this.autoTransformOverlay = this.loadAutoTransformOverlay(); // Modo 'Alças de Transformação Automáticas ao Selecionar' (Toggle - inativo por padrão)
+        this.manualTransformClipId = null; // ID do clipe ativo em modo de transformação manual (ativado por Ctrl+clique no preview)
 
         this.width = 1920; // Largura padrão da sequência (Fase 1)
         this.height = 1080; // Altura padrão da sequência (Fase 1)
@@ -460,6 +462,35 @@ export class CapiauTimelineState {
             }
         } catch (_) {}
         STATE.emit("timelineCollisionModeChanged", mode);
+    }
+
+    /** Carrega a preferência de 'Alças de Transformação Automáticas ao Selecionar' do localStorage (default: false). */
+    loadAutoTransformOverlay() {
+        try {
+            if (typeof localStorage !== "undefined") {
+                const saved = localStorage.getItem("capiau_auto_transform_overlay");
+                if (saved !== null) return saved === "true";
+            }
+        } catch (_) {}
+        return false;
+    }
+
+    /** Alterna ou define a exibição automática das alças de transformação ao selecionar clipe na timeline. */
+    toggleAutoTransformOverlay(enabled) {
+        this.autoTransformOverlay = (enabled !== undefined) ? !!enabled : !this.autoTransformOverlay;
+        try {
+            if (typeof localStorage !== "undefined") {
+                localStorage.setItem("capiau_auto_transform_overlay", String(this.autoTransformOverlay));
+            }
+        } catch (_) {}
+        STATE.emit("timelineAutoTransformOverlayChanged", this.autoTransformOverlay);
+        return this.autoTransformOverlay;
+    }
+
+    /** Define o ID do clipe ativo em modo de transformação manual no preview. */
+    setManualTransformClipId(clipId) {
+        this.manualTransformClipId = clipId ? String(clipId) : null;
+        STATE.emit("manualTransformClipIdChanged", this.manualTransformClipId);
     }
 
     /** Atalho reativo para a lista ativa de cortes na timeline. */
@@ -2253,6 +2284,7 @@ export class CapiauTimelineState {
     clearClipSelection() {
         this.selectedClipIds.clear();
         this.selectedClipId = null;
+        this.manualTransformClipId = null;
         STATE.emit("timelineSelectionChanged", null);
     }
 

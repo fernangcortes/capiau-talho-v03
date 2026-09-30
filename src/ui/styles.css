@@ -3407,6 +3407,19 @@ button {
     color: var(--accent) !important;
 }
 
+/* Botão de Modo de Transformação no Header do Program */
+.player-header .btn-control.btn-transform-mode.active,
+.player-panel:hover .player-header .btn-control.btn-transform-mode.active {
+    opacity: 0.9 !important;
+    pointer-events: auto !important;
+    color: var(--accent) !important;
+    text-shadow: 0 0 8px var(--t-glow, color-mix(in srgb, var(--accent) 50%, transparent));
+}
+.player-panel:hover .player-header .btn-control.btn-transform-mode.active:hover {
+    opacity: 1 !important;
+    color: var(--accent) !important;
+}
+
 .dropdown-wrapper {
     display: flex;
     align-items: center;

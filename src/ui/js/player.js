@@ -2450,6 +2450,7 @@ export class ProgramPlayer {
         this.playbackSpeed = 1.0;
         this.isPlayInOut = false;
         this._osdTimeout = null;
+        this._settingManualTransformFromPreview = false;
         this.textOverlayManager = (typeof PlayerTextOverlayManager === "function") ? new PlayerTextOverlayManager() : { init: () => {}, render: () => {} };
         this.init();
     }
@@ -2487,7 +2488,45 @@ export class ProgramPlayer {
         STATE.on("previewZoomChanged", () => syncProgramViewport());
 
         // Atualiza o overlay de transformações quando a seleção muda
-        STATE.on("timelineSelectionChanged", () => this.syncVideoToPlayhead());
+        STATE.on("timelineSelectionChanged", () => {
+            if (!this._settingManualTransformFromPreview) {
+                TIMELINE_STATE.setManualTransformClipId(null);
+            }
+            this.syncVideoToPlayhead();
+        });
+
+        // Atualiza reativamente ao alternar o modo de alças automáticas
+        STATE.on("timelineAutoTransformOverlayChanged", () => {
+            this.syncTransformOverlay();
+        });
+
+        // Botão de alternar modo de transformação no header do Program Player
+        const btnTransformMode = this.el("btn-toggle-auto-transform");
+        if (btnTransformMode) {
+            const updateTransformBtnUI = (isAuto) => {
+                btnTransformMode.classList.toggle("active", !!isAuto);
+                btnTransformMode.setAttribute(
+                    "data-tooltip",
+                    isAuto
+                        ? "Modo de Alças: Automático (Exibindo sempre ao selecionar clipe) — Clique para alternar para Manual (Ctrl+Clique)"
+                        : "Modo de Alças: Manual (Padrão: Ctrl+Clique no vídeo para exibir) — Clique para ativar modo Automático"
+                );
+            };
+            updateTransformBtnUI(TIMELINE_STATE.autoTransformOverlay);
+            btnTransformMode.addEventListener("click", () => {
+                const next = TIMELINE_STATE.toggleAutoTransformOverlay();
+                updateTransformBtnUI(next);
+                if (window.showToast) {
+                    window.showToast(
+                        next
+                            ? "Alças de Transformação: Automático (ao selecionar clipe)"
+                            : "Alças de Transformação: Manual (Ctrl+Clique no Preview)",
+                        "info"
+                    );
+                }
+            });
+            STATE.on("timelineAutoTransformOverlayChanged", (isAuto) => updateTransformBtnUI(isAuto));
+        }
 
         // Botão Play Program
         const btnPlay = this.el("btn-program-play");
@@ -2799,6 +2838,24 @@ export class ProgramPlayer {
         // 2. Pan por Arraste (Botão do meio, Espaço+Drag, ou Drag quando ampliado)
         wrapper.addEventListener("mousedown", (e) => {
             if (e.target.closest("#program-player-minimap")) return;
+            if (e.target.closest(".program-scrollbar")) return;
+
+            // Ctrl+Clique no vídeo do Preview: ativa ou alterna o overlay de transformação (Fase 4 / Interação Direta)
+            if ((e.ctrlKey || e.metaKey) && e.button === 0) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.handlePreviewCtrlClick(e);
+                return;
+            }
+
+            // Clique fora no wrapper vazio (letterbox / pillarbox) fecha transformação manual
+            if (e.target === wrapper && e.button === 0 && !e.ctrlKey && !e.metaKey) {
+                if (TIMELINE_STATE.manualTransformClipId) {
+                    TIMELINE_STATE.setManualTransformClipId(null);
+                    this.syncTransformOverlay();
+                }
+            }
+
             if (e.target.closest(".transform-handle") || e.target.closest(".transform-handle-rot")) {
                 if (!isSpacePressed && e.button !== 1) return;
             }
@@ -2874,7 +2931,7 @@ export class ProgramPlayer {
                 }
             });
 
-            // 3. Teclado: Espaço para Pan
+            // 3. Teclado: Espaço para Pan e Escape para desativar Transform
             window.addEventListener("keydown", (e) => {
                 if (["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement?.tagName)) return;
                 if (e.code === "Space" && !isSpacePressed && !e.repeat) {
@@ -2883,12 +2940,24 @@ export class ProgramPlayer {
                         wrapper.classList.add("space-mode");
                     }
                 }
+                if (e.key === "Escape" || e.code === "Escape") {
+                    if (TIMELINE_STATE.manualTransformClipId) {
+                        TIMELINE_STATE.setManualTransformClipId(null);
+                        this.syncTransformOverlay();
+                    }
+                }
             });
 
             window.addEventListener("keyup", (e) => {
                 if (e.code === "Space") {
                     isSpacePressed = false;
                     wrapper.classList.remove("space-mode");
+                }
+            });
+
+            wrapper.addEventListener("contextmenu", (e) => {
+                if (e.ctrlKey) {
+                    e.preventDefault();
                 }
             });
         }
@@ -5066,6 +5135,91 @@ export class ProgramPlayer {
         }
     }
 
+    /**
+     * Trata o Ctrl+Clique no vídeo do Preview (Fase 4 / Interação Direta):
+     * Ativa as alças de transformação para o clipe clicado ou sob a agulha;
+     * Se já estiver ativo para este clipe, alterna/desativa.
+     */
+    handlePreviewCtrlClick(e) {
+        const currentFrame = TIMELINE_STATE.playheadFrame;
+        const cuts = STATE.activeTimelineCuts || [];
+
+        // 1. Tenta identificar o clipe sob as coordenadas do clique
+        let targetClip = null;
+        const doc = e?.target?.ownerDocument || document;
+        const elUnderClick = (typeof doc.elementFromPoint === "function") ? doc.elementFromPoint(e.clientX, e.clientY) : null;
+        if (elUnderClick) {
+            const mediaEl = elUnderClick.closest("[data-active-clip-id]");
+            if (mediaEl && mediaEl.dataset.activeClipId) {
+                targetClip = cuts.find(c => String(c.id) === String(mediaEl.dataset.activeClipId));
+            }
+        }
+
+        // 2. Se não encontrou pelo elemento clicado, busca clipe ativo sob o playhead
+        if (!targetClip) {
+            // Prioridade A: o clipe atualmente selecionado na timeline se estiver sob o playhead
+            if (TIMELINE_STATE.selectedClipId) {
+                targetClip = cuts.find(c =>
+                    String(c.id) === String(TIMELINE_STATE.selectedClipId) &&
+                    !c.disabled &&
+                    c.type !== "audio" &&
+                    currentFrame >= c.timelineStartFrame &&
+                    currentFrame < (c.timelineStartFrame + (c.outFrame - c.inFrame))
+                );
+            }
+        }
+
+        // Prioridade B: pista visível mais alta (overlayCut) ou base (baseCut)
+        if (!targetClip) {
+            const videoTracks = TIMELINE_STATE.getVideoTracks().filter(t => !TIMELINE_STATE.muteHiddenTracksPlayback || !t.hidden);
+            for (let i = 0; i < videoTracks.length; i++) {
+                const hit = cuts.find(c =>
+                    c.track === videoTracks[i].id &&
+                    !c.disabled &&
+                    c.type !== "audio" &&
+                    currentFrame >= c.timelineStartFrame &&
+                    currentFrame < (c.timelineStartFrame + (c.outFrame - c.inFrame))
+                );
+                if (hit) {
+                    targetClip = hit;
+                    break;
+                }
+            }
+        }
+
+        // Prioridade C: qualquer clipe de vídeo ou foto ativo no frame
+        if (!targetClip) {
+            targetClip = cuts.find(c =>
+                !c.disabled &&
+                c.type !== "audio" &&
+                currentFrame >= c.timelineStartFrame &&
+                currentFrame < (c.timelineStartFrame + (c.outFrame - c.inFrame))
+            );
+        }
+
+        if (!targetClip) return;
+
+        // Se o overlay já está ativo para este clipe, alterna para desativado (toggle)
+        if (String(TIMELINE_STATE.manualTransformClipId) === String(targetClip.id)) {
+            TIMELINE_STATE.setManualTransformClipId(null);
+            this.syncTransformOverlay();
+            return;
+        }
+
+        // Pausa se o vídeo estiver reproduzindo ao iniciar transformação
+        if (this.isPlaying) {
+            this.pause();
+        }
+
+        this._settingManualTransformFromPreview = true;
+        TIMELINE_STATE.setManualTransformClipId(targetClip.id);
+        if (String(TIMELINE_STATE.selectedClipId) !== String(targetClip.id)) {
+            TIMELINE_STATE.selectClip(targetClip.id);
+        }
+        this._settingManualTransformFromPreview = false;
+        this.syncTransformOverlay();
+    }
+
     syncTransformOverlay() {
         const selectedId = TIMELINE_STATE.selectedClipId;
         const overlay = this.el("program-transform-overlay");
@@ -5087,6 +5241,18 @@ export class ProgramPlayer {
         );
 
         if (!activeClip || activeClip.type === "text" || activeClip.type === "audio") {
+            overlay.style.display = "none";
+            overlay.innerHTML = "";
+            overlay.dataset.clipId = "";
+            return;
+        }
+
+        // Modo manual: por padrão as linhas NÃO aparecem ao apenas selecionar na timeline.
+        // Só aparecem quando ativadas por Ctrl+Clique no vídeo do preview,
+        // OU se o modo automático ("como funciona hoje") estiver ativado pelo usuário.
+        const isAuto = !!TIMELINE_STATE.autoTransformOverlay;
+        const isManualActive = String(activeClip.id) === String(TIMELINE_STATE.manualTransformClipId);
+        if (!isAuto && !isManualActive) {
             overlay.style.display = "none";
             overlay.innerHTML = "";
             overlay.dataset.clipId = "";
@@ -5382,6 +5548,11 @@ export class ProgramPlayer {
         };
 
         const onClick = (e) => {
+            if (e.ctrlKey || e.metaKey) {
+                e.preventDefault();
+                e.stopPropagation();
+                return;
+            }
             const target = e.target;
             const handleType = target?.dataset?.handle;
             const wrapper = this.el("program-video-wrapper");
@@ -5409,6 +5580,15 @@ export class ProgramPlayer {
         const onMouseDown = (e) => {
             const clip = STATE.activeTimelineCuts.find(c => c.id === clipId);
             if (!clip) return;
+
+            if ((e.ctrlKey || e.metaKey) && e.button === 0) {
+                // Ctrl+Clique no vídeo com overlay visível: desativa o modo manual de transformação!
+                e.preventDefault();
+                e.stopPropagation();
+                TIMELINE_STATE.setManualTransformClipId(null);
+                this.syncTransformOverlay();
+                return;
+            }
 
             const target = e.target;
             const handleType = target?.dataset?.handle; // "tl", "tc", "tr", "ml", "mr", "bl", "bc", "br", "rot" ou undefined (corpo)

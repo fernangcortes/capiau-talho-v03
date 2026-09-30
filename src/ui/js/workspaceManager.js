@@ -1244,8 +1244,10 @@ export class WorkspaceManager {
             if (!wrapper) return;
             let clickTimer = null;
             
-            // Ouvinte de clique geral no wrapper (e elementos internos que propagam)
             wrapper.addEventListener("click", (e) => {
+                if (e.ctrlKey || e.metaKey) return;
+                if (e.target.closest("#program-player-minimap") || e.target.closest(".program-scrollbar")) return;
+
                 // Ignora se clicou em algum botão ou controle, ou se clicou em face-box (desambiguação).
                 // A camada de rostos do Source trata o próprio clique (play/pause ou desenhar caixa):
                 // tratar aqui também alternava duas vezes e o clique se anulava.
@@ -3601,6 +3603,7 @@ export class WorkspaceManager {
                 followPlayhead: ts.followPlayhead,
                 followPlayheadMode: ts.followPlayheadMode,
                 selectionFollowsPlayhead: ts.selectionFollowsPlayhead,
+                autoTransformOverlay: ts.autoTransformOverlay,
                 smoothScrollAnchor: ts.smoothScrollAnchor,
                 thumbnailMode: ts.thumbnailMode || (ts.globalThumbnailsInterval === 0 ? "none" : "continuous"),
                 globalThumbnailsInterval: ts.globalThumbnailsInterval,
@@ -4020,6 +4023,9 @@ export class WorkspaceManager {
                     if (window.timelineInteraction && typeof window.timelineInteraction.updateFollowButton === "function") {
                         window.timelineInteraction.updateFollowButton();
                     }
+                }
+                if (td.autoTransformOverlay !== undefined) {
+                    ts.toggleAutoTransformOverlay(td.autoTransformOverlay);
                 }
                 if (td.followPlayheadMode !== undefined) {
                     ts.setFollowPlayheadMode(td.followPlayheadMode);

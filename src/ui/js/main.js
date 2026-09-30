@@ -2464,6 +2464,25 @@ window.addEventListener("DOMContentLoaded", () => {
             });
         }
 
+        const chkAutoTransform = document.getElementById("chk-auto-transform-overlay");
+        if (chkAutoTransform) {
+            chkAutoTransform.checked = !!TIMELINE_STATE.autoTransformOverlay;
+            chkAutoTransform.addEventListener("change", (e) => {
+                TIMELINE_STATE.toggleAutoTransformOverlay(e.target.checked);
+                if (window.showToast) {
+                    window.showToast(
+                        e.target.checked
+                            ? "Alças de Transformação: Automático (ao selecionar clipe)"
+                            : "Alças de Transformação: Manual (Ctrl+Clique no Preview)",
+                        "info"
+                    );
+                }
+            });
+        }
+        STATE.on("timelineAutoTransformOverlayChanged", (enabled) => {
+            if (chkAutoTransform) chkAutoTransform.checked = !!enabled;
+        });
+
         const selectDensity = document.getElementById("select-timeline-thumbs-density");
         if (selectDensity) {
             selectDensity.value = TIMELINE_STATE.thumbnailMode || (TIMELINE_STATE.globalThumbnailsInterval === 0 ? "none" : "continuous");
