@@ -78,6 +78,7 @@ export class PanelsManager {
     init() {
         STATE.on("activeVideoChanged", (video) => this.onVideoChanged(video));
         STATE.on("transcriptUpdated", (dialogues) => this.renderTranscript(dialogues));
+        this.initTranscriptTextSelection();
         STATE.on("visionFramesUpdated", (frames) => this.renderVision(frames));
         STATE.on("timelineCutsUpdated", (cuts) => {
             this.renderTimeline(cuts);
@@ -808,8 +809,44 @@ export class PanelsManager {
         splitBtn.style.background = "transparent";
         splitBtn.style.border = "none";
         
+        // Botão de inserção direta na timeline (Text-based editing)
+        const insertBtn = document.createElement("button");
+        insertBtn.className = "btn-card-action insert-timeline-btn";
+        insertBtn.innerHTML = '<i class="fa-solid fa-arrow-down-to-bracket"></i>';
+        insertBtn.title = "Inserir fala na Timeline (Text-Based Edit)";
+        insertBtn.style.marginLeft = "10px";
+        insertBtn.style.color = "var(--text-muted)";
+        insertBtn.style.cursor = "pointer";
+        insertBtn.style.background = "transparent";
+        insertBtn.style.border = "none";
+        insertBtn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            if (STATE.activeVideo) {
+                const isSecondary = bubble.getAttribute("data-speaker-order") === "2" || bubble.getAttribute("data-audio-track") === "A2";
+                const targetTrack = isSecondary ? "A2" : "A1";
+                if (typeof TIMELINE_STATE.insertSpeechCut === "function") {
+                    TIMELINE_STATE.insertSpeechCut(STATE.activeVideo.id, d.start_time, d.end_time, {
+                        speakerId: d.speaker_id,
+                        isSecondary,
+                        isConcurrent: bubble.classList.contains("overlap-bubble") || isSecondary,
+                        audioTrackId: targetTrack
+                    });
+                } else {
+                    TIMELINE_STATE.addCut(STATE.activeVideo.id, d.start_time, d.end_time, null, null, {
+                        audioTrackId: targetTrack
+                    });
+                }
+                const msg = `Trecho de ${d.speaker_id} inserido na Timeline [Pista ${targetTrack}] (${formatTimecode(d.start_time)} - ${formatTimecode(d.end_time)})`;
+                STATE.emit("statusChanged", { text: msg, active: true });
+                if (typeof window !== "undefined" && typeof window.showToast === "function") {
+                    window.showToast(msg, "success");
+                }
+            }
+        });
+
         metaDiv.appendChild(inspectBtn);
         metaDiv.appendChild(splitBtn);
+        metaDiv.appendChild(insertBtn);
         bubble.appendChild(metaDiv);
         
         const textDiv = document.createElement("div");
@@ -911,8 +948,21 @@ export class PanelsManager {
         bubble.addEventListener("dblclick", (e) => {
             e.stopPropagation();
             if (STATE.activeVideo) {
-                TIMELINE_STATE.addCut(STATE.activeVideo.id, d.start_time, d.end_time, null);
-                STATE.emit("statusChanged", { text: `Trecho de ${d.speaker_id} adicionado à timeline (${formatTimecode(d.start_time)} - ${formatTimecode(d.end_time)}).`, active: true });
+                const isSecondary = bubble.getAttribute("data-speaker-order") === "2" || bubble.getAttribute("data-audio-track") === "A2";
+                const targetTrack = isSecondary ? "A2" : "A1";
+                if (typeof TIMELINE_STATE.insertSpeechCut === "function") {
+                    TIMELINE_STATE.insertSpeechCut(STATE.activeVideo.id, d.start_time, d.end_time, {
+                        speakerId: d.speaker_id,
+                        isSecondary,
+                        isConcurrent: bubble.classList.contains("overlap-bubble") || isSecondary,
+                        audioTrackId: targetTrack
+                    });
+                } else {
+                    TIMELINE_STATE.addCut(STATE.activeVideo.id, d.start_time, d.end_time, null, null, {
+                        audioTrackId: targetTrack
+                    });
+                }
+                STATE.emit("statusChanged", { text: `Trecho de ${d.speaker_id} adicionado à timeline [Pista ${targetTrack}] (${formatTimecode(d.start_time)} - ${formatTimecode(d.end_time)}).`, active: true });
             }
         });
         
@@ -954,6 +1004,7 @@ export class PanelsManager {
             if (group.length === 1) {
                 const item = group[0];
                 const bubble = this.createBubbleDOM(item.dialogue, item.originalIndex, dialogues);
+                bubble.setAttribute("data-audio-track", "A1");
                 scrollFeed.appendChild(bubble);
             } else {
                 const overlapContainer = document.createElement("div");
@@ -964,11 +1015,23 @@ export class PanelsManager {
                 overlapContainer.style.width = "100%";
                 overlapContainer.style.marginBottom = "10px";
                 
-                group.forEach(item => {
+                group.forEach((item, itemIdx) => {
                     const bubble = this.createBubbleDOM(item.dialogue, item.originalIndex, dialogues);
                     bubble.style.flex = "1";
                     bubble.style.marginBottom = "0px";
                     bubble.classList.add("overlap-bubble");
+                    bubble.setAttribute("data-is-concurrent", "true");
+                    bubble.setAttribute("data-speaker-order", (itemIdx + 1).toString());
+                    bubble.setAttribute("data-audio-track", itemIdx === 0 ? "A1" : "A2");
+
+                    const speakerSpan = bubble.querySelector(".speaker-name");
+                    if (speakerSpan) {
+                        const trackBadge = document.createElement("span");
+                        trackBadge.className = "track-badge";
+                        trackBadge.style.cssText = "font-size: var(--fs-9); padding: 1px 4px; border-radius: 3px; margin-left: 6px; background: var(--t-tint-3, rgba(6, 182, 212, 0.15)); color: var(--color-cyan);";
+                        trackBadge.textContent = itemIdx === 0 ? "Pista A1" : "Pista A2 (Fala Concorrente)";
+                        speakerSpan.appendChild(trackBadge);
+                    }
                     overlapContainer.appendChild(bubble);
                 });
                 
@@ -982,6 +1045,171 @@ export class PanelsManager {
         // Busca pistas globais em background se a gaveta não estiver colapsada
         if (this.assistantDrawer && !this.assistantDrawer.classList.contains("collapsed")) {
             this.loadDiarizationClues();
+        }
+    }
+
+    /**
+     * Inicializa a seleção contínua de palavras (.word-span) na transcrição (Text-Based Editing),
+     * exibindo a barra de ação rápida flutuante (HUD) para inserção cirúrgica na timeline.
+     */
+    initTranscriptTextSelection() {
+        if (typeof document === "undefined") return;
+        
+        const scrollFeed = document.getElementById("transcript-feed-scroll") || this.transcriptContainer;
+        if (!scrollFeed) return;
+
+        // Container flutuante (HUD) desacoplado no body
+        let hud = document.getElementById("transcript-selection-hud");
+        if (!hud && document.body) {
+            hud = document.createElement("div");
+            hud.id = "transcript-selection-hud";
+            hud.className = "transcript-selection-hud";
+            hud.style.cssText = `
+                position: fixed;
+                display: none;
+                z-index: 99999;
+                background: var(--t-surface-2, rgba(18, 18, 24, 0.95));
+                border: 1px solid var(--t-line-strong, rgba(6, 182, 212, 0.4));
+                border-radius: 6px;
+                padding: 4px 8px;
+                box-shadow: 0 4px 20px rgba(0,0,0,0.7);
+                backdrop-filter: blur(12px);
+                font-family: 'Outfit', sans-serif;
+                font-size: var(--fs-11);
+                color: #fff;
+                align-items: center;
+                gap: 8px;
+            `;
+            hud.innerHTML = `
+                <span class="hud-info" style="color: var(--color-cyan); font-weight: 500;">0.0s</span>
+                <span class="hud-track-badge" style="background: var(--t-tint-3, rgba(139, 92, 246, 0.2)); color: #c4b5fd; padding: 2px 5px; border-radius: 3px; font-size: var(--fs-10);">A1</span>
+                <button type="button" class="btn-insert-selection" style="background: transparent; border: none; color: #fff; cursor: pointer; padding: 2px 6px; border-radius: 4px; display: inline-flex; align-items: center; gap: 4px;">
+                    <i class="fa-solid fa-arrow-down-to-bracket" style="color: var(--color-cyan);"></i> Inserir na Timeline
+                </button>
+            `;
+            document.body.appendChild(hud);
+        }
+
+        const hideHud = () => {
+            if (hud) hud.style.display = "none";
+        };
+
+        const handleSelection = () => {
+            if (typeof window === "undefined" || !window.getSelection) return;
+            const sel = window.getSelection();
+            if (!sel || sel.isCollapsed || !sel.rangeCount) {
+                hideHud();
+                return;
+            }
+
+            const range = sel.getRangeAt(0);
+            const container = range.commonAncestorContainer;
+            const parentEl = container.nodeType === 1 ? container : container.parentElement;
+            if (!parentEl) {
+                hideHud();
+                return;
+            }
+
+            const bubble = parentEl.closest(".transcript-bubble");
+            if (!bubble) {
+                hideHud();
+                return;
+            }
+
+            const wordSpans = Array.from(bubble.querySelectorAll(".word-span"));
+            const selectedSpans = wordSpans.filter(span => sel.containsNode ? sel.containsNode(span, true) : false);
+
+            if (selectedSpans.length === 0) {
+                const startNode = range.startContainer.nodeType === 1 ? range.startContainer : range.startContainer.parentElement;
+                const endNode = range.endContainer.nodeType === 1 ? range.endContainer : range.endContainer.parentElement;
+                const startSpan = startNode?.closest(".word-span");
+                const endSpan = endNode?.closest(".word-span");
+                if (startSpan && endSpan) {
+                    const startIdx = wordSpans.indexOf(startSpan);
+                    const endIdx = wordSpans.indexOf(endSpan);
+                    if (startIdx !== -1 && endIdx !== -1) {
+                        const [minIdx, maxIdx] = startIdx <= endIdx ? [startIdx, endIdx] : [endIdx, startIdx];
+                        for (let i = minIdx; i <= maxIdx; i++) {
+                            selectedSpans.push(wordSpans[i]);
+                        }
+                    }
+                }
+            }
+
+            if (selectedSpans.length === 0) {
+                hideHud();
+                return;
+            }
+
+            const firstSpan = selectedSpans[0];
+            const lastSpan = selectedSpans[selectedSpans.length - 1];
+            const inSec = parseFloat(firstSpan.getAttribute("data-start") || firstSpan.dataset?.start || 0);
+            const outSec = parseFloat(lastSpan.getAttribute("data-end") || lastSpan.dataset?.end || inSec + 1);
+            const dur = Math.max(0.1, outSec - inSec);
+
+            const isSecondary = bubble.getAttribute("data-speaker-order") === "2" || bubble.getAttribute("data-audio-track") === "A2";
+            const targetAudioTrack = isSecondary ? "A2" : "A1";
+
+            const infoEl = hud.querySelector(".hud-info");
+            const trackEl = hud.querySelector(".hud-track-badge");
+            const btnInsert = hud.querySelector(".btn-insert-selection");
+
+            if (infoEl) infoEl.textContent = `${dur.toFixed(1)}s (${selectedSpans.length} palavras)`;
+            if (trackEl) {
+                trackEl.textContent = targetAudioTrack;
+                trackEl.style.background = isSecondary ? "rgba(244, 63, 94, 0.2)" : "rgba(6, 182, 212, 0.2)";
+                trackEl.style.color = isSecondary ? "#fda4af" : "#67e8f9";
+            }
+
+            const rect = range.getBoundingClientRect ? range.getBoundingClientRect() : { top: 100, left: 100, width: 50 };
+            hud.style.display = "inline-flex";
+            const hudHeight = 32;
+            const topPos = Math.max(10, (rect.top || 100) - hudHeight - 8);
+            const leftPos = Math.max(10, Math.min((window.innerWidth || 1200) - 220, (rect.left || 100) + ((rect.width || 50) / 2) - 100));
+            hud.style.top = `${topPos}px`;
+            hud.style.left = `${leftPos}px`;
+
+            if (btnInsert) {
+                btnInsert.onclick = (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (STATE.activeVideo) {
+                        const dIdx = parseInt(bubble.getAttribute("data-dialogue-index") || "0", 10);
+                        const d = this.activeDialogues ? this.activeDialogues[dIdx] : null;
+                        const speakerId = d ? d.speaker_id : "Locutor";
+
+                        if (typeof TIMELINE_STATE.insertSpeechCut === "function") {
+                            TIMELINE_STATE.insertSpeechCut(STATE.activeVideo.id, inSec, outSec, {
+                                speakerId,
+                                isSecondary,
+                                isConcurrent: bubble.classList.contains("overlap-bubble") || isSecondary,
+                                audioTrackId: targetAudioTrack
+                            });
+                        } else {
+                            TIMELINE_STATE.addCut(STATE.activeVideo.id, inSec, outSec, null, null, {
+                                audioTrackId: targetAudioTrack
+                            });
+                        }
+                        const msg = `Seleção de texto inserida na Timeline [Pista ${targetAudioTrack}] (${formatTimecode(inSec)} - ${formatTimecode(outSec)})`;
+                        STATE.emit("statusChanged", { text: msg, active: true });
+                        if (typeof window !== "undefined" && typeof window.showToast === "function") {
+                            window.showToast(msg, "success");
+                        }
+                    }
+                    hideHud();
+                    sel.removeAllRanges();
+                };
+            }
+        };
+
+        scrollFeed.addEventListener("mouseup", () => setTimeout(handleSelection, 20));
+        scrollFeed.addEventListener("touchend", () => setTimeout(handleSelection, 20));
+        if (typeof document !== "undefined" && document.addEventListener) {
+            document.addEventListener("mousedown", (e) => {
+                if (hud && !hud.contains(e.target) && !e.target.closest("#transcript-feed-scroll")) {
+                    hideHud();
+                }
+            });
         }
     }
 
@@ -4541,3 +4769,39 @@ window.openTasksDrawerAndSwitchTab = function() {
         STATE.emit("rightTabChanged", "tasks");
     }
 };
+
+/**
+ * Utilitário puro de extração de timestamp a partir de lista ou seleção de spans (.word-span).
+ * @param {Array<HTMLElement|Object>} wordSpans
+ */
+export function extractWordRangeFromSpans(wordSpans) {
+    if (!Array.isArray(wordSpans) || wordSpans.length === 0) return null;
+    const first = wordSpans[0];
+    const last = wordSpans[wordSpans.length - 1];
+    const inSec = parseFloat(first.dataset?.start ?? (first.getAttribute ? first.getAttribute("data-start") : null) ?? first.start_time ?? 0);
+    const outSec = parseFloat(last.dataset?.end ?? (last.getAttribute ? last.getAttribute("data-end") : null) ?? last.end_time ?? inSec);
+    const words = wordSpans.map(w => w.textContent || w.word || "").join(" ").trim();
+    return {
+        inSec,
+        outSec,
+        duration: Math.max(0, outSec - inSec),
+        wordCount: wordSpans.length,
+        text: words
+    };
+}
+
+/**
+ * Utilitário de detecção de concorrência/sobreposição de fala e roteamento para pistas de áudio.
+ * @param {Object} dialogue - Diálogo a avaliar
+ * @param {Object} [prevDialogue] - Diálogo imediatamente anterior
+ * @returns {{ isConcurrent: boolean, audioTrackId: string, speakerOrder: number }}
+ */
+export function detectConcurrentSpeakerTrack(dialogue, prevDialogue) {
+    if (!prevDialogue) return { isConcurrent: false, audioTrackId: "A1", speakerOrder: 1 };
+    const isOverlapping = dialogue.start_time < prevDialogue.end_time && dialogue.speaker_id !== prevDialogue.speaker_id;
+    return {
+        isConcurrent: isOverlapping,
+        audioTrackId: isOverlapping ? "A2" : "A1",
+        speakerOrder: isOverlapping ? 2 : 1
+    };
+}

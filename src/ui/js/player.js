@@ -27,6 +27,85 @@ export function formatTimecode(secs, fps = null) {
 }
 
 /**
+ * Converte coordenadas de bounding box no padrão canônico Gemini [ymin, xmin, ymax, xmax] (escala 0-1000)
+ * para pixels absolutos e percentuais CSS baseados nas dimensões do contêiner.
+ * Também oferece retrocompatibilidade transparente com caixas legadas [x, y, w, h] (0.0-1.0).
+ *
+ * @param {Array<number>} box - Coordenadas [ymin, xmin, ymax, xmax] ou [x, y, w, h].
+ * @param {number} [img_w=1000] - Largura do contêiner em pixels.
+ * @param {number} [img_h=1000] - Altura do contêiner em pixels.
+ * @param {boolean} [isLegacyXywh=false] - Força interpretação como [x, y, w, h].
+ * @returns {{ top: number, left: number, width: number, height: number, leftPct: number, topPct: number, widthPct: number, heightPct: number, ymin: number, xmin: number, ymax: number, xmax: number }}
+ */
+export function canonical_to_pixel_box(box, img_w = 1000, img_h = 1000, isLegacyXywh = false) {
+    if (!box || !Array.isArray(box) || box.length !== 4) {
+        return {
+            top: 0, left: 0, width: 0, height: 0,
+            leftPct: 0, topPct: 0, widthPct: 0, heightPct: 0,
+            ymin: 0, xmin: 0, ymax: 0, xmax: 0
+        };
+    }
+
+    const w = Math.max(1, Number(img_w) || 1000);
+    const h = Math.max(1, Number(img_h) || 1000);
+
+    let ymin, xmin, ymax, xmax;
+
+    if (isLegacyXywh) {
+        // [x, y, w, h] (top-left)
+        const [lx, ly, lw, lh] = box.map(v => Number(v) || 0);
+        const factor = (Math.max(lx, ly, lw, lh) <= 1.0) ? 1000 : 1;
+        xmin = lx * factor;
+        ymin = ly * factor;
+        xmax = (lx + lw) * factor;
+        ymax = (ly + lh) * factor;
+    } else {
+        // Gemini canonical [ymin, xmin, ymax, xmax]
+        const vals = box.map(v => Number(v) || 0);
+        const maxVal = Math.max(...vals);
+        const factor = (maxVal <= 1.0 && maxVal > 0) ? 1000 : 1;
+        ymin = vals[0] * factor;
+        xmin = vals[1] * factor;
+        ymax = vals[2] * factor;
+        xmax = vals[3] * factor;
+    }
+
+    // Inverter se invertido acidentalmente
+    if (ymin > ymax) [ymin, ymax] = [ymax, ymin];
+    if (xmin > xmax) [xmin, xmax] = [xmax, xmin];
+
+    const yminClamped = Math.max(0, Math.min(1000, Math.round(ymin)));
+    const xminClamped = Math.max(0, Math.min(1000, Math.round(xmin)));
+    const ymaxClamped = Math.max(yminClamped, Math.min(1000, Math.round(ymax)));
+    const xmaxClamped = Math.max(xminClamped, Math.min(1000, Math.round(xmax)));
+
+    const left = Math.round((xminClamped / 1000) * w);
+    const top = Math.round((yminClamped / 1000) * h);
+    const width = Math.round(((xmaxClamped - xminClamped) / 1000) * w);
+    const height = Math.round(((ymaxClamped - yminClamped) / 1000) * h);
+
+    const leftPct = parseFloat(((xminClamped / 1000) * 100).toFixed(2));
+    const topPct = parseFloat(((yminClamped / 1000) * 100).toFixed(2));
+    const widthPct = parseFloat((((xmaxClamped - xminClamped) / 1000) * 100).toFixed(2));
+    const heightPct = parseFloat((((ymaxClamped - yminClamped) / 1000) * 100).toFixed(2));
+
+    return {
+        top,
+        left,
+        width,
+        height,
+        leftPct,
+        topPct,
+        widthPct,
+        heightPct,
+        ymin: yminClamped,
+        xmin: xminClamped,
+        ymax: ymaxClamped,
+        xmax: xmaxClamped
+    };
+}
+
+/**
  * Analisa uma string de entrada para navegação por timecode (absoluta ou relativa).
  *
  * Suporta:
@@ -1811,64 +1890,145 @@ export class SourcePlayer {
     }
 
     renderFaces(frameFaces) {
+        return this.renderGroundingBoxes(frameFaces);
+    }
+
+    /**
+     * Renderiza caixas delimitadoras de grounding (Gemini Canonical [ymin, xmin, ymax, xmax] 0-1000)
+     * para pessoas e adereços cenográficos (props/objetos) no overlay do player.
+     * Clicar em qualquer caixa dispara busca semântica instantânea (Click-to-Search Grounding) no acervo.
+     */
+    renderGroundingBoxes(detections = []) {
         if (!this.overlayContainer) return;
         
-        const oldBoxes = this.overlayContainer.querySelectorAll(".face-box");
+        const oldBoxes = this.overlayContainer.querySelectorAll(".face-box, .grounding-box");
         oldBoxes.forEach(box => box.remove());
 
-        frameFaces.forEach(face => {
-            const box = face.bounding_box;
-            if (!box || box.length !== 4) return;
+        const cWidth = this.overlayContainer.clientWidth || 1000;
+        const cHeight = this.overlayContainer.clientHeight || 1000;
 
-            const [x, y, w, h] = box;
-            const faceDiv = document.createElement("div");
-            faceDiv.className = "face-box";
-            faceDiv.style.left = `${x * 100}%`;
-            faceDiv.style.top = `${y * 100}%`;
-            faceDiv.style.width = `${w * 100}%`;
-            faceDiv.style.height = `${h * 100}%`;
+        detections.forEach(item => {
+            const rawBox = item.bounding_box || item.box;
+            if (!rawBox || rawBox.length !== 4) return;
 
-            const label = face.name || "Quem é?";
-            faceDiv.title = label;
+            const pBox = canonical_to_pixel_box(rawBox, cWidth, cHeight);
+            const isProp = item.type === "prop" || item.entity_type === "prop" || item.category === "prop" || item.is_object;
+            const label = item.name || item.label || item.object_name || (isProp ? "Objeto" : "Quem é?");
+            const entityType = isProp ? "prop" : "person";
 
+            const boxDiv = document.createElement("div");
+            boxDiv.className = isProp ? "grounding-box prop-box" : "face-box grounding-box person-box";
+            boxDiv.style.position = "absolute";
+            boxDiv.style.left = `${pBox.leftPct}%`;
+            boxDiv.style.top = `${pBox.topPct}%`;
+            boxDiv.style.width = `${pBox.widthPct}%`;
+            boxDiv.style.height = `${pBox.heightPct}%`;
+            boxDiv.style.boxSizing = "border-box";
+            boxDiv.style.cursor = "pointer";
+            boxDiv.style.pointerEvents = "auto";
+            boxDiv.style.transition = "all 0.15s ease";
+            
+            // Design System Styling (Seamless & Glassmorphic)
+            if (isProp) {
+                boxDiv.style.border = "1.5px solid rgba(16, 185, 129, 0.75)";
+                boxDiv.style.background = "rgba(16, 185, 129, 0.08)";
+            } else {
+                boxDiv.style.border = "1.5px solid rgba(6, 182, 212, 0.75)";
+                boxDiv.style.background = "rgba(6, 182, 212, 0.08)";
+            }
+            boxDiv.title = `Clique para buscar cenas com "${label}" no acervo`;
+
+            // Floating Name Tag (Outfit 10px, dark background)
             const nameTag = document.createElement("span");
-            nameTag.className = "face-name-tag";
+            nameTag.className = "grounding-name-tag face-name-tag";
+            nameTag.style.cssText = `
+                position: absolute;
+                top: 0; left: 0;
+                transform: translateY(-100%);
+                background: var(--t-surface-2, rgba(18, 18, 24, 0.95));
+                color: ${isProp ? "#6ee7b7" : "#67e8f9"};
+                font-family: 'Outfit', sans-serif;
+                font-size: var(--fs-10);
+                padding: 1px 5px;
+                border-radius: 3px;
+                white-space: nowrap;
+                pointer-events: none;
+                box-shadow: 0 2px 6px rgba(0,0,0,0.5);
+                border: 1px solid ${isProp ? "rgba(16, 185, 129, 0.3)" : "rgba(6, 182, 212, 0.3)"};
+            `;
             nameTag.textContent = label;
-            faceDiv.appendChild(nameTag);
+            boxDiv.appendChild(nameTag);
 
-            faceDiv.style.pointerEvents = "auto";
-            faceDiv.addEventListener("click", async (e) => {
+            // Click-to-Search Grounding Dispatcher
+            boxDiv.addEventListener("click", async (e) => {
                 e.stopPropagation();
-                let speakers = [];
-                try {
-                    speakers = await CapIAuAPI.fetchProjectSpeakers(STATE.currentProjectId);
-                } catch (err) {
-                    console.warn("Erro ao carregar speakers:", err);
+
+                // Micro-interação tátil de pulso (Design System Seção V.12)
+                boxDiv.classList.add("btn-thumb-click-pulse");
+                setTimeout(() => boxDiv.classList.remove("btn-thumb-click-pulse"), 250);
+
+                if (typeof window !== "undefined" && typeof window.showToast === "function") {
+                    window.showToast(`Buscando cenas com "${label}" no acervo...`, "info");
                 }
 
-                const name = await showAnnotationModal(speakers, face.name || "");
-                if (name) {
-                    const trimmedName = name.trim();
-                    const res = await CapIAuAPI.labelFace(face.id, trimmedName);
-                    
-                    await FaceManager.handleLabelResponse(res, face.id, async () => {
-                        if (STATE.activeVideo) {
-                            const faces = await CapIAuAPI.fetchVideoFaces(STATE.activeVideo.id);
-                            this.videoFaces = faces || [];
-                            this.updateFacesOverlay();
-                        }
-                    });
+                // Dispara evento global de busca semântica por grounding
+                const canonicalBox = [pBox.ymin, pBox.xmin, pBox.ymax, pBox.xmax];
+                STATE.emit("groundingSearchRequested", {
+                    query: label,
+                    entityType,
+                    box: canonicalBox,
+                    videoId: STATE.activeVideo?.id
+                });
+
+                // Atualiza campos de busca na biblioteca ou chat copilot se presentes
+                if (typeof document !== "undefined") {
+                    const searchInput = document.getElementById("search-input") || document.getElementById("library-search");
+                    if (searchInput) {
+                        searchInput.value = label;
+                        searchInput.dispatchEvent(new Event("input", { bubbles: true }));
+                    }
+
+                    const chatInput = document.getElementById("chat-input");
+                    if (chatInput) {
+                        chatInput.value = `Encontre todas as cenas do projeto contendo ${label}`;
+                    }
                 }
             });
 
-            this.overlayContainer.appendChild(faceDiv);
+            // Se for pessoa e clicar com botão direito, permite anotação/rotulação de face
+            boxDiv.addEventListener("contextmenu", async (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (!isProp && item.id) {
+                    let speakers = [];
+                    try {
+                        speakers = await CapIAuAPI.fetchProjectSpeakers(STATE.currentProjectId);
+                    } catch (err) {
+                        console.warn("Erro ao carregar speakers:", err);
+                    }
+                    const name = await showAnnotationModal(speakers, item.name || "");
+                    if (name) {
+                        const trimmedName = name.trim();
+                        const res = await CapIAuAPI.labelFace(item.id, trimmedName);
+                        await FaceManager.handleLabelResponse(res, item.id, async () => {
+                            if (STATE.activeVideo) {
+                                const faces = await CapIAuAPI.fetchVideoFaces(STATE.activeVideo.id);
+                                this.videoFaces = faces || [];
+                                this.updateFacesOverlay();
+                            }
+                        });
+                    }
+                }
+            });
+
+            this.overlayContainer.appendChild(boxDiv);
         });
     }
 
     clearFacesOverlay() {
         if (this.overlayContainer) {
             this.overlayContainer.style.display = "none";
-            const oldBoxes = this.overlayContainer.querySelectorAll(".face-box");
+            const oldBoxes = this.overlayContainer.querySelectorAll(".face-box, .grounding-box");
             oldBoxes.forEach(box => box.remove());
         }
     }

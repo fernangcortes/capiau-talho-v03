@@ -838,6 +838,57 @@ class ChatAgentService:
         {
             "type": "function",
             "function": {
+                "name": "propose_rough_cut",
+                "description": (
+                    "Orquestra uma montagem assistida de primeiro corte (Rough Cut / Assembly) "
+                    "a partir de intenção expressa em linguagem natural, criando uma sequência ordenada "
+                    "de cortes com justificativas dramáticas e marcadores editoriais estruturados."
+                ),
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "editorial_theme": {
+                            "type": "string",
+                            "description": "Tema narrativo ou intenção dramática da montagem."
+                        },
+                        "sequence": {
+                            "type": "array",
+                            "description": "Sequência ordenada de cortes propostos.",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "video_id": {"type": "integer", "description": "ID do vídeo fonte"},
+                                    "in_s": {"type": "number", "description": "Ponto de entrada (segundos)"},
+                                    "out_s": {"type": "number", "description": "Ponto de saída (segundos)"},
+                                    "timeline_start": {"type": "number", "description": "Posição na timeline (segundos)"},
+                                    "track": {"type": "string", "enum": ["V1", "V2"], "description": "Pista (V1 para entrevista/falas, V2 para cobertura b-roll)"},
+                                    "rationale": {"type": "string", "description": "Justificativa dramática do corte"}
+                                },
+                                "required": ["video_id", "in_s", "out_s", "track"]
+                            }
+                        },
+                        "markers": {
+                            "type": "array",
+                            "description": "Marcadores editoriais de timeline estruturados com justificativas dramáticas.",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "timeline_start": {"type": "number", "description": "Tempo em segundos na timeline"},
+                                    "label": {"type": "string", "description": "Rótulo do beat narrativo"},
+                                    "color": {"type": "string", "description": "Cor hexadecimal (ex: #8b5cf6, #06b6d4)"},
+                                    "comment": {"type": "string", "description": "Justificativa dramática detalhada do beat"}
+                                },
+                                "required": ["label", "comment"]
+                            }
+                        }
+                    },
+                    "required": ["editorial_theme", "sequence"]
+                }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
                 "name": "analisar_audio",
                 "description": (
                     "Mede o audio REAL do trecho do clipe com ffmpeg (com cache na tabela "
@@ -1364,6 +1415,318 @@ class ChatAgentService:
         return f"Erro: ferramenta de audio desconhecida: {func_name}"
 
     @staticmethod
+    def evaluate_safety_gatekeeper(shadow_timeline: "TimelineShadowCopy", operations: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """
+        Avaliação de Segurança do Sistema 1 (15-45ms):
+        Audita cada proposta de mutação na timeline antes de qualquer alteração real no projeto.
+        Classifica o nível de risco ('safe', 'warning', 'destructive') e exige confirmação explícita do editor.
+        """
+        if not operations:
+            return {
+                "allow_execution": True,
+                "requires_confirmation": False,
+                "risk_level": "safe",
+                "affected_duration_s": 0.0,
+                "affected_tracks": [],
+                "destructive_operations_count": 0,
+                "reason": "Nenhuma mutação proposta.",
+                "diff_summary": {
+                    "additions": 0,
+                    "replacements": 0,
+                    "deletions": 0,
+                    "net_duration_delta_s": 0.0
+                }
+            }
+
+        destructive_count = 0
+        replacement_count = 0
+        addition_count = 0
+        affected_tracks = set()
+        net_duration_delta = 0.0
+
+        for op in operations:
+            action = (op.get("action") or "INSERT").upper()
+            track = op.get("track") or "V1"
+            affected_tracks.add(track)
+            
+            in_s = float(op.get("in_s") or 0.0)
+            out_s = float(op.get("out_s") or in_s + 5.0)
+            dur = max(0.0, out_s - in_s)
+
+            if action == "DELETE":
+                destructive_count += 1
+                net_duration_delta -= dur
+            elif action == "REPLACE":
+                replacement_count += 1
+            else:  # INSERT
+                addition_count += 1
+                net_duration_delta += dur
+
+        # Classificação de risco Sistema 1
+        if destructive_count > 0:
+            risk_level = "destructive"
+            reason = f"Proposta contém {destructive_count} exclusão(ões) de material da timeline."
+        elif replacement_count > 0 or ("V1" in affected_tracks and addition_count > 0):
+            risk_level = "warning"
+            reason = f"Proposta altera a trilha principal (V1) ou realiza {replacement_count} substituição(ões) com deslocamento temporal."
+        else:
+            risk_level = "safe"
+            reason = f"Proposta inclui {addition_count} inserção(ões) em trilhas secundárias sem afetar sincronia principal."
+
+        return {
+            "allow_execution": True,
+            "requires_confirmation": True,  # Regra de Ouro: Sempre exige clique explícito do editor!
+            "risk_level": risk_level,
+            "affected_duration_s": round(abs(net_duration_delta), 2),
+            "affected_tracks": sorted(list(affected_tracks)),
+            "destructive_operations_count": destructive_count,
+            "reason": reason,
+            "diff_summary": {
+                "additions": addition_count,
+                "replacements": replacement_count,
+                "deletions": destructive_count,
+                "net_duration_delta_s": round(net_duration_delta, 2)
+            }
+        }
+
+    @staticmethod
+    def render_diff_summary_card(safety_audit: Dict[str, Any], operations: List[Dict[str, Any]], rationale: str = "") -> str:
+        diff_id = f"diff_{int(time.time())}"
+        diff_sum = safety_audit.get("diff_summary", {})
+        risk = safety_audit.get("risk_level", "warning")
+        reason = safety_audit.get("reason", "")
+        adds = diff_sum.get("additions", 0)
+        reps = diff_sum.get("replacements", 0)
+        dels = diff_sum.get("deletions", 0)
+        delta_s = diff_sum.get("net_duration_delta_s", 0.0)
+
+        risk_label_map = {
+            "safe": "Operação Segura (Sistema 1)",
+            "warning": "Atenção: Deslocamento / Substituição (Sistema 1)",
+            "destructive": "Crítico: Deleção de Mídia (Sistema 1)"
+        }
+        risk_label = risk_label_map.get(risk, "Validação de Segurança")
+
+        items_html = []
+        for op in operations[:8]:
+            act = op.get("action", "INSERT")
+            trk = op.get("track", "V1")
+            in_s = float(op.get("in_s", 0.0))
+            out_s = float(op.get("out_s", in_s + 5.0))
+            t_start = float(op.get("timeline_start", 0.0))
+            rat = op.get("rationale", "")
+            rat_text = f" — *{rat}*" if rat else ""
+            if act == "INSERT":
+                items_html.append(f'<li class="diff-item insert"><i class="fa-solid fa-plus" style="color:var(--color-cyan)"></i> <strong>+{trk}</strong>: Inserir ({in_s:.1f}s → {out_s:.1f}s em {t_start:.1f}s){rat_text}</li>')
+            elif act == "REPLACE":
+                items_html.append(f'<li class="diff-item replace"><i class="fa-solid fa-arrows-rotate" style="color:var(--color-amber)"></i> <strong>~{trk}</strong>: Substituir clipe {op.get("target_clip_id", "")} por ({in_s:.1f}s → {out_s:.1f}s){rat_text}</li>')
+            elif act == "DELETE":
+                items_html.append(f'<li class="diff-item delete"><i class="fa-solid fa-trash" style="color:var(--color-rose)"></i> <strong>-{trk}</strong>: Remover clipe {op.get("target_clip_id", "")}{rat_text}</li>')
+
+        if len(operations) > 8:
+            items_html.append(f'<li class="diff-item more">... e mais {len(operations) - 8} operações na sequência.</li>')
+
+        items_list_str = "\n".join(items_html)
+        rationale_str = f'<p class="diff-rationale">"{rationale}"</p>' if rationale else ""
+
+        card_html = f'''<div class="timeline-diff-card" data-diff-id="{diff_id}">
+    <div class="diff-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; border-bottom:1px solid rgba(255,255,255,0.08); padding-bottom:6px;">
+        <span class="diff-badge {risk}" style="font-weight:600; font-size:11px; color:{"#22c55e" if risk=="safe" else "#f59e0b" if risk=="warning" else "#ef4444"};"><i class="fa-solid fa-shield-halved"></i> Gatekeeper: {risk_label}</span>
+        <span class="diff-summary" style="font-size:11px; color:var(--text-muted, #94a3b8);">+{adds} | ~{reps} | -{dels} | Δ {delta_s:+.1f}s</span>
+    </div>
+    <div class="diff-body" style="font-size:12px; margin-bottom:10px;">
+        {rationale_str}
+        <ul class="diff-items-list" style="list-style:none; padding-left:0; margin:6px 0; display:flex; flex-direction:column; gap:4px;">
+{items_list_str}
+        </ul>
+    </div>
+    <div class="diff-actions" style="display:flex; gap:10px; margin-top:8px;">
+        <button class="btn-diff-accept btn-flat-action cyan" style="cursor:pointer; background:rgba(6,182,212,0.15); border:1px solid rgba(6,182,212,0.5); color:#67e8f9; padding:4px 10px; border-radius:4px; font-weight:500;" onclick="window.TIMELINE_STATE?.acceptAllGhostSuggestions?.(); window.showToast?.('Edição aplicada na Timeline!', 'success');"><i class="fa-solid fa-check"></i> [Aplicar Mudanças]</button>
+        <button class="btn-diff-reject btn-flat-action rose" style="cursor:pointer; background:rgba(244,63,94,0.15); border:1px solid rgba(244,63,94,0.5); color:#fda4af; padding:4px 10px; border-radius:4px; font-weight:500;" onclick="window.TIMELINE_STATE?.rejectAllGhostSuggestions?.(); window.showToast?.('Proposta descartada.', 'info');"><i class="fa-solid fa-xmark"></i> [Descartar]</button>
+    </div>
+</div>'''
+        return card_html
+
+    @staticmethod
+    def build_rough_cut_operations(
+        project_id: int,
+        sequence: List[Dict[str, Any]],
+        markers: List[Dict[str, Any]],
+        shadow_timeline: "TimelineShadowCopy",
+        editorial_theme: str = "Rough Cut"
+    ) -> tuple:
+        accepted_ops = []
+        generated_markers = []
+        
+        current_time = 0.0
+        for idx, item in enumerate(sequence):
+            v_id = item.get("video_id")
+            in_s = float(item.get("in_s", 0.0))
+            out_s = float(item.get("out_s", in_s + 5.0))
+            track = item.get("track") or "V1"
+            t_start = item.get("timeline_start")
+            if t_start is None:
+                t_start = current_time
+            else:
+                t_start = float(t_start)
+            
+            dur = max(0.5, out_s - in_s)
+            current_time = max(current_time, t_start + dur)
+
+            op = {
+                "action": "INSERT",
+                "video_id": v_id,
+                "in_s": in_s,
+                "out_s": out_s,
+                "timeline_start": t_start,
+                "track": track,
+                "rationale": item.get("rationale") or f"Corte {idx + 1} ({track}) da montagem '{editorial_theme}'"
+            }
+            accepted_ops.append(op)
+
+        fps = shadow_timeline.fps or 24.0
+        for idx, m in enumerate(markers):
+            t_start = m.get("timeline_start")
+            frame = m.get("frame")
+            if frame is None and t_start is not None:
+                frame = int(round(float(t_start) * fps))
+            elif frame is not None and t_start is None:
+                t_start = float(frame) / fps
+            
+            generated_markers.append({
+                "frame": frame or 0,
+                "timeline_start": t_start or 0.0,
+                "label": m.get("label") or f"Beat {idx + 1}",
+                "color": m.get("color") or "#8b5cf6",
+                "comment": m.get("comment") or m.get("dramatic_justification") or f"Justificativa Dramática do Beat {idx + 1}"
+            })
+
+        return accepted_ops, generated_markers
+
+    @staticmethod
+    def parse_and_orchestrate_rough_cut(
+        project_id: int,
+        message: str,
+        shadow_timeline: "TimelineShadowCopy"
+    ) -> Dict[str, Any]:
+        """
+        Interpreta e orquestra uma solicitação de primeiro corte (Rough Cut / Assembly) em linguagem natural.
+        Cria sequências ordenadas na cópia-sombra (espinha dorsal em V1 e cobertura B-Roll em V2)
+        com justificativas dramáticas e marcadores editoriais estruturados.
+        """
+        editorial_theme = "Primeiro Corte Narrativo (Rough Cut)"
+        if "entrevista" in message.lower() and "b-roll" in message.lower():
+            editorial_theme = "Montagem de Entrevista com Cobertura B-Roll"
+        elif "melhores momentos" in message.lower():
+            editorial_theme = "Primeiro Corte: Melhores Momentos"
+
+        interviews = []
+        brolls = []
+
+        try:
+            with get_db() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    "SELECT id, filename, description, duration, video_type FROM video WHERE project_id = ? ORDER BY id ASC",
+                    (project_id,)
+                )
+                videos = cursor.fetchall()
+                for v in videos:
+                    v_type = (v["video_type"] or "").lower()
+                    if "interview" in v_type or "depoimento" in v_type:
+                        interviews.append(v)
+                    elif "broll" in v_type or "cobertura" in v_type or "processo" in v_type:
+                        brolls.append(v)
+                    else:
+                        interviews.append(v)
+        except Exception as e:
+            print(f"[RoughCut] Erro ao buscar mídias do projeto: {e}")
+
+        sequence = []
+        markers = []
+        current_timeline_time = 0.0
+
+        if interviews:
+            beat_idx = 1
+            for idx, int_v in enumerate(interviews[:4]):
+                dur = float(int_v["duration"] or 30.0)
+                cut_dur = min(12.0, max(4.0, dur * 0.4))
+                in_s = 0.0
+                out_s = in_s + cut_dur
+                
+                v1_op = {
+                    "action": "INSERT",
+                    "video_id": int_v["id"],
+                    "in_s": in_s,
+                    "out_s": out_s,
+                    "timeline_start": current_timeline_time,
+                    "track": "V1",
+                    "rationale": f"Espinha dorsal: {int_v['filename']} estabelece o depoimento principal do Beat {beat_idx}."
+                }
+                sequence.append(v1_op)
+
+                markers.append({
+                    "timeline_start": current_timeline_time,
+                    "label": f"Beat {beat_idx}: Depoimento",
+                    "color": "#8b5cf6",
+                    "comment": f"Justificativa Dramática: O depoimento de {int_v['filename']} estabelece o conflito central do Beat {beat_idx}."
+                })
+
+                if brolls:
+                    broll_v = brolls[idx % len(brolls)]
+                    b_dur = float(broll_v["duration"] or 15.0)
+                    b_cut_dur = min(4.5, b_dur)
+                    b_start = current_timeline_time + max(1.0, cut_dur * 0.3)
+                    
+                    v2_op = {
+                        "action": "INSERT",
+                        "video_id": broll_v["id"],
+                        "in_s": 0.0,
+                        "out_s": b_cut_dur,
+                        "timeline_start": b_start,
+                        "track": "V2",
+                        "rationale": f"Cobertura visual: {broll_v['filename']} ancora o relato com planos de cobertura cênica."
+                    }
+                    sequence.append(v2_op)
+
+                    markers.append({
+                        "timeline_start": b_start,
+                        "label": f"Beat {beat_idx}: Cobertura",
+                        "color": "#06b6d4",
+                        "comment": f"Justificativa Dramática: Cobertura de {broll_v['filename']} intensifica o ritmo dramático."
+                    })
+
+                current_timeline_time += cut_dur + 0.5
+                beat_idx += 1
+        else:
+            sequence = [
+                {
+                    "action": "INSERT",
+                    "video_id": 1,
+                    "in_s": 0.0,
+                    "out_s": 6.0,
+                    "timeline_start": 0.0,
+                    "track": "V1",
+                    "rationale": "Plano master introdutório da sequência."
+                }
+            ]
+            markers = [
+                {
+                    "timeline_start": 0.0,
+                    "label": "Beat 1: Introdução",
+                    "color": "#8b5cf6",
+                    "comment": "Justificativa Dramática: Estabelece o universo e tom da narrativa."
+                }
+            ]
+
+        return {
+            "editorial_theme": editorial_theme,
+            "sequence": sequence,
+            "markers": markers,
+            "summary_text": f"Orquestrado rough cut preliminar ('{editorial_theme}') com {len(sequence)} cortes e {len(markers)} marcadores dramáticos."
+        }
+
+    @staticmethod
     def chat_with_agent(
         project_id: int,
         message: str,
@@ -1379,9 +1742,50 @@ class ChatAgentService:
         # Configurações resolvidas (default -> global -> projeto), uma vez por chamada
         S = SettingsService.get_settings(project_id)
 
+        # Inicializa a cópia-sombra
+        shadow_timeline = TimelineShadowCopy(clips, tracks, fps)
+
         # Chave API: custom por requisição > painel de configurações > .env
         api_key = custom_api_key or S.api_key("openrouter")
         if not api_key or api_key == "your_openrouter_api_key_here":
+            # Reconhecimento e orquestração de Rough Cut mesmo em modo offline / sem chave
+            is_rough_cut_msg = any(k in message.lower() for k in ["rough cut", "rough_cut", "assembly", "primeiro corte", "monte um corte"])
+            if is_rough_cut_msg:
+                rc = ChatAgentService.parse_and_orchestrate_rough_cut(project_id, message, shadow_timeline)
+                ops = rc["sequence"]
+                markers = rc["markers"]
+                theme = rc["editorial_theme"]
+
+                safety_audit = ChatAgentService.evaluate_safety_gatekeeper(shadow_timeline, ops)
+                diff_card = ChatAgentService.render_diff_summary_card(safety_audit, ops, rationale=f"Orquestração automática de primeiro corte: {theme}")
+
+                suggestions = []
+                for idx, op in enumerate(ops):
+                    suggestions.append({
+                        "id": f"ghost_rc_{int(time.time())}_{idx}",
+                        "action": "INSERT",
+                        "video_id": op.get("video_id"),
+                        "in": op.get("in_s", 0.0),
+                        "out": op.get("out_s", 5.0),
+                        "track": op.get("track", "V1"),
+                        "timelineStartFrame": None,
+                        "timeline_start": op.get("timeline_start", 0.0),
+                        "rationale": op.get("rationale", ""),
+                        "origin": "ai"
+                    })
+
+                resp_text = f"Montei uma proposta de rough cut preliminar para **{theme}** estruturando as falas com cobertura visual.\n\n{diff_card}"
+                return {
+                    "response": resp_text,
+                    "operations": ops,
+                    "suggestions": suggestions,
+                    "markers": markers,
+                    "safety_audit": safety_audit,
+                    "diff_summary": safety_audit.get("diff_summary"),
+                    "final_cuts": clips,
+                    "final_tracks": tracks
+                }
+
             return {
                 "response": "Olá! Configure a chave do OpenRouter no painel de configurações da IA (engrenagem no topo) ou no `.env` para liberar a IA.",
                 "operations": [],
@@ -1391,9 +1795,6 @@ class ChatAgentService:
 
         # Modelo do agente: override por requisição > configurações
         model_name = agent_model or S.get("agent.model")
-
-        # Inicializa a cópia-sombra
-        shadow_timeline = TimelineShadowCopy(clips, tracks, fps)
 
         # Monta os contextos iniciais para o prompt de sistema
         from src.services.timeline_ai import TimelineAIService
@@ -1456,6 +1857,7 @@ class ChatAgentService:
 
         accumulated_ops = []
         bulk_operations = []  # Armazena propostas de bulk_edit
+        rough_cut_markers = []  # Armazena marcadores dramáticos gerados por rough cut
         steps = 0
         max_steps = S.get("agent.max_steps")
 
@@ -1800,6 +2202,21 @@ class ChatAgentService:
                                 ". Corrija os campos e reenvie SOMENTE as operações rejeitadas."
                             )
 
+                    elif func_name == "propose_rough_cut":
+                        editorial_theme = args.get("editorial_theme", "Rough Cut Preliminar")
+                        sequence = args.get("sequence", [])
+                        raw_markers = args.get("markers", [])
+
+                        accepted_ops, generated_markers = ChatAgentService.build_rough_cut_operations(
+                            project_id, sequence, raw_markers, shadow_timeline, editorial_theme
+                        )
+                        bulk_operations.extend(accepted_ops)
+                        rough_cut_markers.extend(generated_markers)
+                        tool_result = (
+                            f"Primeiro corte ('{editorial_theme}') estruturado com sucesso: "
+                            f"{len(accepted_ops)} cortes ordenados e {len(generated_markers)} marcadores dramáticos gerados."
+                        )
+
                     elif func_name in ChatAgentService.FERRAMENTAS_AUDIO:
                         tool_result = ChatAgentService._despachar_ferramenta_de_audio(
                             func_name, project_id, shadow_timeline, args
@@ -1828,30 +2245,29 @@ class ChatAgentService:
                     "warning": index_warning
                 }
 
-        # --- FIM DO LOOP: CLASSIFICAÇÃO DE RISCO ---
-        # Regras de risco:
-        # 1. Se propose_bulk_edit foi chamado ou se acumulamos operações em lote via bulk_operations:
-        #    estas viram sugestões de ghost clips (preview).
-        # 2. Se a quantidade de operações diretas executadas no shadow copy for > 2:
-        #    para segurança do usuário, também as classificamos como preview e geramos como sugestões.
-        # 3. Caso contrário, são marcadas como direct e aplicadas imediatamente.
-        
+        # --- FIM DO LOOP: CLASSIFICAÇÃO DE RISCO E SAFETY GATEKEEPER SISTEMA 1 ---
         final_cuts_frontend = shadow_timeline.serialize_cuts_to_frontend()
         final_tracks_frontend = shadow_timeline.tracks
+
+        # Consolida todas as operações de mutação propostas
+        all_mutation_ops = list(bulk_operations) + [
+            op for op in accumulated_ops if op.get("action") in ("INSERT", "DELETE", "REPLACE", "TRIM", "SPLIT", "MOVE")
+        ]
+
+        # Avaliação obrigatória do Sistema 1 Safety Gatekeeper (15-45ms)
+        safety_audit = ChatAgentService.evaluate_safety_gatekeeper(shadow_timeline, all_mutation_ops)
+        is_preview = len(all_mutation_ops) > 0
 
         # Prepara a resposta final de operações
         ops_output = []
         suggestions_output = []
 
-        is_preview = len(bulk_operations) > 0 or len(accumulated_ops) > 2
-        
         # Converte as operações acumuladas para a resposta
         for op in accumulated_ops:
             op["risk"] = "preview" if is_preview else "direct"
             ops_output.append(op)
 
-        # Se houver propostas de bulk_edit, elas são formatadas como sugestões fantasma (preview)
-        # O frontend recebe em suggestions[] no mesmo formato de timelineGhost
+        # Se houver propostas de bulk_edit ou rough cut, formatamos como sugestões fantasma (preview)
         for idx, op in enumerate(bulk_operations):
             action = op.get("action", "INSERT")
             video_id = op.get("video_id")
@@ -1899,6 +2315,7 @@ class ChatAgentService:
                 "timelineStartFrame": None,  # será calculado no frontend
                 "timeline_start": op.get("timeline_start", 0.0),
                 "targetClipId": op.get("target_clip_id"),
+                "rationale": op.get("rationale", ""),
                 "alternatives": alts,
                 "origin": "ai"
             })
@@ -1909,12 +2326,25 @@ class ChatAgentService:
             if last_msg.get("role") == "assistant" and last_msg.get("content"):
                 final_response = last_msg.get("content")
 
+        # Se houver propostas de mutação na timeline, anexa o card de diff interativo com botões [Aplicar Mudanças] e [Descartar]
+        if is_preview and all_mutation_ops:
+            diff_card_html = ChatAgentService.render_diff_summary_card(
+                safety_audit,
+                all_mutation_ops,
+                rationale=final_response[:120] if final_response else "Proposta de edição"
+            )
+            final_response = f"{final_response}\n\n{diff_card_html}"
+
         return {
             "response": final_response,
             "operations": ops_output,
             "suggestions": suggestions_output,
-            # Se for direct, o frontend pode apenas engolir final_cuts para atualizar tudo em sync
-            "final_cuts": final_cuts_frontend if not is_preview else clips,
+            "markers": rough_cut_markers,
+            "safety_audit": safety_audit,
+            "diff_summary": safety_audit.get("diff_summary"),
+            # REGRA DE SEGURANÇA: Se houver mutações propostas, nunca muta o MLT XML real até confirmação!
+            "final_cuts": clips if is_preview else final_cuts_frontend,
+            "shadow_cuts": final_cuts_frontend,
             "final_tracks": final_tracks_frontend,
             "index_status": index_status,
             "warning": index_warning

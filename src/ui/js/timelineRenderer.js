@@ -2458,32 +2458,44 @@ export class CapiauTimelineRenderer {
 
     /**
      * Retorna o retângulo de renderização de um ghost clip: {x, y, w, h}.
-     * INSERT/REPLACE são desenhados na pista de IA; DELETE é desenhado
-     * sobre o clipe alvo na pista original (hachurado).
+     * INSERT/REPLACE são desenhados diretamente sobre a pista alvo (V1, V2, A1, A2) ou pista de IA;
+     * DELETE é desenhado sobre o clipe alvo na pista original (hachurado translúcido).
      */
     getGhostRect(ghost) {
         const zoom = TIMELINE_STATE.zoom;
         const scrollLeft = TIMELINE_STATE.scrollLeftFrame;
         const duration = ghost.outFrame - ghost.inFrame;
 
-        if (ghost.action === "DELETE" && ghost.targetClipId) {
-            const target = STATE.activeTimelineCuts.find(c => c.id === ghost.targetClipId);
-            if (target) {
-                const lane = this.getLane(target.track);
-                if (lane) {
-                    return {
-                        x: (ghost.timelineStartFrame - scrollLeft) * zoom,
-                        y: lane.top,
-                        w: duration * zoom,
-                        h: lane.height
-                    };
-                }
+        let lane = null;
+        if (ghost.action === "DELETE") {
+            if (ghost.targetClipId) {
+                const target = STATE.activeTimelineCuts.find(c => c.id === ghost.targetClipId);
+                if (target) lane = this.getLane(target.track);
+            }
+            if (!lane && ghost.track) {
+                lane = this.getLane(ghost.track);
+            }
+        } else if (ghost.action === "REPLACE") {
+            if (ghost.targetClipId) {
+                const target = STATE.activeTimelineCuts.find(c => c.id === ghost.targetClipId);
+                if (target) lane = this.getLane(target.track);
+            }
+            if (!lane && ghost.track) {
+                lane = this.getLane(ghost.track);
+            }
+        } else {
+            // INSERT: projeta sobre a pista de destino (V1/V2/A1/A2) ou fallback para AI
+            if (ghost.track && !ghost.renderOnAiTrack) {
+                lane = this.getLane(ghost.track);
             }
         }
 
-        const aiTrack = TIMELINE_STATE.getAiTrack();
-        const lane = aiTrack ? this.getLane(aiTrack.id) : null;
+        if (!lane) {
+            const aiTrack = TIMELINE_STATE.getAiTrack();
+            lane = aiTrack ? this.getLane(aiTrack.id) : null;
+        }
         if (!lane) return null;
+
         return {
             x: (ghost.timelineStartFrame - scrollLeft) * zoom,
             y: lane.top,
