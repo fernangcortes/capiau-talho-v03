@@ -144,11 +144,12 @@ export class PanelRail {
         return RAIL_PLACES.includes(place.kind) && place.el.ownerDocument === document;
     }
 
-    /** Ícone clicado na barra da janela destacada: vai para a aba e a janela volta a abrir. */
+    /** Ícone clicado na janela destacada: vai para a aba; na barra, a janela também volta a abrir. */
     popoutPick(id, index) {
         const tab = this._tabs?.[id]?.[index];
         if (tab && !tab.active) tab.button?.click();
-        this.setState(id, "aberta");
+        if (this.stateOf(id) === "aberta") this.apply(id);
+        else this.setState(id, "aberta");
     }
 
     /** "pe" quando a Aparência pede abas em pé. */
@@ -218,8 +219,11 @@ export class PanelRail {
             const list = tabs.length ? tabs : [{ button: null, icon: RAIL_PANELS[id].icon, label: RAIL_PANELS[id].label, active: true }];
             this._tabs = this._tabs || {};
             this._tabs[id] = list;
+            // Aberta com abas em pé: a coluna fica ao lado do conteúdo; em linha, as abas do topo aparecem.
+            const popMode = railOn ? "barra" : (pe && state === "aberta" && tabs.length ? "aberta" : null);
+            panel.classList.toggle("tabs-upright", hasStrip && pe && !!popMode);
             try {
-                place.win.capiauSetPanelRail?.(id, railOn, list.map(({ icon, label, active }) => ({ icon, label, active })),
+                place.win.capiauSetPanelRail?.(id, popMode, list.map(({ icon, label, active }) => ({ icon, label, active })),
                     place.el.classList.contains("dock-right"));
             } catch (e) {}
             if (!railOn) this.closeFlyout(id);
