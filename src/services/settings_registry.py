@@ -149,26 +149,39 @@ SETTINGS_REGISTRY: List[Dict[str, Any]] = [
 
     # -- Transcrição ----------------------------------------------------------
     {
-        "key": "transcription.engine", "type": "enum", "default": "nvidia_canary",
-        "enum": ["nvidia_canary", "whisper_turbo", "sensevoice", "assemblyai_universal_35", "deepgram_nova_3"],
+        "key": "transcription.engine", "type": "enum", "default": "assemblyai_universal_35",
+        "enum": ["assemblyai_universal_35", "nvidia_canary", "whisper_turbo", "sensevoice", "deepgram_nova_3"],
+        "enum_labels": {
+            "assemblyai_universal_35": "AssemblyAI Universal-3.5 Pro (nuvem)",
+            "nvidia_canary": "NVIDIA Canary (em teste; por ora usa AssemblyAI)",
+            "whisper_turbo": "Whisper Turbo (em teste; por ora usa AssemblyAI)",
+            "sensevoice": "SenseVoice (em teste; por ora usa AssemblyAI)",
+            "deepgram_nova_3": "Deepgram Nova-3 (em teste; por ora usa AssemblyAI)",
+        },
         "label": "Motor de Transcrição Primária",
-        "help": "Motor de reconhecimento de fala primário.",
-        "help_tech": "Seleciona o pipeline de transcrição ASR.",
+        "help": "Motor de reconhecimento de fala. Os marcados 'em teste' ainda não têm código: a transcrição sai pela AssemblyAI e a tela de Tarefas avisa.",
+        "help_tech": "Resolvido em src/transcription/motores.py (resolver_motores).",
         "category": "transcription", "level": "simple", "scope": "both", "requires_reprocess": True,
     },
     {
-        "key": "diarization.engine", "type": "enum", "default": "nemotron_3_diarization",
-        "enum": ["nemotron_3_diarization", "pyannote_40", "assemblyai_universal_35", "none"],
+        "key": "diarization.engine", "type": "enum", "default": "assemblyai_universal_35",
+        "enum": ["assemblyai_universal_35", "nemotron_3_diarization", "pyannote_40", "none"],
+        "enum_labels": {
+            "assemblyai_universal_35": "AssemblyAI (junto da transcrição)",
+            "nemotron_3_diarization": "Nemotron 3 Diarization (em teste; por ora usa AssemblyAI)",
+            "pyannote_40": "pyannote 4.0 (em teste; por ora usa AssemblyAI)",
+            "none": "Sem separar falantes",
+        },
         "label": "Motor de Diarização de Vozes",
-        "help": "Motor responsável por separar e identificar quem está falando, incluindo fala sobreposta.",
-        "help_tech": "Pipeline de diarização de locutores.",
+        "help": "Separa e identifica quem está falando. Os marcados 'em teste' ainda não têm código: a diarização sai pela AssemblyAI e a tela de Tarefas avisa.",
+        "help_tech": "Resolvido em src/transcription/motores.py; 'none' desliga speaker_labels.",
         "category": "transcription", "level": "simple", "scope": "both", "requires_reprocess": True,
     },
     {
         "key": "diarization.max_speakers", "type": "int", "default": 8, "min": 1, "max": 16, "step": 1,
         "label": "Número Máximo de Locutores",
         "help": "Limite superior de vozes distintas a procurar.",
-        "help_tech": "Restrição de agrupamento de locutores.",
+        "help_tech": "speaker_options.max_speakers_expected da AssemblyAI (teto, não contagem exata).",
         "category": "transcription", "level": "pro", "scope": "both", "requires_reprocess": True,
     },
     {

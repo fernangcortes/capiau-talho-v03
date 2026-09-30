@@ -43,6 +43,7 @@ from src.search.semantic import SemanticSearch
 from src.vision.face_engine import process_video_frame_faces, process_photo_faces
 from src.core.tasks import TASK_MANAGER
 from src.services.settings_service import SettingsService
+from src.transcription.motores import resolver_motores, montar_config_assemblyai, aviso_modelo_usado
 
 class PipelineService:
     @staticmethod
@@ -363,21 +364,39 @@ class PipelineService:
             upload_path = temp_audio_path
 
         try:
-            aai.settings.api_key = api_key
-            config = aai.TranscriptionConfig(
-                language_code=S.get("asr.language"),
-                speaker_labels=S.get("asr.speaker_labels"),
-                entity_detection=S.get("asr.entity_detection"),
-                punctuate=True,
-                format_text=True
+            plano = resolver_motores(S.get("transcription.engine"), S.get("diarization.engine"))
+            for aviso in plano.avisos:
+                print(f"[ASR] AVISO: {aviso}")
+                TASK_MANAGER.update_progress(str(video_id), 0.0, "running", task_type="transcription",
+                                             log_message=f"Aviso: {aviso}")
+
+            cfg = montar_config_assemblyai(
+                plano,
+                idioma=S.get("asr.language"),
+                separar_falantes=S.get("asr.speaker_labels"),
+                detectar_entidades=S.get("asr.entity_detection"),
+                max_falantes=S.get("diarization.max_speakers"),
             )
-            
+            if "speaker_options" in cfg:
+                cfg["speaker_options"] = aai.SpeakerOptions(**cfg["speaker_options"])
+
+            aai.settings.api_key = api_key
+            config = aai.TranscriptionConfig(**cfg)
+
             transcriber = aai.Transcriber()
             transcript = transcriber.transcribe(str(upload_path), config=config)
-            
+
             if transcript.status == aai.TranscriptStatus.error:
                 raise PipelineError(f"Falha na API AssemblyAI: {transcript.error}")
-                
+
+            modelo_usado = getattr(transcript, "speech_model_used", None)
+            print(f"[ASR] Vídeo {video_id}: modelo AssemblyAI usado = {modelo_usado or 'não informado'}")
+            aviso_modelo = aviso_modelo_usado(modelo_usado)
+            if aviso_modelo:
+                print(f"[ASR] AVISO: {aviso_modelo}")
+                TASK_MANAGER.update_progress(str(video_id), 50.0, "running", task_type="transcription",
+                                             log_message=f"Aviso: {aviso_modelo}")
+
             words = []
             for word in transcript.words:
                 words.append({
