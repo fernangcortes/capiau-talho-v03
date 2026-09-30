@@ -1,8 +1,9 @@
 // Janela de Aparência: flutuante, arrastável, sem escurecer o editor. Cada escolha vale na hora
-// (ThemeManager.preview) e é gravada nas Configurações globais logo depois (ThemeManager.save).
+// (ThemeManager.preview) e é gravada logo depois (ThemeManager.save): no global ou só no projeto
+// aberto, conforme "Aplicar em". Projeto com aparência própria vence o global, e a janela avisa.
 // As mesmas chaves ui.* aparecem, completas, em Configurações → Aparência.
 
-import { THEME_DEFAULTS, ACCENTS, BACKGROUNDS, backgroundOf, TRACK_MODES } from "./themeManager.js";
+import { THEME_DEFAULTS, ACCENTS, BACKGROUNDS, backgroundOf, TRACK_MODES, TEXT_CONTRASTS } from "./themeManager.js";
 
 const POS_KEY = "capiau_appearance_pos";
 const SAVE_DELAY = 450;
@@ -17,7 +18,14 @@ const FONTS = [
     ["barlow_semi_condensed", "Barlow Semi Condensed", "'Barlow Semi Condensed', sans-serif"],
     ["inter", "Inter em tudo", "'Inter', sans-serif"],
 ];
-const WEIGHTS = [[300, "Leve"], [400, "Normal"], [500, "Médio"]];
+const CONTRAST_NAMES = { padrao: "Padrão", medio: "Médio", alto: "Alto" };
+const SCOPE_NAMES = { global: "Todos os projetos", project: "Só este projeto" };
+
+/** Peso arredondado ao passo da régua (10) e preso entre 300 e 500. Pura. */
+export function snapWeight(w) {
+    const n = Number.isFinite(Number(w)) ? Number(w) : 400;
+    return Math.min(500, Math.max(300, Math.round(n / 10) * 10));
+}
 
 /** Posição dentro da janela do navegador (a barra de título nunca some). Pura. */
 export function clampPosition(x, y, w, vw, vh) {
@@ -34,6 +42,14 @@ export class AppearanceWindow {
         this.el = null;
         this.draft = {};
         this._timer = 0;
+        this.scope = null;   // null = decide sozinho: projeto com aparência própria → "project"
+        STATE?.on?.("projectChanged", () => { this.flush(); this.scope = null; });
+    }
+
+    /** Onde as escolhas gravam agora. */
+    get activeScope() {
+        if (this.scope) return this.scope;
+        return this.tm?.projectKeys?.length ? "project" : "global";
     }
 
     get values() {
@@ -77,7 +93,7 @@ export class AppearanceWindow {
         if (!Object.keys(pending).length) return;
         this.draft = {};
         try {
-            await this.tm?.save(pending);
+            await this.tm?.save(pending, this.activeScope);
             this.status("");
         } catch (err) {
             console.warn("[Aparência] Não foi possível salvar:", err);
@@ -115,6 +131,14 @@ export class AppearanceWindow {
             </header>
             <div class="apw-body">
                 <div class="apw-sec">
+                    <div class="apw-label">Aplicar em</div>
+                    <div class="apw-seg" data-group="scope"></div>
+                    <div class="apw-scope-note" role="status" hidden>
+                        <span class="apw-scope-text"></span>
+                        <button type="button" class="apw-link" data-action="follow-global">Voltar a seguir o global</button>
+                    </div>
+                </div>
+                <div class="apw-sec">
                     <div class="apw-label">Cor de interação</div>
                     <div class="apw-swatches" data-group="accent"></div>
                     <div class="apw-note">Violeta (seleção da biblioteca), verde (ok) e rosa (erro) ficam de fora.</div>
@@ -135,13 +159,23 @@ export class AppearanceWindow {
                     <div class="apw-label">Tamanho do texto <span class="apw-scale-val"></span></div>
                     <div class="apw-scale">
                         <button type="button" class="apw-mini" data-scale="-1" aria-label="Texto menor">A-</button>
-                        <input type="range" min="90" max="120" step="5" aria-label="Tamanho do texto">
+                        <input type="range" class="apw-size" min="90" max="120" step="5" aria-label="Tamanho do texto">
                         <button type="button" class="apw-mini" data-scale="1" aria-label="Texto maior">A+</button>
                     </div>
                 </div>
                 <div class="apw-sec">
-                    <div class="apw-label">Peso do texto</div>
-                    <div class="apw-seg" data-group="weight"></div>
+                    <div class="apw-label">Peso do texto <span class="apw-weight-val"></span></div>
+                    <div class="apw-scale">
+                        <button type="button" class="apw-mini" data-weight="-1" aria-label="Texto mais fino">A-</button>
+                        <input type="range" class="apw-weight" min="300" max="500" step="10" list="apw-weight-marks" aria-label="Peso do texto">
+                        <button type="button" class="apw-mini" data-weight="1" aria-label="Texto mais grosso">A+</button>
+                        <datalist id="apw-weight-marks"><option value="300"></option><option value="400"></option><option value="500"></option></datalist>
+                    </div>
+                </div>
+                <div class="apw-sec">
+                    <div class="apw-label">Texto secundário</div>
+                    <div class="apw-seg" data-group="contrast"></div>
+                    <div class="apw-note">Horários, legendas e rótulos em cinza. Médio e Alto clareiam o cinza para ler melhor.</div>
                 </div>
             </div>
             <footer class="apw-foot">
@@ -158,12 +192,18 @@ export class AppearanceWindow {
             if (b) return this.pick(b.closest("[data-group]").dataset.group, b.dataset.value);
             const s = e.target.closest("button[data-scale]");
             if (s) return this.set({ "ui.font_scale": this.stepScale(Number(s.dataset.scale)) });
+            const w = e.target.closest("button[data-weight]");
+            if (w) return this.set({ "ui.font_weight": snapWeight(Number(this.values["ui.font_weight"]) + Number(w.dataset.weight) * 10) });
             const a = e.target.closest("button[data-action]");
             if (a?.dataset.action === "reset") this.reset();
+            if (a?.dataset.action === "follow-global") this.followGlobal();
             if (a?.dataset.action === "more") { this.close(); document.getElementById("btn-open-settings")?.click(); }
         });
-        el.querySelector('input[type="range"]').addEventListener("input", (e) => {
+        el.querySelector("input.apw-size").addEventListener("input", (e) => {
             this.set({ "ui.font_scale": Math.round(Number(e.target.value)) / 100 });
+        });
+        el.querySelector("input.apw-weight").addEventListener("input", (e) => {
+            this.set({ "ui.font_weight": snapWeight(e.target.value) });
         });
         el.addEventListener("keydown", (e) => {
             if (e.key === "Escape") { e.stopPropagation(); this.close(); }
@@ -175,16 +215,33 @@ export class AppearanceWindow {
     }
 
     pick(group, value) {
+        if (group === "scope") {
+            this.flush();
+            this.scope = value;
+            return this.render();
+        }
         if (group === "accent") this.set({ "ui.accent": value });
         else if (group === "background") this.set({ ...BACKGROUNDS[value] });
         else if (group === "tracks") this.set({ "ui.track_mode": value });
         else if (group === "font") this.set({ "ui.font_family": value });
-        else if (group === "weight") this.set({ "ui.font_weight": Number(value) });
+        else if (group === "contrast") this.set({ "ui.text_contrast": value });
     }
 
     stepScale(dir) {
         const cur = Math.round(Number(this.values["ui.font_scale"]) * 100);
         return Math.min(120, Math.max(90, cur + dir * 5)) / 100;
+    }
+
+    async followGlobal() {
+        await this.flush();
+        this.scope = "global";
+        try {
+            await this.tm?.followGlobal();
+        } catch (err) {
+            console.warn("[Aparência] Não foi possível voltar ao global:", err);
+            this.status("Sem conexão com o servidor.");
+        }
+        this.render();
     }
 
     render() {
@@ -208,13 +265,26 @@ export class AppearanceWindow {
         q('[data-group="font"]').innerHTML = FONTS.map(([k, label, css]) =>
             btn(k, `<span style="font-family:${css.replace(/"/g, "&quot;")}">${label}</span>`, v["ui.font_family"] === k)).join("");
 
-        const w = Number(v["ui.font_weight"]);
-        const nearest = WEIGHTS.reduce((a, b) => Math.abs(b[0] - w) < Math.abs(a[0] - w) ? b : a)[0];
-        q('[data-group="weight"]').innerHTML = WEIGHTS.map(([k, label]) =>
-            btn(k, `<span style="font-weight:${k}">${label}</span>`, nearest === k)).join("");
+        const scope = this.activeScope;
+        q('[data-group="scope"]').innerHTML = Object.entries(SCOPE_NAMES).map(([k, label]) => btn(k, label, scope === k)).join("");
+        const own = this.tm?.projectKeys?.length || 0;
+        q(".apw-scope-note").hidden = !own;
+        if (own) {
+            const n = `${own} ${own === 1 ? "ajuste" : "ajustes"}`;
+            q(".apw-scope-text").textContent = scope === "project"
+                ? `Este projeto tem aparência própria (${n}). O que você mudar aqui vale só para ele.`
+                : `Este projeto tem aparência própria (${n}): nesses itens ele não segue o global.`;
+        }
+
+        q('[data-group="contrast"]').innerHTML = Object.keys(TEXT_CONTRASTS).map(k =>
+            btn(k, CONTRAST_NAMES[k], v["ui.text_contrast"] === k)).join("");
+
+        const w = snapWeight(v["ui.font_weight"]);
+        q("input.apw-weight").value = String(w);
+        q(".apw-weight-val").textContent = String(w);
 
         const pct = Math.round(Number(v["ui.font_scale"]) * 100);
-        q('input[type="range"]').value = String(pct);
+        q("input.apw-size").value = String(pct);
         q(".apw-scale-val").textContent = `${pct}%`;
     }
 

@@ -7,9 +7,9 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { computeThemeState, ACCENTS, BACKGROUNDS, backgroundOf, TRACK_MODES, THEME_DEFAULTS } from "../src/ui/js/themeManager.js";
+import { computeThemeState, ACCENTS, BACKGROUNDS, backgroundOf, TRACK_MODES, THEME_DEFAULTS, TEXT_CONTRASTS, ACCENT_INK, themeOriginsFromSettings, projectOverrides, ThemeManager } from "../src/ui/js/themeManager.js";
 import { convertColor, applyTrackMode, parseRgba } from "../src/ui/js/trackColors.js";
-import { clampPosition } from "../src/ui/js/appearanceWindow.js";
+import { clampPosition, snapWeight } from "../src/ui/js/appearanceWindow.js";
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 console.log("=== INICIANDO AUTOTESTE: APARÊNCIA ===\n");
@@ -75,7 +75,68 @@ console.log("✔ 4 passou: a janela não se perde fora da tela.");
     assert.deepEqual(enumOf("ui.track_mode"), TRACK_MODES);
     assert.equal(THEME_DEFAULTS["ui.accent"], "padrao");
     assert.equal(THEME_DEFAULTS["ui.track_mode"], "coloridas");
+    assert.deepEqual(enumOf("ui.text_contrast"), Object.keys(TEXT_CONTRASTS));
+    assert.equal(THEME_DEFAULTS["ui.text_contrast"], "padrao");
 }
 console.log("✔ 5 passou: chaves novas iguais no registry do backend.");
+
+{
+    // Texto secundário: padrão não mexe; os níveis passam de 4,5:1 sobre #101010.
+    assert.equal(computeThemeState({ "ui.text_contrast": "padrao" }).vars["--text-muted"], undefined);
+    assert.equal(computeThemeState({ "ui.text_contrast": "alto" }).vars["--text-muted"], TEXT_CONTRASTS.alto);
+    assert.equal(computeThemeState({ "ui.text_contrast": "xyz" }).vars["--text-muted"], undefined, "fora da lista: ignora");
+    const lum = (h) => [1, 3, 5].map(i => parseInt(h.substr(i, 2), 16) / 255)
+        .map(c => c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4)
+        .reduce((a, c, i) => a + c * [0.2126, 0.7152, 0.0722][i], 0);
+    const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
+    for (const hex of Object.values(TEXT_CONTRASTS).filter(Boolean)) {
+        assert.ok(ratio(hex, "#101010") >= 4.5, `${hex} passa de 4,5:1`);
+    }
+    // Primário: tinta escura só quando há cor escolhida, e ela passa em toda a paleta.
+    assert.equal(computeThemeState({}).vars["--t-accent-ink"], undefined, "sem escolha, botão fica como sempre");
+    assert.equal(computeThemeState({ "ui.accent": "lima" }).vars["--t-accent-ink"], ACCENT_INK);
+    for (const hex of Object.values(ACCENTS).filter(Boolean)) {
+        assert.ok(ratio(hex, ACCENT_INK) >= 4.5, `texto escuro legível sobre ${hex}`);
+    }
+    // Peso fino: passo de 10 entre 300 e 500 (o 340 não arredonda mais).
+    assert.equal(snapWeight(340), 340);
+    assert.equal(snapWeight(344), 340);
+    assert.equal(snapWeight(250), 300);
+    assert.equal(snapWeight("abc"), 400);
+    assert.equal(computeThemeState({ "ui.font_weight": 340 }).vars["--font-weight-ui"], "340");
+}
+console.log("✔ 6 passou: contraste do texto secundário, tinta do primário e peso fino.");
+
+{
+    // Origem de cada valor e gravação por escopo.
+    const data = { values: { "ui.accent": { value: "laranja", origin: "project" }, "ui.font_weight": { value: 340, origin: "global" } } };
+    assert.deepEqual(projectOverrides(themeOriginsFromSettings(data)), ["ui.accent"]);
+
+    const calls = [];
+    const STATE = { currentProjectId: 7, on() {}, emit: (ev, p) => calls.push(["emit", ev, p.scope]) };
+    const api = {
+        fetchSettings: async () => data,
+        updateGlobalSettings: async (v) => calls.push(["global", v]),
+        updateProjectSettings: async (pid, v) => calls.push(["project", pid, v]),
+        resetSettings: async (scope, pid, keys) => calls.push(["reset", scope, pid, keys]),
+    };
+    globalThis.localStorage = { setItem() {}, getItem() { return null; } };
+    globalThis.window = globalThis.window || {};
+    const tm = new ThemeManager({ STATE, CapIAuAPI: api });
+    await tm.load();
+    assert.deepEqual(tm.projectKeys, ["ui.accent"]);
+
+    await tm.save({ "ui.accent": "azul" }, "global");
+    assert.deepEqual(calls[0], ["global", { "ui.accent": "azul" }]);
+    assert.equal(tm.saved["ui.accent"], "laranja", "no global, o que o projeto sobrescreve continua valendo nele");
+
+    await tm.save({ "ui.accent": "azul" }, "project");
+    assert.deepEqual(calls[2], ["project", 7, { "ui.accent": "azul" }]);
+    assert.equal(tm.saved["ui.accent"], "azul");
+
+    await tm.followGlobal();
+    assert.deepEqual(calls[4], ["reset", "project", 7, ["ui.accent"]], "voltar ao global apaga só as chaves do projeto");
+}
+console.log("✔ 7 passou: aparência grava no global ou só no projeto, e sabe de onde vem cada valor.");
 
 console.log("\n=== AUTOTESTE APARÊNCIA CONCLUÍDO COM SUCESSO ===");

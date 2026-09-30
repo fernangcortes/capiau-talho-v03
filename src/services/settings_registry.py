@@ -1040,6 +1040,14 @@ SETTINGS_REGISTRY: List[Dict[str, Any]] = [
         "help_tech": "--t-track-mode lido pelo js/timelineRenderer.js (getTrackStyle) e convertido por js/trackColors.js.",
         "category": "appearance", "level": "simple", "scope": "both", "requires_reprocess": False,
     },
+    {
+        "key": "ui.text_contrast", "type": "enum", "default": "padrao",
+        "enum": ["padrao", "medio", "alto"],
+        "label": "Contraste do texto secundário",
+        "help": "O cinza de horários, legendas e rótulos. Padrão é o de sempre; Médio e Alto clareiam o cinza para ler melhor em texto pequeno.",
+        "help_tech": "Redefine --text-muted: padrão #6E6C7A (3,7:1 sobre #101010), médio #7D7B88 (4,6:1), alto #8C8A96 (5,6:1). Paleta em js/themeManager.js (TEXT_CONTRASTS).",
+        "category": "appearance", "level": "simple", "scope": "both", "requires_reprocess": False,
+    },
 
     # -- Áudio: limiares da pré-análise (docs/PLANO_AJUSTES_DE_AUDIO.md, seção 7) --
     {

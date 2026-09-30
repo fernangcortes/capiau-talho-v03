@@ -15,6 +15,7 @@ export const THEME_DEFAULTS = {
     "ui.font_scale": 1.0,
     "ui.accent": "padrao",
     "ui.track_mode": "coloridas",
+    "ui.text_contrast": "padrao",
 };
 
 export const THEME_KEYS = Object.keys(THEME_DEFAULTS);
@@ -38,6 +39,16 @@ export const ACCENTS = {
     lima: "#a3e635",
     laranja: "#fb7a3c",
     gelo: "#e6e6ea",
+};
+
+// Tinta sobre a cor de interação (botão primário): escuro passa de 4,5:1 em toda a paleta; branco em nenhuma.
+export const ACCENT_INK = "#0b0b0c";
+
+// Texto secundário (--text-muted). "padrao" = o de sempre (#6E6C7A, 3,7:1 sobre #101010).
+export const TEXT_CONTRASTS = {
+    padrao: null,
+    medio: "#7d7b88",   // 4,6:1
+    alto: "#8c8a96",    // 5,6:1
 };
 
 // Cor das trilhas na timeline (js/trackColors.js aplica no canvas).
@@ -102,7 +113,7 @@ export function computeThemeState(values = {}) {
         vars["--font-body"] = stack;
         vars["--font-heading"] = stack;
     }
-    const weight = Math.round(num(v["ui.font_weight"], 400));
+    const weight = Math.round(num(v["ui.font_weight"], 400) / 10) * 10;
     if (weight !== 400) vars["--font-weight-ui"] = String(Math.max(300, Math.min(500, weight)));
     const scale = round(num(v["ui.font_scale"], 1), 3);
     if (scale !== 1) vars["--font-scale"] = String(Math.max(0.9, Math.min(1.2, scale)));
@@ -110,7 +121,10 @@ export function computeThemeState(values = {}) {
     if (accent) {
         vars["--accent"] = accent;      // CSS da UI
         vars["--t-accent"] = accent;    // canvas (themeTokens) e quem precisa saber se foi escolhida
+        vars["--t-accent-ink"] = ACCENT_INK;
     }
+    const muted = TEXT_CONTRASTS[v["ui.text_contrast"]];
+    if (muted) vars["--text-muted"] = muted;
     if (TRACK_MODES.includes(v["ui.track_mode"]) && v["ui.track_mode"] !== "coloridas") {
         vars["--t-track-mode"] = v["ui.track_mode"];
     }
@@ -127,6 +141,21 @@ export function themeValuesFromSettings(data) {
     return out;
 }
 
+/** De onde vem cada valor ui.* ("default" | "global" | "project"). */
+export function themeOriginsFromSettings(data) {
+    const out = {};
+    const values = (data && data.values) || {};
+    for (const key of THEME_KEYS) {
+        if (values[key] && values[key].origin) out[key] = values[key].origin;
+    }
+    return out;
+}
+
+/** Chaves ui.* que o projeto sobrescreve. */
+export function projectOverrides(origins) {
+    return THEME_KEYS.filter(k => origins[k] === "project");
+}
+
 function applyState(state) {
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (_) { /* sem storage: só esta janela */ }
     if (window.CapiauTheme) window.CapiauTheme.apply(state);
@@ -137,6 +166,7 @@ export class ThemeManager {
         this.STATE = STATE;
         this.api = CapIAuAPI;
         this.saved = { ...THEME_DEFAULTS };
+        this.origins = {};
         STATE.on("settingsChanged", () => this.load());
         STATE.on("projectChanged", () => this.load());
         // Rascunho do painel (valores ui.* ainda não salvos): prévia ao vivo; {} volta ao salvo.
@@ -147,6 +177,7 @@ export class ThemeManager {
         try {
             const data = await this.api.fetchSettings(this.STATE.currentProjectId || null);
             this.saved = { ...THEME_DEFAULTS, ...themeValuesFromSettings(data) };
+            this.origins = themeOriginsFromSettings(data);
         } catch (err) {
             // Sem servidor: fica com o cache aplicado no boot.
             console.warn("[Tema] Não foi possível ler a aparência salva:", err);
@@ -159,12 +190,40 @@ export class ThemeManager {
         applyState(computeThemeState({ ...this.saved, ...draft }));
     }
 
-    /** Grava valores ui.* nas Configurações globais e aplica (janela de Aparência). */
-    async save(values) {
+    /** Chaves ui.* que o projeto aberto sobrescreve (vencem o global). */
+    get projectKeys() {
+        return projectOverrides(this.origins);
+    }
+
+    /**
+     * Grava valores ui.* e aplica (janela de Aparência). scope "global" vale para todos os projetos,
+     * menos nas chaves que o projeto aberto sobrescreve; "project" grava só no projeto aberto.
+     */
+    async save(values, scope = "global") {
         const clean = Object.fromEntries(Object.entries(values).filter(([k]) => k in THEME_DEFAULTS));
-        this.saved = { ...this.saved, ...clean };
+        const pid = this.STATE.currentProjectId;
+        const toProject = scope === "project" && pid;
+        // No global, o que o projeto sobrescreve continua valendo nele: a prévia não pode mentir.
+        const visible = toProject ? clean
+            : Object.fromEntries(Object.entries(clean).filter(([k]) => this.origins[k] !== "project"));
+        this.saved = { ...this.saved, ...visible };
+        for (const k of Object.keys(clean)) {
+            if (toProject) this.origins[k] = "project";
+            else if (this.origins[k] !== "project") this.origins[k] = "global";
+        }
         applyState(computeThemeState(this.saved));
-        await this.api.updateGlobalSettings(clean);
-        this.STATE.emit("settingsChanged", { scope: "global", source: "appearance" });
+        if (toProject) await this.api.updateProjectSettings(pid, clean);
+        else await this.api.updateGlobalSettings(clean);
+        this.STATE.emit("settingsChanged", { scope: toProject ? "project" : "global", source: "appearance" });
+    }
+
+    /** Tira a aparência própria do projeto aberto: ele volta a seguir o global. */
+    async followGlobal() {
+        const pid = this.STATE.currentProjectId;
+        const keys = this.projectKeys;
+        if (!pid || !keys.length) return;
+        await this.api.resetSettings("project", pid, keys);
+        this.STATE.emit("settingsChanged", { scope: "project", source: "appearance" });
+        await this.load();
     }
 }
