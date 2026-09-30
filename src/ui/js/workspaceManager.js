@@ -106,6 +106,15 @@ const BAND_LINE_IDS = { ...REOPEN_LINE_IDS, [TIMELINE_ID]: "reopen-timeline" };
 /** Altura do divisor da faixa (5px): a faixa com a timeline sozinha = altura dela + divisor. */
 const BAND_RESIZER_H = 5;
 
+/**
+ * Altura inicial da timeline (sem valor salvo): uma fração da altura útil (tela menos o cabeçalho),
+ * dentro de 240..560 px. Mesmo raciocínio das larguras iniciais das colunas. Pura.
+ */
+export function initialTimelineHeight(viewportH, headerH = 36, ratio = 0.36) {
+    const h = Number.isFinite(viewportH) && viewportH > 0 ? viewportH : 900;
+    return Math.round(Math.max(240, Math.min(560, (h - headerH) * ratio)));
+}
+
 function placeInOrder(container, nodes) {
     nodes.filter(Boolean).forEach((node, i) => {
         const current = container.children[i];
@@ -3177,7 +3186,7 @@ export class WorkspaceManager {
                 unit: "px",
                 minVal: 150,
                 maxVal: 700,
-                defaultVal: 300,
+                defaultVal: initialTimelineHeight(window.innerHeight),
                 className: "splitter-timeline",
                 tooltip: "Arraste para redimensionar (duplo clique para ajustar a todas as pistas)",
                 onDoubleClick: () => this.fitTimelineHeightToTracks(true)
@@ -3284,8 +3293,8 @@ export class WorkspaceManager {
         const fitTargetH = Math.max(minAllowedH, Math.min(maxAllowedH, neededH));
 
         // 7. Altura atual e verificação de toggle
-        const currentH = Math.round(timelinePanel.getBoundingClientRect().height || timelinePanel.offsetHeight || 300);
-        const defaultVal = 300;
+        const defaultVal = initialTimelineHeight(window.innerHeight);
+        const currentH = Math.round(timelinePanel.getBoundingClientRect().height || timelinePanel.offsetHeight || defaultVal);
 
         let targetH = fitTargetH;
         // Se a timeline já estiver ajustada na altura de encaixe (diferença <= 3px), alterna para a altura anterior/padrão
