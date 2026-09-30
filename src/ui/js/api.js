@@ -654,6 +654,31 @@ export class CapIAuAPI {
         });
     }
 
+    static onboardingChat(message, history = [], currentProjectName = null, currentProfile = null, customApiKey = null) {
+        return this.request("/api/onboarding/chat", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                message,
+                history,
+                current_project_name: currentProjectName,
+                current_profile: currentProfile,
+                custom_api_key: customApiKey
+            })
+        });
+    }
+
+    static saveOnboardingApiKey(provider, apiKey) {
+        return this.request("/api/onboarding/api-key", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                provider,
+                api_key: apiKey
+            })
+        });
+    }
+
     static fetchAgentModels() {
         return this.request("/api/agent/models");
     }

@@ -30,7 +30,12 @@ export class ProjectsManager {
         if (this.selector) {
             this.selector.addEventListener("change", (e) => {
                 const val = e.target.value;
-                if (val) STATE.currentProjectId = Number(val);
+                if (val) {
+                    if (typeof localStorage !== "undefined") {
+                        localStorage.setItem("capiau_project_explicitly_chosen", "true");
+                    }
+                    STATE.currentProjectId = Number(val);
+                }
             });
         }
 

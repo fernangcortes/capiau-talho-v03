@@ -5,6 +5,7 @@ import { LibraryManager } from "./library.js?v=13";
 import { PanelsManager } from "./panels.js?v=16";
 import { ChatManager } from "./chat.js";
 import { ProjectsManager } from "./projects.js";
+import { WelcomeHub } from "./welcomeHub.js";
 import { FaceManager } from "./faces.js";
 import { EntityManager } from "./entities.js";
 import { WorkspaceManager, getActiveElement } from "./workspaceManager.js";
@@ -1872,6 +1873,8 @@ window.addEventListener("DOMContentLoaded", () => {
     window.panelsManager = panels;
     const chat = new ChatManager();
     const projects = new ProjectsManager();
+    const welcomeHub = new WelcomeHub();
+    window.welcomeHub = welcomeHub;
     window.FaceManager = FaceManager;
     FaceManager.init();
     window.EntityManager = EntityManager;
@@ -2795,10 +2798,23 @@ window.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    // Carregar projetos iniciais
+    // Carregar projetos iniciais e exibir Welcome Hub se nenhum projeto estiver ativo ou sob requisição
     projects.loadProjectsList().then(() => {
         console.log("Projetos iniciais carregados e configurados.");
+        const activeProj = localStorage.getItem("activeProjectId");
+        const urlParams = new URLSearchParams(window.location.search);
+        const forceWelcome = urlParams.get("welcome") === "1" || urlParams.get("hub") === "true";
+        if (!activeProj || forceWelcome) {
+            welcomeHub.show();
+        }
     });
+
+    const btnReopenHub = document.getElementById("btn-welcome-hub-reopen");
+    if (btnReopenHub) {
+        btnReopenHub.addEventListener("click", () => {
+            welcomeHub.show();
+        });
+    }
 
     // -- AWS S3 Status and Backup Integration --
     const s3Indicator = document.getElementById("s3-status-indicator");
