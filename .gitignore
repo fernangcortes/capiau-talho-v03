@@ -48,9 +48,13 @@ data_test_export/
 *.backup
 .tmp_test/
 
-# Planos de Implementação e Pesquisas Locais (não versionados)
+# Planos de Implementação, Pesquisas e Handoffs Locais (não versionados)
 docs/PLANO_*.md
+docs/HANDOFF_*.md
 docs/Pesquisas/
+PROJECT.md
+TEST_INFRA.md
+TEST_READY.md
 
 # Gráficos e Imagens da Documentação (Evita aumentar tamanho do repo)
 docs/graficos/
@@ -58,8 +62,10 @@ docs/graficos/
 # Metadados e arquivos temporários locais
 .claude/
 .gemini/
+.agents/teamwork/
 logs/
 *.lnk
 
 # Documentos privados de produção e making of (repositório privado)
 makingof/
+
