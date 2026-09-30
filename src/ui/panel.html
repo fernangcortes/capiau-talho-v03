@@ -22,7 +22,7 @@
         body {
             margin: 0;
             padding: 0;
-            background: #0b0f19;
+            background: var(--bg-base);
             color: #f8fafc;
             overflow: hidden;
             height: 100vh;
@@ -63,7 +63,7 @@
         /* ── DUAL PANEL WORKSPACE & TOOLBAR ── */
         #dual-popout-toolbar {
             height: 32px;
-            background: rgba(15, 18, 28, 0.96);
+            background: var(--t-surface-2, rgba(15, 18, 28, 0.96));
             backdrop-filter: blur(16px);
             border-bottom: 1px solid var(--border-glass, rgba(255, 255, 255, 0.08));
             display: flex;
@@ -111,24 +111,24 @@
             transform: scale(1.05);
         }
         .dual-tool-btn.active {
-            background: rgba(6, 182, 212, 0.22);
+            background: color-mix(in srgb, var(--t-accent, rgb(6, 182, 212)) 22%, transparent);
             color: #38bdf8;
-            border: 1px solid rgba(6, 182, 212, 0.45);
-            box-shadow: 0 0 8px rgba(6, 182, 212, 0.25);
+            border: 1px solid color-mix(in srgb, var(--t-accent, rgb(6, 182, 212)) 45%, transparent);
+            box-shadow: 0 0 8px color-mix(in srgb, var(--t-accent, rgb(6, 182, 212)) 25%, transparent);
         }
         .dual-tool-btn.collapsed-pill {
             opacity: 0.45;
             color: var(--text-muted, #64748b);
         }
         .dual-tool-btn.btn-reattach {
-            color: #22d3ee;
-            background: rgba(6, 182, 212, 0.12);
-            border: 1px solid rgba(6, 182, 212, 0.35);
+            color: var(--t-accent, #22d3ee);
+            background: color-mix(in srgb, var(--t-accent, rgb(6, 182, 212)) 12%, transparent);
+            border: 1px solid color-mix(in srgb, var(--t-accent, rgb(6, 182, 212)) 35%, transparent);
         }
         .dual-tool-btn.btn-reattach:hover {
-            background: rgba(6, 182, 212, 0.25);
+            background: color-mix(in srgb, var(--t-accent, rgb(6, 182, 212)) 25%, transparent);
             color: #fff;
-            box-shadow: 0 0 10px rgba(6, 182, 212, 0.4);
+            box-shadow: 0 0 10px color-mix(in srgb, var(--t-accent, rgb(6, 182, 212)) 40%, transparent);
         }
         .dual-v-divider {
             width: 1px;
@@ -143,7 +143,7 @@
             display: flex;
             overflow: hidden;
             position: relative;
-            background: #090d16;
+            background: var(--bg-base);
         }
         #dual-workspace.layout-side-by-side {
             flex-direction: row;
@@ -158,7 +158,7 @@
             display: flex;
             flex-direction: column;
             box-sizing: border-box;
-            background: #0b0f19;
+            background: var(--bg-base);
             min-width: 0;
             min-height: 0;
         }
@@ -206,15 +206,15 @@
             border-bottom: 1px solid rgba(0, 0, 0, 0.5);
         }
         .dual-splitter:hover, .dual-splitter.active {
-            background: var(--accent, #06b6d4) !important;
-            box-shadow: 0 0 10px rgba(6, 182, 212, 0.7) !important;
+            background: var(--accent, var(--t-accent, #06b6d4)) !important;
+            box-shadow: 0 0 10px color-mix(in srgb, var(--t-accent, rgb(6, 182, 212)) 70%, transparent) !important;
         }
 
         /* ── LINHAS RESTAURADORAS CONFORME CAPIAU-NLE-DESIGN-SYSTEM ── */
         /* Largura/Altura fixas SEM transição no hover para prevenir flicker */
         .dual-restore-line {
-            background: rgba(139, 92, 246, 0.18);
-            border-right: 1px solid rgba(139, 92, 246, 0.35);
+            background: color-mix(in srgb, var(--t-accent, rgb(139, 92, 246)) 18%, transparent);
+            border-right: 1px solid color-mix(in srgb, var(--t-accent, rgb(139, 92, 246)) 35%, transparent);
             cursor: pointer;
             z-index: 100;
             flex-shrink: 0;
@@ -226,29 +226,29 @@
         }
         #dual-workspace.layout-side-by-side #dual-restore-line-2 {
             border-right: none;
-            border-left: 1px solid rgba(6, 182, 212, 0.35);
+            border-left: 1px solid color-mix(in srgb, var(--t-accent, rgb(6, 182, 212)) 35%, transparent);
         }
         #dual-workspace.layout-stacked .dual-restore-line {
             width: 100%;
             height: 4px;
             border-right: none;
-            border-bottom: 1px solid rgba(139, 92, 246, 0.35);
+            border-bottom: 1px solid color-mix(in srgb, var(--t-accent, rgb(139, 92, 246)) 35%, transparent);
         }
         #dual-workspace.layout-stacked #dual-restore-line-2 {
             border-bottom: none;
-            border-top: 1px solid rgba(6, 182, 212, 0.35);
+            border-top: 1px solid color-mix(in srgb, var(--t-accent, rgb(6, 182, 212)) 35%, transparent);
         }
         .dual-restore-line:hover {
-            background: rgba(139, 92, 246, 0.9) !important;
-            box-shadow: 0 0 12px rgba(139, 92, 246, 0.8) !important;
+            background: color-mix(in srgb, var(--t-accent, rgb(139, 92, 246)) 90%, transparent) !important;
+            box-shadow: 0 0 12px color-mix(in srgb, var(--t-accent, rgb(139, 92, 246)) 80%, transparent) !important;
         }
         .dual-restore-line.cyan-theme {
-            background: rgba(6, 182, 212, 0.18);
-            border-color: rgba(6, 182, 212, 0.35);
+            background: color-mix(in srgb, var(--t-accent, rgb(6, 182, 212)) 18%, transparent);
+            border-color: color-mix(in srgb, var(--t-accent, rgb(6, 182, 212)) 35%, transparent);
         }
         .dual-restore-line.cyan-theme:hover {
-            background: rgba(6, 182, 212, 0.9) !important;
-            box-shadow: 0 0 12px rgba(6, 182, 212, 0.8) !important;
+            background: color-mix(in srgb, var(--t-accent, rgb(6, 182, 212)) 90%, transparent) !important;
+            box-shadow: 0 0 12px color-mix(in srgb, var(--t-accent, rgb(6, 182, 212)) 80%, transparent) !important;
         }
 
         /* ── CABEÇALHO RETRÁTIL NA JANELA MULTI-PAINEL (CAPIAU-NLE-DESIGN-SYSTEM) ── */
@@ -269,16 +269,16 @@
         .dual-header-restore-line {
             width: 100%;
             height: 4px;
-            background: rgba(139, 92, 246, 0.22);
-            border-bottom: 1px solid rgba(139, 92, 246, 0.4);
+            background: color-mix(in srgb, var(--t-accent, rgb(139, 92, 246)) 22%, transparent);
+            border-bottom: 1px solid color-mix(in srgb, var(--t-accent, rgb(139, 92, 246)) 40%, transparent);
             cursor: pointer;
             z-index: 250;
             flex-shrink: 0;
             transition: background 0.2s, box-shadow 0.2s; /* SEM height/width para evitar layout flicker */
         }
         .dual-header-restore-line:hover {
-            background: rgba(139, 92, 246, 0.9) !important;
-            box-shadow: 0 0 12px rgba(139, 92, 246, 0.8) !important;
+            background: color-mix(in srgb, var(--t-accent, rgb(139, 92, 246)) 90%, transparent) !important;
+            box-shadow: 0 0 12px color-mix(in srgb, var(--t-accent, rgb(139, 92, 246)) 80%, transparent) !important;
         }
 
         /* Painel único recolhido */
@@ -286,7 +286,7 @@
             flex: 1;
             display: flex;
             cursor: pointer;
-            background: #090d16;
+            background: var(--bg-base);
         }
         .single-restore.edge-right { flex-direction: row-reverse; }
         /* Barra fina na janela: só a coluna de ícones (js/panelRail.js pede, capiauSetPanelRail desenha). */
@@ -295,7 +295,7 @@
         .popout-rail-nav.panel-rail-right { left: auto; right: 0; }
         .single-restore-line {
             flex: 0 0 4px;
-            background: rgba(6, 182, 212, 0.18);
+            background: color-mix(in srgb, var(--t-accent, rgb(6, 182, 212)) 18%, transparent);
             transition: background 0.2s, box-shadow 0.2s;
         }
         .single-restore-msg {
@@ -304,12 +304,12 @@
             align-items: center;
             justify-content: center;
             gap: 8px;
-            font-size: var(--fs-12);
-            color: var(--text-secondary, #94a3b8);
+            font-size: var(--fs-11);
+            color: var(--text-muted);
         }
         .single-restore:hover .single-restore-line {
-            background: rgba(6, 182, 212, 0.9);
-            box-shadow: 0 0 12px rgba(6, 182, 212, 0.8);
+            background: color-mix(in srgb, var(--t-accent, rgb(6, 182, 212)) 90%, transparent);
+            box-shadow: 0 0 12px color-mix(in srgb, var(--t-accent, rgb(6, 182, 212)) 80%, transparent);
         }
         .single-restore:hover .single-restore-msg { color: #e2e8f0; }
 

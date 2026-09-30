@@ -78,6 +78,14 @@ export function acentuarMarcacao(text, { isJs = false } = {}) {
     trocas += soltos;
     s = s.replace(VAR_CIANO, "var(--accent");
     s = s.split(GUARDA).join("var(--color-cyan)").split("\u0001").join("#");
+    // Blocos <style> das páginas (panel.html, panel-group.html): regra por regra, como no styles.css.
+    if (!isJs) {
+        s = s.replace(/(<style[^>]*>)([\s\S]*?)(<\/style>)/g, (all, a, css, b) => {
+            const r = acentuarCss(css);
+            trocas += r.trocas;
+            return a + r.texto + b;
+        });
+    }
     return { texto: s, trocas };
 }
 
