@@ -85,3 +85,28 @@ body {
     --fs-24: calc(24px * var(--font-scale, 1));
     --fs-32: calc(32px * var(--font-scale, 1));
 }
+
+/* Espaçamento em degraus (padding, margin, gap dentro de style=""): var(--sp-N), nunca px solto.
+   --space-scale (padrão 1) multiplica todos, como --font-scale no texto.
+   Migração e trava: scripts/tema_espacos.mjs e tests/autoteste_tema_tokens.mjs (parte 8). */
+:root {
+    --sp-1: calc(1px * var(--space-scale, 1));
+    --sp-2: calc(2px * var(--space-scale, 1));
+    --sp-4: calc(4px * var(--space-scale, 1));
+    --sp-6: calc(6px * var(--space-scale, 1));
+    --sp-8: calc(8px * var(--space-scale, 1));
+    --sp-10: calc(10px * var(--space-scale, 1));
+    --sp-12: calc(12px * var(--space-scale, 1));
+    --sp-14: calc(14px * var(--space-scale, 1));
+    --sp-16: calc(16px * var(--space-scale, 1));
+    --sp-18: calc(18px * var(--space-scale, 1));
+    --sp-20: calc(20px * var(--space-scale, 1));
+    --sp-24: calc(24px * var(--space-scale, 1));
+    --sp-28: calc(28px * var(--space-scale, 1));
+    --sp-32: calc(32px * var(--space-scale, 1));
+    --sp-36: calc(36px * var(--space-scale, 1));
+    --sp-40: calc(40px * var(--space-scale, 1));
+    --sp-48: calc(48px * var(--space-scale, 1));
+    --sp-56: calc(56px * var(--space-scale, 1));
+    --sp-64: calc(64px * var(--space-scale, 1));
+}

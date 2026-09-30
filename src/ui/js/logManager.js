@@ -402,7 +402,7 @@ class LogManager {
         }
 
         this.aiOutput.innerHTML = `
-            <div style="display:flex; align-items:center; gap:8px; color:var(--color-cyan); font-size:var(--fs-12);">
+            <div style="display:flex; align-items:center; gap:var(--sp-8); color:var(--color-cyan); font-size:var(--fs-12);">
                 <i class="fa-solid fa-spinner fa-spin"></i> Processando análise de logs com a IA...
             </div>
         `;
@@ -467,7 +467,7 @@ ${logsText}
         } catch (e) {
             console.error("[Logs IA] Erro ao analisar logs:", e);
             this.aiOutput.innerHTML = `
-                <div style="color:var(--color-rose); font-size:var(--fs-11); padding:8px; background:var(--t-tint-2, rgba(244,63,94,0.1)); border-radius:4px; border:1px solid var(--t-line-strong, rgba(244,63,94,0.25));">
+                <div style="color:var(--color-rose); font-size:var(--fs-11); padding:var(--sp-8); background:var(--t-tint-2, rgba(244,63,94,0.1)); border-radius:4px; border:1px solid var(--t-line-strong, rgba(244,63,94,0.25));">
                     <i class="fa-solid fa-circle-exclamation"></i> Falha na chamada da IA: ${e.message || e}. Verifique se sua chave API está correta ou se o servidor backend está online.
                 </div>
             `;

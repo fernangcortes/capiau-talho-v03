@@ -95,7 +95,7 @@ export class EntityManager {
         const projectId = STATE.currentProjectId;
         if (!projectId) return;
 
-        tbody.innerHTML = `<tr><td colspan="10" style="text-align:center; padding:20px; color:var(--text-muted);"><i class="fa-solid fa-spinner fa-spin"></i> Carregando entidades...</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="10" style="text-align:center; padding:var(--sp-20); color:var(--text-muted);"><i class="fa-solid fa-spinner fa-spin"></i> Carregando entidades...</td></tr>`;
 
         try {
             const [entitiesResp, clusters] = await Promise.all([
@@ -106,7 +106,7 @@ export class EntityManager {
             this.faceClusters = clusters || [];
             this.applyFilters();
         } catch (e) {
-            tbody.innerHTML = `<tr><td colspan="10" style="text-align:center; padding:20px; color:#ef4444;">Erro ao carregar entidades: ${esc(e.message)}</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="10" style="text-align:center; padding:var(--sp-20); color:#ef4444;">Erro ao carregar entidades: ${esc(e.message)}</td></tr>`;
         }
     }
 
@@ -162,7 +162,7 @@ export class EntityManager {
         if (chkSelectAll) chkSelectAll.checked = false;
 
         if (list.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="10" style="text-align:center; padding:20px; color:var(--text-muted);">Nenhuma entidade encontrada.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="10" style="text-align:center; padding:var(--sp-20); color:var(--text-muted);">Nenhuma entidade encontrada.</td></tr>`;
             this.updateBulkActionsBar();
             return;
         }
@@ -180,16 +180,16 @@ export class EntityManager {
             const showLinkBtn = entity.entity_type === "person" && entity.realm === "story";
 
             tr.innerHTML = `
-                <td style="padding: 8px 10px; text-align: center;"><input type="checkbox" class="entity-select-checkbox" data-entity-id="${entity.id}" style="cursor:pointer;"></td>
-                <td style="padding: 8px 10px;">${this.renderThumb(entity)}</td>
-                <td style="padding: 8px 10px; color:#fff;"><strong>${esc(entity.name)}</strong>${aliasesHtml}</td>
-                <td style="padding: 8px 10px; color:var(--text-secondary);">${TYPE_LABELS[entity.entity_type] || entity.entity_type}</td>
-                <td style="padding: 8px 10px; color:var(--text-secondary);">${REALM_LABELS[entity.realm] || entity.realm}</td>
-                <td style="padding: 8px 10px; color:var(--text-secondary);">${esc(entity.role || "—")}</td>
-                <td style="padding: 8px 10px; color:var(--text-secondary);">${linkText}</td>
-                <td style="padding: 8px 10px; text-align:center; color:var(--text-secondary);">${entity.mention_count}</td>
-                <td style="padding: 8px 10px; color:${statusColor}; font-weight:600;">${STATUS_LABELS[entity.status] || entity.status}</td>
-                <td class="entity-actions-cell" style="padding: 8px 10px; text-align: right; white-space:nowrap;">
+                <td style="padding: var(--sp-8) var(--sp-10); text-align: center;"><input type="checkbox" class="entity-select-checkbox" data-entity-id="${entity.id}" style="cursor:pointer;"></td>
+                <td style="padding: var(--sp-8) var(--sp-10);">${this.renderThumb(entity)}</td>
+                <td style="padding: var(--sp-8) var(--sp-10); color:#fff;"><strong>${esc(entity.name)}</strong>${aliasesHtml}</td>
+                <td style="padding: var(--sp-8) var(--sp-10); color:var(--text-secondary);">${TYPE_LABELS[entity.entity_type] || entity.entity_type}</td>
+                <td style="padding: var(--sp-8) var(--sp-10); color:var(--text-secondary);">${REALM_LABELS[entity.realm] || entity.realm}</td>
+                <td style="padding: var(--sp-8) var(--sp-10); color:var(--text-secondary);">${esc(entity.role || "—")}</td>
+                <td style="padding: var(--sp-8) var(--sp-10); color:var(--text-secondary);">${linkText}</td>
+                <td style="padding: var(--sp-8) var(--sp-10); text-align:center; color:var(--text-secondary);">${entity.mention_count}</td>
+                <td style="padding: var(--sp-8) var(--sp-10); color:${statusColor}; font-weight:600;">${STATUS_LABELS[entity.status] || entity.status}</td>
+                <td class="entity-actions-cell" style="padding: var(--sp-8) var(--sp-10); text-align: right; white-space:nowrap;">
                     <button class="btn-flat-action cyan btn-entity-edit" title="Editar"><i class="fa-solid fa-pen"></i></button>
                     ${showLinkBtn ? `<button class="btn-flat-action violet btn-entity-link" title="${entity.linked_entity_id ? "Desvincular" : "Vincular a pessoa real"}"><i class="fa-solid ${entity.linked_entity_id ? "fa-link-slash" : "fa-link"}"></i></button>` : ""}
                     ${entity.status !== "confirmed" ? `<button class="btn-flat-action btn-entity-confirm" style="color:var(--color-emerald);" title="Confirmar"><i class="fa-solid fa-check"></i></button>` : ""}
@@ -339,7 +339,7 @@ export class EntityManager {
         const candidates = this.allEntities.filter(e => e.entity_type === "person" && e.realm === "production");
         const actionsCell = tr.querySelector(".entity-actions-cell");
         actionsCell.innerHTML = `
-            <div style="display:flex; gap:6px; align-items:center; justify-content:flex-end;">
+            <div style="display:flex; gap:var(--sp-6); align-items:center; justify-content:flex-end;">
                 <select class="link-target-select" style="min-width:140px;">
                     <option value="">Selecione...</option>
                     ${candidates.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join("")}
@@ -375,8 +375,8 @@ export class EntityManager {
         const editRow = document.createElement("tr");
         editRow.className = "entity-edit-row";
         editRow.innerHTML = `
-            <td colspan="10" style="padding: 12px 14px; background: rgba(255,255,255,0.03);">
-                <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;">
+            <td colspan="10" style="padding: var(--sp-12) var(--sp-14); background: rgba(255,255,255,0.03);">
+                <div style="display:flex; gap:var(--sp-10); flex-wrap:wrap; align-items:flex-end;">
                     <div class="form-group" style="flex:1; min-width:140px;">
                         <label>Nome</label>
                         <input type="text" class="edit-name" value="${esc(entity.name)}" style="height:30px;">
@@ -396,12 +396,12 @@ export class EntityManager {
                             <option value="story" ${entity.realm === "story" ? "selected" : ""}>Obra</option>
                         </select>
                     </div>
-                    <div style="display:flex; gap:6px;">
-                        <button class="btn-primary btn-save-entity-edit" style="height:30px; font-size:var(--fs-11); padding:0 12px;">Salvar</button>
-                        <button class="btn-secondary btn-cancel-entity-edit" style="height:30px; font-size:var(--fs-11); padding:0 12px;">Cancelar</button>
+                    <div style="display:flex; gap:var(--sp-6);">
+                        <button class="btn-primary btn-save-entity-edit" style="height:30px; font-size:var(--fs-11); padding:0 var(--sp-12);">Salvar</button>
+                        <button class="btn-secondary btn-cancel-entity-edit" style="height:30px; font-size:var(--fs-11); padding:0 var(--sp-12);">Cancelar</button>
                     </div>
                 </div>
-                <div style="font-size:var(--fs-10); color:var(--text-muted); margin-top:6px;"><i class="fa-solid fa-circle-info"></i> Alterar o nome reprocessa (re-enriquece) as descrições da mídia já associada a esta entidade.</div>
+                <div style="font-size:var(--fs-10); color:var(--text-muted); margin-top:var(--sp-6);"><i class="fa-solid fa-circle-info"></i> Alterar o nome reprocessa (re-enriquece) as descrições da mídia já associada a esta entidade.</div>
             </td>
         `;
         tr.insertAdjacentElement("afterend", editRow);

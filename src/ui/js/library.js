@@ -1771,7 +1771,7 @@ export function showMediaContextMenu(e, item, kind, cardEl) {
     // Item: Girar Mídia (+90°)
     const rotateItem = document.createElement("div");
     rotateItem.className = "menu-item";
-    rotateItem.innerHTML = `<i class="fa-solid fa-rotate-right" style="color:var(--color-cyan);"></i><span class="menu-item-text">Girar Mídia (+90°)</span><span style="margin-left:auto; font-size:var(--fs-10); color:var(--text-muted); padding-left:12px;">R</span>`;
+    rotateItem.innerHTML = `<i class="fa-solid fa-rotate-right" style="color:var(--color-cyan);"></i><span class="menu-item-text">Girar Mídia (+90°)</span><span style="margin-left:auto; font-size:var(--fs-10); color:var(--text-muted); padding-left:var(--sp-12);">R</span>`;
     rotateItem.addEventListener("click", async () => {
         menu.remove();
         try {
@@ -2017,29 +2017,29 @@ export function promptExternalPathIngest(targetFolderPath = "root") {
     modal.style.display = "flex";
     modal.style.zIndex = "9999999";
     modal.innerHTML = `
-        <div class="modal-content glassmorphism" style="max-width: 460px; padding: 20px; border-radius: 8px;">
-            <div class="modal-header" style="margin-bottom: 14px; display: flex; justify-content: space-between; align-items: center;">
-                <h2 style="font-size: var(--fs-14); color: var(--text-primary); display: flex; align-items: center; gap: 8px; margin: 0;">
+        <div class="modal-content glassmorphism" style="max-width: 460px; padding: var(--sp-20); border-radius: 8px;">
+            <div class="modal-header" style="margin-bottom: var(--sp-14); display: flex; justify-content: space-between; align-items: center;">
+                <h2 style="font-size: var(--fs-14); color: var(--text-primary); display: flex; align-items: center; gap: var(--sp-8); margin: 0;">
                     <i class="fa-solid fa-link" style="color: var(--color-cyan);"></i> Vincular Pasta Local / HD Externo
                 </h2>
                 <button class="btn-close-modal" id="btn-close-external-ingest" style="background: none; border: none; color: var(--text-secondary); cursor: pointer; font-size: var(--fs-16);">&times;</button>
             </div>
             <div class="modal-body">
-                <p style="font-size: var(--fs-11); color: var(--text-secondary); line-height: 1.5; margin-bottom: 12px;">
+                <p style="font-size: var(--fs-11); color: var(--text-secondary); line-height: 1.5; margin-bottom: var(--sp-12);">
                     Informe o caminho absoluto da pasta no disco ou HD externo. Os arquivos serão catalogados <strong>in-place (sem cópia de arquivos)</strong>.
                 </p>
-                <label style="font-size: var(--fs-11); color: var(--text-secondary); margin-bottom: 6px; display: block;">Caminho da Pasta:</label>
-                <div style="display: flex; gap: 6px;">
-                    <input type="text" id="external-path-input" placeholder="Ex: D:/Gravacoes/Documentario ou E:\\Acervo" style="flex: 1; box-sizing: border-box; background: rgba(0,0,0,0.35); border: 1px solid var(--border-glass); padding: 8px 10px; border-radius: 4px; color: #fff; font-size: var(--fs-12); font-family: monospace;">
-                    <button id="btn-browse-win" class="btn-outline" title="Procurar no Windows" style="padding: 0 10px; font-size: var(--fs-11); white-space: nowrap; display: flex; align-items: center; gap: 4px;">
+                <label style="font-size: var(--fs-11); color: var(--text-secondary); margin-bottom: var(--sp-6); display: block;">Caminho da Pasta:</label>
+                <div style="display: flex; gap: var(--sp-6);">
+                    <input type="text" id="external-path-input" placeholder="Ex: D:/Gravacoes/Documentario ou E:\\Acervo" style="flex: 1; box-sizing: border-box; background: rgba(0,0,0,0.35); border: 1px solid var(--border-glass); padding: var(--sp-8) var(--sp-10); border-radius: 4px; color: #fff; font-size: var(--fs-12); font-family: monospace;">
+                    <button id="btn-browse-win" class="btn-outline" title="Procurar no Windows" style="padding: 0 var(--sp-10); font-size: var(--fs-11); white-space: nowrap; display: flex; align-items: center; gap: var(--sp-4);">
                         <i class="fa-solid fa-folder-open"></i> Procurar...
                     </button>
                 </div>
-                <div id="browse-hint" style="font-size: var(--fs-10); color: var(--text-muted, #888); margin-top: 6px;">
+                <div id="browse-hint" style="font-size: var(--fs-10); color: var(--text-muted, #888); margin-top: var(--sp-6);">
                     Dica: Você pode copiar e colar o caminho da barra de endereços do Explorer.
                 </div>
             </div>
-            <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px;">
+            <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: var(--sp-8); margin-top: var(--sp-18);">
                 <button id="btn-cancel-external-ingest" class="btn-outline">Cancelar</button>
                 <button id="btn-confirm-external-ingest" class="btn-primary" style="--primary-bg: var(--color-cyan); --primary-ink: #000; font-weight: 600;">Vincular In-Place</button>
             </div>
@@ -2244,18 +2244,18 @@ export function promptCreateSubfolder(parentFolderPath) {
     modal.className = "modal-overlay";
     modal.style.display = "flex";
     modal.innerHTML = `
-        <div class="modal-content glassmorphism" style="max-width: 380px; padding: 18px;">
-            <div class="modal-header" style="margin-bottom: 12px;">
-                <h2 style="font-size: var(--fs-14); color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
+        <div class="modal-content glassmorphism" style="max-width: 380px; padding: var(--sp-18);">
+            <div class="modal-header" style="margin-bottom: var(--sp-12);">
+                <h2 style="font-size: var(--fs-14); color: var(--text-primary); display: flex; align-items: center; gap: var(--sp-8);">
                     <i class="fa-solid fa-folder-plus" style="color: var(--color-violet);"></i> Nova Subpasta
                 </h2>
                 <button class="btn-close-modal" id="btn-close-subfolder">&times;</button>
             </div>
             <div class="modal-body">
-                <label style="font-size: var(--fs-11); color: var(--text-secondary); margin-bottom: 6px; display: block;">Nome da Pasta:</label>
-                <input type="text" id="subfolder-name-input" placeholder="Ex: Entrevistas Principais" style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); padding: 7px 10px; border-radius: 4px; color: #fff; font-size: var(--fs-12);">
+                <label style="font-size: var(--fs-11); color: var(--text-secondary); margin-bottom: var(--sp-6); display: block;">Nome da Pasta:</label>
+                <input type="text" id="subfolder-name-input" placeholder="Ex: Entrevistas Principais" style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); padding: var(--sp-6) var(--sp-10); border-radius: 4px; color: #fff; font-size: var(--fs-12);">
             </div>
-            <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px;">
+            <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: var(--sp-8); margin-top: var(--sp-14);">
                 <button id="btn-cancel-subfolder" class="btn-outline">Cancelar</button>
                 <button id="btn-confirm-subfolder" class="btn-primary">Criar Pasta</button>
             </div>
@@ -2305,18 +2305,18 @@ export function promptRenameFolder(folderPath, currentName) {
     modal.className = "modal-overlay";
     modal.style.display = "flex";
     modal.innerHTML = `
-        <div class="modal-content glassmorphism" style="max-width: 380px; padding: 18px;">
-            <div class="modal-header" style="margin-bottom: 12px;">
-                <h2 style="font-size: var(--fs-14); color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
+        <div class="modal-content glassmorphism" style="max-width: 380px; padding: var(--sp-18);">
+            <div class="modal-header" style="margin-bottom: var(--sp-12);">
+                <h2 style="font-size: var(--fs-14); color: var(--text-primary); display: flex; align-items: center; gap: var(--sp-8);">
                     <i class="fa-solid fa-pen-to-square" style="color: var(--color-cyan);"></i> Renomear Pasta
                 </h2>
                 <button class="btn-close-modal" id="btn-close-rename-folder">&times;</button>
             </div>
             <div class="modal-body">
-                <label style="font-size: var(--fs-11); color: var(--text-secondary); margin-bottom: 6px; display: block;">Novo Nome:</label>
-                <input type="text" id="rename-folder-input" value="${escapeHtml(currentName)}" style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); padding: 7px 10px; border-radius: 4px; color: #fff; font-size: var(--fs-12);">
+                <label style="font-size: var(--fs-11); color: var(--text-secondary); margin-bottom: var(--sp-6); display: block;">Novo Nome:</label>
+                <input type="text" id="rename-folder-input" value="${escapeHtml(currentName)}" style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); padding: var(--sp-6) var(--sp-10); border-radius: 4px; color: #fff; font-size: var(--fs-12);">
             </div>
-            <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px;">
+            <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: var(--sp-8); margin-top: var(--sp-14);">
                 <button id="btn-cancel-rename-folder" class="btn-outline">Cancelar</button>
                 <button id="btn-confirm-rename-folder" class="btn-primary">Salvar</button>
             </div>
@@ -2395,20 +2395,20 @@ export function confirmDeleteVirtualFolder(folderPath, folderName) {
     modal.className = "modal-overlay";
     modal.style.display = "flex";
     modal.innerHTML = `
-        <div class="modal-content glassmorphism" style="max-width: 440px; padding: 20px;">
-            <div class="modal-header" style="margin-bottom: 12px;">
-                <h2 style="font-size: var(--fs-16); color: var(--color-rose); display: flex; align-items: center; gap: 8px;">
+        <div class="modal-content glassmorphism" style="max-width: 440px; padding: var(--sp-20);">
+            <div class="modal-header" style="margin-bottom: var(--sp-12);">
+                <h2 style="font-size: var(--fs-16); color: var(--color-rose); display: flex; align-items: center; gap: var(--sp-8);">
                     <i class="fa-solid fa-triangle-exclamation"></i> Excluir Pasta da Biblioteca
                 </h2>
                 <button class="btn-close-modal" id="btn-close-del-bin">&times;</button>
             </div>
             <div class="modal-body" style="font-size: var(--fs-12); color: var(--text-secondary); line-height: 1.5;">
                 <p>Tem certeza de que deseja remover a pasta <b>"${escapeHtml(folderName)}"</b> da sua biblioteca?</p>
-                <p style="font-size: var(--fs-11); color: var(--text-muted); background: rgba(255,255,255,0.03); padding: 8px; border-radius: 4px; border-left: 2px solid var(--color-cyan); margin-top: 10px;">
+                <p style="font-size: var(--fs-11); color: var(--text-muted); background: rgba(255,255,255,0.03); padding: var(--sp-8); border-radius: 4px; border-left: 2px solid var(--color-cyan); margin-top: var(--sp-10);">
                     <i class="fa-solid fa-circle-info" style="color: var(--color-cyan);"></i> Esta ação remove apenas a pasta virtual do projeto. <b>Nenhum arquivo físico original no seu disco rígido será apagado.</b> Você pode desfazer a qualquer momento com <b>Ctrl + Z</b>.
                 </p>
             </div>
-            <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px;">
+            <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: var(--sp-8); margin-top: var(--sp-16);">
                 <button id="btn-cancel-del-bin" class="btn-outline">Cancelar</button>
                 <button id="btn-confirm-del-bin" class="btn-primary" style="background: var(--color-rose); border-color: var(--color-rose);">Remover Pasta</button>
             </div>
@@ -2547,7 +2547,7 @@ export function showFolderContextMenu(e, node, folderHeader) {
         const sub = targetDoc.createElement("div");
         sub.className = "menu-item";
         sub.innerHTML = `
-            <span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:${c.hex}; margin-right:8px;"></span>
+            <span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:${c.hex}; margin-right:var(--sp-8);"></span>
             <span class="menu-item-text">${c.name}</span>
         `;
         sub.addEventListener("click", (ev) => {
@@ -2638,24 +2638,24 @@ export function promptFolderImportTarget(folderName, targetFolderPath, onChoice)
     const currentDisplayName = (!targetFolderPath || targetFolderPath === "root") ? "Raiz da Biblioteca" : targetFolderPath.replace(/^root\/?/, "");
 
     modal.innerHTML = `
-        <div class="modal-content glassmorphism" style="max-width: 440px; padding: 20px;">
-            <div class="modal-header" style="margin-bottom: 14px;">
-                <h2 style="font-size: var(--fs-14); color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
+        <div class="modal-content glassmorphism" style="max-width: 440px; padding: var(--sp-20);">
+            <div class="modal-header" style="margin-bottom: var(--sp-14);">
+                <h2 style="font-size: var(--fs-14); color: var(--text-primary); display: flex; align-items: center; gap: var(--sp-8);">
                     <i class="fa-solid fa-folder-tree" style="color: var(--color-cyan);"></i> Importação de Pasta
                 </h2>
                 <button class="btn-close-modal" id="btn-close-import-choice">&times;</button>
             </div>
             <div class="modal-body" style="font-size: var(--fs-12); color: var(--text-secondary); line-height: 1.5;">
                 <p>Como você deseja organizar os arquivos da pasta <b>"${escapeHtml(folderName)}"</b> na biblioteca?</p>
-                <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 14px;">
-                    <button id="btn-choice-create-bin" class="btn-primary" style="padding: 10px 14px; display: flex; align-items: center; gap: 10px; text-align: left; background: var(--t-tint-3, rgba(139, 92, 246, 0.2)); border: 1px solid var(--t-line-strong, rgba(139, 92, 246, 0.5)); color: #fff; cursor: pointer; border-radius: 6px;">
+                <div style="display: flex; flex-direction: column; gap: var(--sp-10); margin-top: var(--sp-14);">
+                    <button id="btn-choice-create-bin" class="btn-primary" style="padding: var(--sp-10) var(--sp-14); display: flex; align-items: center; gap: var(--sp-10); text-align: left; background: var(--t-tint-3, rgba(139, 92, 246, 0.2)); border: 1px solid var(--t-line-strong, rgba(139, 92, 246, 0.5)); color: #fff; cursor: pointer; border-radius: 6px;">
                         <i class="fa-solid fa-folder-plus" style="font-size: var(--fs-16); color: var(--color-violet);"></i>
                         <div>
                             <div style="font-weight: 700;">Criar Bin "${escapeHtml(folderName)}"</div>
                             <div style="font-size: var(--fs-10); color: var(--text-muted);">Cria uma pasta virtual dedicada na biblioteca</div>
                         </div>
                     </button>
-                    <button id="btn-choice-current-folder" class="btn-secondary" style="padding: 10px 14px; display: flex; align-items: center; gap: 10px; text-align: left; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border-glass); color: #fff; cursor: pointer; border-radius: 6px;">
+                    <button id="btn-choice-current-folder" class="btn-secondary" style="padding: var(--sp-10) var(--sp-14); display: flex; align-items: center; gap: var(--sp-10); text-align: left; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border-glass); color: #fff; cursor: pointer; border-radius: 6px;">
                         <i class="fa-solid fa-folder-open" style="font-size: var(--fs-16); color: var(--color-cyan);"></i>
                         <div>
                             <div style="font-weight: 700;">Importar na Pasta Atual (${escapeHtml(currentDisplayName)})</div>
@@ -2664,7 +2664,7 @@ export function promptFolderImportTarget(folderName, targetFolderPath, onChoice)
                     </button>
                 </div>
             </div>
-            <div class="modal-footer" style="display: flex; justify-content: flex-end; margin-top: 16px;">
+            <div class="modal-footer" style="display: flex; justify-content: flex-end; margin-top: var(--sp-16);">
                 <button id="btn-cancel-import-choice" class="btn-outline">Cancelar</button>
             </div>
         </div>
@@ -2713,30 +2713,30 @@ export function promptMoveMediaToBin(item, mediaType = "video") {
     }).join("");
 
     modal.innerHTML = `
-        <div class="modal-content glassmorphism" style="max-width: 400px; padding: 18px;">
-            <div class="modal-header" style="margin-bottom: 12px;">
-                <h2 style="font-size: var(--fs-14); color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
+        <div class="modal-content glassmorphism" style="max-width: 400px; padding: var(--sp-18);">
+            <div class="modal-header" style="margin-bottom: var(--sp-12);">
+                <h2 style="font-size: var(--fs-14); color: var(--text-primary); display: flex; align-items: center; gap: var(--sp-8);">
                     <i class="fa-solid fa-folder-tree" style="color: var(--color-violet);"></i> Mover Mídia para Bin
                 </h2>
                 <button class="btn-close-modal" id="btn-close-move-bin">&times;</button>
             </div>
             <div class="modal-body" style="font-size: var(--fs-11); color: var(--text-secondary);">
-                <div style="margin-bottom: 8px; font-weight: 600; color: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                <div style="margin-bottom: var(--sp-8); font-weight: 600; color: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
                     Mídia: ${escapeHtml(item.filename || item.title || `Item #${item.id}`)}
                 </div>
-                <label style="display: block; margin-bottom: 6px;">Selecione o Bin de Destino:</label>
-                <div class="dropdown-wrapper" style="height: 32px; padding: 0 10px; margin-bottom: 10px; display: flex; align-items: center;">
+                <label style="display: block; margin-bottom: var(--sp-6);">Selecione o Bin de Destino:</label>
+                <div class="dropdown-wrapper" style="height: 32px; padding: 0 var(--sp-10); margin-bottom: var(--sp-10); display: flex; align-items: center;">
                     <select id="select-target-bin" style="background: transparent; border: none; outline: none; color: #fff; font-size: var(--fs-11); width: 100%; cursor: pointer;">
                         ${binOptions}
                         <option value="__new__">+ Criar Novo Bin...</option>
                     </select>
                 </div>
-                <div id="new-bin-container" style="display: none; margin-top: 6px;">
-                    <label style="display: block; margin-bottom: 4px;">Nome da Nova Pasta:</label>
-                    <input type="text" id="input-new-bin-name" placeholder="Ex: Cenas Externas" style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); padding: 6px 10px; border-radius: 4px; color: #fff; font-size: var(--fs-11);">
+                <div id="new-bin-container" style="display: none; margin-top: var(--sp-6);">
+                    <label style="display: block; margin-bottom: var(--sp-4);">Nome da Nova Pasta:</label>
+                    <input type="text" id="input-new-bin-name" placeholder="Ex: Cenas Externas" style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); padding: var(--sp-6) var(--sp-10); border-radius: 4px; color: #fff; font-size: var(--fs-11);">
                 </div>
             </div>
-            <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px;">
+            <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: var(--sp-8); margin-top: var(--sp-14);">
                 <button id="btn-cancel-move-bin" class="btn-outline">Cancelar</button>
                 <button id="btn-confirm-move-bin" class="btn-primary">Mover Mídia</button>
             </div>
@@ -2812,26 +2812,26 @@ export function promptEditMediaMetadata(item, mediaType = "video") {
     }).join("");
 
     modal.innerHTML = `
-        <div class="modal-content glassmorphism" style="max-width: 480px; padding: 20px; max-height: 90vh; overflow-y: auto;">
-            <div class="modal-header" style="margin-bottom: 14px;">
-                <h2 style="font-size: var(--fs-14); color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
+        <div class="modal-content glassmorphism" style="max-width: 480px; padding: var(--sp-20); max-height: 90vh; overflow-y: auto;">
+            <div class="modal-header" style="margin-bottom: var(--sp-14);">
+                <h2 style="font-size: var(--fs-14); color: var(--text-primary); display: flex; align-items: center; gap: var(--sp-8);">
                     <i class="fa-solid fa-pen-to-square" style="color: var(--color-gold);"></i> Editar Metadados da Mídia
                 </h2>
                 <button class="btn-close-modal" id="btn-close-edit-meta">&times;</button>
             </div>
-            <div class="modal-body" style="font-size: var(--fs-11); color: var(--text-secondary); display: flex; flex-direction: column; gap: 10px;">
-                <div style="font-size: var(--fs-10); color: var(--text-muted); background: rgba(255,255,255,0.03); padding: 6px 8px; border-radius: 4px; word-break: break-all;">
+            <div class="modal-body" style="font-size: var(--fs-11); color: var(--text-secondary); display: flex; flex-direction: column; gap: var(--sp-10);">
+                <div style="font-size: var(--fs-10); color: var(--text-muted); background: rgba(255,255,255,0.03); padding: var(--sp-6) var(--sp-8); border-radius: 4px; word-break: break-all;">
                     <strong>Arquivo:</strong> ${escapeHtml(item.filename || "")}<br>
                     <strong>Caminho Real:</strong> ${escapeHtml(item.filepath || "")}
                 </div>
                 <div>
-                    <label style="display: block; margin-bottom: 4px; font-weight: 600; color: #fff;">Título Editorial:</label>
-                    <input type="text" id="meta-title" value="${escapeHtml(currentTitle)}" placeholder="Ex: Entrevista com Diretora" style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); padding: 6px 10px; border-radius: 4px; color: #fff; font-size: var(--fs-11);">
+                    <label style="display: block; margin-bottom: var(--sp-4); font-weight: 600; color: #fff;">Título Editorial:</label>
+                    <input type="text" id="meta-title" value="${escapeHtml(currentTitle)}" placeholder="Ex: Entrevista com Diretora" style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); padding: var(--sp-6) var(--sp-10); border-radius: 4px; color: #fff; font-size: var(--fs-11);">
                 </div>
-                <div style="display: flex; gap: 10px;">
+                <div style="display: flex; gap: var(--sp-10);">
                     <div style="flex: 1;">
-                        <label style="display: block; margin-bottom: 4px; font-weight: 600; color: #fff;">Categoria de Triagem:</label>
-                        <div class="dropdown-wrapper" style="height: 30px; padding: 0 8px; display: flex; align-items: center;">
+                        <label style="display: block; margin-bottom: var(--sp-4); font-weight: 600; color: #fff;">Categoria de Triagem:</label>
+                        <div class="dropdown-wrapper" style="height: 30px; padding: 0 var(--sp-8); display: flex; align-items: center;">
                             <select id="meta-category" style="background: transparent; border: none; outline: none; color: #fff; font-size: var(--fs-11); width: 100%; cursor: pointer;">
                                 <option value="">Sem Categoria</option>
                                 ${catOptions}
@@ -2839,28 +2839,28 @@ export function promptEditMediaMetadata(item, mediaType = "video") {
                         </div>
                     </div>
                     <div style="flex: 1;">
-                        <label style="display: block; margin-bottom: 4px; font-weight: 600; color: #fff;">Data / Diária de Gravação:</label>
-                        <input type="datetime-local" id="meta-recorded-at" value="${escapeHtml(currentRecAt)}" style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); padding: 5px 8px; border-radius: 4px; color: #fff; font-size: var(--fs-11);">
+                        <label style="display: block; margin-bottom: var(--sp-4); font-weight: 600; color: #fff;">Data / Diária de Gravação:</label>
+                        <input type="datetime-local" id="meta-recorded-at" value="${escapeHtml(currentRecAt)}" style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); padding: var(--sp-4) var(--sp-8); border-radius: 4px; color: #fff; font-size: var(--fs-11);">
                     </div>
                 </div>
                 <div>
-                    <label style="display: block; margin-bottom: 4px; font-weight: 600; color: #fff;">Pasta Virtual (Bin):</label>
-                    <input type="text" id="meta-vfolder" value="${escapeHtml(currentVFolder)}" placeholder="root ou root/Subpasta" style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); padding: 6px 10px; border-radius: 4px; color: #fff; font-size: var(--fs-11);">
+                    <label style="display: block; margin-bottom: var(--sp-4); font-weight: 600; color: #fff;">Pasta Virtual (Bin):</label>
+                    <input type="text" id="meta-vfolder" value="${escapeHtml(currentVFolder)}" placeholder="root ou root/Subpasta" style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); padding: var(--sp-6) var(--sp-10); border-radius: 4px; color: #fff; font-size: var(--fs-11);">
                 </div>
                 <div>
-                    <label style="display: block; margin-bottom: 4px; font-weight: 600; color: #fff;">Resumo / Destaque:</label>
-                    <input type="text" id="meta-summary" value="${escapeHtml(currentSummary)}" placeholder="Síntese curta da ação ou depoimento" style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); padding: 6px 10px; border-radius: 4px; color: #fff; font-size: var(--fs-11);">
+                    <label style="display: block; margin-bottom: var(--sp-4); font-weight: 600; color: #fff;">Resumo / Destaque:</label>
+                    <input type="text" id="meta-summary" value="${escapeHtml(currentSummary)}" placeholder="Síntese curta da ação ou depoimento" style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); padding: var(--sp-6) var(--sp-10); border-radius: 4px; color: #fff; font-size: var(--fs-11);">
                 </div>
                 <div>
-                    <label style="display: block; margin-bottom: 4px; font-weight: 600; color: #fff;">Descrição Detalhada:</label>
-                    <textarea id="meta-description" rows="3" placeholder="Descrição visual e contextual completa..." style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); padding: 6px 10px; border-radius: 4px; color: #fff; font-size: var(--fs-11); resize: vertical;">${escapeHtml(currentDesc)}</textarea>
+                    <label style="display: block; margin-bottom: var(--sp-4); font-weight: 600; color: #fff;">Descrição Detalhada:</label>
+                    <textarea id="meta-description" rows="3" placeholder="Descrição visual e contextual completa..." style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); padding: var(--sp-6) var(--sp-10); border-radius: 4px; color: #fff; font-size: var(--fs-11); resize: vertical;">${escapeHtml(currentDesc)}</textarea>
                 </div>
                 <div>
-                    <label style="display: block; margin-bottom: 4px; font-weight: 600; color: #fff;">Tags (separadas por vírgula):</label>
-                    <input type="text" id="meta-tags" value="${escapeHtml(currentTags)}" placeholder="ex: externa, drone, luciana, por do sol" style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); padding: 6px 10px; border-radius: 4px; color: #fff; font-size: var(--fs-11);">
+                    <label style="display: block; margin-bottom: var(--sp-4); font-weight: 600; color: #fff;">Tags (separadas por vírgula):</label>
+                    <input type="text" id="meta-tags" value="${escapeHtml(currentTags)}" placeholder="ex: externa, drone, luciana, por do sol" style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); padding: var(--sp-6) var(--sp-10); border-radius: 4px; color: #fff; font-size: var(--fs-11);">
                 </div>
             </div>
-            <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px;">
+            <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: var(--sp-8); margin-top: var(--sp-16);">
                 <button id="btn-cancel-edit-meta" class="btn-outline">Cancelar</button>
                 <button id="btn-confirm-edit-meta" class="btn-primary">Salvar Metadados</button>
             </div>
@@ -2916,30 +2916,30 @@ export function promptRelinkMediaDialog(prefillFolder = "") {
     modal.style.display = "flex";
 
     modal.innerHTML = `
-        <div class="modal-content glassmorphism" style="max-width: 480px; padding: 20px;">
-            <div class="modal-header" style="margin-bottom: 14px;">
-                <h2 style="font-size: var(--fs-14); color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
+        <div class="modal-content glassmorphism" style="max-width: 480px; padding: var(--sp-20);">
+            <div class="modal-header" style="margin-bottom: var(--sp-14);">
+                <h2 style="font-size: var(--fs-14); color: var(--text-primary); display: flex; align-items: center; gap: var(--sp-8);">
                     <i class="fa-solid fa-link" style="color: var(--color-cyan);"></i> Relincar Mídias / Buscar no Disco
                 </h2>
                 <button class="btn-close-modal" id="btn-close-relink">&times;</button>
             </div>
-            <div class="modal-body" style="font-size: var(--fs-11); color: var(--text-secondary); line-height: 1.5; display: flex; flex-direction: column; gap: 10px;">
+            <div class="modal-body" style="font-size: var(--fs-11); color: var(--text-secondary); line-height: 1.5; display: flex; flex-direction: column; gap: var(--sp-10);">
                 <p>Se você trocou de computador ou moveu a pasta de arquivos, aponte a pasta raiz onde as gravações estão agora. O Talho fará uma <b>busca inteligente recursiva em todas as subpastas</b>, reconciliando os arquivos pelo nome e hash sem perder suas decupagens.</p>
                 <div>
-                    <label style="display: block; margin-bottom: 4px; font-weight: 600; color: #fff;">Pasta Raiz de Busca:</label>
-                    <div style="display: flex; gap: 6px;">
-                        <input type="text" id="relink-folder-input" value="${escapeHtml(prefillFolder)}" placeholder="Ex: D:/MeusProjetos/Gravacoes" style="flex: 1; box-sizing: border-box; background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); padding: 6px 10px; border-radius: 4px; color: #fff; font-size: var(--fs-11);">
-                        <button id="btn-browse-relink" class="btn-secondary" style="font-size: var(--fs-11); padding: 0 12px; cursor: pointer;">
+                    <label style="display: block; margin-bottom: var(--sp-4); font-weight: 600; color: #fff;">Pasta Raiz de Busca:</label>
+                    <div style="display: flex; gap: var(--sp-6);">
+                        <input type="text" id="relink-folder-input" value="${escapeHtml(prefillFolder)}" placeholder="Ex: D:/MeusProjetos/Gravacoes" style="flex: 1; box-sizing: border-box; background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); padding: var(--sp-6) var(--sp-10); border-radius: 4px; color: #fff; font-size: var(--fs-11);">
+                        <button id="btn-browse-relink" class="btn-secondary" style="font-size: var(--fs-11); padding: 0 var(--sp-12); cursor: pointer;">
                             <i class="fa-solid fa-folder-open"></i> Procurar...
                         </button>
                     </div>
                 </div>
-                <div id="relink-status-feedback" style="display: none; padding: 8px; border-radius: 4px; background: rgba(0,0,0,0.25); border: 1px solid var(--border-glass); font-size: var(--fs-11);">
+                <div id="relink-status-feedback" style="display: none; padding: var(--sp-8); border-radius: 4px; background: rgba(0,0,0,0.25); border: 1px solid var(--border-glass); font-size: var(--fs-11);">
                 </div>
             </div>
-            <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px;">
+            <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: var(--sp-8); margin-top: var(--sp-16);">
                 <button id="btn-cancel-relink" class="btn-outline">Cancelar</button>
-                <button id="btn-start-relink" class="btn-primary" style="display: flex; align-items: center; gap: 6px;">
+                <button id="btn-start-relink" class="btn-primary" style="display: flex; align-items: center; gap: var(--sp-6);">
                     <i class="fa-solid fa-arrows-rotate"></i> Iniciar Relink Recursivo
                 </button>
             </div>
@@ -2986,7 +2986,7 @@ export function promptRelinkMediaDialog(prefillFolder = "") {
             const stillMissing = res.still_missing_count || 0;
 
             statusBox.innerHTML = `
-                <div style="color: var(--color-emerald); font-weight: 600; margin-bottom: 4px;">
+                <div style="color: var(--color-emerald); font-weight: 600; margin-bottom: var(--sp-4);">
                     <i class="fa-solid fa-circle-check"></i> Varredura de Relink Concluída!
                 </div>
                 <div style="color: #fff;">
@@ -3588,14 +3588,14 @@ function animateStreamToggle(btnEl, goingToExpand, onComplete) {
     if (goingToExpand) {
         // Fluxo descendo: 4 setas para baixo e a última apontando para cima
         for (let i = 0; i < count - 1; i++) {
-            arrowsHtml += `<svg class="arrow-svg" style="margin-bottom: 3px;" viewBox="0 0 16 16"><path d="${ARROW_DOWN_PATH}" /></svg>`;
+            arrowsHtml += `<svg class="arrow-svg" style="margin-bottom: var(--sp-2);" viewBox="0 0 16 16"><path d="${ARROW_DOWN_PATH}" /></svg>`;
         }
         arrowsHtml += `<svg class="arrow-svg" viewBox="0 0 16 16"><path d="${ARROW_UP_PATH}" /></svg>`;
     } else {
         // Fluxo subindo: 1 seta para baixo na base e 4 setas para cima
         arrowsHtml += `<svg class="arrow-svg" viewBox="0 0 16 16"><path d="${ARROW_DOWN_PATH}" /></svg>`;
         for (let i = 0; i < count - 1; i++) {
-            arrowsHtml += `<svg class="arrow-svg" style="margin-top: 3px;" viewBox="0 0 16 16"><path d="${ARROW_UP_PATH}" /></svg>`;
+            arrowsHtml += `<svg class="arrow-svg" style="margin-top: var(--sp-2);" viewBox="0 0 16 16"><path d="${ARROW_UP_PATH}" /></svg>`;
         }
     }
 
@@ -3969,15 +3969,15 @@ function renderTreeNode(node, container, depth = 0) {
         
         folderHeader.innerHTML = `
             <div style="display: flex; align-items: center; flex: 1; min-width: 0;">
-                <i class="fa-solid ${chevron} chevron-icon" style="font-size:var(--fs-9); margin-right:6px; color:var(--text-muted);"></i>
-                <i class="fa-solid ${icon} folder-icon" style="color:${folderColor}; margin-right:8px;"></i>
+                <i class="fa-solid ${chevron} chevron-icon" style="font-size:var(--fs-9); margin-right:var(--sp-6); color:var(--text-muted);"></i>
+                <i class="fa-solid ${icon} folder-icon" style="color:${folderColor}; margin-right:var(--sp-8);"></i>
                 <span class="folder-name" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;">${node.name}</span>
             </div>
-            <div class="folder-actions" style="display: flex; gap: 4px; margin-right: 6px;">
-                <button class="btn-folder-action" data-action="add-media" title="Importar mídias para esta pasta" style="background: none; border: none; padding: 2px 4px; color: var(--color-cyan); cursor: pointer; font-size: var(--fs-10); display: flex; align-items: center; justify-content: center;">
+            <div class="folder-actions" style="display: flex; gap: var(--sp-4); margin-right: var(--sp-6);">
+                <button class="btn-folder-action" data-action="add-media" title="Importar mídias para esta pasta" style="background: none; border: none; padding: var(--sp-2) var(--sp-4); color: var(--color-cyan); cursor: pointer; font-size: var(--fs-10); display: flex; align-items: center; justify-content: center;">
                     <i class="fa-solid fa-plus"></i>
                 </button>
-                <button class="btn-folder-action btn-folder-toggle ${toggleStateClass}" data-action="toggle-subfolders" title="${toggleTitle}" style="background: none; border: none; padding: 2px; cursor: pointer; display: flex; align-items: center; justify-content: center;">
+                <button class="btn-folder-action btn-folder-toggle ${toggleStateClass}" data-action="toggle-subfolders" title="${toggleTitle}" style="background: none; border: none; padding: var(--sp-2); cursor: pointer; display: flex; align-items: center; justify-content: center;">
                     <div class="stream-viewport mini">
                         <svg class="arrow-svg" viewBox="0 0 16 16"><path d="${toggleIconPath}" /></svg>
                     </div>
@@ -4152,28 +4152,28 @@ function renderTreeNode(node, container, depth = 0) {
         } else if (v.status === "transcribing" || v.status === "processing") {
             if (isConverting) {
                 statusGlow = `<i class="fa-solid fa-circle-notch fa-spin proxy-spin-icon" style="color: var(--color-cyan);" data-tooltip="Convertendo..."></i>`;
-                actionBtn = `<button class="btn-card-action" style="background:transparent; border:none; color:var(--color-rose); cursor:pointer; padding:2px;" onclick="event.stopPropagation(); window.cancelConversion(${v.id})" data-tooltip="Cancelar Conversão"><i class="fa-solid fa-circle-stop" style="font-size:var(--fs-10);"></i></button>`;
+                actionBtn = `<button class="btn-card-action" style="background:transparent; border:none; color:var(--color-rose); cursor:pointer; padding:var(--sp-2);" onclick="event.stopPropagation(); window.cancelConversion(${v.id})" data-tooltip="Cancelar Conversão"><i class="fa-solid fa-circle-stop" style="font-size:var(--fs-10);"></i></button>`;
             } else {
                 statusGlow = `<span class="waveform-anim-icon" data-tooltip="Processando áudio / ASR..."><span class="waveform-anim-bar"></span><span class="waveform-anim-bar"></span><span class="waveform-anim-bar"></span><span class="waveform-anim-bar"></span></span>`;
             }
         } else if (v.status === "analyzing") {
             statusGlow = `<i class="fa-solid fa-circle-notch fa-spin" style="color: var(--color-violet);" data-tooltip="Analisando visão com IA..."></i>`;
-            actionBtn = `<button class="btn-card-action" style="background:transparent; border:none; color:var(--color-rose); cursor:pointer; padding:2px;" onclick="event.stopPropagation(); window.cancelConversion(${v.id})" data-tooltip="Cancelar Análise"><i class="fa-solid fa-circle-stop" style="font-size:var(--fs-10);"></i></button>`;
+            actionBtn = `<button class="btn-card-action" style="background:transparent; border:none; color:var(--color-rose); cursor:pointer; padding:var(--sp-2);" onclick="event.stopPropagation(); window.cancelConversion(${v.id})" data-tooltip="Cancelar Análise"><i class="fa-solid fa-circle-stop" style="font-size:var(--fs-10);"></i></button>`;
         } else if (v.status === "transcribed") {
             statusBadge = `<span class="badge" style="color: var(--color-cyan); border-color: var(--t-line-strong, rgba(6, 182, 212, 0.3));">ASR</span>`;
-            actionBtn = `<button class="btn-card-action btn-hover-only" style="background:transparent; border:none; color:var(--text-muted); cursor:pointer; padding: 2px;" onclick="event.stopPropagation(); window.deleteProxy(${v.id})" data-tooltip="Deletar Proxy"><i class="fa-solid fa-trash-can" style="font-size: var(--fs-10);"></i></button>`;
+            actionBtn = `<button class="btn-card-action btn-hover-only" style="background:transparent; border:none; color:var(--text-muted); cursor:pointer; padding: var(--sp-2);" onclick="event.stopPropagation(); window.deleteProxy(${v.id})" data-tooltip="Deletar Proxy"><i class="fa-solid fa-trash-can" style="font-size: var(--fs-10);"></i></button>`;
         } else if (v.status === "analyzed") {
             if (hasVisionError) {
                 statusBadge = `<span class="badge" style="color: var(--color-rose); border-color: var(--t-line-strong, rgba(244, 63, 94, 0.4));">FALHA VISUAL</span>`;
             } else {
                 statusBadge = `<span class="badge" style="color: var(--color-violet); border-color: var(--t-line-strong, rgba(138, 92, 246, 0.3));">VISÃO</span>`;
             }
-            actionBtn = `<button class="btn-card-action btn-hover-only" style="background:transparent; border:none; color:var(--text-muted); cursor:pointer; padding: 2px;" onclick="event.stopPropagation(); window.deleteProxy(${v.id})" data-tooltip="Deletar Proxy"><i class="fa-solid fa-trash-can" style="font-size: var(--fs-10);"></i></button>`;
+            actionBtn = `<button class="btn-card-action btn-hover-only" style="background:transparent; border:none; color:var(--text-muted); cursor:pointer; padding: var(--sp-2);" onclick="event.stopPropagation(); window.deleteProxy(${v.id})" data-tooltip="Deletar Proxy"><i class="fa-solid fa-trash-can" style="font-size: var(--fs-10);"></i></button>`;
         } else if (v.status === "ingested") {
-            actionBtn = `<button class="btn-card-action btn-hover-only" style="background:transparent; border:none; color:var(--text-muted); cursor:pointer; padding: 2px;" onclick="event.stopPropagation(); window.deleteProxy(${v.id})" data-tooltip="Deletar Proxy"><i class="fa-solid fa-trash-can" style="font-size: var(--fs-10);"></i></button>`;
+            actionBtn = `<button class="btn-card-action btn-hover-only" style="background:transparent; border:none; color:var(--text-muted); cursor:pointer; padding: var(--sp-2);" onclick="event.stopPropagation(); window.deleteProxy(${v.id})" data-tooltip="Deletar Proxy"><i class="fa-solid fa-trash-can" style="font-size: var(--fs-10);"></i></button>`;
         } else if (v.status === "error") {
             statusGlow = `<i class="fa-solid fa-triangle-exclamation" style="color: var(--color-rose);" data-tooltip="Erro no processamento!"></i>`;
-            actionBtn = `<button class="btn-card-action" style="background:transparent; border:none; color:var(--text-secondary); cursor:pointer; padding: 2px;" onclick="event.stopPropagation(); window.deleteProxy(${v.id})" data-tooltip="Limpar Vídeo/Proxy"><i class="fa-solid fa-trash-can" style="font-size: var(--fs-10);"></i></button>`;
+            actionBtn = `<button class="btn-card-action" style="background:transparent; border:none; color:var(--text-secondary); cursor:pointer; padding: var(--sp-2);" onclick="event.stopPropagation(); window.deleteProxy(${v.id})" data-tooltip="Limpar Vídeo/Proxy"><i class="fa-solid fa-trash-can" style="font-size: var(--fs-10);"></i></button>`;
         }
         
         // Thumbnail (Real ou Ícone)
@@ -4204,11 +4204,11 @@ function renderTreeNode(node, container, depth = 0) {
         const visionBadgeHtml = hasVisionError ? `<div class="vision-error-badge" data-tooltip="Falha visual detectada. Clique em Reanalisar Falhas no topo"><i class="fa-solid fa-triangle-exclamation"></i> Falha Visual</div>` : '';
 
         const overrideBtnHtml = hasVisionError
-            ? `<button class="btn-card-action btn-hover-only btn-quick-override-ok" style="background:transparent; border:none; color:var(--color-emerald); cursor:pointer; padding: 2px;" data-tooltip="Marcar como Analisado (Ignorar Falha)"><i class="fa-solid fa-circle-check" style="font-size: var(--fs-10);"></i></button>`
-            : `<button class="btn-card-action btn-hover-only btn-quick-override-fail" style="background:transparent; border:none; color:var(--text-muted); cursor:pointer; padding: 2px;" data-tooltip="Sinalizar Falha Visual (Mandar para Reanálise)"><i class="fa-solid fa-triangle-exclamation" style="font-size: var(--fs-10);"></i></button>`;
+            ? `<button class="btn-card-action btn-hover-only btn-quick-override-ok" style="background:transparent; border:none; color:var(--color-emerald); cursor:pointer; padding: var(--sp-2);" data-tooltip="Marcar como Analisado (Ignorar Falha)"><i class="fa-solid fa-circle-check" style="font-size: var(--fs-10);"></i></button>`
+            : `<button class="btn-card-action btn-hover-only btn-quick-override-fail" style="background:transparent; border:none; color:var(--text-muted); cursor:pointer; padding: var(--sp-2);" data-tooltip="Sinalizar Falha Visual (Mandar para Reanálise)"><i class="fa-solid fa-triangle-exclamation" style="font-size: var(--fs-10);"></i></button>`;
 
         const subclipBadgeHtml = v.is_subclip
-            ? `<span class="badge badge-subclip" style="background: var(--t-tint-3, rgba(168, 85, 247, 0.2)); border: 1px solid var(--t-line-strong, rgba(168, 85, 247, 0.4)); color: #c084fc; font-size: var(--fs-10); padding: 1px 5px; border-radius: 3px; font-weight: 600; display: inline-flex; align-items: center; gap: 3px;"><i class="fa-solid fa-scissors"></i> SUBCLIPE</span>`
+            ? `<span class="badge badge-subclip" style="background: var(--t-tint-3, rgba(168, 85, 247, 0.2)); border: 1px solid var(--t-line-strong, rgba(168, 85, 247, 0.4)); color: #c084fc; font-size: var(--fs-10); padding: var(--sp-1) var(--sp-4); border-radius: 3px; font-weight: 600; display: inline-flex; align-items: center; gap: var(--sp-2);"><i class="fa-solid fa-scissors"></i> SUBCLIPE</span>`
             : `<span class="badge-tag ${badgeClass}">${badgeLabel}</span>`;
 
         card.innerHTML = `
@@ -5902,7 +5902,7 @@ export class GalleryInteractionController {
         if (showKeyword) {
             const kw = getMediaKeyword(item);
             if (kw) {
-                keywordHtml = `<div class="gallery-hud-keyword" style="font-size: var(--fs-10); color: var(--color-cyan); margin-bottom: 4px; display: flex; align-items: center; gap: 4px;"><i class="fa-solid fa-tag" style="font-size: var(--fs-8);"></i> <span>${escapeHtml(kw)}</span></div>`;
+                keywordHtml = `<div class="gallery-hud-keyword" style="font-size: var(--fs-10); color: var(--color-cyan); margin-bottom: var(--sp-4); display: flex; align-items: center; gap: var(--sp-4);"><i class="fa-solid fa-tag" style="font-size: var(--fs-8);"></i> <span>${escapeHtml(kw)}</span></div>`;
             }
         }
         let filenameHtml = (showFilename && item.filename && item.filename !== item.title) ? `<div class="gallery-hud-filename">${escapeHtml(item.filename)}</div>` : "";
@@ -7884,7 +7884,7 @@ export class LibraryManager {
         
         const suggestions = getAvailableSuggestions(items, tabId);
         if (suggestions.length === 0) {
-            chipsContainer.innerHTML = `<span style="color:var(--text-muted); font-size:var(--fs-9); padding: 4px;">Nenhuma tag sugerida para este material.</span>`;
+            chipsContainer.innerHTML = `<span style="color:var(--text-muted); font-size:var(--fs-9); padding: var(--sp-4);">Nenhuma tag sugerida para este material.</span>`;
             return;
         }
         
@@ -8260,7 +8260,7 @@ export class LibraryManager {
             this.allDocuments = docs;
             this.renderDocuments(docs);
         } catch (e) {
-            this.docsListEl.innerHTML = "<div style='color:var(--text-muted); font-size:var(--fs-11); padding:8px;'>Nenhum documento cadastrado. Importe um roteiro acima!</div>";
+            this.docsListEl.innerHTML = "<div style='color:var(--text-muted); font-size:var(--fs-11); padding:var(--sp-8);'>Nenhum documento cadastrado. Importe um roteiro acima!</div>";
         }
     }
 
@@ -8275,7 +8275,7 @@ export class LibraryManager {
         this.docsListEl.innerHTML = "";
         
         if (!docs || docs.length === 0) {
-            this.docsListEl.innerHTML = "<div style='color:var(--text-muted); font-size:var(--fs-11); padding:8px;'>Nenhum documento cadastrado. Importe um roteiro acima!</div>";
+            this.docsListEl.innerHTML = "<div style='color:var(--text-muted); font-size:var(--fs-11); padding:var(--sp-8);'>Nenhum documento cadastrado. Importe um roteiro acima!</div>";
             return;
         }
 
@@ -8292,7 +8292,7 @@ export class LibraryManager {
         }
         
         if (filtered.length === 0) {
-            this.docsListEl.innerHTML = "<div style='color:var(--text-muted); font-size:var(--fs-11); padding:8px;'>Nenhum documento encontrado.</div>";
+            this.docsListEl.innerHTML = "<div style='color:var(--text-muted); font-size:var(--fs-11); padding:var(--sp-8);'>Nenhum documento encontrado.</div>";
             return;
         }
         
@@ -8321,7 +8321,7 @@ export class LibraryManager {
                 : "";
 
             card.innerHTML = `
-                <div style="display:flex; align-items:center; gap:8px; min-width:0; flex:1;">
+                <div style="display:flex; align-items:center; gap:var(--sp-8); min-width:0; flex:1;">
                     <i class="fa-solid ${docIcon}" style="color: var(--color-cyan); font-size: var(--fs-14);"></i>
                     <div style="display:flex; flex-direction:column; min-width:0; flex:1;">
                         <span style="font-size:var(--fs-12); font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text-primary);" title="${doc.filename}">${doc.filename}</span>
@@ -8329,7 +8329,7 @@ export class LibraryManager {
                         ${extractBadge}
                     </div>
                 </div>
-                <div style="display:flex; align-items:center; gap:2px; flex-shrink:0;">
+                <div style="display:flex; align-items:center; gap:var(--sp-2); flex-shrink:0;">
                     ${extractBtn}
                     <button class="btn-card-action" style="color:var(--color-rose); background:transparent; border:none; cursor:pointer;" onclick="window.deleteDocument(${doc.id})" title="Deletar Documento"><i class="fa-solid fa-trash-can"></i></button>
                 </div>
@@ -8423,7 +8423,7 @@ export class LibraryManager {
             const scenesResp = await CapIAuAPI.fetchScenes(STATE.currentProjectId, docId, true);
             this.renderScriptStructureSection(docId, scenesResp.scenes || []);
         } catch (e) {
-            section.innerHTML = `<div style="font-size:var(--fs-11); color:var(--color-rose); padding:8px;">Erro ao carregar estrutura: ${e.message}</div>`;
+            section.innerHTML = `<div style="font-size:var(--fs-11); color:var(--color-rose); padding:var(--sp-8);">Erro ao carregar estrutura: ${e.message}</div>`;
         }
     }
 
@@ -8436,14 +8436,14 @@ export class LibraryManager {
 
         const visibleScenes = scenes.filter(s => s.status !== "rejected");
         const sceneRows = visibleScenes.map(s => `
-            <label style="display:flex; align-items:flex-start; gap:6px; font-size:var(--fs-11); padding:4px 0; cursor:pointer;">
-                <input type="checkbox" class="curation-scene-check" data-scene-id="${s.id}" style="margin-top:2px;">
+            <label style="display:flex; align-items:flex-start; gap:var(--sp-6); font-size:var(--fs-11); padding:var(--sp-4) 0; cursor:pointer;">
+                <input type="checkbox" class="curation-scene-check" data-scene-id="${s.id}" style="margin-top:var(--sp-2);">
                 <span>
                     <strong>${s.number}. ${esc(s.heading || "(sem título)")}</strong>${s.status === "confirmed" ? ' <span style="color:var(--color-emerald);">✓ confirmada</span>' : ""}
                     <br><span style="color:var(--text-muted);">${esc(s.synopsis || "")}</span>
                 </span>
             </label>
-        `).join("") || `<div style="font-size:var(--fs-11); color:var(--text-muted); padding:4px 0;">Nenhuma cena extraída.</div>`;
+        `).join("") || `<div style="font-size:var(--fs-11); color:var(--text-muted); padding:var(--sp-4) 0;">Nenhuma cena extraída.</div>`;
 
         section.innerHTML = `
             <div style="display:flex; align-items:center; justify-content:space-between;">
@@ -8451,18 +8451,18 @@ export class LibraryManager {
                 <button onclick="window.closeScriptStructure()" style="background:transparent; border:none; color:var(--text-muted); cursor:pointer; font-size:var(--fs-12);" title="Fechar"><i class="fa-solid fa-xmark"></i></button>
             </div>
 
-            <div style="display:flex; flex-direction:column; gap:2px;">
+            <div style="display:flex; flex-direction:column; gap:var(--sp-2);">
                 <div style="font-size:var(--fs-10); font-weight:700; color:var(--color-violet); text-transform:uppercase;">Cenas (${visibleScenes.length})</div>
-                <div style="max-height:220px; overflow-y:auto; border:1px solid var(--border-glass); border-radius:6px; padding:4px 8px;">${sceneRows}</div>
-                <div style="display:flex; gap:6px; margin-top:4px;">
-                    <button class="btn-secondary" style="font-size:var(--fs-10); padding:4px 8px;" onclick="window.applySceneCuration('confirmed')">Aceitar selecionadas</button>
-                    <button class="btn-secondary" style="font-size:var(--fs-10); padding:4px 8px;" onclick="window.applySceneCuration('rejected')">Rejeitar selecionadas</button>
-                    <button class="btn-secondary" style="font-size:var(--fs-10); padding:4px 8px;" onclick="window.applySceneCuration('confirmed', true)">Aceitar todas</button>
+                <div style="max-height:220px; overflow-y:auto; border:1px solid var(--border-glass); border-radius:6px; padding:var(--sp-4) var(--sp-8);">${sceneRows}</div>
+                <div style="display:flex; gap:var(--sp-6); margin-top:var(--sp-4);">
+                    <button class="btn-secondary" style="font-size:var(--fs-10); padding:var(--sp-4) var(--sp-8);" onclick="window.applySceneCuration('confirmed')">Aceitar selecionadas</button>
+                    <button class="btn-secondary" style="font-size:var(--fs-10); padding:var(--sp-4) var(--sp-8);" onclick="window.applySceneCuration('rejected')">Rejeitar selecionadas</button>
+                    <button class="btn-secondary" style="font-size:var(--fs-10); padding:var(--sp-4) var(--sp-8);" onclick="window.applySceneCuration('confirmed', true)">Aceitar todas</button>
                 </div>
             </div>
 
-            <div style="margin-top:6px;">
-                <button class="btn-secondary" style="font-size:var(--fs-10); padding:4px 8px;" onclick="window.EntityManager.openEntitiesModal({status:'suggested'})"><i class="fa-solid fa-address-card"></i> Ver personagens / locações / objetos sugeridos</button>
+            <div style="margin-top:var(--sp-6);">
+                <button class="btn-secondary" style="font-size:var(--fs-10); padding:var(--sp-4) var(--sp-8);" onclick="window.EntityManager.openEntitiesModal({status:'suggested'})"><i class="fa-solid fa-address-card"></i> Ver personagens / locações / objetos sugeridos</button>
             </div>
         `;
     }
@@ -8936,7 +8936,7 @@ export class LibraryManager {
 
                 let subclipBadgeHtml = "";
                 if (item.is_subclip) {
-                    subclipBadgeHtml = `<div class="gallery-subclip-badge badge-subclip" style="position: absolute; top: 4px; left: 4px; background: rgba(168, 85, 247, 0.85); color: #fff; font-size: var(--fs-10); font-weight: 700; padding: 2px 6px; border-radius: 4px; z-index: 4; display: flex; align-items: center; gap: 4px; backdrop-filter: blur(4px);"><i class="fa-solid fa-scissors"></i> SUB</div>`;
+                    subclipBadgeHtml = `<div class="gallery-subclip-badge badge-subclip" style="position: absolute; top: 4px; left: 4px; background: rgba(168, 85, 247, 0.85); color: #fff; font-size: var(--fs-10); font-weight: 700; padding: var(--sp-2) var(--sp-6); border-radius: 4px; z-index: 4; display: flex; align-items: center; gap: var(--sp-4); backdrop-filter: blur(4px);"><i class="fa-solid fa-scissors"></i> SUB</div>`;
                 }
 
                 if (isVideo) {
@@ -10606,7 +10606,7 @@ export class LibraryManager {
                             const timecode = formatTimecode(d.start_time).substring(3, 11);
                             item.innerHTML = `
                                 <span class="timeline-chapter-time" data-time="${d.start_time}">${timecode}</span>
-                                <div style="font-weight: 700; font-size: var(--fs-11); color: var(--color-cyan); margin-bottom: 2px;">${d.speaker_id}</div>
+                                <div style="font-weight: 700; font-size: var(--fs-11); color: var(--color-cyan); margin-bottom: var(--sp-2);">${d.speaker_id}</div>
                                 <div class="timeline-chapter-text">"${d.text.substring(0, 80)}${d.text.length > 80 ? '...' : ''}"</div>
                             `;
                             
@@ -10648,17 +10648,17 @@ export class LibraryManager {
                             <div class="inspector-dialogue-header">
                                 <div class="inspector-dialogue-speaker">
                                     <i class="fa-solid fa-user" style="color:var(--color-cyan); font-size: var(--fs-9);"></i>
-                                    <select class="nle-select sel-dialogue-speaker" style="padding: 2px 6px; font-size: var(--fs-10); width: 120px;">
+                                    <select class="nle-select sel-dialogue-speaker" style="padding: var(--sp-2) var(--sp-6); font-size: var(--fs-10); width: 120px;">
                                         ${optionsHtml}
                                     </select>
-                                    <input type="text" class="input-new-speaker" placeholder="Nome do falante..." style="display:none; width:100px; padding: 2px 4px; font-size: var(--fs-10);">
+                                    <input type="text" class="input-new-speaker" placeholder="Nome do falante..." style="display:none; width:100px; padding: var(--sp-2) var(--sp-4); font-size: var(--fs-10);">
                                 </div>
                                 <span class="inspector-dialogue-time" data-time="${d.start_time}">${timecode}</span>
                             </div>
                             <textarea class="inspector-dialogue-text-area txt-dialogue-text">${d.text}</textarea>
                             <div class="inspector-dialogue-actions">
                                 <button class="btn-flat-action cyan btn-dialogue-split" style="font-size: var(--fs-9);" title="Dividir fala neste ponto"><i class="fa-solid fa-scissors"></i> Dividir</button>
-                                <button class="btn-primary btn-dialogue-save" style="font-size: var(--fs-9); padding: 2px 8px; border-radius: 4px; border:none; background:var(--t-tint-3, rgba(6,182,212,0.15)); color:var(--color-cyan); font-weight:bold; cursor:pointer;"><i class="fa-solid fa-floppy-disk"></i> Salvar</button>
+                                <button class="btn-primary btn-dialogue-save" style="font-size: var(--fs-9); padding: var(--sp-2) var(--sp-8); border-radius: 4px; border:none; background:var(--t-tint-3, rgba(6,182,212,0.15)); color:var(--color-cyan); font-weight:bold; cursor:pointer;"><i class="fa-solid fa-floppy-disk"></i> Salvar</button>
                             </div>
                         `;
 
@@ -10900,7 +10900,7 @@ export class LibraryManager {
                             <img src="/api/faces/face/${face.id}/thumbnail" class="inspector-face-thumb" onerror="this.src='https://placehold.co/60x60/11131a/cyan?text=Face'">
                             <span class="inspector-face-time" title="Buscar no Source Player">${timecode}</span>
                             <input type="text" class="inspector-face-input" value="${face.name || 'Pessoa Desconhecida'}" placeholder="Nome do rosto...">
-                            <button class="btn-primary btn-face-save" style="font-size: var(--fs-8); padding: 2px 6px; border-radius: 4px; border:none; background:var(--t-tint-2, rgba(6,182,212,0.1)); color:var(--color-cyan); font-weight:bold; cursor:pointer; width: 100%; margin-top:2px;">Salvar Rótulo</button>
+                            <button class="btn-primary btn-face-save" style="font-size: var(--fs-8); padding: var(--sp-2) var(--sp-6); border-radius: 4px; border:none; background:var(--t-tint-2, rgba(6,182,212,0.1)); color:var(--color-cyan); font-weight:bold; cursor:pointer; width: 100%; margin-top:var(--sp-2);">Salvar Rótulo</button>
                         `;
 
                         card.querySelector(".inspector-face-time").addEventListener("click", () => {

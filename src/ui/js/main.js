@@ -143,7 +143,7 @@ function showSearchResultPreview(r, card) {
         const isPhoto = mediaType === "photo";
         
         popover.innerHTML = `
-            <div style="font-size:var(--fs-10); color:var(--text-secondary); text-transform:uppercase; font-weight:600; display:flex; align-items:center; gap:5px;">
+            <div style="font-size:var(--fs-10); color:var(--text-secondary); text-transform:uppercase; font-weight:600; display:flex; align-items:center; gap:var(--sp-4);">
                 <i class="fa-solid fa-eye" style="color:var(--color-cyan);"></i> Preview da Busca
             </div>
             <div id="search-popover-media" style="width:100%; height:180px; border-radius:6px; overflow:hidden; background:#000; position:relative; display:flex; align-items:center; justify-content:center;">
@@ -577,7 +577,7 @@ function applyFiltersAndRenderCards() {
         banner.style.color = "#fca5a5";
         banner.style.lineHeight = "1.4";
         banner.innerHTML = `
-            <div style="font-weight: 700; font-size: var(--fs-12); display: flex; align-items: center; gap: 6px; margin-bottom: 4px; color: var(--color-rose);">
+            <div style="font-weight: 700; font-size: var(--fs-12); display: flex; align-items: center; gap: var(--sp-6); margin-bottom: var(--sp-4); color: var(--color-rose);">
                 <i class="fa-solid fa-triangle-exclamation"></i> Índice de Busca Indisponível
             </div>
             <div>${escapeHtml(SEARCH_STATE.indexWarning || "Provavelmente há outra instância do app aberta (lock do Qdrant).")}</div>
@@ -632,18 +632,18 @@ function applyFiltersAndRenderCards() {
             card.innerHTML = `
                 <div class="search-result-layout">
                     <div style="position: relative; flex-shrink: 0;">
-                        <img class="search-result-thumb" src="${src}" alt="Thumb" style="width: 50px; height: 50px; object-fit: cover; border-radius: 4px; margin-right: 8px;">
+                        <img class="search-result-thumb" src="${src}" alt="Thumb" style="width: 50px; height: 50px; object-fit: cover; border-radius: 4px; margin-right: var(--sp-8);">
                         <button class="btn-select-similar-item" data-tooltip="Selecionar para busca por similaridade" style="position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border: none; background: rgba(0,0,0,0.65); color: var(--text-muted); font-size: var(--fs-10); cursor: pointer; display: none; align-items: center; justify-content: center; border-radius: 3px; z-index: 10;">
                             <i class="fa-regular fa-square"></i>
                         </button>
                     </div>
                     <div class="search-result-content" style="flex: 1; min-width: 0;">
-                        <div class="bubble-meta" style="margin-bottom: 3px; display: flex; justify-content: space-between; align-items: center; gap: 4px;">
+                        <div class="bubble-meta" style="margin-bottom: var(--sp-2); display: flex; justify-content: space-between; align-items: center; gap: var(--sp-4);">
                             <span class="speaker-name" style="color:#f59e0b; font-weight:600; font-size:var(--fs-10);"><i class="fa-solid fa-image"></i> Foto de Set</span>
                             ${scoreBadge}
                         </div>
                         <div class="bubble-text" style="font-size:var(--fs-11); line-height:1.3;">${highlightedText}</div>
-                        <div style="font-size:var(--fs-9); color:var(--text-muted); margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" data-tooltip="Arquivo: ${escapeHtml(filename)}">Arquivo: ${filename}</div>
+                        <div style="font-size:var(--fs-9); color:var(--text-muted); margin-top:var(--sp-2); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" data-tooltip="Arquivo: ${escapeHtml(filename)}">Arquivo: ${filename}</div>
                     </div>
                 </div>
             `;
@@ -706,23 +706,23 @@ function applyFiltersAndRenderCards() {
             }
             
             card.innerHTML = `
-                <div class="bubble-meta" style="margin-bottom: 4px; display: flex; justify-content: space-between; align-items: center; gap: 6px;">
+                <div class="bubble-meta" style="margin-bottom: var(--sp-4); display: flex; justify-content: space-between; align-items: center; gap: var(--sp-6);">
                     <span class="speaker-name" style="color:${color}; font-weight:600; font-size:var(--fs-10); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:120px;" data-tooltip="${escapeHtml(title)}"><i class="fa-solid ${icon}"></i> ${title}</span>
-                    <div style="display:flex; align-items:center; gap:6px; flex-shrink: 0;">
-                        <span style="font-weight:600; font-size:var(--fs-10); color:var(--color-cyan); display:flex; align-items:center; gap:3px;">
+                    <div style="display:flex; align-items:center; gap:var(--sp-6); flex-shrink: 0;">
+                        <span style="font-weight:600; font-size:var(--fs-10); color:var(--color-cyan); display:flex; align-items:center; gap:var(--sp-2);">
                             <i class="fa-solid fa-circle-play"></i> ${timecode}
                         </span>
                         ${scoreBadge}
                     </div>
                 </div>
                 <div class="bubble-text" style="font-size:var(--fs-11); line-height:1.3;">${highlightedText}</div>
-                <div style="font-size:var(--fs-9); color:var(--text-muted); margin-top:3px; display:flex; justify-content:space-between; align-items:center; width:100%; gap:6px;">
+                <div style="font-size:var(--fs-9); color:var(--text-muted); margin-top:var(--sp-2); display:flex; justify-content:space-between; align-items:center; width:100%; gap:var(--sp-6);">
                     <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1;" data-tooltip="Vídeo: ${escapeHtml(videoDisplayTitle)} (${((r.payload.end_time || 0) - (r.payload.start_time || 0)).toFixed(1)}s)">Vídeo: ${videoDisplayTitle} (${((r.payload.end_time || 0) - (r.payload.start_time || 0)).toFixed(1)}s)</span>
-                    <div style="display:flex; gap:2px; align-items:center; flex-shrink:0;">
-                        <button class="btn-select-similar-item" data-tooltip="Selecionar para busca por similaridade" style="background:none; border:none; color:var(--text-muted); cursor:pointer; padding:2px; font-size:var(--fs-10); display:none; align-items:center; justify-content:center; border-radius:50%; width:20px; height:20px;">
+                    <div style="display:flex; gap:var(--sp-2); align-items:center; flex-shrink:0;">
+                        <button class="btn-select-similar-item" data-tooltip="Selecionar para busca por similaridade" style="background:none; border:none; color:var(--text-muted); cursor:pointer; padding:var(--sp-2); font-size:var(--fs-10); display:none; align-items:center; justify-content:center; border-radius:50%; width:20px; height:20px;">
                             <i class="fa-regular fa-square"></i>
                         </button>
-                        <button class="view-context-btn" data-tooltip="Ver no Contexto" style="background:none; border:none; color:var(--color-cyan); cursor:pointer; padding:2px; font-size:var(--fs-11); display:flex; align-items:center; justify-content:center; border-radius:50%; width:20px; height:20px;">
+                        <button class="view-context-btn" data-tooltip="Ver no Contexto" style="background:none; border:none; color:var(--color-cyan); cursor:pointer; padding:var(--sp-2); font-size:var(--fs-11); display:flex; align-items:center; justify-content:center; border-radius:50%; width:20px; height:20px;">
                             <i class="fa-solid fa-eye"></i>
                         </button>
                     </div>
@@ -793,10 +793,10 @@ function applyFiltersAndRenderCards() {
                 occWrapper.style.paddingTop = "6px";
                 
                 occWrapper.innerHTML = `
-                    <button class="btn-toggle-occurrences" style="background: none; border: none; color: var(--color-cyan); font-size: var(--fs-10); cursor: pointer; display: flex; align-items: center; gap: 4px; padding: 2px 0; outline: none; font-weight: 600;">
+                    <button class="btn-toggle-occurrences" style="background: none; border: none; color: var(--color-cyan); font-size: var(--fs-10); cursor: pointer; display: flex; align-items: center; gap: var(--sp-4); padding: var(--sp-2) 0; outline: none; font-weight: 600;">
                         <i class="fa-solid fa-chevron-down"></i> Ver mais ocorrências (${r.other_occurrences.length})
                     </button>
-                    <div class="occurrences-list" style="display: none; flex-direction: column; gap: 6px; margin-top: 6px; padding-left: 8px; border-left: 2px solid var(--t-line-strong, rgba(6, 182, 212, 0.25));">
+                    <div class="occurrences-list" style="display: none; flex-direction: column; gap: var(--sp-6); margin-top: var(--sp-6); padding-left: var(--sp-8); border-left: 2px solid var(--t-line-strong, rgba(6, 182, 212, 0.25));">
                     </div>
                 `;
                 
@@ -834,13 +834,13 @@ function applyFiltersAndRenderCards() {
                     }
                     
                     subCard.innerHTML = `
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-                            <span style="color: var(--color-cyan); font-weight: 600; font-size: var(--fs-10); display: flex; align-items: center; gap: 4px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--sp-4);">
+                            <span style="color: var(--color-cyan); font-weight: 600; font-size: var(--fs-10); display: flex; align-items: center; gap: var(--sp-4);">
                                 <i class="fa-solid fa-circle-play"></i> ${formatTimecode(occ.start_time)}
                             </span>
-                            <div style="display: flex; gap: 6px; align-items: center;">
-                                <span class="match-badge ${subScoreClass}" style="font-size: var(--fs-8); padding: 1px 4px; line-height: 1;"><i class="fa-solid fa-fire"></i> ${(occ.score * 100).toFixed(0)}%</span>
-                                <button class="view-occ-context-btn" data-tooltip="Ver no Contexto" style="background:none; border:none; color:var(--color-cyan); cursor:pointer; font-size:var(--fs-10); padding:2px; display:flex; align-items:center; justify-content:center;">
+                            <div style="display: flex; gap: var(--sp-6); align-items: center;">
+                                <span class="match-badge ${subScoreClass}" style="font-size: var(--fs-8); padding: var(--sp-1) var(--sp-4); line-height: 1;"><i class="fa-solid fa-fire"></i> ${(occ.score * 100).toFixed(0)}%</span>
+                                <button class="view-occ-context-btn" data-tooltip="Ver no Contexto" style="background:none; border:none; color:var(--color-cyan); cursor:pointer; font-size:var(--fs-10); padding:var(--sp-2); display:flex; align-items:center; justify-content:center;">
                                     <i class="fa-solid fa-eye"></i>
                                 </button>
                             </div>
@@ -978,11 +978,11 @@ function renderSearchResults(query) {
     if (!searchContainer) return;
 
     searchContainer.innerHTML = `
-        <div class="transcription-actions" style="border:none; padding: 6px 12px; display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-shrink: 0;">
-            <h4 style="font-size:var(--fs-11); color:var(--color-cyan); display: flex; align-items: center; gap: 4px; margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 140px;" data-tooltip="Resultados para: &quot;${escapeHtml(query)}&quot;">
+        <div class="transcription-actions" style="border:none; padding: var(--sp-6) var(--sp-12); display: flex; align-items: center; justify-content: space-between; gap: var(--sp-8); flex-shrink: 0;">
+            <h4 style="font-size:var(--fs-11); color:var(--color-cyan); display: flex; align-items: center; gap: var(--sp-4); margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 140px;" data-tooltip="Resultados para: &quot;${escapeHtml(query)}&quot;">
                 <i class="fa-solid fa-wand-magic-sparkles"></i> "${query}"
             </h4>
-            <div class="search-type-tabs" style="margin: 0; padding: 0; border: none; gap: 4px; display: flex; align-items: center; flex-shrink: 0;">
+            <div class="search-type-tabs" style="margin: 0; padding: 0; border: none; gap: var(--sp-4); display: flex; align-items: center; flex-shrink: 0;">
                 <div class="search-type-tab ${SEARCH_STATE.activeMediaFilter === '' ? 'active' : ''}" data-type="" data-tooltip="Todas as Mídias" style="width: 24px; height: 24px; font-size: var(--fs-11);"><i class="fa-solid fa-border-all"></i></div>
                 <div class="search-type-tab ${SEARCH_STATE.activeMediaFilter === 'interview' ? 'active' : ''}" data-type="interview" data-tooltip="Entrevistas (ASR)" style="width: 24px; height: 24px; font-size: var(--fs-11);"><i class="fa-solid fa-microphone-lines"></i></div>
                 <div class="search-type-tab ${SEARCH_STATE.activeMediaFilter === 'broll' ? 'active' : ''}" data-type="broll" data-tooltip="Bastidores (B-roll)" style="width: 24px; height: 24px; font-size: var(--fs-11);"><i class="fa-solid fa-video"></i></div>
@@ -990,24 +990,24 @@ function renderSearchResults(query) {
             </div>
         </div>
 
-        <div class="search-playlist-controls" style="display: none; align-items: center; justify-content: space-between; background: transparent; border: none; margin: 0 12px 6px 12px; padding: 0; font-size: var(--fs-11); flex-shrink: 0; flex-wrap: wrap; gap: 6px;">
-            <div style="display: flex; align-items: center; gap: 4px;">
-                <button id="btn-search-prev" class="flat-sidebar-btn" style="padding: 2px 4px; font-size: var(--fs-9); height: 20px; width: 20px; display: flex; align-items: center; justify-content: center;" data-tooltip="Resultado Anterior">
+        <div class="search-playlist-controls" style="display: none; align-items: center; justify-content: space-between; background: transparent; border: none; margin: 0 var(--sp-12) var(--sp-6) var(--sp-12); padding: 0; font-size: var(--fs-11); flex-shrink: 0; flex-wrap: wrap; gap: var(--sp-6);">
+            <div style="display: flex; align-items: center; gap: var(--sp-4);">
+                <button id="btn-search-prev" class="flat-sidebar-btn" style="padding: var(--sp-2) var(--sp-4); font-size: var(--fs-9); height: 20px; width: 20px; display: flex; align-items: center; justify-content: center;" data-tooltip="Resultado Anterior">
                     <i class="fa-solid fa-step-backward"></i>
                 </button>
-                <button id="btn-search-play-seq" class="flat-sidebar-btn" style="padding: 2px 6px; font-size: var(--fs-10); height: 20px; display: flex; align-items: center; justify-content: center; gap: 3px; font-weight:600;" data-tooltip="Iniciar Reprodução Automática Sequencial">
+                <button id="btn-search-play-seq" class="flat-sidebar-btn" style="padding: var(--sp-2) var(--sp-6); font-size: var(--fs-10); height: 20px; display: flex; align-items: center; justify-content: center; gap: var(--sp-2); font-weight:600;" data-tooltip="Iniciar Reprodução Automática Sequencial">
                     <i class="fa-solid fa-play"></i> Autoplay
                 </button>
-                <button id="btn-search-next" class="flat-sidebar-btn" style="padding: 2px 4px; font-size: var(--fs-9); height: 20px; width: 20px; display: flex; align-items: center; justify-content: center;" data-tooltip="Próximo Resultado">
+                <button id="btn-search-next" class="flat-sidebar-btn" style="padding: var(--sp-2) var(--sp-4); font-size: var(--fs-9); height: 20px; width: 20px; display: flex; align-items: center; justify-content: center;" data-tooltip="Próximo Resultado">
                     <i class="fa-solid fa-step-forward"></i>
                 </button>
             </div>
-            <div style="display: flex; align-items: center; gap: 8px;">
+            <div style="display: flex; align-items: center; gap: var(--sp-8);">
                 <div id="search-playlist-status" style="color: var(--text-muted); font-size: var(--fs-10); font-weight: 600;">
                     Nenhum selecionado
                 </div>
                 <div class="search-playlist-options" style="display: none; align-items: center; margin: 0; padding: 0;">
-                    <label style="display: flex; align-items: center; gap: 4px; font-size: var(--fs-10); color: var(--text-secondary); cursor: pointer; user-select: none;" data-tooltip="Abrir fotos no player de vídeo">
+                    <label style="display: flex; align-items: center; gap: var(--sp-4); font-size: var(--fs-10); color: var(--text-secondary); cursor: pointer; user-select: none;" data-tooltip="Abrir fotos no player de vídeo">
                         <input type="checkbox" id="chk-search-photos-in-player" style="cursor: pointer; width: 11px; height: 11px; accent-color: var(--color-cyan);">
                         <span>Abrir fotos</span>
                     </label>
@@ -1019,9 +1019,9 @@ function renderSearchResults(query) {
             <!-- Pílulas contextuais e IA injetadas dinamicamente -->
         </div>
 
-        <div class="search-results-list scrollable" style="flex: 1; overflow-y: auto; padding: 0 12px 10px 12px; min-height: 0;"></div>
+        <div class="search-results-list scrollable" style="flex: 1; overflow-y: auto; padding: 0 var(--sp-12) var(--sp-10) var(--sp-12); min-height: 0;"></div>
         
-        <div class="search-loading-more" style="display:none; text-align:center; padding: 10px; font-size:var(--fs-11); color:var(--text-muted); flex-shrink: 0;">
+        <div class="search-loading-more" style="display:none; text-align:center; padding: var(--sp-10); font-size:var(--fs-11); color:var(--text-muted); flex-shrink: 0;">
             <i class="fa-solid fa-spinner fa-spin"></i> Carregando mais resultados...
         </div>
     `;
@@ -1082,7 +1082,7 @@ function renderSearchResults(query) {
             
             const resultsList = searchContainer.querySelector(".search-results-list");
             if (resultsList) {
-                resultsList.innerHTML = "<div class='loading' style='padding: 15px;'>Filtrando mídias...</div>";
+                resultsList.innerHTML = "<div class='loading' style='padding: var(--sp-14);'>Filtrando mídias...</div>";
             }
             
             try {
@@ -1103,7 +1103,7 @@ function renderSearchResults(query) {
             } catch (err) {
                 console.error("Erro ao filtrar busca:", err);
                 if (resultsList) {
-                    resultsList.innerHTML = `<div class='error' style='padding: 15px;'>Erro: ${err.message}</div>`;
+                    resultsList.innerHTML = `<div class='error' style='padding: var(--sp-14);'>Erro: ${err.message}</div>`;
                 }
             }
         });
@@ -1124,7 +1124,7 @@ async function runSemanticSearch() {
     const filter = filterSelect ? filterSelect.value : "";
     const searchContainer = getActiveElement("search-container");
     if (searchContainer) {
-        searchContainer.innerHTML = "<div class='loading' style='padding: 15px;'>Buscando conceitos na biblioteca...</div>";
+        searchContainer.innerHTML = "<div class='loading' style='padding: var(--sp-14);'>Buscando conceitos na biblioteca...</div>";
     }
     
     STATE.currentRightTab = "search";
@@ -1158,7 +1158,7 @@ async function runSemanticSearch() {
         SEARCH_STATE.indexStatus = "unavailable";
         SEARCH_STATE.indexWarning = err.message;
         if (searchContainer) {
-            searchContainer.innerHTML = `<div class='error' style='padding: 15px;'>Erro na busca semântica: ${err.message}</div>`;
+            searchContainer.innerHTML = `<div class='error' style='padding: var(--sp-14);'>Erro na busca semântica: ${err.message}</div>`;
         }
     }
 }
@@ -1174,7 +1174,7 @@ window.runSemanticSearch = runSemanticSearch;
 async function showSimilarMedia(kind, id, opts = {}) {
     const searchContainer = getActiveElement("search-container");
     if (searchContainer) {
-        searchContainer.innerHTML = "<div class='loading' style='padding: 15px;'>Buscando mídias visualmente similares (CLIP local)...</div>";
+        searchContainer.innerHTML = "<div class='loading' style='padding: var(--sp-14);'>Buscando mídias visualmente similares (CLIP local)...</div>";
     }
     STATE.currentRightTab = "search";
     if (window.expandRightPanel) window.expandRightPanel();
@@ -1206,7 +1206,7 @@ async function showSimilarMedia(kind, id, opts = {}) {
         SEARCH_STATE.indexStatus = "unavailable";
         SEARCH_STATE.indexWarning = err.message;
         if (searchContainer) {
-            searchContainer.innerHTML = `<div class='error' style='padding: 15px;'>Erro ao buscar similares: ${err.message}</div>`;
+            searchContainer.innerHTML = `<div class='error' style='padding: var(--sp-14);'>Erro ao buscar similares: ${err.message}</div>`;
         }
     }
 }
@@ -1393,7 +1393,7 @@ async function runSimilarBatch(mediaTypeFilter = null) {
         const loadingMsg = ctx.searchType === "visual"
             ? "Buscando mídias com aparência parecida (CLIP local)..."
             : "Buscando mídias sobre o mesmo assunto (busca semântica local)...";
-        searchContainer.innerHTML = `<div class='loading' style='padding: 15px;'>${loadingMsg}</div>`;
+        searchContainer.innerHTML = `<div class='loading' style='padding: var(--sp-14);'>${loadingMsg}</div>`;
     }
 
     SEARCH_STATE.query = "";
@@ -1431,7 +1431,7 @@ async function runSimilarBatch(mediaTypeFilter = null) {
         SEARCH_STATE.indexStatus = "unavailable";
         SEARCH_STATE.indexWarning = err.message;
         if (searchContainer) {
-            searchContainer.innerHTML = `<div class='error' style='padding: 15px;'>Erro ao buscar similares: ${escapeHtml(err.message)}</div>`;
+            searchContainer.innerHTML = `<div class='error' style='padding: var(--sp-14);'>Erro ao buscar similares: ${escapeHtml(err.message)}</div>`;
         }
     }
 }
@@ -1688,7 +1688,7 @@ window.addEventListener("DOMContentLoaded", () => {
                 const descPart = escapeHtml(descLines.join("\n").trim());
                 
                 if (descPart && titlePart && descPart !== titlePart && !descPart.startsWith(titlePart)) {
-                    globalTooltip.innerHTML = `<div style="font-weight: 600; color: #ffffff; margin-bottom: 3px; word-break: break-word;">${titlePart}</div><div style="font-weight: 400; opacity: 0.90; white-space: pre-line; word-break: break-word;">${descPart}</div>`;
+                    globalTooltip.innerHTML = `<div style="font-weight: 600; color: #ffffff; margin-bottom: var(--sp-2); word-break: break-word;">${titlePart}</div><div style="font-weight: 400; opacity: 0.90; white-space: pre-line; word-break: break-word;">${descPart}</div>`;
                 } else {
                     const singleText = descPart || titlePart;
                     globalTooltip.innerHTML = `<div style="font-weight: 400; opacity: 0.95; white-space: pre-line; word-break: break-word;">${singleText}</div>`;

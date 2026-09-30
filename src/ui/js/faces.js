@@ -726,7 +726,7 @@ export class FaceManager {
         try { (doc.defaultView || window).focus(); } catch (e) {}
 
         infoText.textContent = `O nome "${targetName}" já está associado a outro grupo de rostos (Grupo ${existingClusterId + 1}). Escolha os rostos do Grupo ${currentClusterId + 1} abaixo que pertencem a "${targetName}" para fazer a reassociação, ou clique em "Fusão Total" para unir os grupos por completo.`;
-        grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 20px; color: var(--text-muted);"><i class="fa-solid fa-spinner fa-spin"></i> Carregando rostos...</div>';
+        grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: var(--sp-20); color: var(--text-muted);"><i class="fa-solid fa-spinner fa-spin"></i> Carregando rostos...</div>';
         
         modal.style.display = "flex";
 
@@ -735,7 +735,7 @@ export class FaceManager {
             grid.innerHTML = "";
 
             if (!faces || faces.length === 0) {
-                grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 20px; color: var(--text-muted);">Nenhum rosto encontrado no cluster.</div>';
+                grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: var(--sp-20); color: var(--text-muted);">Nenhum rosto encontrado no cluster.</div>';
                 return;
             }
 
@@ -819,7 +819,7 @@ export class FaceManager {
 
         } catch (e) {
             console.error("[FaceManager] Error loading cluster faces for disambiguation:", e);
-            grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 20px; color: var(--color-red);">Erro ao carregar faces do grupo.</div>';
+            grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: var(--sp-20); color: var(--color-red);">Erro ao carregar faces do grupo.</div>';
         }
     }
 
@@ -860,7 +860,7 @@ export class FaceManager {
         try { (doc.defaultView || window).focus(); } catch (e) {}
 
         modal.style.display = "flex";
-        grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 40px; color: var(--text-muted);"><i class="fa-solid fa-spinner fa-spin fa-2x"></i><p style="margin-top:10px;">Carregando rostos do projeto...</p></div>';
+        grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: var(--sp-40); color: var(--text-muted);"><i class="fa-solid fa-spinner fa-spin fa-2x"></i><p style="margin-top:var(--sp-10);">Carregando rostos do projeto...</p></div>';
         
         // Oculta a barra de ações em massa inicialmente
         const bulkBar = modal.querySelector("#fullscreen-bulk-actions-bar") || getActiveElement("fullscreen-bulk-actions-bar");
@@ -893,7 +893,7 @@ export class FaceManager {
             this.renderFullscreenFaces(faces);
         } catch (e) {
             console.error("[FaceManager] Error fetching unlabeled faces:", e);
-            grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 40px; color: var(--color-red);"><i class="fa-solid fa-triangle-exclamation fa-2x"></i><p style="margin-top:10px;">Erro ao carregar os rostos para desambiguação.</p></div>';
+            grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: var(--sp-40); color: var(--color-red);"><i class="fa-solid fa-triangle-exclamation fa-2x"></i><p style="margin-top:var(--sp-10);">Erro ao carregar os rostos para desambiguação.</p></div>';
         }
     }
 
@@ -928,9 +928,9 @@ export class FaceManager {
 
         if (pageFaces.length === 0 && this.currentPage === 0) {
             grid.innerHTML = `
-                <div style="grid-column: 1/-1; text-align: center; padding: 60px; color: var(--text-muted);">
-                    <i class="fa-solid fa-circle-check fa-4x" style="color: var(--color-emerald); margin-bottom: 20px;"></i>
-                    <h3 style="font-size: var(--fs-18); color: var(--text-primary); margin: 0 0 8px 0;">Tudo limpo!</h3>
+                <div style="grid-column: 1/-1; text-align: center; padding: var(--sp-56); color: var(--text-muted);">
+                    <i class="fa-solid fa-circle-check fa-4x" style="color: var(--color-emerald); margin-bottom: var(--sp-20);"></i>
+                    <h3 style="font-size: var(--fs-18); color: var(--text-primary); margin: 0 0 var(--sp-8) 0;">Tudo limpo!</h3>
                     <p style="margin: 0; font-size: var(--fs-13);">Todos os rostos detectados no projeto já foram identificados.</p>
                 </div>
             `;
@@ -965,7 +965,7 @@ export class FaceManager {
                     <img class="fullscreen-face-thumb" src="${thumbUrl}" alt="Rosto" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%22120%22 height=%22120%22><rect width=%22120%22 height=%22120%22 fill=%22%23222%22/><text x=%2250%%22 y=%2250%%22 font-size=%2224%22 text-anchor=%22middle%22 dy=%22.3em%22 fill=%22%23666%22>?</text></svg>'">
                 </div>
                 <div class="fullscreen-face-meta" title="${metaText}">${metaText}</div>
-                <div class="fullscreen-face-input-wrapper" style="display:flex; gap:6px; margin-top:5px; width:100%;">
+                <div class="fullscreen-face-input-wrapper" style="display:flex; gap:var(--sp-6); margin-top:var(--sp-4); width:100%;">
                     <input class="fullscreen-face-input" type="text" list="speakers-datalist" value="${inputValue}" placeholder="${inputPlaceholder}" style="flex:1;">
                     <button class="btn-reject-face" title="Não relevante / Não é rosto" style="background:var(--t-tint-3, rgba(239, 68, 68, 0.15)); border:1px solid var(--t-line-strong, rgba(239, 68, 68, 0.4)); color:#ef4444; border-radius:6px; width:34px; height:32px; display:flex; align-items:center; justify-content:center; cursor:pointer; transition:all 0.2s;">
                         <i class="fa-solid fa-ban"></i>
@@ -1410,7 +1410,7 @@ export class FaceManager {
         popover.style.display = "flex";
 
         popover.innerHTML = `
-            <div style="font-size:var(--fs-10); color:var(--text-secondary); text-transform:uppercase; font-weight:600; display:flex; align-items:center; gap:5px;">
+            <div style="font-size:var(--fs-10); color:var(--text-secondary); text-transform:uppercase; font-weight:600; display:flex; align-items:center; gap:var(--sp-4);">
                 <i class="fa-solid fa-eye" style="color:var(--color-cyan);"></i> Visualização do Contexto
             </div>
             <div id="popover-media-container" style="width:100%; height:180px; border-radius:6px; overflow:hidden; background:#000; position:relative; display:flex; align-items:center; justify-content:center;">
@@ -1506,7 +1506,7 @@ export class FaceManager {
         if (title) title.textContent = `Gerenciar Rostos: ${clusterNameDisplay}`;
         if (countVal) countVal.textContent = cluster.occurrences;
         
-        grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 40px; color: var(--text-muted);"><i class="fa-solid fa-spinner fa-spin fa-2x"></i><p style="margin-top:10px;">Carregando rostos do grupo...</p></div>';
+        grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: var(--sp-40); color: var(--text-muted);"><i class="fa-solid fa-spinner fa-spin fa-2x"></i><p style="margin-top:var(--sp-10);">Carregando rostos do grupo...</p></div>';
         
         this.activeGroupCluster = cluster;
         
@@ -1515,7 +1515,7 @@ export class FaceManager {
             this.renderGroupManagerFaces(faces, cluster);
         } catch (e) {
             console.error("Erro ao carregar faces do grupo:", e);
-            grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 20px; color: var(--color-red);">Erro ao carregar faces do grupo.</div>';
+            grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: var(--sp-20); color: var(--color-red);">Erro ao carregar faces do grupo.</div>';
         }
     }
 
@@ -1533,7 +1533,7 @@ export class FaceManager {
         grid.innerHTML = "";
         
         if (!faces || faces.length === 0) {
-            grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 40px; color: var(--text-muted);">Nenhum rosto neste grupo.</div>';
+            grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: var(--sp-40); color: var(--text-muted);">Nenhum rosto neste grupo.</div>';
             return;
         }
         
@@ -1903,7 +1903,7 @@ export class FaceManager {
         if (chkSelectAll) chkSelectAll.checked = false;
         this.updateNamesBulkActionsBar();
 
-        tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; padding:20px; color:var(--text-muted);"><i class="fa-solid fa-spinner fa-spin"></i> Carregando nomes...</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; padding:var(--sp-20); color:var(--text-muted);"><i class="fa-solid fa-spinner fa-spin"></i> Carregando nomes...</td></tr>';
 
         try {
             const projectId = STATE.currentProjectId;
@@ -1922,7 +1922,7 @@ export class FaceManager {
             const filteredSpeakers = cleanSpeakers.filter(sp => sp.toLowerCase().includes(filterText));
 
             if (filteredSpeakers.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; padding:20px; color:var(--text-muted);">Nenhum nome encontrado.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; padding:var(--sp-20); color:var(--text-muted);">Nenhum nome encontrado.</td></tr>';
                 return;
             }
 
@@ -1933,18 +1933,18 @@ export class FaceManager {
                 tr.style.borderBottom = "1px solid var(--t-line-weak, rgba(255,255,255,0.04))";
                 
                 tr.innerHTML = `
-                    <td style="padding: 10px 12px; width: 40px; text-align: center;">
+                    <td style="padding: var(--sp-10) var(--sp-12); width: 40px; text-align: center;">
                         <input type="checkbox" class="name-select-checkbox" data-name="${sp}" style="cursor: pointer;">
                     </td>
-                    <td style="padding: 10px 12px; font-weight: 500; color: #fff; font-size: var(--fs-13);">${sp}</td>
-                    <td class="names-actions-cell" style="padding: 10px 12px; text-align: right; display: flex; gap: 8px; justify-content: flex-end; align-items: center; width: 280px;">
-                        <button class="btn-flat-action cyan btn-rename" title="Renomear" style="background: transparent; border: none; padding: 4px 8px; font-size: var(--fs-11); cursor: pointer;">
+                    <td style="padding: var(--sp-10) var(--sp-12); font-weight: 500; color: #fff; font-size: var(--fs-13);">${sp}</td>
+                    <td class="names-actions-cell" style="padding: var(--sp-10) var(--sp-12); text-align: right; display: flex; gap: var(--sp-8); justify-content: flex-end; align-items: center; width: 280px;">
+                        <button class="btn-flat-action cyan btn-rename" title="Renomear" style="background: transparent; border: none; padding: var(--sp-4) var(--sp-8); font-size: var(--fs-11); cursor: pointer;">
                             <i class="fa-solid fa-user-pen"></i> Renomear
                         </button>
-                        <button class="btn-flat-action violet btn-merge" title="Mesclar" style="background: transparent; border: none; padding: 4px 8px; font-size: var(--fs-11); cursor: pointer;">
+                        <button class="btn-flat-action violet btn-merge" title="Mesclar" style="background: transparent; border: none; padding: var(--sp-4) var(--sp-8); font-size: var(--fs-11); cursor: pointer;">
                             <i class="fa-solid fa-code-merge"></i> Mesclar
                         </button>
-                        <button class="btn-flat-action rose btn-delete" title="Deletar" style="background: transparent; border: none; padding: 4px 8px; font-size: var(--fs-11); cursor: pointer;">
+                        <button class="btn-flat-action rose btn-delete" title="Deletar" style="background: transparent; border: none; padding: var(--sp-4) var(--sp-8); font-size: var(--fs-11); cursor: pointer;">
                             <i class="fa-solid fa-trash"></i> Deletar
                         </button>
                     </td>
@@ -1961,11 +1961,11 @@ export class FaceManager {
                 tr.querySelector(".btn-merge").addEventListener("click", () => {
                     const actionsCell = tr.querySelector(".names-actions-cell");
                     actionsCell.innerHTML = `
-                        <div style="display: flex; gap: 6px; align-items: center; justify-content: flex-end; width: 100%;">
+                        <div style="display: flex; gap: var(--sp-6); align-items: center; justify-content: flex-end; width: 100%;">
                             <span style="font-size: var(--fs-11); color: var(--text-secondary);">Mesclar em:</span>
-                            <input type="text" list="speakers-datalist" class="merge-target-input" placeholder="Digite/Selecione..." style="padding: 4px 8px; border-radius: 4px; border: 1px solid var(--border-glass); background: rgba(0,0,0,0.3); color: #fff; font-size: var(--fs-11); width: 130px; outline: none;">
-                            <button class="btn-flat-action cyan btn-confirm-merge-inline" style="font-size: var(--fs-11); padding: 4px 6px;" title="Confirmar"><i class="fa-solid fa-check"></i></button>
-                            <button class="btn-flat-action rose btn-cancel-merge-inline" style="font-size: var(--fs-11); padding: 4px 6px;" title="Cancelar"><i class="fa-solid fa-xmark"></i></button>
+                            <input type="text" list="speakers-datalist" class="merge-target-input" placeholder="Digite/Selecione..." style="padding: var(--sp-4) var(--sp-8); border-radius: 4px; border: 1px solid var(--border-glass); background: rgba(0,0,0,0.3); color: #fff; font-size: var(--fs-11); width: 130px; outline: none;">
+                            <button class="btn-flat-action cyan btn-confirm-merge-inline" style="font-size: var(--fs-11); padding: var(--sp-4) var(--sp-6);" title="Confirmar"><i class="fa-solid fa-check"></i></button>
+                            <button class="btn-flat-action rose btn-cancel-merge-inline" style="font-size: var(--fs-11); padding: var(--sp-4) var(--sp-6);" title="Cancelar"><i class="fa-solid fa-xmark"></i></button>
                         </div>
                     `;
 
@@ -2015,7 +2015,7 @@ export class FaceManager {
             });
         } catch (e) {
             console.error("[NamesManager] Error loading speakers:", e);
-            tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; padding:20px; color:#ef4444;">Erro ao carregar nomes.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; padding:var(--sp-20); color:#ef4444;">Erro ao carregar nomes.</td></tr>';
         }
     }
 

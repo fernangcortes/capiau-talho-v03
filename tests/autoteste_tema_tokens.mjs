@@ -16,6 +16,7 @@ import {
     FS_STEPS, fsStep, scanFontCalcs, applyFontSteps, unwrapFontSteps, roundFontCalcs
 } from "./tema_cores.mjs";
 import { temaArquivos, temaAchados } from "../scripts/tema_tokenizar.mjs";
+import { SP_STEPS, spStep, scanSpacing, applySpacing, unwrapSpacing, roundSpacing, espacosArquivos } from "../scripts/tema_espacos.mjs";
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -267,5 +268,49 @@ console.log("✔ 7.1 passou: calc(Npx) → var(--fs-N).");
     assert.deepEqual(indefinidos.slice(0, 20), [], "var(--fs-N) sem definição em theme.css");
 }
 console.log("✔ 7.2 passou: a UI só usa degraus definidos em theme.css.");
+
+// ======================================================================
+// PARTE 8: Espaçamento em degraus (var(--sp-N) dentro de style="")
+// ======================================================================
+console.log("\n--- PARTE 8: Espaçamento em degraus ---");
+{
+    assert.equal(spStep(8), 8);
+    assert.equal(spStep(15), 14, "fora da escala desce, nunca aumenta");
+    assert.equal(spStep(5), 4);
+    assert.equal(spStep(0.5), null, "abaixo de 1px fica");
+    assert.equal(spStep(80), null, "acima de 64px fica");
+    const html = `<div style="padding: 4px 15px; gap: 6px; margin-top: -5px; width: 30px; font-size: 12px"></div>`;
+    const out = applySpacing(html);
+    assert.equal(out, `<div style="padding: var(--sp-4) var(--sp-14); gap: var(--sp-6); margin-top: -5px; width: 30px; font-size: 12px"></div>`,
+        "só padding/margin/gap; negativo, largura e fonte ficam");
+    assert.equal(unwrapSpacing(out), roundSpacing(html), "desfazer devolve o original no degrau");
+    assert.equal(scanSpacing(out).length, 0, "idempotente");
+    assert.equal(applySpacing("const s = `<i style=\"gap: ${g}px\"></i>`;"), "const s = `<i style=\"gap: ${g}px\"></i>`;", "valor calculado no JS fica");
+}
+console.log("✔ 8.1 passou: px de espaçamento → var(--sp-N).");
+{
+    const theme = readFileSync(path.join(rootDir, "src", "ui", "theme.css"), "utf8");
+    const definidos = new Set();
+    for (const m of theme.matchAll(/--sp-(\d+):\s*calc\((\d+)px \* var\(--space-scale, 1\)\)/g)) {
+        assert.equal(m[1], m[2], `--sp-${m[1]} vale ${m[1]}px`);
+        definidos.add(Number(m[1]));
+    }
+    assert.deepEqual([...definidos].sort((a, b) => a - b), SP_STEPS, "theme.css define todos os degraus");
+    const soltos = [], indefinidos = [];
+    for (const file of espacosArquivos()) {
+        const text = readFileSync(file, "utf8");
+        const rel = path.relative(rootDir, file);
+        for (const f of scanSpacing(text)) if (f.step != null) soltos.push(`${rel}:${text.slice(0, f.index).split("\n").length}  ${f.match}`);
+        for (const m of text.matchAll(/var\(--sp-(\d+)\)/g)) if (!definidos.has(Number(m[1]))) indefinidos.push(`${rel}: --sp-${m[1]}`);
+    }
+    assert.deepEqual(soltos.slice(0, 20), [], "espaçamento em px solto em style=\"\" (rode: node scripts/tema_espacos.mjs --write)");
+    assert.deepEqual(indefinidos.slice(0, 20), [], "var(--sp-N) sem definição em theme.css");
+    // As páginas pedem a versão do theme.css que já tem os degraus (senão o cache zera os espaçamentos).
+    for (const f of ["index.html", "panel.html", "panel-group.html"]) {
+        const page = readFileSync(path.join(rootDir, "src", "ui", f), "utf8");
+        assert.match(page, /theme\.css\?v=([5-9]|\d{2,})"/, `${f} carrega o theme.css novo`);
+    }
+}
+console.log("✔ 8.2 passou: a UI só usa degraus de espaçamento definidos em theme.css.");
 
 console.log("\n=== AUTOTESTE TOKENS DE TEMA CONCLUÍDO COM SUCESSO ===");

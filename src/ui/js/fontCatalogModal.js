@@ -77,28 +77,28 @@ export class FontCatalogModal {
         this.modalEl.innerHTML = `
             <div class="nle-modal-container" style="background: var(--bg-glass-active, #181524); border: 1px solid var(--border-glass); border-radius: 8px; width: 900px; max-width: 95vw; height: 680px; max-height: 90vh; display: flex; flex-direction: column; box-shadow: var(--shadow-premium); overflow: hidden;">
                 <!-- Header -->
-                <div style="padding: 14px 18px; border-bottom: 1px solid var(--border-glass); display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.2);">
-                    <div style="display: flex; align-items: center; gap: 10px;">
+                <div style="padding: var(--sp-14) var(--sp-18); border-bottom: 1px solid var(--border-glass); display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.2);">
+                    <div style="display: flex; align-items: center; gap: var(--sp-10);">
                         <i class="fa-solid fa-font" style="color: #f59e0b; font-size: var(--fs-16);"></i>
                         <h2 style="font-size: var(--fs-14); font-weight: 700; color: #fff; margin: 0;">Tipografia, Moods & Brand Kit</h2>
                     </div>
-                    <div style="display: flex; align-items: center; gap: 8px;">
-                        <div class="media-tabs" style="border: none; gap: 4px;">
-                            <button id="btn-font-tab-catalog" class="tab-btn ${this.activeTab === 'catalog' ? 'active' : ''}" style="padding: 4px 12px; font-size: var(--fs-11);"><i class="fa-solid fa-swatchbook"></i> Catálogo & Moods</button>
-                            <button id="btn-font-tab-brandkit" class="tab-btn ${this.activeTab === 'brandkit' ? 'active' : ''}" style="padding: 4px 12px; font-size: var(--fs-11);"><i class="fa-solid fa-palette"></i> Brand Kit do Projeto</button>
+                    <div style="display: flex; align-items: center; gap: var(--sp-8);">
+                        <div class="media-tabs" style="border: none; gap: var(--sp-4);">
+                            <button id="btn-font-tab-catalog" class="tab-btn ${this.activeTab === 'catalog' ? 'active' : ''}" style="padding: var(--sp-4) var(--sp-12); font-size: var(--fs-11);"><i class="fa-solid fa-swatchbook"></i> Catálogo & Moods</button>
+                            <button id="btn-font-tab-brandkit" class="tab-btn ${this.activeTab === 'brandkit' ? 'active' : ''}" style="padding: var(--sp-4) var(--sp-12); font-size: var(--fs-11);"><i class="fa-solid fa-palette"></i> Brand Kit do Projeto</button>
                         </div>
-                        <button id="btn-close-font-modal" class="btn-flat-action" style="background: transparent; border: none; color: var(--text-secondary); cursor: pointer; padding: 4px 8px; font-size: var(--fs-14);"><i class="fa-solid fa-xmark"></i></button>
+                        <button id="btn-close-font-modal" class="btn-flat-action" style="background: transparent; border: none; color: var(--text-secondary); cursor: pointer; padding: var(--sp-4) var(--sp-8); font-size: var(--fs-14);"><i class="fa-solid fa-xmark"></i></button>
                     </div>
                 </div>
 
                 <!-- Conteúdo da Aba: Catálogo & Moods -->
                 <div id="font-tab-content-catalog" style="display: ${this.activeTab === 'catalog' ? 'flex' : 'none'}; flex: 1; flex-direction: column; overflow: hidden;">
                     <!-- Toolbar Superior: Moods, Busca e Upload -->
-                    <div style="padding: 10px 18px; border-bottom: 1px solid var(--border-glass); display: flex; flex-direction: column; gap: 10px; background: rgba(0,0,0,0.12);">
+                    <div style="padding: var(--sp-10) var(--sp-18); border-bottom: 1px solid var(--border-glass); display: flex; flex-direction: column; gap: var(--sp-10); background: rgba(0,0,0,0.12);">
                         <!-- Pílulas de Clima / Mood -->
-                        <div style="display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px;">
+                        <div style="display: flex; gap: var(--sp-6); overflow-x: auto; padding-bottom: var(--sp-2);">
                             ${FONT_MOODS.map(m => `
-                                <button class="mood-pill-btn ${this.selectedMood === m.id ? 'active' : ''}" data-mood="${m.id}" style="padding: 4px 10px; font-size: var(--fs-11); border-radius: 20px; border: 1px solid ${this.selectedMood === m.id ? 'var(--color-cyan)' : 'var(--border-glass)'}; background: ${this.selectedMood === m.id ? 'rgba(6,182,212,0.15)' : 'rgba(255,255,255,0.03)'}; color: ${this.selectedMood === m.id ? '#fff' : 'var(--text-secondary)'}; cursor: pointer; white-space: nowrap; display: flex; align-items: center; gap: 6px; transition: all 0.15s;">
+                                <button class="mood-pill-btn ${this.selectedMood === m.id ? 'active' : ''}" data-mood="${m.id}" style="padding: var(--sp-4) var(--sp-10); font-size: var(--fs-11); border-radius: 20px; border: 1px solid ${this.selectedMood === m.id ? 'var(--color-cyan)' : 'var(--border-glass)'}; background: ${this.selectedMood === m.id ? 'rgba(6,182,212,0.15)' : 'rgba(255,255,255,0.03)'}; color: ${this.selectedMood === m.id ? '#fff' : 'var(--text-secondary)'}; cursor: pointer; white-space: nowrap; display: flex; align-items: center; gap: var(--sp-6); transition: all 0.15s;">
                                     <i class="${m.icon}" style="font-size: var(--fs-9); color: ${this.selectedMood === m.id ? 'var(--color-cyan)' : 'var(--text-muted)'};"></i>
                                     ${m.label}
                                 </button>
@@ -106,18 +106,18 @@ export class FontCatalogModal {
                         </div>
 
                         <!-- Barra de Ações Rápidas & Busca -->
-                        <div style="display: flex; gap: 10px; align-items: center;">
-                            <div class="search-area glassmorphism" style="flex: 1; display: flex; align-items: center; gap: 8px; height: 30px; padding: 0 10px;">
+                        <div style="display: flex; gap: var(--sp-10); align-items: center;">
+                            <div class="search-area glassmorphism" style="flex: 1; display: flex; align-items: center; gap: var(--sp-8); height: 30px; padding: 0 var(--sp-10);">
                                 <i class="fa-solid fa-magnifying-glass" style="color: var(--text-muted); font-size: var(--fs-11);"></i>
                                 <input type="text" id="font-search-input" placeholder="Buscar por nome de fonte ou estilo..." value="${this.searchQuery}" style="flex: 1; background: transparent; border: none; outline: none; font-size: var(--fs-11); color: #fff;">
                             </div>
-                            <input type="text" id="font-sample-input" placeholder="Texto de amostra..." value="${this.previewSampleText}" style="width: 220px; height: 30px; background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); border-radius: 4px; padding: 0 8px; font-size: var(--fs-11); color: #e2e8f0; outline: none;">
+                            <input type="text" id="font-sample-input" placeholder="Texto de amostra..." value="${this.previewSampleText}" style="width: 220px; height: 30px; background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); border-radius: 4px; padding: 0 var(--sp-8); font-size: var(--fs-11); color: #e2e8f0; outline: none;">
                             
-                            <button id="btn-load-system-fonts" class="lib-action-btn" title="Detectar fontes instaladas no sistema operacional (queryLocalFonts)" style="display: flex; align-items: center; gap: 6px; padding: 0 10px; height: 30px; font-size: var(--fs-11); color: var(--color-cyan);">
+                            <button id="btn-load-system-fonts" class="lib-action-btn" title="Detectar fontes instaladas no sistema operacional (queryLocalFonts)" style="display: flex; align-items: center; gap: var(--sp-6); padding: 0 var(--sp-10); height: 30px; font-size: var(--fs-11); color: var(--color-cyan);">
                                 <i class="fa-solid fa-desktop"></i> Fontes do PC
                             </button>
                             
-                            <label class="lib-action-btn" title="Fazer upload de arquivo de fonte (.ttf, .otf, .woff2)" style="display: flex; align-items: center; gap: 6px; padding: 0 10px; height: 30px; font-size: var(--fs-11); color: var(--color-violet); cursor: pointer;">
+                            <label class="lib-action-btn" title="Fazer upload de arquivo de fonte (.ttf, .otf, .woff2)" style="display: flex; align-items: center; gap: var(--sp-6); padding: 0 var(--sp-10); height: 30px; font-size: var(--fs-11); color: var(--color-violet); cursor: pointer;">
                                 <i class="fa-solid fa-file-arrow-up"></i> Upload (.ttf)
                                 <input type="file" id="font-file-upload" accept=".ttf,.otf,.woff2,.woff" style="display: none;">
                             </label>
@@ -125,29 +125,29 @@ export class FontCatalogModal {
                     </div>
 
                     <!-- Grid de Specimens de Fontes -->
-                    <div style="flex: 1; overflow-y: auto; padding: 16px 18px; display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; align-content: flex-start;">
+                    <div style="flex: 1; overflow-y: auto; padding: var(--sp-16) var(--sp-18); display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: var(--sp-14); align-content: flex-start;">
                         ${filteredFonts.length === 0 ? `
-                            <div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: var(--text-muted); font-size: var(--fs-12);">
+                            <div style="grid-column: 1 / -1; text-align: center; padding: var(--sp-40); color: var(--text-muted); font-size: var(--fs-12);">
                                 Nenhuma fonte encontrada para o filtro selecionado.
                             </div>
                         ` : filteredFonts.map(font => `
-                            <div class="font-specimen-card" data-font-id="${font.id}" style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); border-radius: 6px; padding: 12px; display: flex; flex-direction: column; justify-content: space-between; gap: 10px; cursor: pointer; transition: all 0.2s;">
+                            <div class="font-specimen-card" data-font-id="${font.id}" style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); border-radius: 6px; padding: var(--sp-12); display: flex; flex-direction: column; justify-content: space-between; gap: var(--sp-10); cursor: pointer; transition: all 0.2s;">
                                 <div>
-                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--sp-6);">
                                         <span style="font-size: var(--fs-12); font-weight: 700; color: #fff;">${font.name}</span>
-                                        <span style="font-size: var(--fs-9); padding: 2px 6px; border-radius: 4px; background: rgba(255,255,255,0.06); color: var(--text-muted); text-transform: uppercase;">${font.category}</span>
+                                        <span style="font-size: var(--fs-9); padding: var(--sp-2) var(--sp-6); border-radius: 4px; background: rgba(255,255,255,0.06); color: var(--text-muted); text-transform: uppercase;">${font.category}</span>
                                     </div>
                                     <div style="font-family: '${font.id}', sans-serif; font-size: var(--fs-18); color: var(--text-primary); line-height: 1.3; min-height: 48px; word-break: break-word;">
                                         ${this.previewSampleText || font.specimen}
                                     </div>
                                 </div>
-                                <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px dashed var(--border-glass); padding-top: 8px; margin-top: 4px;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px dashed var(--border-glass); padding-top: var(--sp-8); margin-top: var(--sp-4);">
                                     <span style="font-size: var(--fs-9); color: var(--text-muted);">${font.weights ? font.weights.length + ' pesos' : 'Normal'}</span>
-                                    <div style="display: flex; gap: 6px;">
-                                        <button class="btn-select-font-clip" data-font-id="${font.id}" title="Aplicar ao clipe selecionado" style="font-size: var(--fs-10); font-weight: 600; padding: 3px 8px; border-radius: 4px; border: 1px solid var(--t-line-strong, rgba(6,182,212,0.4)); background: var(--t-tint-2, rgba(6,182,212,0.1)); color: var(--color-cyan); cursor: pointer;">
+                                    <div style="display: flex; gap: var(--sp-6);">
+                                        <button class="btn-select-font-clip" data-font-id="${font.id}" title="Aplicar ao clipe selecionado" style="font-size: var(--fs-10); font-weight: 600; padding: var(--sp-2) var(--sp-8); border-radius: 4px; border: 1px solid var(--t-line-strong, rgba(6,182,212,0.4)); background: var(--t-tint-2, rgba(6,182,212,0.1)); color: var(--color-cyan); cursor: pointer;">
                                             Aplicar
                                         </button>
-                                        <button class="btn-set-brandkit-font" data-font-id="${font.id}" title="Definir como fonte padrão no Brand Kit" style="font-size: var(--fs-10); padding: 3px 6px; border-radius: 4px; border: 1px solid var(--border-glass); background: transparent; color: var(--text-secondary); cursor: pointer;">
+                                        <button class="btn-set-brandkit-font" data-font-id="${font.id}" title="Definir como fonte padrão no Brand Kit" style="font-size: var(--fs-10); padding: var(--sp-2) var(--sp-6); border-radius: 4px; border: 1px solid var(--border-glass); background: transparent; color: var(--text-secondary); cursor: pointer;">
                                             <i class="fa-solid fa-star"></i>
                                         </button>
                                     </div>
@@ -158,36 +158,36 @@ export class FontCatalogModal {
                 </div>
 
                 <!-- Conteúdo da Aba: Brand Kit do Projeto -->
-                <div id="font-tab-content-brandkit" style="display: ${this.activeTab === 'brandkit' ? 'flex' : 'none'}; flex: 1; flex-direction: column; overflow-y: auto; padding: 20px 24px; gap: 20px;">
-                    <div style="background: var(--t-tint-1, rgba(245,158,11,0.06)); border: 1px solid var(--t-line-strong, rgba(245,158,11,0.25)); border-radius: 6px; padding: 12px 16px; font-size: var(--fs-12); color: #fde047; line-height: 1.5; display: flex; gap: 12px; align-items: center;">
+                <div id="font-tab-content-brandkit" style="display: ${this.activeTab === 'brandkit' ? 'flex' : 'none'}; flex: 1; flex-direction: column; overflow-y: auto; padding: var(--sp-20) var(--sp-24); gap: var(--sp-20);">
+                    <div style="background: var(--t-tint-1, rgba(245,158,11,0.06)); border: 1px solid var(--t-line-strong, rgba(245,158,11,0.25)); border-radius: 6px; padding: var(--sp-12) var(--sp-16); font-size: var(--fs-12); color: #fde047; line-height: 1.5; display: flex; gap: var(--sp-12); align-items: center;">
                         <i class="fa-solid fa-wand-magic-sparkles" style="font-size: var(--fs-18); color: #f59e0b;"></i>
                         <div>
                             <strong>Guia Tipográfico & Visual do Projeto:</strong> As regras do Brand Kit guiam a Inteligência Artificial e a criação de novos títulos, mantendo a consistência visual em todo o corte. Você tem liberdade total para alterar qualquer elemento a qualquer momento.
                         </div>
                     </div>
 
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-20);">
                         <!-- Coluna 1: Tipografia Oficial -->
-                        <div style="display: flex; flex-direction: column; gap: 14px; background: rgba(0,0,0,0.2); border: 1px solid var(--border-glass); border-radius: 6px; padding: 16px;">
+                        <div style="display: flex; flex-direction: column; gap: var(--sp-14); background: rgba(0,0,0,0.2); border: 1px solid var(--border-glass); border-radius: 6px; padding: var(--sp-16);">
                             <h3 style="font-size: var(--fs-12); font-weight: 700; color: var(--color-cyan); margin: 0; text-transform: uppercase; letter-spacing: 0.5px;"><i class="fa-solid fa-font"></i> Tipografia Oficial</h3>
                             
-                            <div style="display: flex; flex-direction: column; gap: 6px;">
+                            <div style="display: flex; flex-direction: column; gap: var(--sp-6);">
                                 <label style="font-size: var(--fs-11); color: var(--text-secondary);">Fonte de Títulos & Cartelas de Capítulo</label>
-                                <select id="bk-title-font" class="nle-select" style="padding: 6px 8px; font-size: var(--fs-11); background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); border-radius: 4px; color: #fff;">
+                                <select id="bk-title-font" class="nle-select" style="padding: var(--sp-6) var(--sp-8); font-size: var(--fs-11); background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); border-radius: 4px; color: #fff;">
                                     ${CURATED_FONTS.map(f => `<option value="${f.id}" ${f.id === brandKit.titleFont ? 'selected' : ''}>${f.name} (${f.mood})</option>`).join('')}
                                 </select>
                             </div>
 
-                            <div style="display: flex; flex-direction: column; gap: 6px;">
+                            <div style="display: flex; flex-direction: column; gap: var(--sp-6);">
                                 <label style="font-size: var(--fs-11); color: var(--text-secondary);">Fonte de Corpo, Depoimentos & GCs</label>
-                                <select id="bk-body-font" class="nle-select" style="padding: 6px 8px; font-size: var(--fs-11); background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); border-radius: 4px; color: #fff;">
+                                <select id="bk-body-font" class="nle-select" style="padding: var(--sp-6) var(--sp-8); font-size: var(--fs-11); background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); border-radius: 4px; color: #fff;">
                                     ${CURATED_FONTS.map(f => `<option value="${f.id}" ${f.id === brandKit.bodyFont ? 'selected' : ''}>${f.name} (${f.mood})</option>`).join('')}
                                 </select>
                             </div>
 
-                            <div style="display: flex; flex-direction: column; gap: 6px;">
+                            <div style="display: flex; flex-direction: column; gap: var(--sp-6);">
                                 <label style="font-size: var(--fs-11); color: var(--text-secondary);">Alinhamento Padrão</label>
-                                <select id="bk-alignment" class="nle-select" style="padding: 6px 8px; font-size: var(--fs-11); background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); border-radius: 4px; color: #fff;">
+                                <select id="bk-alignment" class="nle-select" style="padding: var(--sp-6) var(--sp-8); font-size: var(--fs-11); background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); border-radius: 4px; color: #fff;">
                                     <option value="left" ${brandKit.defaultAlignment === 'left' ? 'selected' : ''}>À Esquerda (Documentário / TV)</option>
                                     <option value="center" ${brandKit.defaultAlignment === 'center' ? 'selected' : ''}>Centralizado (Cinema / Clássico)</option>
                                     <option value="right" ${brandKit.defaultAlignment === 'right' ? 'selected' : ''}>À Direita</option>
@@ -196,27 +196,27 @@ export class FontCatalogModal {
                         </div>
 
                         <!-- Coluna 2: Paleta de Cores & Caixa -->
-                        <div style="display: flex; flex-direction: column; gap: 14px; background: rgba(0,0,0,0.2); border: 1px solid var(--border-glass); border-radius: 6px; padding: 16px;">
+                        <div style="display: flex; flex-direction: column; gap: var(--sp-14); background: rgba(0,0,0,0.2); border: 1px solid var(--border-glass); border-radius: 6px; padding: var(--sp-16);">
                             <h3 style="font-size: var(--fs-12); font-weight: 700; color: #f59e0b; margin: 0; text-transform: uppercase; letter-spacing: 0.5px;"><i class="fa-solid fa-palette"></i> Cores & Caixa de Fundo</h3>
 
-                            <div style="display: flex; gap: 12px; align-items: center;">
+                            <div style="display: flex; gap: var(--sp-12); align-items: center;">
                                 <label style="flex: 1; font-size: var(--fs-11); color: var(--text-secondary);">Cor Principal do Texto</label>
                                 <input type="color" id="bk-color-text" value="${brandKit.textColor}" style="width: 32px; height: 32px; border: none; background: transparent; cursor: pointer;">
                             </div>
 
-                            <div style="display: flex; gap: 12px; align-items: center;">
+                            <div style="display: flex; gap: var(--sp-12); align-items: center;">
                                 <label style="flex: 1; font-size: var(--fs-11); color: var(--text-secondary);">Cor de Destaque / Acentos</label>
                                 <input type="color" id="bk-color-accent" value="${brandKit.accentColor}" style="width: 32px; height: 32px; border: none; background: transparent; cursor: pointer;">
                             </div>
 
-                            <div style="display: flex; gap: 12px; align-items: center;">
+                            <div style="display: flex; gap: var(--sp-12); align-items: center;">
                                 <label style="flex: 1; font-size: var(--fs-11); color: var(--text-secondary);">Cor do Box de Fundo</label>
                                 <input type="color" id="bk-color-bg" value="${brandKit.backgroundColor.startsWith('#') ? brandKit.backgroundColor : '#000000'}" style="width: 32px; height: 32px; border: none; background: transparent; cursor: pointer;">
                             </div>
 
-                            <div style="display: flex; gap: 12px; align-items: center;">
+                            <div style="display: flex; gap: var(--sp-12); align-items: center;">
                                 <label style="flex: 1; font-size: var(--fs-11); color: var(--text-secondary);">Curva Easing de Animação</label>
-                                <select id="bk-easing" class="nle-select" style="padding: 4px 6px; font-size: var(--fs-11); background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); border-radius: 4px; color: #fff;">
+                                <select id="bk-easing" class="nle-select" style="padding: var(--sp-4) var(--sp-6); font-size: var(--fs-11); background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); border-radius: 4px; color: #fff;">
                                     <option value="easeOutCubic" ${brandKit.defaultEasing === 'easeOutCubic' ? 'selected' : ''}>Suave (Ease Out Cubic)</option>
                                     <option value="easeInOutQuad" ${brandKit.defaultEasing === 'easeInOutQuad' ? 'selected' : ''}>Harmônico (Ease In Out)</option>
                                     <option value="spring" ${brandKit.defaultEasing === 'spring' ? 'selected' : ''}>Elástico / Mola (Spring)</option>
@@ -227,11 +227,11 @@ export class FontCatalogModal {
                     </div>
 
                     <!-- Ações do Brand Kit -->
-                    <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border-glass); padding-top: 16px; margin-top: auto;">
-                        <button id="btn-apply-brandkit-all" class="btn-secondary" style="height: 32px; font-size: var(--fs-11); font-weight: 600; padding: 0 14px; border: 1px solid var(--t-line-strong, rgba(245,158,11,0.4)); background: var(--t-tint-2, rgba(245,158,11,0.08)); color: #f59e0b; cursor: pointer; border-radius: 4px; display: flex; align-items: center; gap: 6px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border-glass); padding-top: var(--sp-16); margin-top: auto;">
+                        <button id="btn-apply-brandkit-all" class="btn-secondary" style="height: 32px; font-size: var(--fs-11); font-weight: 600; padding: 0 var(--sp-14); border: 1px solid var(--t-line-strong, rgba(245,158,11,0.4)); background: var(--t-tint-2, rgba(245,158,11,0.08)); color: #f59e0b; cursor: pointer; border-radius: 4px; display: flex; align-items: center; gap: var(--sp-6);">
                             <i class="fa-solid fa-wand-magic"></i> Padronizar Todos os Textos da Timeline
                         </button>
-                        <button id="btn-save-brandkit" class="btn-primary" style="height: 32px; font-size: var(--fs-11); font-weight: 700; padding: 0 18px; border: none; --primary-bg: var(--color-cyan); --primary-ink: #000; cursor: pointer; border-radius: 4px; display: flex; align-items: center; gap: 6px;">
+                        <button id="btn-save-brandkit" class="btn-primary" style="height: 32px; font-size: var(--fs-11); font-weight: 700; padding: 0 var(--sp-18); border: none; --primary-bg: var(--color-cyan); --primary-ink: #000; cursor: pointer; border-radius: 4px; display: flex; align-items: center; gap: var(--sp-6);">
                             <i class="fa-solid fa-check"></i> Salvar Brand Kit do Projeto
                         </button>
                     </div>

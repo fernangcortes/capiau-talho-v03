@@ -7120,9 +7120,9 @@ export class VideoPlayer {
             item.className = `popover-rm-item ${idx === currentIndex ? "is-active" : ""}`;
             item.dataset.index = String(idx);
             item.innerHTML = `
-                <div style="display: flex; align-items: center; gap: 6px;">
+                <div style="display: flex; align-items: center; gap: var(--sp-6);">
                     <span style="color: var(--color-cyan, #06b6d4); font-weight: bold; font-family: monospace;">${idx + 1}.</span>
-                    <span style="background: rgba(255,255,255,0.08); padding: 1px 4px; border-radius: 3px; font-size: var(--fs-10);">${track}</span>
+                    <span style="background: rgba(255,255,255,0.08); padding: var(--sp-1) var(--sp-4); border-radius: 3px; font-size: var(--fs-10);">${track}</span>
                     <span style="font-family: monospace; font-size: var(--fs-11);">${tc}</span>
                     <span style="color: var(--text-secondary, #94a3b8); max-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${clipName}</span>
                 </div>
@@ -7219,7 +7219,7 @@ export function showAnnotationModal(speakers, initialValue = "") {
         header.style.borderBottom = "1px solid var(--border-glass)";
         header.style.paddingBottom = "10px";
         header.innerHTML = `
-            <h2 style="margin:0; font-size:var(--fs-16); color:#fff; display:flex; align-items:center; gap:8px;">
+            <h2 style="margin:0; font-size:var(--fs-16); color:#fff; display:flex; align-items:center; gap:var(--sp-8);">
                 <i class="fa-solid fa-tags" style="color:var(--color-cyan);"></i> Identificar Elemento
             </h2>
             <button class="btn-close-modal" style="font-size:var(--fs-24); color:var(--text-secondary); background:transparent; border:none; cursor:pointer;">&times;</button>

@@ -1082,8 +1082,8 @@ export class PanelsManager {
             `;
             hud.innerHTML = `
                 <span class="hud-info" style="color: var(--color-cyan); font-weight: 500;">0.0s</span>
-                <span class="hud-track-badge" style="background: var(--t-tint-3, rgba(139, 92, 246, 0.2)); color: #c4b5fd; padding: 2px 5px; border-radius: 3px; font-size: var(--fs-10);">A1</span>
-                <button type="button" class="btn-insert-selection" style="background: transparent; border: none; color: #fff; cursor: pointer; padding: 2px 6px; border-radius: 4px; display: inline-flex; align-items: center; gap: 4px;">
+                <span class="hud-track-badge" style="background: var(--t-tint-3, rgba(139, 92, 246, 0.2)); color: #c4b5fd; padding: var(--sp-2) var(--sp-4); border-radius: 3px; font-size: var(--fs-10);">A1</span>
+                <button type="button" class="btn-insert-selection" style="background: transparent; border: none; color: #fff; cursor: pointer; padding: var(--sp-2) var(--sp-6); border-radius: 4px; display: inline-flex; align-items: center; gap: var(--sp-4);">
                     <i class="fa-solid fa-arrow-down-to-bracket" style="color: var(--color-cyan);"></i> Inserir na Timeline
                 </button>
             `;
@@ -1270,7 +1270,7 @@ export class PanelsManager {
         
         const cluesList = document.getElementById("assistant-clues-list");
         if (!cluesList) return;
-        cluesList.innerHTML = `<div style="font-style: italic; color: var(--text-muted); font-size: var(--fs-10); text-align: center; padding: 10px 0;"><i class="fa-solid fa-spinner fa-spin"></i> Buscando pistas...</div>`;
+        cluesList.innerHTML = `<div style="font-style: italic; color: var(--text-muted); font-size: var(--fs-10); text-align: center; padding: var(--sp-10) 0;"><i class="fa-solid fa-spinner fa-spin"></i> Buscando pistas...</div>`;
         
         try {
             const clues = await CapIAuAPI.fetchDiarizationClues(
@@ -1283,7 +1283,7 @@ export class PanelsManager {
             
             cluesList.innerHTML = "";
             if (clues.length === 0) {
-                cluesList.innerHTML = `<div style="font-style: italic; color: var(--text-muted); font-size: var(--fs-10); text-align: center; padding: 10px 0;">Nenhuma pista detectada com as configurações atuais.</div>`;
+                cluesList.innerHTML = `<div style="font-style: italic; color: var(--text-muted); font-size: var(--fs-10); text-align: center; padding: var(--sp-10) 0;">Nenhuma pista detectada com as configurações atuais.</div>`;
                 return;
             }
             
@@ -1306,14 +1306,14 @@ export class PanelsManager {
                 }
                 
                 card.innerHTML = `
-                    <div class="clue-meta" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                    <div class="clue-meta" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:var(--sp-4);">
                         <span class="clue-badge ${badgeClass}">${badgeLabel}</span>
                         <span style="color:var(--text-muted); font-size:var(--fs-9);">${formatTimecode(clue.timestamp)}</span>
                     </div>
                     <div class="clue-context" style="font-style:italic; color:var(--text-muted); font-size:var(--fs-10); line-height:1.3; overflow:hidden; text-overflow:ellipsis; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;">"${clue.context}"</div>
-                    <div class="clue-actions" style="display:flex; gap:6px; margin-top:6px;">
-                        <button class="btn-flat-action cyan btn-listen-clue" style="font-size:var(--fs-9); padding:2px 4px; background:var(--t-tint-2, rgba(6, 182, 212, 0.1)) !important; border-radius:3px;"><i class="fa-solid fa-play"></i> Ouvir</button>
-                        <button class="btn-flat-action rose btn-inspect-clue" style="font-size:var(--fs-9); padding:2px 4px; background:var(--t-tint-2, rgba(244, 63, 94, 0.1)) !important; border-radius:3px;"><i class="fa-solid fa-magnifying-glass"></i> Ajustar</button>
+                    <div class="clue-actions" style="display:flex; gap:var(--sp-6); margin-top:var(--sp-6);">
+                        <button class="btn-flat-action cyan btn-listen-clue" style="font-size:var(--fs-9); padding:var(--sp-2) var(--sp-4); background:var(--t-tint-2, rgba(6, 182, 212, 0.1)) !important; border-radius:3px;"><i class="fa-solid fa-play"></i> Ouvir</button>
+                        <button class="btn-flat-action rose btn-inspect-clue" style="font-size:var(--fs-9); padding:var(--sp-2) var(--sp-4); background:var(--t-tint-2, rgba(244, 63, 94, 0.1)) !important; border-radius:3px;"><i class="fa-solid fa-magnifying-glass"></i> Ajustar</button>
                     </div>
                 `;
                 
@@ -1334,7 +1334,7 @@ export class PanelsManager {
                 cluesList.appendChild(card);
             });
         } catch (err) {
-            cluesList.innerHTML = `<div style="color: var(--color-rose); font-size: var(--fs-10); text-align: center; padding: 10px 0;">Erro: ${err.message}</div>`;
+            cluesList.innerHTML = `<div style="color: var(--color-rose); font-size: var(--fs-10); text-align: center; padding: var(--sp-10) 0;">Erro: ${err.message}</div>`;
         }
     }
 
@@ -1431,10 +1431,10 @@ export class PanelsManager {
         const secText = document.createElement("div");
         secText.innerHTML = `
             <div class="inspector-section-title"><i class="fa-solid fa-quote-left" style="color:var(--color-cyan);"></i> Trecho Selecionado</div>
-            <div style="font-size:var(--fs-11); color:#fff; line-height:1.4; padding:8px; background:rgba(255,255,255,0.03); border:1px solid var(--border-glass); border-radius:6px; font-style:italic;">
+            <div style="font-size:var(--fs-11); color:#fff; line-height:1.4; padding:var(--sp-8); background:rgba(255,255,255,0.03); border:1px solid var(--border-glass); border-radius:6px; font-style:italic;">
                 "${d.text}"
             </div>
-            <div style="display:flex; justify-content:space-between; margin-top:6px; font-size:var(--fs-10); color:var(--text-muted);">
+            <div style="display:flex; justify-content:space-between; margin-top:var(--sp-6); font-size:var(--fs-10); color:var(--text-muted);">
                 <span>Início: ${formatTimecode(d.start_time)}</span>
                 <span>Fim: ${formatTimecode(d.end_time)}</span>
             </div>
@@ -1448,14 +1448,14 @@ export class PanelsManager {
         secWave.innerHTML = `
             <div class="inspector-section-title" style="display:flex; justify-content:space-between; align-items:center;">
                 <span><i class="fa-solid fa-chart-simple" style="color:var(--color-rose);"></i> Waveform de Fala & Silêncio</span>
-                <button id="btn-toggle-inspector-words" class="btn-flat-action" style="font-size:var(--fs-10); padding:2px 8px; border-radius:4px; cursor:pointer; background:${this.inspectorShowWords ? 'rgba(6, 182, 212, 0.2)' : 'rgba(255,255,255,0.06)'}; color:${this.inspectorShowWords ? '#22d3ee' : '#94a3b8'}; border:1px solid ${this.inspectorShowWords ? 'rgba(6, 182, 212, 0.4)' : 'var(--t-line-weak, rgba(255,255,255,0.08))'};" title="Mostrar/Esconder marcação de palavras sobre a onda">
+                <button id="btn-toggle-inspector-words" class="btn-flat-action" style="font-size:var(--fs-10); padding:var(--sp-2) var(--sp-8); border-radius:4px; cursor:pointer; background:${this.inspectorShowWords ? 'rgba(6, 182, 212, 0.2)' : 'rgba(255,255,255,0.06)'}; color:${this.inspectorShowWords ? '#22d3ee' : '#94a3b8'}; border:1px solid ${this.inspectorShowWords ? 'rgba(6, 182, 212, 0.4)' : 'var(--t-line-weak, rgba(255,255,255,0.08))'};" title="Mostrar/Esconder marcação de palavras sobre a onda">
                     <i class="fa-solid fa-font"></i> Palavras
                 </button>
             </div>
             <div class="waveform-container">
                 <canvas id="inspector-waveform" class="waveform-canvas"></canvas>
             </div>
-            <div style="font-size:var(--fs-9); color:var(--text-muted); margin-top:4px; text-align:center;">
+            <div style="font-size:var(--fs-9); color:var(--text-muted); margin-top:var(--sp-4); text-align:center;">
                 Clique para navegar. Duplo clique para adicionar corte.
             </div>
         `;
@@ -1477,17 +1477,17 @@ export class PanelsManager {
         const secSpeaker = document.createElement("div");
         secSpeaker.innerHTML = `
             <div class="inspector-section-title"><i class="fa-solid fa-user-pen" style="color:var(--color-violet);"></i> Identificação do Falante</div>
-            <div style="display:flex; flex-direction:column; gap:8px;">
-                <div style="display:flex; gap:6px;">
-                    <select id="sel-inspector-speaker" class="nle-select" style="flex:1; padding:6px; border-radius:6px; border:1px solid var(--border-glass); background:rgba(0,0,0,0.3); color:#fff; font-size:var(--fs-11);">
+            <div style="display:flex; flex-direction:column; gap:var(--sp-8);">
+                <div style="display:flex; gap:var(--sp-6);">
+                    <select id="sel-inspector-speaker" class="nle-select" style="flex:1; padding:var(--sp-6); border-radius:6px; border:1px solid var(--border-glass); background:rgba(0,0,0,0.3); color:#fff; font-size:var(--fs-11);">
                         <!-- Carregado via autocomplete -->
                     </select>
                 </div>
-                <label style="font-size:var(--fs-10); color:var(--text-secondary); display:flex; align-items:center; gap:4px; cursor:pointer;">
+                <label style="font-size:var(--fs-10); color:var(--text-secondary); display:flex; align-items:center; gap:var(--sp-4); cursor:pointer;">
                     <input type="checkbox" id="chk-global-rename"> Aplicar a TODOS os blocos de "${d.speaker_id}" neste vídeo
                 </label>
-                <div style="display:flex; gap:6px; margin-top:4px;">
-                    <button id="btn-save-speaker-name" class="btn-flat-action cyan" style="font-weight:600; padding:6px 12px; background:var(--t-tint-3, rgba(6, 182, 212, 0.15)) !important; border-radius:4px;"><i class="fa-solid fa-floppy-disk"></i> Salvar Rótulo</button>
+                <div style="display:flex; gap:var(--sp-6); margin-top:var(--sp-4);">
+                    <button id="btn-save-speaker-name" class="btn-flat-action cyan" style="font-weight:600; padding:var(--sp-6) var(--sp-12); background:var(--t-tint-3, rgba(6, 182, 212, 0.15)) !important; border-radius:4px;"><i class="fa-solid fa-floppy-disk"></i> Salvar Rótulo</button>
                 </div>
             </div>
         `;
@@ -1497,7 +1497,7 @@ export class PanelsManager {
         const secLocalSilences = document.createElement("div");
         secLocalSilences.innerHTML = `
             <div class="inspector-section-title"><i class="fa-solid fa-scissors" style="color:var(--color-rose);"></i> Sugestões de Divisão Internas</div>
-            <div id="inspector-local-silences-list" style="display:flex; flex-direction:column; gap:6px; font-size:var(--fs-10);">
+            <div id="inspector-local-silences-list" style="display:flex; flex-direction:column; gap:var(--sp-6); font-size:var(--fs-10);">
                 <!-- Carregado via JS -->
             </div>
         `;
@@ -1826,7 +1826,7 @@ export class PanelsManager {
         }
         
         if (localSilences.length === 0) {
-            listDiv.innerHTML = `<div style="font-style: italic; color: var(--text-muted); font-size: var(--fs-9); text-align: center; padding: 5px 0;">Nenhuma pausa longa dentro deste balão.</div>`;
+            listDiv.innerHTML = `<div style="font-style: italic; color: var(--text-muted); font-size: var(--fs-9); text-align: center; padding: var(--sp-4) 0;">Nenhuma pausa longa dentro deste balão.</div>`;
             return;
         }
         
@@ -1842,13 +1842,13 @@ export class PanelsManager {
             row.style.marginBottom = "4px";
             
             row.innerHTML = `
-                <div style="display:flex; flex-direction:column; gap:2px;">
+                <div style="display:flex; flex-direction:column; gap:var(--sp-2);">
                     <span style="font-weight:600; color:var(--color-rose);"><i class="fa-solid fa-volume-xmark"></i> Pausa de ${s.duration.toFixed(1)}s</span>
                     <span style="color:var(--text-muted); font-size:var(--fs-9);">Entre "${s.wordBefore}" e "${s.wordAfter}" às ${formatTimecode(s.timestamp)}</span>
                 </div>
-                <div style="display:flex; gap:4px;">
+                <div style="display:flex; gap:var(--sp-4);">
                     <button class="btn-flat-action cyan btn-listen-silence" title="Ouvir" style="background:none; border:none; cursor:pointer;"><i class="fa-solid fa-play"></i></button>
-                    <button class="btn-flat-action rose btn-split-silence" title="Dividir aqui" style="font-size:var(--fs-9); padding:2px 4px; background:var(--t-tint-2, rgba(244, 63, 94, 0.1)) !important; border-radius:3px; cursor:pointer;"><i class="fa-solid fa-scissors"></i> Dividir</button>
+                    <button class="btn-flat-action rose btn-split-silence" title="Dividir aqui" style="font-size:var(--fs-9); padding:var(--sp-2) var(--sp-4); background:var(--t-tint-2, rgba(244, 63, 94, 0.1)) !important; border-radius:3px; cursor:pointer;"><i class="fa-solid fa-scissors"></i> Dividir</button>
                 </div>
             `;
             
@@ -1889,7 +1889,7 @@ export class PanelsManager {
             
             grid.innerHTML = "";
             if (localFaces.length === 0) {
-                grid.innerHTML = `<div style="font-style: italic; color: var(--text-muted); font-size: var(--fs-9); text-align: center; grid-column: 1 / -1; padding: 5px 0;">Nenhum rosto detectado neste trecho do vídeo.</div>`;
+                grid.innerHTML = `<div style="font-style: italic; color: var(--text-muted); font-size: var(--fs-9); text-align: center; grid-column: 1 / -1; padding: var(--sp-4) 0;">Nenhum rosto detectado neste trecho do vídeo.</div>`;
                 return;
             }
             
@@ -1909,7 +1909,7 @@ export class PanelsManager {
                 card.innerHTML = `
                     <img src="/api/face/${face.id}/thumbnail" alt="${label}" onerror="this.src='https://placehold.co/45x45/181824/ffffff?text=?'">
                     <span style="font-size:var(--fs-9); text-overflow:ellipsis; overflow:hidden; width:100%; white-space:nowrap;">${label}</span>
-                    <button class="btn-flat-action cyan" style="font-size: var(--fs-9); padding: 2px 4px; margin-top:2px; background:var(--t-tint-2, rgba(6, 182, 212, 0.1)) !important; border-radius:3px; cursor:pointer;" title="Usar este nome"><i class="fa-solid fa-check"></i> Atribuir</button>
+                    <button class="btn-flat-action cyan" style="font-size: var(--fs-9); padding: var(--sp-2) var(--sp-4); margin-top:var(--sp-2); background:var(--t-tint-2, rgba(6, 182, 212, 0.1)) !important; border-radius:3px; cursor:pointer;" title="Usar este nome"><i class="fa-solid fa-check"></i> Atribuir</button>
                 `;
                 
                 const actionBtn = card.querySelector("button");
@@ -2043,10 +2043,10 @@ export class PanelsManager {
         tagsHeader.style.border = "1px solid var(--border-glass)";
         tagsHeader.style.background = "rgba(0, 0, 0, 0.2)";
         tagsHeader.innerHTML = `
-            <div style="font-size:var(--fs-11); color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.5px; font-weight:600; display:flex; align-items:center; gap:6px;">
+            <div style="font-size:var(--fs-11); color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.5px; font-weight:600; display:flex; align-items:center; gap:var(--sp-6);">
                 <i class="fa-solid fa-tags" style="color:var(--color-cyan);"></i> Pessoas/Objetos Marcados:
             </div>
-            <div class="vision-tags-list" style="display:flex; flex-wrap:wrap; gap:6px;">
+            <div class="vision-tags-list" style="display:flex; flex-wrap:wrap; gap:var(--sp-6);">
                 <span style="font-size:var(--fs-11); color:var(--text-secondary); font-style:italic;">Carregando marcações...</span>
             </div>
         `;
@@ -2068,10 +2068,10 @@ export class PanelsManager {
             row.style.marginBottom = "0px";
             row.style.cursor = "pointer";
             row.innerHTML = `
-                <div class="bubble-meta" style="margin-bottom: 6px; display: flex; align-items: center; width: 100%;">
-                    <span class="speaker-name" style="color: var(--color-cyan); font-weight:700;"><i class="fa-solid fa-eye" style="font-size: var(--fs-9); margin-right: 4px;"></i> VISÃO IA</span>
+                <div class="bubble-meta" style="margin-bottom: var(--sp-6); display: flex; align-items: center; width: 100%;">
+                    <span class="speaker-name" style="color: var(--color-cyan); font-weight:700;"><i class="fa-solid fa-eye" style="font-size: var(--fs-9); margin-right: var(--sp-4);"></i> VISÃO IA</span>
                     <span class="bubble-time" style="font-family: monospace; font-size:var(--fs-10); color: var(--text-secondary); margin-left: auto;">${formatTimecode(f.timestamp)}</span>
-                    <button class="btn-card-action btn-play-vision" style="margin-left: 10px; color: var(--text-muted); background: transparent; border:none; cursor:pointer;" title="Assistir"><i class="fa-solid fa-play"></i></button>
+                    <button class="btn-card-action btn-play-vision" style="margin-left: var(--sp-10); color: var(--text-muted); background: transparent; border:none; cursor:pointer;" title="Assistir"><i class="fa-solid fa-play"></i></button>
                 </div>
                 <div class="bubble-text vision-description" style="user-select: text; cursor: text; font-size: var(--fs-12); line-height: 1.5; color: var(--text-primary);">${f.description}</div>
             `;
@@ -2228,7 +2228,7 @@ export class PanelsManager {
         
         if (filtered.length === 0) {
             container.innerHTML = `
-                <div style="color:var(--text-muted); font-size:var(--fs-11); padding:12px; text-align:center;">
+                <div style="color:var(--text-muted); font-size:var(--fs-11); padding:var(--sp-12); text-align:center;">
                     Nenhum tema encontrado.
                 </div>
             `;
@@ -2246,24 +2246,24 @@ export class PanelsManager {
             card.style.padding = "12px";
 
             const segmentsBadge = t.segments_count
-                ? `<span style="font-size: var(--fs-9); color: var(--color-emerald); background: var(--t-tint-2, rgba(16,185,129,0.1)); border: 1px solid var(--t-line-strong, rgba(16,185,129,0.25)); border-radius: 10px; padding: 1px 7px; font-weight: 600;">${t.segments_count} trechos</span>`
+                ? `<span style="font-size: var(--fs-9); color: var(--color-emerald); background: var(--t-tint-2, rgba(16,185,129,0.1)); border: 1px solid var(--t-line-strong, rgba(16,185,129,0.25)); border-radius: 10px; padding: var(--sp-1) var(--sp-6); font-weight: 600;">${t.segments_count} trechos</span>`
                 : "";
 
             card.innerHTML = `
-                <h4 style="color: var(--color-cyan); margin: 0; font-size: var(--fs-12); font-weight: 600; display:flex; align-items:center; gap:6px; width: 100%;"><i class="fa-solid fa-brain"></i> <span style="flex:1;">${t.title}</span> ${segmentsBadge}</h4>
+                <h4 style="color: var(--color-cyan); margin: 0; font-size: var(--fs-12); font-weight: 600; display:flex; align-items:center; gap:var(--sp-6); width: 100%;"><i class="fa-solid fa-brain"></i> <span style="flex:1;">${t.title}</span> ${segmentsBadge}</h4>
                 <p style="font-size: var(--fs-11); color: var(--text-secondary); margin: 0; line-height: 1.4; text-align: left;">${t.description}</p>
-                <div style="display:flex; gap:6px; margin-top:6px; width: 100%; flex-wrap: wrap;">
-                    ${t.segments_count ? `<button class="btn-secondary btn-theme-segments" style="padding: 4px 8px; font-size: var(--fs-9); height: 22px; display: flex; align-items: center; gap: 4px; border-radius: 4px; cursor: pointer; color: var(--color-emerald); border: 1px solid var(--t-line-strong, rgba(16,185,129,0.3)); background: var(--t-tint-1, rgba(16,185,129,0.06));" data-theme-id="${t.id}">
+                <div style="display:flex; gap:var(--sp-6); margin-top:var(--sp-6); width: 100%; flex-wrap: wrap;">
+                    ${t.segments_count ? `<button class="btn-secondary btn-theme-segments" style="padding: var(--sp-4) var(--sp-8); font-size: var(--fs-9); height: 22px; display: flex; align-items: center; gap: var(--sp-4); border-radius: 4px; cursor: pointer; color: var(--color-emerald); border: 1px solid var(--t-line-strong, rgba(16,185,129,0.3)); background: var(--t-tint-1, rgba(16,185,129,0.06));" data-theme-id="${t.id}">
                         <i class="fa-solid fa-clock"></i> Ver Trechos
                     </button>` : ""}
-                    <button class="btn-primary btn-theme-search" style="padding: 4px 8px; font-size: var(--fs-9); height: 22px; display: flex; align-items: center; gap: 4px; border-radius: 4px; cursor: pointer; border: none;" data-title="${t.title}">
+                    <button class="btn-primary btn-theme-search" style="padding: var(--sp-4) var(--sp-8); font-size: var(--fs-9); height: 22px; display: flex; align-items: center; gap: var(--sp-4); border-radius: 4px; cursor: pointer; border: none;" data-title="${t.title}">
                         <i class="fa-solid fa-magnifying-glass"></i> Buscar Cortes
                     </button>
-                    <button class="btn-secondary btn-theme-chat" style="padding: 4px 8px; font-size: var(--fs-9); height: 22px; display: flex; align-items: center; gap: 4px; border-radius: 4px; cursor: pointer; color: var(--text-primary); border: none;" data-title="${t.title}">
+                    <button class="btn-secondary btn-theme-chat" style="padding: var(--sp-4) var(--sp-8); font-size: var(--fs-9); height: 22px; display: flex; align-items: center; gap: var(--sp-4); border-radius: 4px; cursor: pointer; color: var(--text-primary); border: none;" data-title="${t.title}">
                         <i class="fa-solid fa-comments"></i> Perguntar IA
                     </button>
                 </div>
-                <div class="theme-segments-list" style="display: none; width: 100%; margin-top: 6px; flex-direction: column; gap: 4px; max-height: 220px; overflow-y: auto;"></div>
+                <div class="theme-segments-list" style="display: none; width: 100%; margin-top: var(--sp-6); flex-direction: column; gap: var(--sp-4); max-height: 220px; overflow-y: auto;"></div>
             `;
 
             // Listener: expandir/recolher trechos do tema (com seek na mídia)
@@ -2859,7 +2859,7 @@ export class PanelsManager {
                         <span class="task-row-title" title="${title} — ${typeHint} · ${esc(t.status)}">${title}</span>
                         <div class="task-row-bar" data-tooltip="Progresso: ${pct}% (${typeHint})"><div class="task-row-bar-fill" style="width:${pct}%"></div></div>
                         <span class="task-row-pct">${pct}%</span>
-                        <div class="task-row-actions" data-last-status="${t.status}" style="display: flex; gap: 4px; align-items: center; margin-left: 4px;">
+                        <div class="task-row-actions" data-last-status="${t.status}" style="display: flex; gap: var(--sp-4); align-items: center; margin-left: var(--sp-4);">
                             ${actionsHtml}
                         </div>
                     </div>
@@ -2878,7 +2878,7 @@ export class PanelsManager {
                     </div>
                     <div class="task-actions">
                         <span class="task-percent">${typeHint} · ${pct}%</span>
-                        <div class="task-card-actions" data-last-status="${t.status}" style="display: flex; gap: 6px; align-items: center;">
+                        <div class="task-card-actions" data-last-status="${t.status}" style="display: flex; gap: var(--sp-6); align-items: center;">
                             ${actionsHtml}
                         </div>
                     </div>
@@ -3492,23 +3492,23 @@ export class PanelsManager {
         if (track.kind === "ai") {
             if (h >= 40) {
                 row.innerHTML = `
-                    <div style="display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 4px;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; width: 100%; gap: var(--sp-4);">
                         <span style="color: #22c55e; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0;" title="${track.name}"><i class="fa-solid fa-robot" style="font-size: var(--fs-9);"></i> ${track.name}</span>
-                        <div style="display: flex; align-items: center; gap: 4px; flex-shrink: 0;">
+                        <div style="display: flex; align-items: center; gap: var(--sp-4); flex-shrink: 0;">
                             <button class="btn-track-visibility btn-track-action" title="Ocultar pista" style="color: var(--text-secondary); font-size: var(--fs-9);"><i class="fa-solid fa-eye"></i></button>
                         </div>
                     </div>
-                    <div style="display: flex; justify-content: flex-end; align-items: center; width: 100%; gap: 4px; margin-top: 2px;">
-                        <button class="btn-track-ai-run" title="✨ Analisar corte atual com a persona selecionada" style="border: 1px solid var(--t-line-strong, rgba(34,197,94,0.35)); background: var(--t-tint-2, rgba(34,197,94,0.08)); color: #22c55e; cursor: pointer; padding: 1px 6px; font-size: var(--fs-9); border-radius: 4px;"><i class="fa-solid fa-wand-magic-sparkles"></i> Analisar</button>
+                    <div style="display: flex; justify-content: flex-end; align-items: center; width: 100%; gap: var(--sp-4); margin-top: var(--sp-2);">
+                        <button class="btn-track-ai-run" title="✨ Analisar corte atual com a persona selecionada" style="border: 1px solid var(--t-line-strong, rgba(34,197,94,0.35)); background: var(--t-tint-2, rgba(34,197,94,0.08)); color: #22c55e; cursor: pointer; padding: var(--sp-1) var(--sp-6); font-size: var(--fs-9); border-radius: 4px;"><i class="fa-solid fa-wand-magic-sparkles"></i> Analisar</button>
                     </div>
                 `;
             } else {
                 row.innerHTML = `
-                    <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; gap: 4px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; gap: var(--sp-4);">
                         <span style="color: #22c55e; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0;" title="${track.name}"><i class="fa-solid fa-robot" style="font-size: var(--fs-9);"></i> ${track.name}</span>
-                        <div style="display: flex; gap: 4px; align-items: center; flex-shrink: 0;">
+                        <div style="display: flex; gap: var(--sp-4); align-items: center; flex-shrink: 0;">
                             <button class="btn-track-visibility btn-track-action" title="Ocultar pista" style="color: var(--text-secondary); font-size: var(--fs-9);"><i class="fa-solid fa-eye"></i></button>
-                            <button class="btn-track-ai-run" title="✨ Analisar corte atual com a persona selecionada" style="border: 1px solid var(--t-line-strong, rgba(34,197,94,0.35)); background: var(--t-tint-2, rgba(34,197,94,0.08)); color: #22c55e; cursor: pointer; padding: 1px 6px; font-size: var(--fs-9); border-radius: 4px;"><i class="fa-solid fa-wand-magic-sparkles"></i></button>
+                            <button class="btn-track-ai-run" title="✨ Analisar corte atual com a persona selecionada" style="border: 1px solid var(--t-line-strong, rgba(34,197,94,0.35)); background: var(--t-tint-2, rgba(34,197,94,0.08)); color: #22c55e; cursor: pointer; padding: var(--sp-1) var(--sp-6); font-size: var(--fs-9); border-radius: 4px;"><i class="fa-solid fa-wand-magic-sparkles"></i></button>
                         </div>
                     </div>
                 `;
@@ -3555,28 +3555,28 @@ export class PanelsManager {
 
             if (h >= 40) {
                 row.innerHTML = `
-                    <div style="display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 4px;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; width: 100%; gap: var(--sp-4);">
                         <span class="track-name-label" title="Clique duplo para renomear: ${track.name}" style="cursor: text; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0;">${kindIcon}${track.id} ${track.name}</span>
-                        <div style="display: flex; align-items: center; gap: 4px; flex-shrink: 0;">
+                        <div style="display: flex; align-items: center; gap: var(--sp-4); flex-shrink: 0;">
                             <button class="btn-track-visibility btn-track-action" title="Ocultar pista" style="color: var(--text-secondary); font-size: var(--fs-9);">${visibilityIcon}</button>
                             <button class="btn-track-remove btn-track-action" title="Remover pista (clipes vão para outra pista do mesmo tipo)" style="color: var(--text-muted); font-size: var(--fs-9);"><i class="fa-solid fa-xmark"></i></button>
                         </div>
                     </div>
-                    <div style="display: flex; align-items: center; width: 100%; gap: 6px; margin-top: 2px;">
-                        <div style="display: flex; gap: 6px; flex-shrink: 0; align-items: center;">
+                    <div style="display: flex; align-items: center; width: 100%; gap: var(--sp-6); margin-top: var(--sp-2);">
+                        <div style="display: flex; gap: var(--sp-6); flex-shrink: 0; align-items: center;">
                             ${thumbBtn}
                             ${syncBtn}
                             ${lockBtn}
                             ${muteBtn}
                         </div>
-                        ${volumeSlider ? `<div class="track-volume-wrapper" title="Volume: ${volPct}% (Duplo clique para 100%)" style="flex: 1; display: flex; align-items: center; min-width: 40px; gap: 4px; margin-left: 2px;">${volumeSlider}<span class="track-volume-val" style="font-size: var(--fs-9); font-family: monospace; color: var(--color-cyan); min-width: 26px; text-align: right; flex-shrink: 0; user-select: none;">${volPct}%</span></div>` : ''}
+                        ${volumeSlider ? `<div class="track-volume-wrapper" title="Volume: ${volPct}% (Duplo clique para 100%)" style="flex: 1; display: flex; align-items: center; min-width: 40px; gap: var(--sp-4); margin-left: var(--sp-2);">${volumeSlider}<span class="track-volume-val" style="font-size: var(--fs-9); font-family: monospace; color: var(--color-cyan); min-width: 26px; text-align: right; flex-shrink: 0; user-select: none;">${volPct}%</span></div>` : ''}
                     </div>
                 `;
             } else {
                 row.innerHTML = `
-                    <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; gap: 4px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; gap: var(--sp-4);">
                         <span class="track-name-label" title="Clique duplo para renomear: ${track.name}" style="cursor: text; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0;">${kindIcon}${track.id}</span>
-                        <div style="display: flex; gap: 4px; flex-shrink: 0; align-items: center;">
+                        <div style="display: flex; gap: var(--sp-4); flex-shrink: 0; align-items: center;">
                             ${thumbBtn}
                             <button class="btn-track-visibility btn-track-action" title="Ocultar pista" style="color: var(--text-secondary); font-size: var(--fs-9);">${visibilityIcon}</button>
                             ${syncBtn}
@@ -3585,7 +3585,7 @@ export class PanelsManager {
                             <button class="btn-track-remove btn-track-action" title="Remover pista (clipes vão para outra pista do mesmo tipo)" style="color: var(--text-muted); font-size: var(--fs-9);"><i class="fa-solid fa-xmark"></i></button>
                         </div>
                     </div>
-                    ${volumeSlider ? `<div class="track-volume-wrapper" title="Volume: ${volPct}% (Duplo clique para 100%)" style="width: 100%; display: flex; align-items: center; gap: 4px; margin-top: 2px;">${volumeSlider}<span class="track-volume-val" style="font-size: var(--fs-9); font-family: monospace; color: var(--color-cyan); min-width: 26px; text-align: right; flex-shrink: 0; user-select: none;">${volPct}%</span></div>` : ''}
+                    ${volumeSlider ? `<div class="track-volume-wrapper" title="Volume: ${volPct}% (Duplo clique para 100%)" style="width: 100%; display: flex; align-items: center; gap: var(--sp-4); margin-top: var(--sp-2);">${volumeSlider}<span class="track-volume-val" style="font-size: var(--fs-9); font-family: monospace; color: var(--color-cyan); min-width: 26px; text-align: right; flex-shrink: 0; user-select: none;">${volPct}%</span></div>` : ''}
                 `;
             }
 
@@ -4148,11 +4148,11 @@ export class PanelsManager {
             else if (cmd.category === "canvas_history") badgeColor = "#06b6d4";
 
             item.innerHTML = `
-                <div style="display: flex; align-items: center; gap: 6px; min-width: 0;">
-                    <kbd style="padding: 1px 5px; border-radius: 3px; background: rgba(0,0,0,0.5); border: 1px solid var(--t-line-strong, rgba(255,255,255,0.12)); font-family: monospace; font-weight: 700; font-size: var(--fs-10); color: ${badgeColor}; white-space: nowrap;">${cleanKey}</kbd>
+                <div style="display: flex; align-items: center; gap: var(--sp-6); min-width: 0;">
+                    <kbd style="padding: var(--sp-1) var(--sp-4); border-radius: 3px; background: rgba(0,0,0,0.5); border: 1px solid var(--t-line-strong, rgba(255,255,255,0.12)); font-family: monospace; font-weight: 700; font-size: var(--fs-10); color: ${badgeColor}; white-space: nowrap;">${cleanKey}</kbd>
                     <span style="font-weight: 600; color: rgba(255,255,255,0.9); font-size: var(--fs-11); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${cmdName}</span>
                 </div>
-                <span style="font-size: var(--fs-9); color: var(--text-muted); font-family: monospace; margin-left: 4px;">→</span>
+                <span style="font-size: var(--fs-9); color: var(--text-muted); font-family: monospace; margin-left: var(--sp-4);">→</span>
             `;
 
             // Hover bidirecional: passa no índice -> ilumina a tecla
@@ -4431,11 +4431,11 @@ export class PanelsManager {
             const catTitle = catMeta.label || catMeta.name || catId;
 
             html += `
-            <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--t-line-weak, rgba(255,255,255,0.05)); border-radius: 8px; padding: 10px 12px;">
-                <h4 style="color: #fff; margin: 0 0 8px 0; font-size: var(--fs-12); font-weight: 700; display: flex; align-items: center; gap: 6px;">
+            <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--t-line-weak, rgba(255,255,255,0.05)); border-radius: 8px; padding: var(--sp-10) var(--sp-12);">
+                <h4 style="color: #fff; margin: 0 0 var(--sp-8) 0; font-size: var(--fs-12); font-weight: 700; display: flex; align-items: center; gap: var(--sp-6);">
                     <i class="fa-solid ${icon}" style="color: var(--color-cyan); font-size: var(--fs-10);"></i> ${catTitle}
                 </h4>
-                <div style="display: grid; grid-template-columns: minmax(190px, 240px) 1fr; gap: 8px 12px; font-size: var(--fs-12); align-items: start;">
+                <div style="display: grid; grid-template-columns: minmax(190px, 240px) 1fr; gap: var(--sp-8) var(--sp-12); font-size: var(--fs-12); align-items: start;">
             `;
 
             cmds.forEach(cmd => {
@@ -4444,7 +4444,7 @@ export class PanelsManager {
                 html += `
                     <div>${badgesHtml}</div>
                     <div>
-                        <strong style="color: #fff; display: block; font-size: var(--fs-12); margin-bottom: 2px;">${cmdName}</strong>
+                        <strong style="color: #fff; display: block; font-size: var(--fs-12); margin-bottom: var(--sp-2);">${cmdName}</strong>
                         <span style="color: rgba(255,255,255,0.7); font-size: var(--fs-11); line-height: 1.4; display: block;">${cmd.description}</span>
                     </div>
                 `;
@@ -4458,8 +4458,8 @@ export class PanelsManager {
 
         // 8. Pistas Dinâmicas (Multipista)
         html += `
-        <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--t-line-weak, rgba(255,255,255,0.05)); border-radius: 8px; padding: 10px 12px;">
-            <h4 style="color: #fff; margin: 0 0 6px 0; font-size: var(--fs-12); font-weight: 700; display: flex; align-items: center; gap: 6px;">
+        <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--t-line-weak, rgba(255,255,255,0.05)); border-radius: 8px; padding: var(--sp-10) var(--sp-12);">
+            <h4 style="color: #fff; margin: 0 0 var(--sp-6) 0; font-size: var(--fs-12); font-weight: 700; display: flex; align-items: center; gap: var(--sp-6);">
                 <i class="fa-solid fa-layer-group" style="color: var(--color-cyan); font-size: var(--fs-10);"></i> 8. Pistas Dinâmicas (Multipista)
             </h4>
             <p style="margin: 0; font-size: var(--fs-12); color: rgba(255,255,255,0.85); line-height: 1.5;">
@@ -4492,7 +4492,7 @@ export class PanelsManager {
         if (cmds.length === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="4" style="text-align: center; padding: 25px; color: var(--text-muted); font-size: var(--fs-12);">
+                    <td colspan="4" style="text-align: center; padding: var(--sp-24); color: var(--text-muted); font-size: var(--fs-12);">
                         Nenhum comando encontrado com os filtros atuais.
                     </td>
                 </tr>
@@ -4512,7 +4512,7 @@ export class PanelsManager {
                 const catTitle = catMeta ? (catMeta.label || catMeta.name) : currentCat;
                 html += `
                     <tr style="background: rgba(255,255,255,0.03);">
-                        <td colspan="4" style="padding: 6px 12px; font-weight: 700; color: var(--color-cyan); font-size: var(--fs-11); text-transform: uppercase; letter-spacing: 0.5px;">
+                        <td colspan="4" style="padding: var(--sp-6) var(--sp-12); font-weight: 700; color: var(--color-cyan); font-size: var(--fs-11); text-transform: uppercase; letter-spacing: 0.5px;">
                             ${catTitle}
                         </td>
                     </tr>
@@ -4527,7 +4527,7 @@ export class PanelsManager {
                 <tr data-cmd-id="${cmd.id}">
                     <td style="font-weight: 600; color: #fff;">
                         ${cmdDisplayName}
-                        ${isOverridden ? '<span style="font-size: var(--fs-9); color: var(--color-cyan); margin-left: 4px; background: var(--t-tint-3, rgba(6,182,212,0.15)); padding: 1px 4px; border-radius: 3px;">MODIFICADO</span>' : ''}
+                        ${isOverridden ? '<span style="font-size: var(--fs-9); color: var(--color-cyan); margin-left: var(--sp-4); background: var(--t-tint-3, rgba(6,182,212,0.15)); padding: var(--sp-1) var(--sp-4); border-radius: 3px;">MODIFICADO</span>' : ''}
                     </td>
                     <td style="color: var(--text-secondary); font-size: var(--fs-11);">
                         ${cmd.description}
@@ -4535,7 +4535,7 @@ export class PanelsManager {
                     <td style="text-align: center;">
                         <button class="keymap-badge-btn btn-trigger-record" data-cmd-id="${cmd.id}" title="Clique para gravar um novo atalho">
                             ${badgesHtml}
-                            <i class="fa-solid fa-pen-to-square" style="font-size: var(--fs-10); margin-left: 4px; opacity: 0.7;"></i>
+                            <i class="fa-solid fa-pen-to-square" style="font-size: var(--fs-10); margin-left: var(--sp-4); opacity: 0.7;"></i>
                         </button>
                     </td>
                     <td style="text-align: center;">
