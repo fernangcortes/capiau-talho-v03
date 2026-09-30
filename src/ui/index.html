@@ -17,7 +17,7 @@
     <!-- FontAwesome para ícones premium -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Estilos Customizados -->
-    <link rel="stylesheet" href="styles.css?v=89">
+    <link rel="stylesheet" href="styles.css?v=90">
     <link rel="stylesheet" href="theme.css?v=5">
     <script src="js/themeBoot.js?v=2"></script>
 </head>
@@ -237,7 +237,7 @@
                             <i class="fa-solid fa-arrows-rotate"></i>
                             <span id="failed-count-badge" class="badge-failed-square">0</span>
                         </button>
-                        <button id="btn-select-all-failed" data-tooltip="Selecionar todas as mídias com falha" class="lib-action-btn" style="display: none; color: var(--color-cyan);"><i class="fa-solid fa-square-check"></i></button>
+                        <button id="btn-select-all-failed" data-tooltip="Selecionar todas as mídias com falha" class="lib-action-btn" style="display: none; color: var(--accent);"><i class="fa-solid fa-square-check"></i></button>
                         <button id="btn-deselect-all-failed" data-tooltip="Desmarcar todas as mídias" class="lib-action-btn" style="display: none; color: var(--text-muted);"><i class="fa-regular fa-square"></i></button>
                         <button id="btn-exit-failed-filter" data-tooltip="Voltar a ver todas as mídias (Esc ou Ctrl+Z)" class="lib-action-btn btn-exit-filter-active" style="display: none; align-items: center; gap: var(--sp-4); color: #f87171; background: var(--t-tint-3, rgba(244, 63, 94, 0.15)); border: 1px solid var(--t-line-strong, rgba(244, 63, 94, 0.35)); padding: var(--sp-2) var(--sp-8); border-radius: 4px; font-size: var(--fs-11); cursor: pointer; flex-shrink: 0;">
                             <i class="fa-solid fa-arrow-left"></i>
@@ -268,7 +268,7 @@
                                 <span class="similar-criteria-desc">compara o que é falado ou descrito — ignora a aparência</span>
                             </span>
                         </label>
-                        <div id="similar-criteria-hint" style="display: none; font-size: var(--fs-9); color: var(--color-cyan);"></div>
+                        <div id="similar-criteria-hint" style="display: none; font-size: var(--fs-9); color: var(--accent);"></div>
                         <button id="btn-trigger-similar-search" style="height: 26px; font-size: var(--fs-10); font-weight: 700; color: #fff; border: 1px solid var(--t-line-strong, rgba(168,85,247,0.5)); background: var(--t-tint-3, rgba(168,85,247,0.25)); border-radius: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: var(--sp-6);">
                             <i class="fa-solid fa-magnifying-glass"></i> Buscar
                         </button>
@@ -296,7 +296,7 @@
                                 <option value="<">&lt;</option>
                             </select>
                             <input type="text" id="adv-filter-value" placeholder="Valor" style="flex: 2; height: 20px; font-size: var(--fs-9); padding: 0 var(--sp-4); background: rgba(255,255,255,0.03); border: 1px solid var(--border-glass); border-radius: 3px; color: #fff; outline: none; min-width: 0;">
-                            <button id="btn-add-adv-filter" class="lib-action-btn" data-tooltip="Adicionar Filtro" style="color: var(--color-cyan); width: 20px; height: 20px;">
+                            <button id="btn-add-adv-filter" class="lib-action-btn" data-tooltip="Adicionar Filtro" style="color: var(--accent); width: 20px; height: 20px;">
                                 <i class="fa-solid fa-plus"></i>
                             </button>
                         </div>
@@ -383,7 +383,7 @@
 
                         <div class="display-opt-sep"></div>
 
-                        <div class="display-opt-header" style="color: var(--color-cyan);"><i class="fa-solid fa-grip"></i> Galeria Clean (Google Fotos)</div>
+                        <div class="display-opt-header" style="color: var(--accent);"><i class="fa-solid fa-grip"></i> Galeria Clean (Google Fotos)</div>
                         <div class="display-opt-select-row">
                             <span class="display-opt-select-label">Agrupamento:</span>
                             <select id="sel-gallery-grouping" class="nle-select" style="flex: 1; height: 20px; font-size: var(--fs-9); padding: 0 var(--sp-4); background: rgba(255,255,255,0.04); border: 1px solid var(--border-glass); color: #fff; border-radius: 3px; cursor: pointer;">
@@ -400,7 +400,7 @@
                         <div class="display-opt-select-row" style="margin-top: var(--sp-4);">
                             <span class="display-opt-select-label">Borda / Espaçamento:</span>
                             <div style="display: flex; align-items: center; gap: var(--sp-6); flex: 1;">
-                                <input type="range" id="gallery-gap-slider" min="0" max="8" value="2" style="flex: 1; height: 3px; accent-color: var(--color-cyan); cursor: pointer;">
+                                <input type="range" id="gallery-gap-slider" min="0" max="8" value="2" style="flex: 1; height: 3px; accent-color: var(--accent); cursor: pointer;">
                                 <span id="gallery-gap-val" style="font-size: var(--fs-8); color: var(--text-muted); width: 18px; text-align: right;">2px</span>
                             </div>
                         </div>
@@ -465,7 +465,7 @@
                             
                             <div class="zoom-container" style="display: flex; align-items: center; gap: var(--sp-4); flex: 1; min-width: 0;">
                                 <i class="fa-solid fa-magnifying-glass" style="font-size: var(--fs-8); color: var(--text-muted); flex-shrink: 0;"></i>
-                                <input type="range" id="library-zoom-slider" class="library-zoom-input" min="30" max="300" value="45" data-tooltip="Zoom Thumbs: 45px" style="height: 4px; cursor: pointer; accent-color: var(--color-cyan); margin: 0; padding: 0; background: rgba(255,255,255,0.1); border: none; outline: none; flex: 1; min-width: 0;">
+                                <input type="range" id="library-zoom-slider" class="library-zoom-input" min="30" max="300" value="45" data-tooltip="Zoom Thumbs: 45px" style="height: 4px; cursor: pointer; accent-color: var(--accent); margin: 0; padding: 0; background: rgba(255,255,255,0.1); border: none; outline: none; flex: 1; min-width: 0;">
                                 <span id="library-zoom-label" style="font-size: var(--fs-8); color: var(--text-muted); font-family: monospace; flex-shrink: 0;">45px</span>
                             </div>
                         </div>
@@ -559,7 +559,7 @@
                                     <i class="fa-solid fa-file-upload"></i> Importar Roteiro / Contexto
                                 </button>
                                 <div class="dropdown-wrapper" style="height: 32px; padding: 0 var(--sp-10); display: flex; align-items: center;">
-                                    <i class="fa-solid fa-tags" style="color: var(--color-cyan); font-size: var(--fs-11);"></i>
+                                    <i class="fa-solid fa-tags" style="color: var(--accent); font-size: var(--fs-11);"></i>
                                     <select id="doc-type-selector" style="background: transparent; border: none; outline: none; color: var(--text-secondary); font-size: var(--fs-11); font-weight: 600; cursor: pointer; flex: 1; padding: var(--sp-4) 0;">
                                         <option value="script">Roteiro (Screenplay)</option>
                                         <option value="outline">Pauta / Argumento</option>
@@ -635,7 +635,7 @@
                                         <option value="999999">Desativado</option>
                                     </select>
                                 </div>
-                                <button id="btn-sync-enrich" class="btn-primary" style="font-size: var(--fs-11); padding: var(--sp-6) var(--sp-10); margin-top: var(--sp-6); display: flex; align-items: center; justify-content: center; gap: var(--sp-6); height: 28px; width: 100%; --primary-bg: linear-gradient(135deg, #06b6d4, #0891b2);">
+                                <button id="btn-sync-enrich" class="btn-primary" style="font-size: var(--fs-11); padding: var(--sp-6) var(--sp-10); margin-top: var(--sp-6); display: flex; align-items: center; justify-content: center; gap: var(--sp-6); height: 28px; width: 100%; --primary-bg: linear-gradient(135deg, var(--t-accent, #06b6d4), var(--t-accent, #0891b2));">
                                     <i class="fa-solid fa-arrows-rotate"></i> Sincronizar Nomes nas Descrições
                                 </button>
                             </div>
@@ -659,28 +659,28 @@
                                 <i class="fa-solid fa-chevron-left"></i>
                             </button>
                             <h2 style="flex: 1; display: flex; align-items: center; gap: var(--sp-6); margin: 0; font-size: var(--fs-12); white-space: nowrap; text-overflow: ellipsis; overflow: hidden; color: #fff; min-width: 0;" id="inspector-media-title">
-                                <i id="inspector-media-title-icon" class="fa-solid fa-microphone-lines" style="color: var(--color-cyan); flex-shrink: 0;"></i>
+                                <i id="inspector-media-title-icon" class="fa-solid fa-microphone-lines" style="color: var(--accent); flex-shrink: 0;"></i>
                                 <span id="inspector-media-title-text" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Painel de Mídia</span>
                             </h2>
                             <button id="btn-inspector-edit-title" class="btn-flat-action cyan" title="Renomear Título Executivo" style="background: transparent; border: none; color: var(--text-secondary); cursor: pointer; padding: var(--sp-2) var(--sp-4); font-size: var(--fs-11); flex-shrink: 0; transition: color 0.15s, transform 0.15s;">
                                 <i class="fa-solid fa-pen-to-square"></i>
                             </button>
                         </div>
-                        <span id="inspector-media-status-badge" style="font-size: var(--fs-8); padding: var(--sp-2) var(--sp-6); border-radius: 4px; font-weight: bold; background: var(--t-tint-2, rgba(6, 182, 212, 0.1)); color: var(--color-cyan); text-transform: uppercase; letter-spacing: 0.5px; flex-shrink: 0;">Carregando</span>
+                        <span id="inspector-media-status-badge" style="font-size: var(--fs-8); padding: var(--sp-2) var(--sp-6); border-radius: 4px; font-weight: bold; background: var(--t-tint-2, color-mix(in srgb, var(--t-accent, rgb(6, 182, 212)) 10%, transparent)); color: var(--accent); text-transform: uppercase; letter-spacing: 0.5px; flex-shrink: 0;">Carregando</span>
                     </div>
 
                     <!-- Quick Action Bar -->
                     <div class="inspector-quick-actions" style="padding: var(--sp-8) var(--sp-12); border-bottom: 1px solid var(--border-glass); display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.15); font-size: var(--fs-11); flex-shrink: 0;">
                         <div style="display: flex; gap: var(--sp-6);">
-                            <button id="btn-inspector-mark-in" class="btn-flat-action cyan" title="Marcar Ponto In (I)" style="background: transparent; border: none; color: var(--color-cyan); padding: var(--sp-4); font-size: var(--fs-11); cursor: pointer; transition: all 0.2s;"><i class="fa-solid fa-right-to-bracket"></i> IN</button>
-                            <button id="btn-inspector-mark-out" class="btn-flat-action cyan" title="Marcar Ponto Out (O)" style="background: transparent; border: none; color: var(--color-cyan); padding: var(--sp-4); font-size: var(--fs-11); cursor: pointer; transition: all 0.2s;"><i class="fa-solid fa-right-from-bracket"></i> OUT</button>
+                            <button id="btn-inspector-mark-in" class="btn-flat-action cyan" title="Marcar Ponto In (I)" style="background: transparent; border: none; color: var(--accent); padding: var(--sp-4); font-size: var(--fs-11); cursor: pointer; transition: all 0.2s;"><i class="fa-solid fa-right-to-bracket"></i> IN</button>
+                            <button id="btn-inspector-mark-out" class="btn-flat-action cyan" title="Marcar Ponto Out (O)" style="background: transparent; border: none; color: var(--accent); padding: var(--sp-4); font-size: var(--fs-11); cursor: pointer; transition: all 0.2s;"><i class="fa-solid fa-right-from-bracket"></i> OUT</button>
                             <button id="btn-inspector-set-thumb" class="btn-flat-action cyan" title="Definir Miniatura" style="background: transparent; border: none; color: var(--text-secondary); padding: var(--sp-4); font-size: var(--fs-11); cursor: pointer; transition: all 0.2s;"><i class="fa-solid fa-camera"></i></button>
                         </div>
                         <div style="font-size: var(--fs-10); font-family: monospace; color: var(--text-secondary); display: flex; gap: var(--sp-8);">
-                            <span>IN: <strong id="lbl-inspector-in" style="color: var(--color-cyan);">00:00:00</strong></span>
-                            <span>OUT: <strong id="lbl-inspector-out" style="color: var(--color-cyan);">00:00:00</strong></span>
+                            <span>IN: <strong id="lbl-inspector-in" style="color: var(--accent);">00:00:00</strong></span>
+                            <span>OUT: <strong id="lbl-inspector-out" style="color: var(--accent);">00:00:00</strong></span>
                         </div>
-                        <button id="btn-inspector-append" class="btn-primary" title="Enviar para a Timeline (E)" style="font-size: var(--fs-10); font-weight: bold; padding: var(--sp-4) var(--sp-10); display: flex; align-items: center; gap: var(--sp-4); cursor: pointer; border-radius: 4px; border: none; --primary-bg: var(--color-cyan); --primary-ink: #000;"><i class="fa-solid fa-circle-plus"></i> Inserir</button>
+                        <button id="btn-inspector-append" class="btn-primary" title="Enviar para a Timeline (E)" style="font-size: var(--fs-10); font-weight: bold; padding: var(--sp-4) var(--sp-10); display: flex; align-items: center; gap: var(--sp-4); cursor: pointer; border-radius: 4px; border: none; --primary-bg: var(--accent); --primary-ink: #000;"><i class="fa-solid fa-circle-plus"></i> Inserir</button>
                     </div>
 
                     <!-- Abas do Inspetor -->
@@ -699,16 +699,16 @@
                                 <span id="inspector-warning-text"></span>
                             </div>
                             <div class="glassmorphism" style="padding: var(--sp-12); border-radius: 6px; background: rgba(255,255,255,0.02); display: flex; flex-direction: column; gap: var(--sp-6);">
-                                <div style="font-size: var(--fs-9); font-weight: 700; color: var(--color-cyan); text-transform: uppercase; letter-spacing: 0.5px;">Categoria (Triagem IA)</div>
+                                <div style="font-size: var(--fs-9); font-weight: 700; color: var(--accent); text-transform: uppercase; letter-spacing: 0.5px;">Categoria (Triagem IA)</div>
                                 <div style="display: flex; align-items: center; gap: var(--sp-8);">
                                     <select id="sel-inspector-category" class="nle-select" title="Corrigir a categoria detectada pela triagem. A correção é registrada e ensina a IA (few-shot)." style="flex: 1; padding: var(--sp-4) var(--sp-6); border-radius: 6px; border: 1px solid var(--border-glass); background: rgba(0,0,0,0.3); color: #fff; font-size: var(--fs-11);"></select>
                                     <span id="lbl-inspector-category-conf" style="font-size: var(--fs-9); color: var(--text-muted); white-space: nowrap;"></span>
                                 </div>
                             </div>
                             <div class="glassmorphism" style="padding: var(--sp-12); border-radius: 6px; background: rgba(255,255,255,0.02); display: flex; flex-direction: column; gap: var(--sp-6);">
-                                <div style="font-size: var(--fs-9); font-weight: 700; color: var(--color-cyan); text-transform: uppercase; letter-spacing: 0.5px;">Resumo Executivo</div>
+                                <div style="font-size: var(--fs-9); font-weight: 700; color: var(--accent); text-transform: uppercase; letter-spacing: 0.5px;">Resumo Executivo</div>
                                 <div id="inspector-summary" style="font-size: var(--fs-11); color: var(--text-secondary); line-height: 1.4; white-space: pre-line;">Carregando resumo...</div>
-                                <button id="btn-inspector-metadata-history" title="Título, descrição, resumo e tags que já valeram para esta mídia. Só a versão atual entra na busca." style="align-self: flex-start; background: none; border: none; padding: 0; margin-top: var(--sp-2); font-size: var(--fs-10); font-family: inherit; color: var(--color-cyan); cursor: pointer; display: none; align-items: center; gap: var(--sp-4);"><i class="fa-solid fa-clock-rotate-left"></i> <span id="lbl-inspector-metadata-history">ver versões anteriores</span></button>
+                                <button id="btn-inspector-metadata-history" title="Título, descrição, resumo e tags que já valeram para esta mídia. Só a versão atual entra na busca." style="align-self: flex-start; background: none; border: none; padding: 0; margin-top: var(--sp-2); font-size: var(--fs-10); font-family: inherit; color: var(--accent); cursor: pointer; display: none; align-items: center; gap: var(--sp-4);"><i class="fa-solid fa-clock-rotate-left"></i> <span id="lbl-inspector-metadata-history">ver versões anteriores</span></button>
                             </div>
                             <button id="btn-inspector-copy-notes" class="btn-secondary" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: var(--sp-6); height: 28px; font-size: var(--fs-11); font-weight: 600; cursor: pointer; border-radius: 4px; border: 1px solid var(--border-glass); background: rgba(255,255,255,0.03); color: var(--text-primary);"><i class="fa-regular fa-clipboard"></i> Copiar Notas de Decupagem</button>
                             
@@ -717,7 +717,7 @@
                                 <button id="btn-inspector-mark-failed" class="btn-secondary" style="flex: 1; display: flex; align-items: center; justify-content: center; gap: var(--sp-6); height: 28px; font-size: var(--fs-11); font-weight: 600; cursor: pointer; border-radius: 4px; border: 1px solid var(--t-line-strong, rgba(244, 63, 94, 0.4)); background: var(--t-tint-2, rgba(244, 63, 94, 0.08)); color: var(--color-rose);" title="Sinalizar manualmente como falha para reanálise em lote"><i class="fa-solid fa-triangle-exclamation"></i> Sinalizar Falha</button>
                                 <button id="btn-inspector-mark-analyzed" class="btn-secondary" style="flex: 1; display: flex; align-items: center; justify-content: center; gap: var(--sp-6); height: 28px; font-size: var(--fs-11); font-weight: 600; cursor: pointer; border-radius: 4px; border: 1px solid var(--t-line-strong, rgba(16, 185, 129, 0.4)); background: var(--t-tint-2, rgba(16, 185, 129, 0.08)); color: var(--color-emerald);" title="Marcar como analisado e remover da lista de reanálise"><i class="fa-solid fa-circle-check"></i> Ignorar Falha</button>
                             </div>
-                            <div style="font-size: var(--fs-9); font-weight: 700; color: var(--color-cyan); text-transform: uppercase; margin-top: var(--sp-6); letter-spacing: 0.5px;">Navegação por Capítulos</div>
+                            <div style="font-size: var(--fs-9); font-weight: 700; color: var(--accent); text-transform: uppercase; margin-top: var(--sp-6); letter-spacing: 0.5px;">Navegação por Capítulos</div>
                             <div class="timeline-vertical" id="inspector-chapters-list" style="position: relative; padding-left: var(--sp-14); display: flex; flex-direction: column; gap: var(--sp-10);">
                                 <!-- Índice gerado por JS -->
                             </div>
@@ -729,8 +729,8 @@
                                 </div>
                                 <div id="inspector-link-theme-form" hidden>
                                     <!-- Formulário rápido para vincular tema -->
-                                    <div class="glassmorphism" style="padding: var(--sp-12); border-radius: 6px; background: var(--t-tint-1, rgba(6, 182, 212, 0.03)); border: 1px solid var(--t-line-weak, rgba(6, 182, 212, 0.15)); display: flex; flex-direction: column; gap: var(--sp-8);">
-                                        <div style="font-size: var(--fs-9); font-weight: 700; color: var(--color-cyan); text-transform: uppercase; letter-spacing: 0.5px;"><i class="fa-solid fa-link"></i> Vincular Novo Tema Narrativo</div>
+                                    <div class="glassmorphism" style="padding: var(--sp-12); border-radius: 6px; background: var(--t-tint-1, color-mix(in srgb, var(--t-accent, rgb(6, 182, 212)) 3%, transparent)); border: 1px solid var(--t-line-weak, color-mix(in srgb, var(--t-accent, rgb(6, 182, 212)) 15%, transparent)); display: flex; flex-direction: column; gap: var(--sp-8);">
+                                        <div style="font-size: var(--fs-9); font-weight: 700; color: var(--accent); text-transform: uppercase; letter-spacing: 0.5px;"><i class="fa-solid fa-link"></i> Vincular Novo Tema Narrativo</div>
                                         <div style="display: flex; flex-direction: column; gap: var(--sp-4);">
                                             <label style="font-size: var(--fs-9); color: var(--text-secondary); margin: 0;">Tema Narrativo:</label>
                                             <select id="sel-inspector-link-theme" class="nle-select" style="width: 100%; padding: var(--sp-4); font-size: var(--fs-10);"></select>
@@ -749,7 +749,7 @@
                                             <label style="font-size: var(--fs-9); color: var(--text-secondary); margin: 0;">Trecho Falado (Opcional):</label>
                                             <textarea id="txt-inspector-link-excerpt" placeholder="Trecho falado correspondente..." rows="2" style="width: 100%; background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); border-radius: 4px; padding: var(--sp-4) var(--sp-6); font-size: var(--fs-10); color:#fff; outline:none; font-family:var(--font-body); resize:vertical;"></textarea>
                                         </div>
-                                        <button id="btn-inspector-link-theme-submit" class="btn-primary" style="height: 26px; font-size: var(--fs-10); font-weight: bold; width: 100%; margin-top: var(--sp-4); border-radius: 4px; --primary-bg: var(--color-cyan); --primary-ink: #000; border: none; cursor: pointer;"><i class="fa-solid fa-plus-circle"></i> Confirmar Vínculo</button>
+                                        <button id="btn-inspector-link-theme-submit" class="btn-primary" style="height: 26px; font-size: var(--fs-10); font-weight: bold; width: 100%; margin-top: var(--sp-4); border-radius: 4px; --primary-bg: var(--accent); --primary-ink: #000; border: none; cursor: pointer;"><i class="fa-solid fa-plus-circle"></i> Confirmar Vínculo</button>
                                     </div>
                                 </div>
                                 <div id="inspector-themes-list" style="display: flex; flex-direction: column; gap: var(--sp-8);">
@@ -780,18 +780,18 @@
                         <!-- Aba: Análise de IA -->
                         <div class="inspector-tab-page" id="inspector-tab-ai" style="display: none; flex-direction: column; gap: var(--sp-12);">
                             <div class="glassmorphism" style="padding: var(--sp-12); border-radius: 6px; background: rgba(255,255,255,0.02); display: flex; flex-direction: column; gap: var(--sp-8);">
-                                <div style="font-size: var(--fs-9); font-weight: 700; color: var(--color-cyan); text-transform: uppercase; letter-spacing: 0.5px;"><i class="fa-solid fa-bolt"></i> Processamento & Análise Profunda</div>
+                                <div style="font-size: var(--fs-9); font-weight: 700; color: var(--accent); text-transform: uppercase; letter-spacing: 0.5px;"><i class="fa-solid fa-bolt"></i> Processamento & Análise Profunda</div>
                                 <div style="font-size: var(--fs-10); color: var(--text-secondary); line-height: 1.4;">Execute tarefas de Inteligência Artificial para extrair mais metadados ou corrigir elementos narrativos desta mídia de forma individual.</div>
                                 
                                 <div style="display: flex; flex-direction: column; gap: var(--sp-8); margin-top: var(--sp-6);">
                                     <button id="btn-inspector-ai-transcribe" class="btn-secondary" style="height: 30px; font-size: var(--fs-11); display: flex; align-items: center; gap: var(--sp-8); justify-content: flex-start; padding-left: var(--sp-12); cursor: pointer; border-radius: 4px; background: rgba(255,255,255,0.03); color: var(--text-primary); border: 1px solid var(--border-glass);">
-                                        <i class="fa-solid fa-microphone-lines" style="color: var(--color-cyan);"></i> Transcrever Áudio (ASR)
+                                        <i class="fa-solid fa-microphone-lines" style="color: var(--accent);"></i> Transcrever Áudio (ASR)
                                     </button>
                                     <button id="btn-inspector-ai-vision" class="btn-secondary" style="height: 30px; font-size: var(--fs-11); display: flex; align-items: center; gap: var(--sp-8); justify-content: flex-start; padding-left: var(--sp-12); cursor: pointer; border-radius: 4px; background: rgba(255,255,255,0.03); color: var(--text-primary); border: 1px solid var(--border-glass);">
-                                        <i class="fa-solid fa-eye" style="color: var(--color-cyan);"></i> Análise Visual (Descrever Cenas)
+                                        <i class="fa-solid fa-eye" style="color: var(--accent);"></i> Análise Visual (Descrever Cenas)
                                     </button>
                                     <button id="btn-inspector-ai-detect-faces" class="btn-secondary" style="height: 30px; font-size: var(--fs-11); display: flex; align-items: center; gap: var(--sp-8); justify-content: flex-start; padding-left: var(--sp-12); cursor: pointer; border-radius: 4px; background: rgba(255,255,255,0.03); color: var(--text-primary); border: 1px solid var(--border-glass);">
-                                        <i class="fa-solid fa-user-gear" style="color: var(--color-cyan);"></i> Detectar & Agrupar Rostos
+                                        <i class="fa-solid fa-user-gear" style="color: var(--accent);"></i> Detectar & Agrupar Rostos
                                     </button>
                                     <button id="btn-inspector-ai-similar" class="btn-secondary" title="Buscar mídias visualmente parecidas com o frame atual do player (CLIP local, sem custo de API)" style="height: 30px; font-size: var(--fs-11); display: flex; align-items: center; gap: var(--sp-8); justify-content: flex-start; padding-left: var(--sp-12); cursor: pointer; border-radius: 4px; background: rgba(255,255,255,0.03); color: var(--text-primary); border: 1px solid var(--border-glass);">
                                         <i class="fa-solid fa-images" style="color: #a855f7;"></i> Encontrar Similares (Visual)
@@ -842,7 +842,7 @@
                     <div style="display: flex; width: 100%; align-items: center; justify-content: space-between; height: 22px; margin-top: var(--sp-2);">
                         <div style="display: flex; align-items: center; gap: var(--sp-4);">
                             <button id="btn-adj-expand-all" class="lib-action-btn" data-tooltip="Expandir todas as seções" style="display: flex; align-items: center; gap: var(--sp-4); padding: var(--sp-2) var(--sp-6); font-size: var(--fs-9); color: var(--text-secondary);">
-                                <i class="fa-solid fa-angles-down" style="color: var(--color-cyan);"></i> <span>Expandir</span>
+                                <i class="fa-solid fa-angles-down" style="color: var(--accent);"></i> <span>Expandir</span>
                             </button>
                             <button id="btn-adj-collapse-all" class="lib-action-btn" data-tooltip="Recolher todas as seções" style="display: flex; align-items: center; gap: var(--sp-4); padding: var(--sp-2) var(--sp-6); font-size: var(--fs-9); color: var(--text-secondary);">
                                 <i class="fa-solid fa-angles-up"></i> <span>Recolher</span>
@@ -909,7 +909,7 @@
                             <div class="scrubber-container" style="display: flex; align-items: center; gap: var(--sp-10); width: 100%;">
                                 <span class="time-code interactive-timecode" id="source-current-time" style="font-size: var(--fs-10); font-family: monospace; color: var(--text-secondary);" data-tooltip="Timecode Atual do Source (Clique ou Ctrl+G para editar)">00:00:00:00</span>
                                 <div class="scrubber-bar" id="source-scrubber-progress-bar" style="flex: 1; height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; position: relative; cursor: pointer;">
-                                    <div class="scrubber-fill" id="source-scrubber-progress-fill" style="height: 100%; width: 0%; background: var(--color-cyan); border-radius: 3px;"></div>
+                                    <div class="scrubber-fill" id="source-scrubber-progress-fill" style="height: 100%; width: 0%; background: var(--accent); border-radius: 3px;"></div>
                                     <div class="scrubber-handle" id="source-scrubber-progress-handle" style="width: 10px; height: 10px; border-radius: 50%; background: #fff; position: absolute; top: -2px; left: 0%; transform: translateX(-50%); pointer-events: none;"></div>
                                     <div class="marker-in" id="source-marker-in-pos" style="display:none; position: absolute; width: 4px; height: 100%; background: #22c55e; top: 0;"></div>
                                     <div class="marker-out" id="source-marker-out-pos" style="display:none; position: absolute; width: 4px; height: 100%; background: #ef4444; top: 0;"></div>
@@ -924,7 +924,7 @@
                                     <button id="btn-source-prev-frame" class="btn-control" style="padding: var(--sp-4) var(--sp-8); font-size: var(--fs-11);" title="Frame Anterior"><i class="fa-solid fa-chevron-left"></i></button>
                                     <button id="btn-source-play" class="btn-control play-btn" style="padding: var(--sp-4) var(--sp-12); font-size: var(--fs-11);" title="Play/Pause"><i class="fa-solid fa-play"></i></button>
                                     <button id="btn-source-next-frame" class="btn-control" style="padding: var(--sp-4) var(--sp-8); font-size: var(--fs-11);" title="Próximo Frame"><i class="fa-solid fa-chevron-right"></i></button>
-                                    <button id="btn-source-set-thumbnail" class="btn-control" style="padding: var(--sp-4) var(--sp-8); font-size: var(--fs-11); color: var(--color-cyan);" title="Definir Frame como Miniatura"><i class="fa-solid fa-camera"></i></button>
+                                    <button id="btn-source-set-thumbnail" class="btn-control" style="padding: var(--sp-4) var(--sp-8); font-size: var(--fs-11); color: var(--accent);" title="Definir Frame como Miniatura"><i class="fa-solid fa-camera"></i></button>
                                     <button id="btn-source-toggle-crucial" class="btn-control" style="padding: var(--sp-4) var(--sp-8); font-size: var(--fs-11); color: #fbbf24;" data-tooltip="Marcar/Desmarcar Momento Crucial no Frame Atual (Ctrl+Shift+Click)"><i class="fa-solid fa-star"></i></button>
                                 </div>
                                 <div style="display: flex; gap: var(--sp-6); align-items: center;">
@@ -1046,15 +1046,15 @@
                             <!-- Minimapa de Navegação do Program (Fase Zoom Livre) -->
                             <div id="program-player-minimap" class="program-minimap" style="display: none; position: absolute; top: 12px; left: 12px; width: 140px; height: 80px; border: 1px solid var(--border-glass); border-radius: 6px; background: var(--t-surface-1, rgba(10, 8, 14, 0.85)); overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.7); z-index: 70; pointer-events: auto; cursor: crosshair; backdrop-filter: blur(8px);">
                                 <canvas id="program-minimap-canvas" width="140" height="80" style="width: 100%; height: 100%; object-fit: contain; display: block; opacity: 0.9; pointer-events: none;"></canvas>
-                                <div id="program-minimap-rect" style="position: absolute; border: 2px solid var(--color-cyan); background: var(--t-tint-3, rgba(6, 182, 212, 0.25)); border-radius: 2px; pointer-events: none; box-sizing: border-box; box-shadow: 0 0 8px var(--t-glow, rgba(6, 182, 212, 0.4));"></div>
+                                <div id="program-minimap-rect" style="position: absolute; border: 2px solid var(--accent); background: var(--t-tint-3, color-mix(in srgb, var(--t-accent, rgb(6, 182, 212)) 25%, transparent)); border-radius: 2px; pointer-events: none; box-sizing: border-box; box-shadow: 0 0 8px var(--t-glow, color-mix(in srgb, var(--t-accent, rgb(6, 182, 212)) 40%, transparent));"></div>
                             </div>
 
                             <!-- Indicadores de Rolagem Sutis -->
                             <div id="program-scrollbar-v" class="program-scrollbar v" style="display: none; position: absolute; right: 4px; top: 8px; bottom: 8px; width: 4px; border-radius: 2px; background: rgba(255,255,255,0.06); z-index: 65; pointer-events: none; opacity: 0; transition: opacity 0.3s ease;">
-                                <div id="program-scrollbar-v-thumb" style="width: 100%; height: 20%; background: rgba(6, 182, 212, 0.6); border-radius: 2px;"></div>
+                                <div id="program-scrollbar-v-thumb" style="width: 100%; height: 20%; background: color-mix(in srgb, var(--t-accent, rgb(6, 182, 212)) 60%, transparent); border-radius: 2px;"></div>
                             </div>
                             <div id="program-scrollbar-h" class="program-scrollbar h" style="display: none; position: absolute; bottom: 4px; left: 8px; right: 8px; height: 4px; border-radius: 2px; background: rgba(255,255,255,0.06); z-index: 65; pointer-events: none; opacity: 0; transition: opacity 0.3s ease;">
-                                <div id="program-scrollbar-h-thumb" style="height: 100%; width: 20%; background: rgba(6, 182, 212, 0.6); border-radius: 2px;"></div>
+                                <div id="program-scrollbar-h-thumb" style="height: 100%; width: 20%; background: color-mix(in srgb, var(--t-accent, rgb(6, 182, 212)) 60%, transparent); border-radius: 2px;"></div>
                             </div>
                         </div>
                         
@@ -1064,9 +1064,9 @@
                             <div class="scrubber-container" style="display: flex; align-items: center; gap: var(--sp-10); width: 100%;">
                                 <span class="time-code interactive-timecode" id="program-current-time" style="font-size: var(--fs-10); font-family: monospace; color: var(--text-secondary);" data-tooltip="Timecode Atual do Programa (Clique ou Ctrl+G para editar)">00:00:00:00</span>
                                 <div class="scrubber-bar" id="program-scrubber-progress-bar" style="flex: 1; height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; position: relative; cursor: pointer;">
-                                    <div class="program-inout-span" id="program-inout-span" style="position: absolute; height: 100%; top: 0; left: 0%; width: 0%; background: var(--t-tint-3, rgba(6, 182, 212, 0.25)); border-radius: 2px; pointer-events: none; display: none;"></div>
+                                    <div class="program-inout-span" id="program-inout-span" style="position: absolute; height: 100%; top: 0; left: 0%; width: 0%; background: var(--t-tint-3, color-mix(in srgb, var(--t-accent, rgb(6, 182, 212)) 25%, transparent)); border-radius: 2px; pointer-events: none; display: none;"></div>
                                     <div class="scrubber-fill" id="program-scrubber-progress-fill" style="height: 100%; width: 0%; background: #a855f7; border-radius: 3px;"></div>
-                                    <div class="scrubber-marker in-marker" id="program-marker-in-pos" style="position: absolute; top: -4px; width: 2px; height: 14px; background: #06b6d4; display: none; z-index: 2; pointer-events: none; box-shadow: 0 0 4px var(--t-glow, #06b6d4);"></div>
+                                    <div class="scrubber-marker in-marker" id="program-marker-in-pos" style="position: absolute; top: -4px; width: 2px; height: 14px; background: var(--t-accent, #06b6d4); display: none; z-index: 2; pointer-events: none; box-shadow: 0 0 4px var(--t-glow, var(--t-accent, #06b6d4));"></div>
                                     <div class="scrubber-marker out-marker" id="program-marker-out-pos" style="position: absolute; top: -4px; width: 2px; height: 14px; background: #f43f5e; display: none; z-index: 2; pointer-events: none; box-shadow: 0 0 4px var(--t-glow, #f43f5e);"></div>
                                     <div class="scrubber-handle" id="program-scrubber-progress-handle" style="width: 10px; height: 10px; border-radius: 50%; background: #fff; position: absolute; top: -2px; left: 0%; transform: translateX(-50%); pointer-events: none; z-index: 3;"></div>
                                 </div>
@@ -1080,7 +1080,7 @@
                                     <button id="btn-program-play" class="btn-control play-btn" style="padding: var(--sp-4) var(--sp-12); font-size: var(--fs-11);" title="Play/Pause (Espaço)"><i class="fa-solid fa-play"></i></button>
                                     <button id="btn-program-next-frame" class="btn-control" style="padding: var(--sp-4) var(--sp-8); font-size: var(--fs-11);" title="Próximo Frame (Seta Direita)"><i class="fa-solid fa-chevron-right"></i></button>
                                     <div style="width: 1px; height: 16px; background: var(--border-glass); margin: 0 var(--sp-2);"></div>
-                                    <button id="btn-program-mark-in" class="btn-control btn-marker-in" style="padding: var(--sp-4) var(--sp-8); font-size: var(--fs-10); font-weight: bold; color: var(--color-cyan);" title="Marcar Ponto IN (I)"><i class="fa-solid fa-bracket-square"></i> IN</button>
+                                    <button id="btn-program-mark-in" class="btn-control btn-marker-in" style="padding: var(--sp-4) var(--sp-8); font-size: var(--fs-10); font-weight: bold; color: var(--accent);" title="Marcar Ponto IN (I)"><i class="fa-solid fa-bracket-square"></i> IN</button>
                                     <button id="btn-program-mark-out" class="btn-control btn-marker-out" style="padding: var(--sp-4) var(--sp-8); font-size: var(--fs-10); font-weight: bold; color: #f43f5e;" title="Marcar Ponto OUT (O)"><i class="fa-solid fa-bracket-square"></i> OUT</button>
                                     <button id="btn-program-play-in-out" class="btn-control" style="padding: var(--sp-4) var(--sp-8); font-size: var(--fs-11);" title="Tocar de IN até OUT (Shift+Espaço)"><i class="fa-solid fa-play"></i><i class="fa-solid fa-arrows-left-right" style="font-size: var(--fs-8); margin-left: var(--sp-2);"></i></button>
                                     <button id="btn-program-loop" class="btn-control" style="padding: var(--sp-4) var(--sp-8); font-size: var(--fs-11);" title="Alternar Loop Contínuo (Ctrl+L)"><i class="fa-solid fa-repeat"></i></button>
@@ -1118,7 +1118,7 @@
                         <div class="timeline-header-left">
                             <div class="timeline-title-group" id="timeline-title-group" data-tooltip="Clique para renomear a sequência">
                                 <h3 style="margin: 0; font-size: var(--fs-11); font-weight: 600; display: flex; align-items: center; gap: var(--sp-6);">
-                                    <i class="fa-solid fa-clapperboard" style="color: var(--color-cyan); font-size: var(--fs-11);"></i>
+                                    <i class="fa-solid fa-clapperboard" style="color: var(--accent); font-size: var(--fs-11);"></i>
                                     <span id="timeline-name-display" class="timeline-name-display">Rascunho Making Of #1</span>
                                 </h3>
                                 <button id="btn-rename-timeline" class="btn-header-flat" data-tooltip="Renomear Timeline (Clique para editar)"><i class="fa-solid fa-pen-to-square"></i></button>
@@ -1282,7 +1282,7 @@
 
                                 <!-- Grupo 5: Criação -->
                                 <button id="btn-tool-add-text" class="btn-toolbar-action" data-tooltip="Inserir Título / Lower Third na Agulha (Ctrl+T)" style="color: #f59e0b;"><i class="fa-solid fa-font"></i></button>
-                                <button id="btn-add-marker" class="btn-toolbar-action" data-tooltip="Adicionar Marcador na Playhead (M)" style="color: var(--color-cyan);"><i class="fa-solid fa-bookmark"></i></button>
+                                <button id="btn-add-marker" class="btn-toolbar-action" data-tooltip="Adicionar Marcador na Playhead (M)" style="color: var(--accent);"><i class="fa-solid fa-bookmark"></i></button>
 
                                 <div class="toolbar-divider"></div>
 
@@ -1296,14 +1296,14 @@
 
                             <!-- Sidebar de trilhas (gerada dinamicamente pelo panels.js) -->
                             <div class="timeline-headers-sidebar" id="timeline-headers-sidebar" style="width: 180px; flex: 0 0 180px; display: flex; flex-direction: column; background: rgba(0, 0, 0, 0.4); border-right: 1px solid var(--border-glass); z-index: 10; flex-shrink: 0; box-sizing: border-box; overflow: hidden;">
-                                <div class="timeline-header-ruler" style="height: 30px; flex-shrink: 0; border-bottom: 1px solid var(--border-glass); display: flex; align-items: center; justify-content: space-between; padding: 0 var(--sp-8); font-size: var(--fs-9); font-weight: 700; color: var(--color-cyan); font-family: monospace; letter-spacing: 0.5px; box-sizing: border-box;">
+                                <div class="timeline-header-ruler" style="height: 30px; flex-shrink: 0; border-bottom: 1px solid var(--border-glass); display: flex; align-items: center; justify-content: space-between; padding: 0 var(--sp-8); font-size: var(--fs-9); font-weight: 700; color: var(--accent); font-family: monospace; letter-spacing: 0.5px; box-sizing: border-box;">
                                     <div style="display: flex; align-items: center; gap: var(--sp-6); min-width: 0; overflow: hidden;">
-                                        <button id="btn-toggle-headers" title="Recolher cabeçalhos de pistas" style="border: none; background: none; color: var(--color-cyan); cursor: pointer; padding: 0; font-size: var(--fs-10); display: flex; align-items: center; justify-content: center; flex-shrink: 0;"><i class="fa-solid fa-chevron-left"></i></button>
+                                        <button id="btn-toggle-headers" title="Recolher cabeçalhos de pistas" style="border: none; background: none; color: var(--accent); cursor: pointer; padding: 0; font-size: var(--fs-10); display: flex; align-items: center; justify-content: center; flex-shrink: 0;"><i class="fa-solid fa-chevron-left"></i></button>
                                         <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">TIMECODE</span>
                                     </div>
                                     <div style="display: flex; gap: var(--sp-4); flex-shrink: 0;">
                                         <button id="btn-add-text-track" title="Adicionar nova pista de texto/títulos" style="border: 1px solid var(--t-line-strong, rgba(245,158,11,0.3)); background: var(--t-tint-2, rgba(245,158,11,0.08)); color: #f59e0b; cursor: pointer; border-radius: 4px; width: 18px; height: 18px; font-size: var(--fs-9); display: flex; align-items: center; justify-content: center; padding: 0;"><i class="fa-solid fa-font"></i></button>
-                                        <button id="btn-add-track" title="Adicionar nova pista de vídeo" style="border: 1px solid var(--t-line-strong, rgba(6,182,212,0.3)); background: var(--t-tint-2, rgba(6,182,212,0.08)); color: var(--color-cyan); cursor: pointer; border-radius: 4px; width: 18px; height: 18px; font-size: var(--fs-10); display: flex; align-items: center; justify-content: center; padding: 0;"><i class="fa-solid fa-plus"></i></button>
+                                        <button id="btn-add-track" title="Adicionar nova pista de vídeo" style="border: 1px solid var(--t-line-strong, color-mix(in srgb, var(--t-accent, rgb(6, 182, 212)) 30%, transparent)); background: var(--t-tint-2, color-mix(in srgb, var(--t-accent, rgb(6, 182, 212)) 8%, transparent)); color: var(--accent); cursor: pointer; border-radius: 4px; width: 18px; height: 18px; font-size: var(--fs-10); display: flex; align-items: center; justify-content: center; padding: 0;"><i class="fa-solid fa-plus"></i></button>
                                         <button id="btn-add-audio-track" title="Adicionar nova pista de áudio" style="border: 1px solid var(--t-line-strong, rgba(16,185,129,0.3)); background: var(--t-tint-2, rgba(16,185,129,0.08)); color: #10b981; cursor: pointer; border-radius: 4px; width: 18px; height: 18px; font-size: var(--fs-9); display: flex; align-items: center; justify-content: center; padding: 0;"><i class="fa-solid fa-music"></i></button>
                                     </div>
                                 </div>
@@ -1364,7 +1364,7 @@
                             <!-- Sub-header de Ações ASR dentro da aba Falas -->
                             <div class="panel-sub-actions" style="display: flex; align-items: center; justify-content: space-between; padding: var(--sp-6) var(--sp-12); border-bottom: 1px solid var(--border-glass); background: rgba(0, 0, 0, 0.12); flex-shrink: 0;">
                                 <span style="font-size: var(--fs-10); color: var(--text-secondary); text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px; display: flex; align-items: center; gap: var(--sp-4);">
-                                    <i class="fa-solid fa-microphone" style="color: var(--color-cyan);"></i> <span class="header-title-text">Controles ASR</span>
+                                    <i class="fa-solid fa-microphone" style="color: var(--accent);"></i> <span class="header-title-text">Controles ASR</span>
                                 </span>
                                 <div style="display: flex; gap: var(--sp-4); align-items: center;">
                                     <button id="btn-transcribe-now" class="flat-sub-btn cyan-btn" data-tooltip="Transcrever o depoimento atualmente selecionado na biblioteca">
@@ -1380,7 +1380,7 @@
                             </div>
                             <!-- Gaveta de Pistas Globais (Assistente de Falas) -->
                             <div id="speech-assistant-drawer" class="speech-assistant-drawer collapsed">
-                                <div class="drawer-header" id="btn-toggle-assistant-drawer" style="cursor: pointer; padding: var(--sp-8) var(--sp-12); background: rgba(255,255,255,0.03); border-bottom: 1px solid var(--border-glass); display: flex; justify-content: space-between; align-items: center; font-size: var(--fs-11); font-weight: 600; color: var(--color-cyan);">
+                                <div class="drawer-header" id="btn-toggle-assistant-drawer" style="cursor: pointer; padding: var(--sp-8) var(--sp-12); background: rgba(255,255,255,0.03); border-bottom: 1px solid var(--border-glass); display: flex; justify-content: space-between; align-items: center; font-size: var(--fs-11); font-weight: 600; color: var(--accent);">
                                     <span><i class="fa-solid fa-wand-magic-sparkles"></i> Assistente de Falas & Pistas</span>
                                     <i class="fa-solid fa-chevron-down toggle-icon" style="transition: transform 0.2s;"></i>
                                 </div>
@@ -1389,7 +1389,7 @@
                                         <label style="display: flex; align-items: center; gap: var(--sp-2); cursor: pointer;"><input type="checkbox" id="chk-enable-silence" checked> Silêncios (Limiar: <input type="number" id="num-silence-threshold" value="1.2" step="0.1" style="width: 45px; background: rgba(0,0,0,0.4); border: 1px solid var(--border-glass); color:#fff; padding: var(--sp-1) var(--sp-2); border-radius: 4px; font-size:var(--fs-10); outline:none; text-align:center;">s)</label>
                                         <label style="display: flex; align-items: center; gap: var(--sp-2); cursor: pointer;"><input type="checkbox" id="chk-enable-questions" checked> Perguntas (?)</label>
                                         <label style="display: flex; align-items: center; gap: var(--sp-2); cursor: pointer;"><input type="checkbox" id="chk-enable-faces" checked> Rostos</label>
-                                        <button id="btn-update-clues" class="btn-card-action" style="font-size:var(--fs-10); color:var(--color-cyan); background:none; border:none; padding: var(--sp-2); cursor:pointer; margin-left:auto;" title="Atualizar Pistas"><i class="fa-solid fa-arrows-rotate"></i></button>
+                                        <button id="btn-update-clues" class="btn-card-action" style="font-size:var(--fs-10); color:var(--accent); background:none; border:none; padding: var(--sp-2); cursor:pointer; margin-left:auto;" title="Atualizar Pistas"><i class="fa-solid fa-arrows-rotate"></i></button>
                                     </div>
                                     <div id="assistant-clues-list" class="clues-list scrollable" style="max-height: 180px; overflow-y: auto; padding: var(--sp-8) var(--sp-12); display: flex; flex-direction: column; gap: var(--sp-8);">
                                         <!-- Carregado via JS -->
@@ -1417,7 +1417,7 @@
                         <!-- Sub-header de Ações Visão IA dentro da aba Visão -->
                         <div class="panel-sub-actions" style="display: flex; align-items: center; justify-content: space-between; padding: var(--sp-6) var(--sp-12); border-bottom: 1px solid var(--border-glass); background: rgba(0, 0, 0, 0.12); flex-shrink: 0;">
                             <span style="font-size: var(--fs-10); color: var(--text-secondary); text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px; display: flex; align-items: center; gap: var(--sp-4);">
-                                <i class="fa-solid fa-eye" style="color: var(--color-cyan);"></i> <span class="header-title-text">Controles Visão IA</span>
+                                <i class="fa-solid fa-eye" style="color: var(--accent);"></i> <span class="header-title-text">Controles Visão IA</span>
                             </span>
                             <div style="display: flex; gap: var(--sp-4); align-items: center;">
                                 <button id="btn-analyze-vision-now" class="flat-sub-btn cyan-btn" data-tooltip="Analisar a visão do clipe de B-roll atualmente selecionado">
@@ -1445,7 +1445,7 @@
                         <!-- Sub-header de Ações das Tarefas -->
                         <div class="panel-sub-actions" style="display: flex; align-items: center; justify-content: space-between; padding: var(--sp-6) var(--sp-12); border-bottom: 1px solid var(--border-glass); background: rgba(0, 0, 0, 0.12); flex-shrink: 0;">
                             <span style="font-size: var(--fs-10); color: var(--text-secondary); text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px; display: flex; align-items: center; gap: var(--sp-4);">
-                                <i class="fa-solid fa-list-check" style="color: var(--color-cyan);"></i> <span class="header-title-text">Tarefas</span>
+                                <i class="fa-solid fa-list-check" style="color: var(--accent);"></i> <span class="header-title-text">Tarefas</span>
                             </span>
                             <div style="display: flex; gap: var(--sp-4); align-items: center;">
                                 <button id="btn-tasks-cancel-all-thumbs" class="flat-sub-btn rose-btn" data-tooltip="Cancelar todas as gerações de miniaturas">
@@ -1473,7 +1473,7 @@
 
                     <!-- Tab: Chat IA -->
                     <div id="chat-container" style="display: none; height: 100%; display: flex; flex-direction: column;">
-                        <h4 style="font-size:var(--fs-12); color:var(--color-cyan); display:flex; align-items:center; justify-content:space-between; width:100%; margin:0; padding: var(--sp-10) var(--sp-14) var(--sp-4) var(--sp-14); flex-shrink: 0;">
+                        <h4 style="font-size:var(--fs-12); color:var(--accent); display:flex; align-items:center; justify-content:space-between; width:100%; margin:0; padding: var(--sp-10) var(--sp-14) var(--sp-4) var(--sp-14); flex-shrink: 0;">
                             <span title="Chat assistente de montagem" style="cursor: help;"><i class="fa-solid fa-comments"></i> CapIAu</span>
                             <div style="display: flex; gap: var(--sp-8); align-items: center;">
                                 <button class="flat-sidebar-btn" id="btn-chat-layout" style="font-size:var(--fs-9); padding:var(--sp-2) var(--sp-8); height:20px; display:none; align-items:center; gap:var(--sp-4);" title="Alternar Layout">
@@ -1501,7 +1501,7 @@
                                 <input type="password" id="agent-api-key-input" placeholder="OpenRouter API Key (deixe vazio para usar a do .env)..." style="flex: 1; height: 24px; font-size: var(--fs-11); background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); border-radius: 4px; color: var(--text-primary); padding: 0 var(--sp-6); outline: none;">
                             </div>
                             <div style="font-size: var(--fs-9); color: var(--text-muted); margin-top: var(--sp-2); margin-bottom: var(--sp-2); text-align: right; width: 100%;">
-                                Ajustes finos no <a href="#" id="link-open-settings-from-chat" style="color: var(--color-cyan); text-decoration: none;">painel de configurações da IA</a>.
+                                Ajustes finos no <a href="#" id="link-open-settings-from-chat" style="color: var(--accent); text-decoration: none;">painel de configurações da IA</a>.
                             </div>
                         </div>
                         <div class="chat-main-layout" style="display: flex; flex: 1; overflow: hidden; position: relative; width: 100%;">
@@ -1520,7 +1520,7 @@
                             <div class="chat-media-pane" id="chat-media-board" style="display: none; flex-direction: column; height: 100%; border-left: 1px solid var(--border-glass); min-width: 250px; background: rgba(0,0,0,0.15);">
                                 <div class="chat-media-player-container" style="position: relative; width: 100%; aspect-ratio: 16/9; background: #000; overflow: hidden; border-bottom: 1px solid var(--border-glass); border-radius: 6px;">
                                     <div class="chat-mini-player-header" style="position: absolute; top: 0; left: 0; right: 0; z-index: 20; padding: var(--sp-8) var(--sp-12); display: flex; justify-content: space-between; align-items: center; background: linear-gradient(to bottom, rgba(0,0,0,0.8), transparent); opacity: 0; pointer-events: none; transition: opacity 0.2s ease;">
-                                        <span style="font-size: var(--fs-10); color: var(--color-cyan); font-weight: 700;">PREVIEW LOCAL</span>
+                                        <span style="font-size: var(--fs-10); color: var(--accent); font-weight: 700;">PREVIEW LOCAL</span>
                                         <span id="chat-mini-player-title" style="color: var(--text-secondary); max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-10);">Nenhum clipe carregado</span>
                                     </div>
                                     <video id="chat-mini-video" src="" controls style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain; z-index: 10;"></video>
@@ -1570,8 +1570,8 @@
                         </div>
                         
                         <!-- AI Output Area (Retractable/Collapsible Panel) -->
-                        <div id="logs-ai-container" style="display: none; flex-direction: column; background: var(--t-tint-1, rgba(6, 182, 212, 0.05)); border: 1px solid var(--t-line-weak, rgba(6, 182, 212, 0.15)); border-radius: 8px; margin-bottom: var(--sp-12); flex-shrink: 0; min-height: 150px; max-height: 50%; overflow: hidden; transition: all 0.3s ease-out;">
-                            <div id="logs-ai-header" style="display: flex; justify-content: space-between; align-items: center; background: var(--t-tint-2, rgba(6, 182, 212, 0.1)); padding: var(--sp-6) var(--sp-12); border-bottom: 1px solid var(--t-line-strong, rgba(6, 182, 212, 0.2)); font-size: var(--fs-11); font-weight: 600; color: var(--color-cyan); flex-shrink: 0;">
+                        <div id="logs-ai-container" style="display: none; flex-direction: column; background: var(--t-tint-1, color-mix(in srgb, var(--t-accent, rgb(6, 182, 212)) 5%, transparent)); border: 1px solid var(--t-line-weak, color-mix(in srgb, var(--t-accent, rgb(6, 182, 212)) 15%, transparent)); border-radius: 8px; margin-bottom: var(--sp-12); flex-shrink: 0; min-height: 150px; max-height: 50%; overflow: hidden; transition: all 0.3s ease-out;">
+                            <div id="logs-ai-header" style="display: flex; justify-content: space-between; align-items: center; background: var(--t-tint-2, color-mix(in srgb, var(--t-accent, rgb(6, 182, 212)) 10%, transparent)); padding: var(--sp-6) var(--sp-12); border-bottom: 1px solid var(--t-line-strong, color-mix(in srgb, var(--t-accent, rgb(6, 182, 212)) 20%, transparent)); font-size: var(--fs-11); font-weight: 600; color: var(--accent); flex-shrink: 0;">
                                 <span><i class="fa-solid fa-brain"></i> Relatório de IA</span>
                                 <div style="display: flex; gap: var(--sp-8);">
                                     <button class="flat-sidebar-btn" id="btn-copy-ai-report" style="font-size: var(--fs-9); padding: var(--sp-2) var(--sp-6); height: 18px; display: flex; align-items: center; gap: var(--sp-2); color: var(--text-secondary); background: transparent; border: none; cursor: pointer;" title="Copiar relatório para o clipboard">
@@ -1708,7 +1708,7 @@
                 
                 <!-- 1. Seção Google Drive Link -->
                 <div class="sync-section" style="border: 1px solid var(--border-glass); border-radius: 8px; padding: var(--sp-14); background: rgba(0,0,0,0.15);">
-                    <h3 style="font-size: var(--fs-13); font-weight: 600; color: var(--color-cyan); margin-top: 0; margin-bottom: var(--sp-10); display: flex; align-items: center; gap: var(--sp-8);">
+                    <h3 style="font-size: var(--fs-13); font-weight: 600; color: var(--accent); margin-top: 0; margin-bottom: var(--sp-10); display: flex; align-items: center; gap: var(--sp-8);">
                         <i class="fa-brands fa-google-drive"></i> Link do Google Drive Compartilhado
                     </h3>
                     <p style="font-size: var(--fs-11); color: var(--text-muted); margin-bottom: var(--sp-10); line-height: 1.4;">
@@ -1729,7 +1729,7 @@
 
                 <!-- 2. Seção Exportação -->
                 <div class="sync-section" style="border: 1px solid var(--border-glass); border-radius: 8px; padding: var(--sp-14); background: rgba(0,0,0,0.15);">
-                    <h3 style="font-size: var(--fs-13); font-weight: 600; color: var(--color-cyan); margin-top: 0; margin-bottom: var(--sp-10); display: flex; align-items: center; gap: var(--sp-8);">
+                    <h3 style="font-size: var(--fs-13); font-weight: 600; color: var(--accent); margin-top: 0; margin-bottom: var(--sp-10); display: flex; align-items: center; gap: var(--sp-8);">
                         <i class="fa-solid fa-file-export"></i> Exportar Projeto (.ZIP)
                     </h3>
                     <p style="font-size: var(--fs-11); color: var(--text-muted); margin-bottom: var(--sp-12); line-height: 1.4;">
@@ -1738,19 +1738,19 @@
                     
                     <div class="export-options" style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-10); margin-bottom: var(--sp-14);">
                         <label style="display: flex; align-items: center; gap: var(--sp-8); font-size: var(--fs-11); color: var(--text-secondary); cursor: pointer;">
-                            <input type="checkbox" id="chk-export-metadata" checked disabled style="cursor: not-allowed; accent-color: var(--color-cyan);">
+                            <input type="checkbox" id="chk-export-metadata" checked disabled style="cursor: not-allowed; accent-color: var(--accent);">
                             <span>Metadados & Transcrições (Obrigatório)</span>
                         </label>
                         <label style="display: flex; align-items: center; gap: var(--sp-8); font-size: var(--fs-11); color: var(--text-secondary); cursor: pointer;">
-                            <input type="checkbox" id="chk-export-proxies" style="cursor: pointer; accent-color: var(--color-cyan);">
+                            <input type="checkbox" id="chk-export-proxies" style="cursor: pointer; accent-color: var(--accent);">
                             <span>Arquivos de Proxies de Vídeo</span>
                         </label>
                         <label style="display: flex; align-items: center; gap: var(--sp-8); font-size: var(--fs-11); color: var(--text-secondary); cursor: pointer;">
-                            <input type="checkbox" id="chk-export-photos" style="cursor: pointer; accent-color: var(--color-cyan);">
+                            <input type="checkbox" id="chk-export-photos" style="cursor: pointer; accent-color: var(--accent);">
                             <span>Proxies de Fotos de Set</span>
                         </label>
                         <label style="display: flex; align-items: center; gap: var(--sp-8); font-size: var(--fs-11); color: var(--text-secondary); cursor: pointer;">
-                            <input type="checkbox" id="chk-export-docs" style="cursor: pointer; accent-color: var(--color-cyan);">
+                            <input type="checkbox" id="chk-export-docs" style="cursor: pointer; accent-color: var(--accent);">
                             <span>Documentos de Contexto</span>
                         </label>
                     </div>
@@ -1759,21 +1759,21 @@
                         <i class="fa-solid fa-file-zipper"></i> Gerar Pacote de Exportação e Baixar
                     </button>
                     <div id="export-status" style="font-size: var(--fs-10); color: var(--text-muted); margin-top: var(--sp-6); text-align: center; display: none;">
-                        <i class="fa-solid fa-spinner fa-spin" style="color: var(--color-cyan);"></i> Compactando arquivos de projeto... Aguarde.
+                        <i class="fa-solid fa-spinner fa-spin" style="color: var(--accent);"></i> Compactando arquivos de projeto... Aguarde.
                     </div>
                 </div>
 
                 <!-- 3. Seção Importação -->
                 <div class="sync-section" style="border: 1px solid var(--border-glass); border-radius: 8px; padding: var(--sp-14); background: rgba(0,0,0,0.15);">
-                    <h3 style="font-size: var(--fs-13); font-weight: 600; color: var(--color-cyan); margin-top: 0; margin-bottom: var(--sp-10); display: flex; align-items: center; gap: var(--sp-8);">
+                    <h3 style="font-size: var(--fs-13); font-weight: 600; color: var(--accent); margin-top: 0; margin-bottom: var(--sp-10); display: flex; align-items: center; gap: var(--sp-8);">
                         <i class="fa-solid fa-file-import"></i> Importar Projeto (.ZIP)
                     </h3>
                     <p style="font-size: var(--fs-11); color: var(--text-muted); margin-bottom: var(--sp-10); line-height: 1.4;">
                         Selecione ou arraste um pacote ZIP exportado de outro computador para restaurar dados, mídias e reconstruir índices de IA.
                     </p>
                     
-                    <div id="sync-import-dropzone" style="border: 2px dashed var(--t-line-strong, rgba(6, 182, 212, 0.3)); border-radius: 6px; padding: var(--sp-24) var(--sp-14); text-align: center; background: rgba(255,255,255,0.01); cursor: pointer; transition: all 0.2s;">
-                        <i class="fa-solid fa-cloud-arrow-up" style="font-size: var(--fs-32); color: var(--color-cyan); margin-bottom: var(--sp-8);"></i>
+                    <div id="sync-import-dropzone" style="border: 2px dashed var(--t-line-strong, color-mix(in srgb, var(--t-accent, rgb(6, 182, 212)) 30%, transparent)); border-radius: 6px; padding: var(--sp-24) var(--sp-14); text-align: center; background: rgba(255,255,255,0.01); cursor: pointer; transition: all 0.2s;">
+                        <i class="fa-solid fa-cloud-arrow-up" style="font-size: var(--fs-32); color: var(--accent); margin-bottom: var(--sp-8);"></i>
                         <p style="font-size: var(--fs-11); font-weight: 500; color: var(--text-secondary); margin: 0;">Arraste o arquivo ZIP ou clique para selecionar</p>
                         <input type="file" id="sync-import-file-input" accept=".zip" style="display: none;">
                     </div>
@@ -1785,7 +1785,7 @@
                             <span id="sync-import-percent-text">0%</span>
                         </div>
                         <div style="height: 6px; background: rgba(255,255,255,0.05); border-radius: 3px; overflow: hidden; border: 1px solid var(--border-glass);">
-                            <div id="sync-import-progress-fill" style="width: 0%; height: 100%; background: linear-gradient(90deg, var(--color-cyan), var(--color-violet)); transition: width 0.1s ease;"></div>
+                            <div id="sync-import-progress-fill" style="width: 0%; height: 100%; background: linear-gradient(90deg, var(--accent), var(--color-violet)); transition: width 0.1s ease;"></div>
                         </div>
                     </div>
                 </div>
@@ -1802,7 +1802,7 @@
         <div class="modal-content glassmorphism" style="max-width: 950px; width: 90%; text-align: center; padding: var(--sp-20); transition: all 0.3s ease;">
             <div class="modal-header" style="padding-bottom: var(--sp-10);">
                 <div style="display: flex; align-items: center; gap: var(--sp-10);">
-                    <i class="fa-solid fa-image" style="color: var(--color-cyan); text-shadow: 0 0 10px rgba(6, 182, 212, 0.4);"></i>
+                    <i class="fa-solid fa-image" style="color: var(--accent); text-shadow: 0 0 10px color-mix(in srgb, var(--t-accent, rgb(6, 182, 212)) 40%, transparent);"></i>
                     <h2 id="photo-viewer-title" style="font-size: var(--fs-16); margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 60vw;">Foto de Set</h2>
                 </div>
                 <div style="display: flex; align-items: center; gap: var(--sp-8);">
@@ -1823,7 +1823,7 @@
                         
                         <!-- Spinner de processamento/carregamento interno -->
                         <div id="photo-viewer-loading" class="photo-placeholder-loading" style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none; background: var(--t-surface-1, rgba(10, 8, 14, 0.85)); flex-direction: column; justify-content: center; align-items: center;">
-                            <i class="fa-solid fa-spinner fa-spin" style="font-size: var(--fs-24); color: var(--color-cyan); margin-bottom: var(--sp-10);"></i>
+                            <i class="fa-solid fa-spinner fa-spin" style="font-size: var(--fs-24); color: var(--accent); margin-bottom: var(--sp-10);"></i>
                             <span style="font-size: var(--fs-12); font-weight: 500; color: var(--text-primary);">Gerando Proxy de Imagem...</span>
                             <span style="font-size: var(--fs-10); color: var(--text-muted); margin-top: var(--sp-4);">Aguarde o processamento em background</span>
                         </div>
@@ -1831,7 +1831,7 @@
                         <!-- Minimapa / Miniatura da Foto com retângulo de zoom -->
                         <div id="photo-viewer-minimap" class="photo-minimap" style="display: none; position: absolute; bottom: 12px; right: 12px; width: 130px; height: 95px; border: 1px solid var(--border-glass); border-radius: 6px; background: var(--t-surface-1, rgba(10, 8, 14, 0.85)); overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.7); z-index: 10; pointer-events: auto; cursor: crosshair;">
                             <img id="photo-viewer-minimap-img" src="" alt="Minimapa" style="width: 100%; height: 100%; object-fit: contain; display: block; opacity: 0.85; pointer-events: none;">
-                            <div id="photo-viewer-minimap-rect" style="position: absolute; border: 2px solid var(--color-cyan); background: var(--t-tint-3, rgba(6, 182, 212, 0.25)); border-radius: 2px; pointer-events: none; box-sizing: border-box; box-shadow: 0 0 8px var(--t-glow, rgba(6, 182, 212, 0.4));"></div>
+                            <div id="photo-viewer-minimap-rect" style="position: absolute; border: 2px solid var(--accent); background: var(--t-tint-3, color-mix(in srgb, var(--t-accent, rgb(6, 182, 212)) 25%, transparent)); border-radius: 2px; pointer-events: none; box-sizing: border-box; box-shadow: 0 0 8px var(--t-glow, color-mix(in srgb, var(--t-accent, rgb(6, 182, 212)) 40%, transparent));"></div>
                         </div>
                     </div>
                     
@@ -1864,7 +1864,7 @@
         <div class="modal-content glassmorphism" style="max-width: 600px; width: 90%; padding: var(--sp-20); transition: all 0.3s ease;">
             <div class="modal-header" style="padding-bottom: var(--sp-10); border-bottom: 1px solid var(--border-glass);">
                 <div style="display: flex; align-items: center; gap: var(--sp-10);">
-                    <i class="fa-solid fa-people-arrows" style="color: var(--color-cyan);"></i>
+                    <i class="fa-solid fa-people-arrows" style="color: var(--accent);"></i>
                     <h2 style="font-size: var(--fs-14); margin: 0; font-weight: 600;">Desambiguação Manual Unitária</h2>
                 </div>
                 <button class="btn-close-modal" id="btn-close-disambiguation" style="font-size: var(--fs-20); background: transparent; border: none; color: var(--text-secondary); cursor: pointer;">&times;</button>
@@ -1889,7 +1889,7 @@
         <div class="modal-content glassmorphism" style="max-width: 560px; width: 90%; padding: var(--sp-20); transition: all 0.3s ease;">
             <div class="modal-header" style="padding-bottom: var(--sp-10); border-bottom: 1px solid var(--border-glass);">
                 <div style="display: flex; align-items: center; gap: var(--sp-10);">
-                    <i class="fa-solid fa-file-export" style="color: var(--color-cyan);"></i>
+                    <i class="fa-solid fa-file-export" style="color: var(--accent);"></i>
                     <h2 style="font-size: var(--fs-14); margin: 0; font-weight: 600;">Exportar Timeline</h2>
                 </div>
                 <button class="btn-close-modal" id="btn-close-export-modal" style="font-size: var(--fs-20); background: transparent; border: none; color: var(--text-secondary); cursor: pointer;">&times;</button>
@@ -1920,7 +1920,7 @@
 
                 <div>
                     <label class="ev-check" style="display: flex; align-items: center; gap: var(--sp-8); font-size: var(--fs-11); cursor: pointer; color: var(--text-primary);" data-tooltip="Gera o arquivo de timeline (.otio, .xml, .edl) apontando para os proxies 720p locais em vez dos originais">
-                        <input type="checkbox" id="chk-export-timeline-proxies" style="accent-color: var(--color-cyan); cursor: pointer;">
+                        <input type="checkbox" id="chk-export-timeline-proxies" style="accent-color: var(--accent); cursor: pointer;">
                         <span>Exportar apontando para mídias proxy (720p)</span>
                     </label>
                 </div>
@@ -2135,7 +2135,7 @@
                         <div class="ev-proxy-opcoes" style="margin-top: var(--sp-10); padding-top: var(--sp-8); border-top: 1px solid var(--border-glass);">
                             <label class="ev-check" data-tooltip="Renderiza utilizando os arquivos de proxy (720p locais) em vez dos originais pesados, viabilizando render rápido ou exportação offline">
                                 <input type="checkbox" id="ev-use-proxies">
-                                <span><i class="fa-solid fa-bolt" style="color: var(--color-cyan); margin-right: var(--sp-4);"></i> Exportar com proxies (render rápido / offline)</span>
+                                <span><i class="fa-solid fa-bolt" style="color: var(--accent); margin-right: var(--sp-4);"></i> Exportar com proxies (render rápido / offline)</span>
                             </label>
                             <div id="ev-proxy-fallback-wrap" style="display: none; margin-top: var(--sp-4); padding-left: var(--sp-20);">
                                 <label class="ev-check ev-proxy-fallback" data-tooltip="Master segue com mídia de proxy quando o original estiver indisponível; o nome ganha sufixo _proxy">
@@ -2302,7 +2302,7 @@
                 <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: var(--sp-8); background: rgba(0,0,0,0.25); border: 1px solid var(--border-glass); border-radius: 6px; padding: var(--sp-8) var(--sp-12); text-align: center;">
                     <div>
                         <div style="font-size: var(--fs-9); color: var(--text-muted); text-transform: uppercase;">Ponto IN</div>
-                        <div id="subclip-in-display" style="font-family: monospace; font-size: var(--fs-12); color: var(--color-cyan); font-weight: 600; margin-top: var(--sp-2);">00:00:00:00</div>
+                        <div id="subclip-in-display" style="font-family: monospace; font-size: var(--fs-12); color: var(--accent); font-weight: 600; margin-top: var(--sp-2);">00:00:00:00</div>
                     </div>
                     <div>
                         <div style="font-size: var(--fs-9); color: var(--text-muted); text-transform: uppercase;">Ponto OUT</div>
@@ -2322,7 +2322,7 @@
             </div>
             <div class="modal-footer" style="padding-top: var(--sp-12); border-top: 1px solid var(--border-glass); gap: var(--sp-10); margin-top: var(--sp-12); display: flex; justify-content: flex-end;">
                 <button id="btn-cancel-subclip" class="btn-secondary" style="height: 30px; font-size: var(--fs-11); padding: 0 var(--sp-14); background: rgba(255,255,255,0.06); border: 1px solid var(--border-glass); color: #cbd5e1; border-radius: 4px; cursor: pointer;">Cancelar</button>
-                <button id="btn-confirm-subclip" class="btn-primary" style="height: 30px; font-size: var(--fs-11); padding: 0 var(--sp-16); --primary-bg: linear-gradient(135deg, rgba(139,92,246,0.8), rgba(6,182,212,0.8)); border: none; --primary-ink: #fff; font-weight: 600; border-radius: 4px; cursor: pointer; display: inline-flex; align-items: center; gap: var(--sp-6);">
+                <button id="btn-confirm-subclip" class="btn-primary" style="height: 30px; font-size: var(--fs-11); padding: 0 var(--sp-16); --primary-bg: linear-gradient(135deg, rgba(139,92,246,0.8), color-mix(in srgb, var(--t-accent, rgb(6, 182, 212)) 80%, transparent)); border: none; --primary-ink: #fff; font-weight: 600; border-radius: 4px; cursor: pointer; display: inline-flex; align-items: center; gap: var(--sp-6);">
                     <i class="fa-solid fa-scissors"></i> Criar Subclipe
                 </button>
             </div>
@@ -2330,11 +2330,11 @@
     </div>
 
     <!-- Diálogo Flutuante: Velocidade / Duração do Clipe (Clip Speed / Duration - Ctrl+R) -->
-    <div id="clip-speed-modal" class="floating-speed-dialog glassmorphism" style="display: none; position: fixed; top: 90px; right: 30px; width: 420px; z-index: 9990; border: 1px solid var(--t-line-strong, rgba(6, 182, 212, 0.45)); box-shadow: 0 16px 45px rgba(0,0,0,0.75); border-radius: 8px; overflow: hidden; pointer-events: auto; background: var(--t-surface-3, rgba(15, 23, 42, 0.95)); backdrop-filter: blur(20px);">
+    <div id="clip-speed-modal" class="floating-speed-dialog glassmorphism" style="display: none; position: fixed; top: 90px; right: 30px; width: 420px; z-index: 9990; border: 1px solid var(--t-line-strong, color-mix(in srgb, var(--t-accent, rgb(6, 182, 212)) 45%, transparent)); box-shadow: 0 16px 45px rgba(0,0,0,0.75); border-radius: 8px; overflow: hidden; pointer-events: auto; background: var(--t-surface-3, rgba(15, 23, 42, 0.95)); backdrop-filter: blur(20px);">
         <div style="padding: var(--sp-16); display: flex; flex-direction: column; gap: var(--sp-12);">
             <div class="modal-header" id="clip-speed-header" style="display: flex; justify-content: space-between; align-items: center; padding-bottom: var(--sp-8); border-bottom: 1px solid var(--border-glass); cursor: move; user-select: none;">
                 <div style="display: flex; align-items: center; gap: var(--sp-8);">
-                    <i class="fa-solid fa-gauge-high" style="color: var(--color-cyan); font-size: var(--fs-14);"></i>
+                    <i class="fa-solid fa-gauge-high" style="color: var(--accent); font-size: var(--fs-14);"></i>
                     <h2 style="font-size: var(--fs-13); margin: 0; font-weight: 600; color: #f1f5f9;">Velocidade / Duração do Clipe</h2>
                 </div>
                 <button class="btn-close-modal" id="btn-close-clip-speed-modal" title="Fechar" style="font-size: var(--fs-18); background: transparent; border: none; color: var(--text-secondary); cursor: pointer; line-height: 1; padding: var(--sp-2) var(--sp-6);">&times;</button>
@@ -2343,10 +2343,10 @@
                 <!-- Informações do Clipe Alvo -->
                 <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); border-radius: 6px; padding: var(--sp-4) var(--sp-10); font-size: var(--fs-11);">
                     <div style="display: flex; align-items: center; gap: var(--sp-6); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 70%;">
-                        <i class="fa-solid fa-film" style="color: var(--color-cyan); font-size: var(--fs-11);"></i>
+                        <i class="fa-solid fa-film" style="color: var(--accent); font-size: var(--fs-11);"></i>
                         <span id="clip-speed-target-name" style="color: #fff; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Clipe</span>
                     </div>
-                    <span id="clip-speed-target-track" class="badge-track" style="font-size: var(--fs-9); padding: var(--sp-2) var(--sp-6); border-radius: 4px; background: var(--t-tint-3, rgba(6,182,212,0.15)); color: var(--color-cyan); font-weight: bold;">V1</span>
+                    <span id="clip-speed-target-track" class="badge-track" style="font-size: var(--fs-9); padding: var(--sp-2) var(--sp-6); border-radius: 4px; background: var(--t-tint-3, color-mix(in srgb, var(--t-accent, rgb(6, 182, 212)) 15%, transparent)); color: var(--accent); font-weight: bold;">V1</span>
                 </div>
 
                 <!-- Linha Velocidade (%) e Duração com Trava Proporcional -->
@@ -2362,7 +2362,7 @@
 
                     <!-- Botão Vínculo Proporcional (Trava) -->
                     <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; margin-top: var(--sp-14);">
-                        <button id="btn-clip-speed-lock" class="btn-speed-lock active" data-tooltip="Vínculo Proporcional Ativo: alterar velocidade recalcula a duração e vice-versa" style="background: var(--t-tint-3, rgba(6,182,212,0.15)); border: 1px solid var(--t-line-strong, rgba(6,182,212,0.4)); color: var(--color-cyan); width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s;">
+                        <button id="btn-clip-speed-lock" class="btn-speed-lock active" data-tooltip="Vínculo Proporcional Ativo: alterar velocidade recalcula a duração e vice-versa" style="background: var(--t-tint-3, color-mix(in srgb, var(--t-accent, rgb(6, 182, 212)) 15%, transparent)); border: 1px solid var(--t-line-strong, color-mix(in srgb, var(--t-accent, rgb(6, 182, 212)) 40%, transparent)); color: var(--accent); width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s;">
                             <i class="fa-solid fa-link" style="font-size: var(--fs-11);"></i>
                         </button>
                     </div>
@@ -2390,17 +2390,17 @@
 
                 <!-- Slider Contínuo (Duplo Clique para 100%) -->
                 <div style="display: flex; align-items: center; gap: var(--sp-8);">
-                    <input type="range" id="clip-speed-slider" min="10" max="500" value="100" data-tooltip="Duplo clique para voltar a 100%" style="flex: 1; accent-color: var(--color-cyan); cursor: pointer;">
+                    <input type="range" id="clip-speed-slider" min="10" max="500" value="100" data-tooltip="Duplo clique para voltar a 100%" style="flex: 1; accent-color: var(--accent); cursor: pointer;">
                 </div>
 
                 <!-- Preenchimento de Espaço na Trilha (Fit to Gap) -->
                 <div id="clip-speed-gap-container" style="display: flex; flex-direction: column; gap: var(--sp-6); border-top: 1px solid var(--border-glass); padding-top: var(--sp-10);">
                     <div style="display: flex; justify-content: space-between; align-items: center;">
                         <span style="font-size: var(--fs-10); text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); display: flex; align-items: center; gap: var(--sp-4);">
-                            <i class="fa-solid fa-arrows-to-dot" style="color: var(--color-cyan); font-size: var(--fs-10);"></i>
+                            <i class="fa-solid fa-arrows-to-dot" style="color: var(--accent); font-size: var(--fs-10);"></i>
                             Preencher Espaço na Trilha
                         </span>
-                        <span id="clip-speed-gap-info" style="font-size: var(--fs-10); color: var(--color-cyan); font-family: monospace;"></span>
+                        <span id="clip-speed-gap-info" style="font-size: var(--fs-10); color: var(--accent); font-family: monospace;"></span>
                     </div>
                     <div style="display: grid; grid-template-columns: 1fr 1.15fr 1fr; gap: var(--sp-6);">
                         <button type="button" class="btn-gap-fill" id="btn-clip-speed-fill-left" title="Preencher espaço à esquerda (para trás) até o clipe anterior ou início da pista">
@@ -2420,14 +2420,14 @@
                     <span style="font-size: var(--fs-10); text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); display: block;">Comportamento na Timeline</span>
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-8);">
                         <label style="display: flex; align-items: center; gap: var(--sp-6); font-size: var(--fs-11); color: #e2e8f0; background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); border-radius: 4px; padding: var(--sp-6) var(--sp-8); cursor: pointer; user-select: none;">
-                            <input type="radio" name="clip-speed-mode" id="rad-clip-speed-ripple" value="ripple" checked style="accent-color: var(--color-cyan); cursor: pointer;">
+                            <input type="radio" name="clip-speed-mode" id="rad-clip-speed-ripple" value="ripple" checked style="accent-color: var(--accent); cursor: pointer;">
                             <span style="display: flex; align-items: center; gap: var(--sp-4);">
-                                <i class="fa-solid fa-arrows-left-right-to-line" style="color: var(--color-cyan); font-size: var(--fs-10);"></i>
+                                <i class="fa-solid fa-arrows-left-right-to-line" style="color: var(--accent); font-size: var(--fs-10);"></i>
                                 Deslocar (Ripple)
                             </span>
                         </label>
                         <label style="display: flex; align-items: center; gap: var(--sp-6); font-size: var(--fs-11); color: #e2e8f0; background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); border-radius: 4px; padding: var(--sp-6) var(--sp-8); cursor: pointer; user-select: none;">
-                            <input type="radio" name="clip-speed-mode" id="rad-clip-speed-cut" value="cut" style="accent-color: var(--color-cyan); cursor: pointer;">
+                            <input type="radio" name="clip-speed-mode" id="rad-clip-speed-cut" value="cut" style="accent-color: var(--accent); cursor: pointer;">
                             <span style="display: flex; align-items: center; gap: var(--sp-4);">
                                 <i class="fa-solid fa-scissors" style="color: #f59e0b; font-size: var(--fs-10);"></i>
                                 Cortar (Manter Tam.)
@@ -2441,14 +2441,14 @@
                 <!-- Checkboxes de Opções Avançadas -->
                 <div style="display: flex; flex-direction: column; gap: var(--sp-8);">
                     <label style="display: flex; align-items: center; gap: var(--sp-8); font-size: var(--fs-11); color: var(--text-secondary); cursor: pointer; user-select: none;">
-                        <input type="checkbox" id="chk-clip-speed-reverse" style="accent-color: var(--color-cyan); cursor: pointer;">
+                        <input type="checkbox" id="chk-clip-speed-reverse" style="accent-color: var(--accent); cursor: pointer;">
                         <span style="display: flex; align-items: center; gap: var(--sp-6);">
                             <i class="fa-solid fa-backward" style="color: #f43f5e; font-size: var(--fs-10);"></i>
                             Inverter Reprodução (Reverse Clip)
                         </span>
                     </label>
                     <label style="display: flex; align-items: center; gap: var(--sp-8); font-size: var(--fs-11); color: var(--text-secondary); cursor: pointer; user-select: none;">
-                        <input type="checkbox" id="chk-clip-speed-pitch" checked style="accent-color: var(--color-cyan); cursor: pointer;">
+                        <input type="checkbox" id="chk-clip-speed-pitch" checked style="accent-color: var(--accent); cursor: pointer;">
                         <span style="display: flex; align-items: center; gap: var(--sp-6);">
                             <i class="fa-solid fa-music" style="color: #a855f7; font-size: var(--fs-10);"></i>
                             Manter afinação original do áudio (Pitch Correction)
@@ -2458,7 +2458,7 @@
             </div>
             <div class="modal-footer" style="padding-top: var(--sp-10); border-top: 1px solid var(--border-glass); gap: var(--sp-10); display: flex; justify-content: flex-end;">
                 <button id="btn-cancel-clip-speed" class="btn-secondary" style="height: 30px; font-size: var(--fs-11); padding: 0 var(--sp-14); background: rgba(255,255,255,0.06); border: 1px solid var(--border-glass); color: #cbd5e1; border-radius: 4px; cursor: pointer;">Fechar</button>
-                <button id="btn-confirm-clip-speed" class="btn-primary" style="height: 30px; font-size: var(--fs-11); padding: 0 var(--sp-16); --primary-bg: linear-gradient(135deg, rgba(6,182,212,0.85), rgba(139,92,246,0.85)); border: none; --primary-ink: #fff; font-weight: 600; border-radius: 4px; cursor: pointer; display: inline-flex; align-items: center; gap: var(--sp-6); --primary-shadow: 0 0 12px var(--t-glow, rgba(6,182,212,0.3));">
+                <button id="btn-confirm-clip-speed" class="btn-primary" style="height: 30px; font-size: var(--fs-11); padding: 0 var(--sp-16); --primary-bg: linear-gradient(135deg, color-mix(in srgb, var(--t-accent, rgb(6, 182, 212)) 85%, transparent), rgba(139,92,246,0.85)); border: none; --primary-ink: #fff; font-weight: 600; border-radius: 4px; cursor: pointer; display: inline-flex; align-items: center; gap: var(--sp-6); --primary-shadow: 0 0 12px var(--t-glow, color-mix(in srgb, var(--t-accent, rgb(6, 182, 212)) 30%, transparent));">
                     <i class="fa-solid fa-check"></i> Aplicar
                 </button>
             </div>
@@ -2467,10 +2467,10 @@
 
     <!-- Gerenciador de Nomes & Falantes -->
     <div id="names-manager-modal" class="modal-overlay" style="display: none; background: var(--t-surface-1, rgba(10, 8, 14, 0.95)); backdrop-filter: blur(20px);">
-        <div class="modal-content glassmorphism" style="width: 80%; max-width: 700px; height: 80vh; display: flex; flex-direction: column; padding: var(--sp-24); box-sizing: border-box; gap: var(--sp-14); border: 1px solid var(--t-line-strong, rgba(6, 182, 212, 0.3));">
+        <div class="modal-content glassmorphism" style="width: 80%; max-width: 700px; height: 80vh; display: flex; flex-direction: column; padding: var(--sp-24); box-sizing: border-box; gap: var(--sp-14); border: 1px solid var(--t-line-strong, color-mix(in srgb, var(--t-accent, rgb(6, 182, 212)) 30%, transparent));">
             <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-glass); padding-bottom: var(--sp-12);">
                 <div style="display: flex; align-items: center; gap: var(--sp-12);">
-                    <i class="fa-solid fa-address-book" style="color: var(--color-cyan); font-size: var(--fs-20);"></i>
+                    <i class="fa-solid fa-address-book" style="color: var(--accent); font-size: var(--fs-20);"></i>
                     <div>
                         <h3 style="margin: 0; font-size: var(--fs-18); font-weight: 700; font-family: var(--font-heading);">Gerenciador de Nomes & Falantes</h3>
                         <span style="font-size: var(--fs-12); color: var(--text-muted);">Edite, delete ou mescle nomes e falantes do projeto</span>
@@ -2489,8 +2489,8 @@
                 </div>
                 
                 <!-- Barra de Ações em Massa (oculta por padrão) -->
-                <div id="names-bulk-actions-bar" style="display: none; align-items: center; justify-content: space-between; background: var(--t-tint-2, rgba(6, 182, 212, 0.1)); border: 1px solid var(--t-line-strong, rgba(6, 182, 212, 0.3)); padding: var(--sp-8) var(--sp-12); border-radius: 6px; font-size: var(--fs-11); flex-shrink: 0; margin-bottom: var(--sp-4);">
-                    <span style="color: #fff;"><strong id="names-bulk-select-count" style="color: var(--color-cyan);">0</strong> nomes selecionados</span>
+                <div id="names-bulk-actions-bar" style="display: none; align-items: center; justify-content: space-between; background: var(--t-tint-2, color-mix(in srgb, var(--t-accent, rgb(6, 182, 212)) 10%, transparent)); border: 1px solid var(--t-line-strong, color-mix(in srgb, var(--t-accent, rgb(6, 182, 212)) 30%, transparent)); padding: var(--sp-8) var(--sp-12); border-radius: 6px; font-size: var(--fs-11); flex-shrink: 0; margin-bottom: var(--sp-4);">
+                    <span style="color: #fff;"><strong id="names-bulk-select-count" style="color: var(--accent);">0</strong> nomes selecionados</span>
                     <div style="display: flex; gap: var(--sp-8); align-items: center;">
                         <button id="btn-names-bulk-delete" class="btn-secondary" style="border-color: var(--t-line-strong, rgba(239, 68, 68, 0.4)); color: #ef4444; background: var(--t-tint-2, rgba(239, 68, 68, 0.1)); height: 26px; font-size: var(--fs-11); padding: 0 var(--sp-8); cursor: pointer; border-radius: 4px;">
                             <i class="fa-solid fa-trash"></i> Deletar
@@ -2523,10 +2523,10 @@
 
     <!-- Painel de Entidades do Projeto (E-B) -->
     <div id="entities-manager-modal" class="modal-overlay" style="display: none; background: var(--t-surface-1, rgba(10, 8, 14, 0.95)); backdrop-filter: blur(20px);">
-        <div class="modal-content glassmorphism" style="width: 92%; max-width: 1180px; height: 85vh; display: flex; flex-direction: column; padding: var(--sp-24); box-sizing: border-box; gap: var(--sp-14); border: 1px solid var(--t-line-strong, rgba(6, 182, 212, 0.3));">
+        <div class="modal-content glassmorphism" style="width: 92%; max-width: 1180px; height: 85vh; display: flex; flex-direction: column; padding: var(--sp-24); box-sizing: border-box; gap: var(--sp-14); border: 1px solid var(--t-line-strong, color-mix(in srgb, var(--t-accent, rgb(6, 182, 212)) 30%, transparent));">
             <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-glass); padding-bottom: var(--sp-12);">
                 <div style="display: flex; align-items: center; gap: var(--sp-12);">
-                    <i class="fa-solid fa-address-card" style="color: var(--color-cyan); font-size: var(--fs-20);"></i>
+                    <i class="fa-solid fa-address-card" style="color: var(--accent); font-size: var(--fs-20);"></i>
                     <div>
                         <h3 style="margin: 0; font-size: var(--fs-18); font-weight: 700; font-family: var(--font-heading);">Entidades do Projeto</h3>
                         <span style="font-size: var(--fs-12); color: var(--text-muted);">Pessoas, objetos e locações — produção e obra, num só lugar</span>
@@ -2565,8 +2565,8 @@
                 </div>
 
                 <!-- Barra de Ações em Massa (oculta por padrão) -->
-                <div id="entities-bulk-actions-bar" style="display: none; align-items: center; justify-content: space-between; background: var(--t-tint-2, rgba(6, 182, 212, 0.1)); border: 1px solid var(--t-line-strong, rgba(6, 182, 212, 0.3)); padding: var(--sp-8) var(--sp-12); border-radius: 6px; font-size: var(--fs-11); flex-shrink: 0;">
-                    <span style="color: #fff;"><strong id="entities-bulk-select-count" style="color: var(--color-cyan);">0</strong> selecionadas</span>
+                <div id="entities-bulk-actions-bar" style="display: none; align-items: center; justify-content: space-between; background: var(--t-tint-2, color-mix(in srgb, var(--t-accent, rgb(6, 182, 212)) 10%, transparent)); border: 1px solid var(--t-line-strong, color-mix(in srgb, var(--t-accent, rgb(6, 182, 212)) 30%, transparent)); padding: var(--sp-8) var(--sp-12); border-radius: 6px; font-size: var(--fs-11); flex-shrink: 0;">
+                    <span style="color: #fff;"><strong id="entities-bulk-select-count" style="color: var(--accent);">0</strong> selecionadas</span>
                     <div id="entities-bulk-actions-default" style="display: flex; gap: var(--sp-8); align-items: center;">
                         <button id="btn-entities-bulk-confirm" style="border:1px solid var(--t-line-strong, rgba(16,185,129,0.4)); color: var(--color-emerald); background: var(--t-tint-2, rgba(16,185,129,0.1)); height: 26px; font-size: var(--fs-11); padding: 0 var(--sp-10); cursor: pointer; border-radius: 4px;">
                             <i class="fa-solid fa-check"></i> Confirmar
@@ -2614,10 +2614,10 @@
 
     <!-- Modal de Gerenciamento de Grupo de Rostos -->
     <div id="face-group-manager-modal" class="modal-overlay" style="display: none; background: var(--t-surface-1, rgba(10, 8, 14, 0.95)); backdrop-filter: blur(20px);">
-        <div class="modal-content glassmorphism" style="width: 80%; max-width: 900px; height: 85vh; display: flex; flex-direction: column; padding: var(--sp-24); box-sizing: border-box; gap: var(--sp-14); border: 1px solid var(--t-line-strong, rgba(6, 182, 212, 0.3));">
+        <div class="modal-content glassmorphism" style="width: 80%; max-width: 900px; height: 85vh; display: flex; flex-direction: column; padding: var(--sp-24); box-sizing: border-box; gap: var(--sp-14); border: 1px solid var(--t-line-strong, color-mix(in srgb, var(--t-accent, rgb(6, 182, 212)) 30%, transparent));">
             <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-glass); padding-bottom: var(--sp-12);">
                 <div style="display: flex; align-items: center; gap: var(--sp-12);">
-                    <i class="fa-solid fa-users-gear" style="color: var(--color-cyan); font-size: var(--fs-20);"></i>
+                    <i class="fa-solid fa-users-gear" style="color: var(--accent); font-size: var(--fs-20);"></i>
                     <div>
                         <h3 id="group-manager-title" style="margin: 0; font-size: var(--fs-18); font-weight: 700; font-family: var(--font-heading);">Gerenciar Grupo de Rostos</h3>
                         <span id="group-manager-subtitle" style="font-size: var(--fs-12); color: var(--text-muted);">Visualize e altere as desambiguações deste grupo</span>
@@ -2631,7 +2631,7 @@
             <div class="modal-body" style="flex: 1; display: flex; flex-direction: column; gap: var(--sp-14); overflow: hidden;">
                 <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.02); padding: var(--sp-12) var(--sp-16); border-radius: 8px; border: 1px solid var(--border-glass); flex-shrink: 0;">
                     <div style="font-size: var(--fs-13); color: var(--text-secondary);">
-                        Total de aparições cadastradas neste grupo: <strong id="group-manager-count-val" style="color: var(--color-cyan);">0</strong>
+                        Total de aparições cadastradas neste grupo: <strong id="group-manager-count-val" style="color: var(--accent);">0</strong>
                     </div>
                     <div style="display: flex; gap: var(--sp-8);">
                         <button id="btn-group-confirm-all" class="btn-primary" style="border-color: var(--t-line-strong, rgba(16, 185, 129, 0.5)); color: #10b981; background: var(--t-tint-3, rgba(16, 185, 129, 0.15)); height: 32px; font-size: var(--fs-11); padding: 0 var(--sp-14); font-weight: 600; cursor: pointer; border-radius: 6px;">
@@ -2644,10 +2644,10 @@
                 </div>
                 
                 <!-- Barra de Ações Rápidas para Selecionados (oculta por padrão) -->
-                <div id="group-manager-bulk-bar" style="display: none; flex-direction: column; gap: var(--sp-10); background: var(--t-tint-2, rgba(6, 182, 212, 0.1)); border: 1px solid var(--t-line-strong, rgba(6, 182, 212, 0.3)); padding: var(--sp-12) var(--sp-16); border-radius: 8px; animation: fadeIn 0.2s ease; flex-shrink: 0;">
+                <div id="group-manager-bulk-bar" style="display: none; flex-direction: column; gap: var(--sp-10); background: var(--t-tint-2, color-mix(in srgb, var(--t-accent, rgb(6, 182, 212)) 10%, transparent)); border: 1px solid var(--t-line-strong, color-mix(in srgb, var(--t-accent, rgb(6, 182, 212)) 30%, transparent)); padding: var(--sp-12) var(--sp-16); border-radius: 8px; animation: fadeIn 0.2s ease; flex-shrink: 0;">
                     <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
                         <div style="display: flex; align-items: center; gap: var(--sp-8); font-size: var(--fs-12); font-weight: 600; color: #fff;">
-                            <i class="fa-solid fa-square-check" style="color: var(--color-cyan);"></i>
+                            <i class="fa-solid fa-square-check" style="color: var(--accent);"></i>
                             <span id="group-manager-bulk-count">0 itens selecionados</span>
                         </div>
                         <div style="display: flex; gap: var(--sp-8);">
@@ -2691,9 +2691,9 @@
         <div style="width: 100%; height: 100%; display: flex; flex-direction: column; padding: var(--sp-28); box-sizing: border-box;">
             <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-glass); padding-bottom: var(--sp-20);">
                 <div style="display: flex; align-items: center; gap: var(--sp-14);">
-                    <i class="fa-solid fa-people-line" style="color: var(--color-cyan); font-size: var(--fs-24);"></i>
+                    <i class="fa-solid fa-people-line" style="color: var(--accent); font-size: var(--fs-24);"></i>
                     <div>
-                        <h2 style="font-size: var(--fs-20); font-weight: 700; margin: 0; font-family: var(--font-heading); background: linear-gradient(90deg, #06b6d4, #8b5cf6); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Desambiguação Rápida de Rostos</h2>
+                        <h2 style="font-size: var(--fs-20); font-weight: 700; margin: 0; font-family: var(--font-heading); background: linear-gradient(90deg, var(--t-accent, #06b6d4), #8b5cf6); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Desambiguação Rápida de Rostos</h2>
                         <span style="font-size: var(--fs-12); color: var(--text-muted);">Identifique rostos não rotulados ou em grupos desconhecidos (Estilo Google Fotos)</span>
                     </div>
                 </div>
@@ -2703,9 +2703,9 @@
             </div>
             
             <!-- Barra de Ações em Massa (oculta por padrão) -->
-            <div id="fullscreen-bulk-actions-bar" style="display: none; align-items: center; justify-content: space-between; background: var(--t-tint-2, rgba(6, 182, 212, 0.1)); border: 1px solid var(--t-line-strong, rgba(6, 182, 212, 0.3)); padding: var(--sp-12) var(--sp-20); border-radius: 8px; margin-top: var(--sp-14); box-sizing: border-box; animation: fadeIn 0.2s ease;">
+            <div id="fullscreen-bulk-actions-bar" style="display: none; align-items: center; justify-content: space-between; background: var(--t-tint-2, color-mix(in srgb, var(--t-accent, rgb(6, 182, 212)) 10%, transparent)); border: 1px solid var(--t-line-strong, color-mix(in srgb, var(--t-accent, rgb(6, 182, 212)) 30%, transparent)); padding: var(--sp-12) var(--sp-20); border-radius: 8px; margin-top: var(--sp-14); box-sizing: border-box; animation: fadeIn 0.2s ease;">
                 <div style="display: flex; align-items: center; gap: var(--sp-10);">
-                    <i class="fa-solid fa-square-check" style="color: var(--color-cyan); font-size: var(--fs-18);"></i>
+                    <i class="fa-solid fa-square-check" style="color: var(--accent); font-size: var(--fs-18);"></i>
                     <span id="bulk-select-count" style="font-size: var(--fs-13); font-weight: 600; color: #fff;">0 itens selecionados</span>
                 </div>
                 <div style="display: flex; align-items: center; gap: var(--sp-14);">
@@ -2766,8 +2766,8 @@
     </div>
 
     <!-- Tooltip flutuante estilizada para Marcadores na Timeline (Ultra-compacta e sutil) -->
-    <div id="timeline-marker-tooltip" class="glassmorphism" style="display: none; position: fixed; z-index: 3500; padding: var(--sp-4) var(--sp-8); border-radius: 5px; background: var(--t-surface-3, rgba(15, 23, 42, 0.9)); opacity: 0.9; border: 1px solid var(--color-cyan); box-shadow: 0 4px 12px rgba(0,0,0,0.4); pointer-events: none; backdrop-filter: blur(8px); flex-direction: column; gap: var(--sp-2); max-width: 200px; box-sizing: border-box;">
-        <div class="marker-tooltip-title" style="font-weight: 600; font-size: var(--fs-10); font-family: var(--font-heading); display: flex; align-items: center; gap: var(--sp-4); color: var(--color-cyan); line-height: 1.2;"></div>
+    <div id="timeline-marker-tooltip" class="glassmorphism" style="display: none; position: fixed; z-index: 3500; padding: var(--sp-4) var(--sp-8); border-radius: 5px; background: var(--t-surface-3, rgba(15, 23, 42, 0.9)); opacity: 0.9; border: 1px solid var(--accent); box-shadow: 0 4px 12px rgba(0,0,0,0.4); pointer-events: none; backdrop-filter: blur(8px); flex-direction: column; gap: var(--sp-2); max-width: 200px; box-sizing: border-box;">
+        <div class="marker-tooltip-title" style="font-weight: 600; font-size: var(--fs-10); font-family: var(--font-heading); display: flex; align-items: center; gap: var(--sp-4); color: var(--accent); line-height: 1.2;"></div>
         <div class="marker-tooltip-comment" style="font-size: var(--fs-10); color: #94a3b8; font-family: var(--font-body); line-height: 1.2; display: none;"></div>
     </div>
 
@@ -2776,11 +2776,11 @@
         <!-- Cabeçalho Compacto -->
         <div style="display: flex; align-items: center; justify-content: space-between;">
             <div style="display: flex; align-items: center; gap: var(--sp-6);">
-                <i class="fa-solid fa-bookmark" id="marker-edit-icon" style="color: var(--color-cyan); font-size: var(--fs-11);"></i>
+                <i class="fa-solid fa-bookmark" id="marker-edit-icon" style="color: var(--accent); font-size: var(--fs-11);"></i>
                 <span style="font-weight: 700; font-size: var(--fs-12); color: #fff; font-family: var(--font-heading);">Editar Marcador</span>
             </div>
             <div style="display: flex; align-items: center; gap: var(--sp-8);">
-                <span id="marker-edit-timecode" style="font-size: var(--fs-10); font-family: monospace; color: var(--color-cyan); background: var(--t-tint-3, rgba(6, 182, 212, 0.15)); border: 1px solid var(--t-line-strong, rgba(6, 182, 212, 0.3)); padding: var(--sp-2) var(--sp-6); border-radius: 4px; font-weight: 600;">00:00:00:00</span>
+                <span id="marker-edit-timecode" style="font-size: var(--fs-10); font-family: monospace; color: var(--accent); background: var(--t-tint-3, color-mix(in srgb, var(--t-accent, rgb(6, 182, 212)) 15%, transparent)); border: 1px solid var(--t-line-strong, color-mix(in srgb, var(--t-accent, rgb(6, 182, 212)) 30%, transparent)); padding: var(--sp-2) var(--sp-6); border-radius: 4px; font-weight: 600;">00:00:00:00</span>
                 <button id="btn-close-marker-modal" tabindex="-1" title="Fechar (Esc)" style="border: none; background: none; color: var(--text-secondary); cursor: pointer; font-size: var(--fs-13); padding: 0 var(--sp-2);"><i class="fa-solid fa-xmark"></i></button>
             </div>
         </div>
@@ -2815,7 +2815,7 @@
                 </div>
                 <div style="display: flex; gap: var(--sp-6);">
                     <button id="btn-delete-marker" type="button" tabindex="-1" style="background: transparent; border: 1px solid var(--t-line-strong, rgba(239, 68, 68, 0.4)); color: #f87171; border-radius: 4px; height: 22px; padding: 0 var(--sp-8); font-size: var(--fs-10); font-weight: 500; cursor: pointer; display: flex; align-items: center; gap: var(--sp-4);"><i class="fa-solid fa-trash"></i> Excluir</button>
-                    <button id="btn-marker-save" type="button" tabindex="4" style="background: var(--color-cyan); border: none; color: #090d16; border-radius: 4px; height: 22px; padding: 0 var(--sp-10); font-size: var(--fs-10); font-weight: 700; cursor: pointer;">Salvar</button>
+                    <button id="btn-marker-save" type="button" tabindex="4" style="background: var(--accent); border: none; color: #090d16; border-radius: 4px; height: 22px; padding: 0 var(--sp-10); font-size: var(--fs-10); font-weight: 700; cursor: pointer;">Salvar</button>
                 </div>
             </div>
         </div>
@@ -2826,13 +2826,13 @@
         <div id="modal-timeline-help-card" class="modal-fullscreen-container is-maximized" style="background: var(--t-surface-2, rgba(11, 17, 32, 0.99)); width: 100vw; height: 100vh; border: none; border-radius: 0; padding: var(--sp-12) var(--sp-18); display: flex; flex-direction: column; gap: var(--sp-8); position: relative; overflow-y: hidden; box-sizing: border-box;">
             <!-- Cabeçalho com Título, Seletor de Perfil NLE e Fechar -->
             <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--t-line-weak, rgba(255,255,255,0.08)); padding-bottom: var(--sp-8); flex-shrink: 0; gap: var(--sp-14); flex-wrap: wrap;">
-                <h3 style="color: var(--color-cyan); margin: 0; font-family: var(--font-heading); display: flex; align-items: center; gap: var(--sp-10); font-size: var(--fs-16); font-weight: 700;">
-                    <i class="fa-solid fa-keyboard" style="color: var(--color-cyan);"></i> Atalhos & Perfis de Teclado (NLE)
+                <h3 style="color: var(--accent); margin: 0; font-family: var(--font-heading); display: flex; align-items: center; gap: var(--sp-10); font-size: var(--fs-16); font-weight: 700;">
+                    <i class="fa-solid fa-keyboard" style="color: var(--accent);"></i> Atalhos & Perfis de Teclado (NLE)
                 </h3>
                 <div style="display: flex; align-items: center; gap: var(--sp-10);">
                     <div style="display: flex; align-items: center; gap: var(--sp-6);">
                         <span style="font-size: var(--fs-11); color: var(--text-secondary); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Perfil:</span>
-                        <select id="select-keymap-preset" class="nle-select" style="background: var(--t-surface-2, rgba(10, 15, 26, 0.9)); color: var(--color-cyan); border: 1px solid var(--border-glass); border-radius: 6px; padding: var(--sp-2) var(--sp-8); font-size: var(--fs-12); font-weight: 600; outline: none; cursor: pointer;">
+                        <select id="select-keymap-preset" class="nle-select" style="background: var(--t-surface-2, rgba(10, 15, 26, 0.9)); color: var(--accent); border: 1px solid var(--border-glass); border-radius: 6px; padding: var(--sp-2) var(--sp-8); font-size: var(--fs-12); font-weight: 600; outline: none; cursor: pointer;">
                             <option value="capiau">🎬 CapIAu Padrão</option>
                             <option value="kdenlive">🐧 Kdenlive</option>
                             <option value="premiere">🟣 Adobe Premiere Pro</option>
@@ -2864,7 +2864,7 @@
                 <div style="display: flex; align-items: center; justify-content: space-between; gap: var(--sp-8); flex-wrap: wrap; flex-shrink: 0; width: 100%; max-width: 1260px; margin: 0 auto;">
                     <div style="display: flex; align-items: center; gap: var(--sp-4);">
                         <span style="font-size: var(--fs-10); color: var(--text-secondary); font-weight: 700; text-transform: uppercase;">Camada:</span>
-                        <button class="vk-mod-btn active" data-layer="none" style="padding: var(--sp-2) var(--sp-8); border-radius: 4px; font-size: var(--fs-11); font-weight: 600; background: var(--t-tint-3, rgba(6,182,212,0.2)); border: 1px solid var(--color-cyan); color: var(--color-cyan); cursor: pointer;">Padrão</button>
+                        <button class="vk-mod-btn active" data-layer="none" style="padding: var(--sp-2) var(--sp-8); border-radius: 4px; font-size: var(--fs-11); font-weight: 600; background: var(--t-tint-3, color-mix(in srgb, var(--t-accent, rgb(6, 182, 212)) 20%, transparent)); border: 1px solid var(--accent); color: var(--accent); cursor: pointer;">Padrão</button>
                         <button class="vk-mod-btn" data-layer="shift" style="padding: var(--sp-2) var(--sp-8); border-radius: 4px; font-size: var(--fs-11); font-weight: 600; background: rgba(255,255,255,0.04); border: 1px solid var(--t-line-weak, rgba(255,255,255,0.08)); color: var(--text-secondary); cursor: pointer;">+ Shift</button>
                         <button class="vk-mod-btn" data-layer="ctrl" style="padding: var(--sp-2) var(--sp-8); border-radius: 4px; font-size: var(--fs-11); font-weight: 600; background: rgba(255,255,255,0.04); border: 1px solid var(--t-line-weak, rgba(255,255,255,0.08)); color: var(--text-secondary); cursor: pointer;">+ Ctrl</button>
                         <button class="vk-mod-btn" data-layer="alt" style="padding: var(--sp-2) var(--sp-8); border-radius: 4px; font-size: var(--fs-11); font-weight: 600; background: rgba(255,255,255,0.04); border: 1px solid var(--t-line-weak, rgba(255,255,255,0.08)); color: var(--text-secondary); cursor: pointer;">+ Alt</button>
@@ -2873,7 +2873,7 @@
 
                     <!-- Legenda de Cores -->
                     <div style="display: flex; align-items: center; gap: var(--sp-10); font-size: var(--fs-10); color: var(--text-secondary); font-family: monospace;">
-                        <span style="display: flex; align-items: center; gap: var(--sp-4);"><span style="width: 8px; height: 8px; border-radius: 2px; background: rgba(6,182,212,0.6); border: 1px solid var(--color-cyan); display: inline-block;"></span> Reprodução</span>
+                        <span style="display: flex; align-items: center; gap: var(--sp-4);"><span style="width: 8px; height: 8px; border-radius: 2px; background: color-mix(in srgb, var(--t-accent, rgb(6, 182, 212)) 60%, transparent); border: 1px solid var(--accent); display: inline-block;"></span> Reprodução</span>
                         <span style="display: flex; align-items: center; gap: var(--sp-4);"><span style="width: 8px; height: 8px; border-radius: 2px; background: rgba(245,158,11,0.6); border: 1px solid var(--color-amber); display: inline-block;"></span> Ferramentas</span>
                         <span style="display: flex; align-items: center; gap: var(--sp-4);"><span style="width: 8px; height: 8px; border-radius: 2px; background: rgba(139,92,246,0.6); border: 1px solid var(--color-violet); display: inline-block;"></span> Cortes/Split</span>
                         <span style="display: flex; align-items: center; gap: var(--sp-4);"><span style="width: 8px; height: 8px; border-radius: 2px; background: rgba(56,189,248,0.6); border: 1px solid var(--color-sky); display: inline-block;"></span> Marcadores</span>
@@ -3064,7 +3064,7 @@
                 <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--sp-10); flex: 1; min-height: 0;">
                     <!-- Coluna A: Reprodução & Shuttle -->
                     <div style="background: var(--t-surface-2, rgba(10, 15, 26, 0.7)); border: 1px solid var(--t-line-weak, rgba(255,255,255,0.06)); border-radius: 8px; padding: var(--sp-8) var(--sp-10); display: flex; flex-direction: column; gap: var(--sp-6); min-height: 0; height: 100%; box-sizing: border-box;">
-                        <div style="display: flex; align-items: center; gap: var(--sp-6); color: var(--color-cyan); font-family: monospace; font-size: var(--fs-11); font-weight: 700; border-bottom: 1px solid var(--t-line-weak, rgba(255,255,255,0.06)); padding-bottom: var(--sp-4); flex-shrink: 0;">
+                        <div style="display: flex; align-items: center; gap: var(--sp-6); color: var(--accent); font-family: monospace; font-size: var(--fs-11); font-weight: 700; border-bottom: 1px solid var(--t-line-weak, rgba(255,255,255,0.06)); padding-bottom: var(--sp-4); flex-shrink: 0;">
                             <i class="fa-solid fa-play" style="font-size: var(--fs-9);"></i> SEÇÃO A · REPRODUÇÃO & NAVEGAÇÃO
                         </div>
                         <div id="vk-schematic-list-playback" style="display: flex; flex-direction: column; gap: var(--sp-4); flex: 1; min-height: 0; overflow-y: auto; padding-right: var(--sp-4);"></div>
@@ -3096,14 +3096,14 @@
                 </div>
 
                 <!-- Rodapé de Teste Ativo em Tempo Real (Live HUD) -->
-                <div style="background: var(--t-surface-2, rgba(10, 15, 26, 0.95)); border: 1px solid var(--t-line-strong, rgba(6,182,212,0.3)); border-radius: 8px; padding: var(--sp-8) var(--sp-12); display: flex; align-items: center; justify-content: space-between; gap: var(--sp-12); flex-shrink: 0;">
+                <div style="background: var(--t-surface-2, rgba(10, 15, 26, 0.95)); border: 1px solid var(--t-line-strong, color-mix(in srgb, var(--t-accent, rgb(6, 182, 212)) 30%, transparent)); border-radius: 8px; padding: var(--sp-8) var(--sp-12); display: flex; align-items: center; justify-content: space-between; gap: var(--sp-12); flex-shrink: 0;">
                     <div style="display: flex; align-items: center; gap: var(--sp-10); min-width: 0;">
-                        <div id="vk-live-combo-badge" style="padding: var(--sp-2) var(--sp-8); border-radius: 5px; background: var(--t-tint-3, rgba(6,182,212,0.15)); border: 1px solid var(--color-cyan); color: var(--color-cyan); font-family: monospace; font-weight: 700; font-size: var(--fs-12); text-align: center; min-width: 60px;">
+                        <div id="vk-live-combo-badge" style="padding: var(--sp-2) var(--sp-8); border-radius: 5px; background: var(--t-tint-3, color-mix(in srgb, var(--t-accent, rgb(6, 182, 212)) 15%, transparent)); border: 1px solid var(--accent); color: var(--accent); font-family: monospace; font-weight: 700; font-size: var(--fs-12); text-align: center; min-width: 60px;">
                             ESPAÇO
                         </div>
                         <div style="min-width: 0;">
                             <div id="vk-live-action-title" style="font-size: var(--fs-12); font-weight: 700; color: #fff; display: flex; align-items: center; gap: var(--sp-6);">
-                                <i class="fa-solid fa-circle-check" style="color: var(--color-cyan);"></i> <span>Play / Pause</span>
+                                <i class="fa-solid fa-circle-check" style="color: var(--accent);"></i> <span>Play / Pause</span>
                             </div>
                             <div id="vk-live-action-desc" style="font-size: var(--fs-11); color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
                                 Inicia ou pausa a reprodução no player focado (Source ou Program).
@@ -3121,7 +3121,7 @@
             <!-- TAB 2: Guia Rápido Dinâmico -->
             <div id="container-keymap-cheatsheet" style="flex: 1; overflow-y: auto; display: none; flex-direction: column; gap: var(--sp-12); padding-right: var(--sp-4);">
                 <p id="keymap-cheatsheet-intro" style="margin: 0; font-size: var(--fs-12); color: rgba(255,255,255,0.75);">
-                    O <strong>CapIAu-Talho</strong> está operando com o perfil ativo: <strong id="lbl-active-preset-name" style="color: var(--color-cyan);">CapIAu Padrão</strong>.
+                    O <strong>CapIAu-Talho</strong> está operando com o perfil ativo: <strong id="lbl-active-preset-name" style="color: var(--accent);">CapIAu Padrão</strong>.
                 </p>
                 <div id="keymap-cheatsheet-content" style="display: flex; flex-direction: column; gap: var(--sp-12);">
                     <!-- Preenchido dinamicamente pelo render do KeymapService -->
@@ -3184,10 +3184,10 @@
 
     <!-- Modal de Captura / Gravação de Tecla -->
     <div id="modal-key-recorder" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.75); z-index: 12000; align-items: center; justify-content: center; backdrop-filter: blur(8px);">
-        <div class="glassmorphism" style="width: 420px; background: var(--t-surface-3, rgba(15, 23, 42, 0.98)); border: 1px solid var(--color-cyan); border-radius: 12px; padding: var(--sp-20); display: flex; flex-direction: column; gap: var(--sp-14); box-shadow: 0 15px 40px rgba(0,0,0,0.8); text-align: center;">
+        <div class="glassmorphism" style="width: 420px; background: var(--t-surface-3, rgba(15, 23, 42, 0.98)); border: 1px solid var(--accent); border-radius: 12px; padding: var(--sp-20); display: flex; flex-direction: column; gap: var(--sp-14); box-shadow: 0 15px 40px rgba(0,0,0,0.8); text-align: center;">
             <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--t-line-weak, rgba(255,255,255,0.08)); padding-bottom: var(--sp-8);">
                 <h4 style="margin: 0; color: #fff; font-size: var(--fs-13); font-weight: 700; display: flex; align-items: center; gap: var(--sp-6);">
-                    <i class="fa-solid fa-keyboard" style="color: var(--color-cyan);"></i> Gravar Atalho de Teclado
+                    <i class="fa-solid fa-keyboard" style="color: var(--accent);"></i> Gravar Atalho de Teclado
                 </h4>
                 <button id="btn-cancel-key-recorder" style="border: none; background: transparent; color: var(--text-secondary); cursor: pointer; font-size: var(--fs-14);"><i class="fa-solid fa-xmark"></i></button>
             </div>
@@ -3197,8 +3197,8 @@
             </div>
 
             <!-- Caixa de Captura Interativa com Animação -->
-            <div id="key-recorder-box" class="key-recorder-recording" style="background: rgba(0,0,0,0.5); border: 1.5px dashed var(--color-cyan); border-radius: 8px; padding: var(--sp-18); display: flex; align-items: center; justify-content: center; min-height: 50px;">
-                <span id="lbl-recorder-live-keys" style="font-family: monospace; font-size: var(--fs-16); font-weight: 700; color: var(--color-cyan); letter-spacing: 1px;">
+            <div id="key-recorder-box" class="key-recorder-recording" style="background: rgba(0,0,0,0.5); border: 1.5px dashed var(--accent); border-radius: 8px; padding: var(--sp-18); display: flex; align-items: center; justify-content: center; min-height: 50px;">
+                <span id="lbl-recorder-live-keys" style="font-family: monospace; font-size: var(--fs-16); font-weight: 700; color: var(--accent); letter-spacing: 1px;">
                     Aguardando teclas...
                 </span>
             </div>
@@ -3217,10 +3217,10 @@
 
     <!-- Modal de Entrevista (Atalho 'A') -->
     <div id="interview-modal" class="modal-overlay" style="display: none; background: var(--t-surface-1, rgba(10, 8, 14, 0.96)); backdrop-filter: blur(20px);">
-        <div class="modal-content glassmorphism" style="width: 90%; max-width: 1200px; height: 90vh; display: flex; flex-direction: column; padding: var(--sp-24); box-sizing: border-box; gap: var(--sp-14); border: 1px solid var(--t-line-strong, rgba(6, 182, 212, 0.3));">
+        <div class="modal-content glassmorphism" style="width: 90%; max-width: 1200px; height: 90vh; display: flex; flex-direction: column; padding: var(--sp-24); box-sizing: border-box; gap: var(--sp-14); border: 1px solid var(--t-line-strong, color-mix(in srgb, var(--t-accent, rgb(6, 182, 212)) 30%, transparent));">
             <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-glass); padding-bottom: var(--sp-12); flex-shrink: 0;">
                 <div style="display: flex; align-items: center; gap: var(--sp-10);">
-                    <i class="fa-solid fa-microphone-lines" style="color: var(--color-cyan); font-size: var(--fs-18);"></i>
+                    <i class="fa-solid fa-microphone-lines" style="color: var(--accent); font-size: var(--fs-18);"></i>
                     <h3 id="interview-modal-title" style="color: #fff; margin: 0; font-family: var(--font-heading); font-size: var(--fs-16);">Detalhes da Entrevista</h3>
                 </div>
                 <button class="btn-close-modal" id="btn-close-interview-modal" style="font-size: var(--fs-20); background: transparent; border: none; color: var(--text-secondary); cursor: pointer;"><i class="fa-solid fa-xmark"></i></button>
@@ -3234,12 +3234,12 @@
                         <video id="interview-modal-video" controls preload="auto" playsinline style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; outline: none; border-radius: 6px; z-index: 10; pointer-events: auto;"></video>
                         
                         <!-- Controles do Player do Modal (I, O, E, Câmera) -->
-                        <div class="modal-player-controls glassmorphism" style="position: absolute; bottom: 45px; left: 10px; right: 10px; z-index: 20; padding: var(--sp-10); border-radius: 6px; background: var(--t-surface-1, rgba(10, 8, 14, 0.9)); display: flex; flex-direction: column; gap: var(--sp-8); border: 1px solid var(--t-line-strong, rgba(6, 182, 212, 0.3)); opacity: 0; pointer-events: none; transition: opacity 0.2s ease;">
+                        <div class="modal-player-controls glassmorphism" style="position: absolute; bottom: 45px; left: 10px; right: 10px; z-index: 20; padding: var(--sp-10); border-radius: 6px; background: var(--t-surface-1, rgba(10, 8, 14, 0.9)); display: flex; flex-direction: column; gap: var(--sp-8); border: 1px solid var(--t-line-strong, color-mix(in srgb, var(--t-accent, rgb(6, 182, 212)) 30%, transparent)); opacity: 0; pointer-events: none; transition: opacity 0.2s ease;">
                             <div style="display: flex; gap: var(--sp-6); justify-content: space-between; align-items: center;">
-                                <button id="btn-interview-modal-mark-in" class="btn-control" style="flex: 1; height: 28px; border-radius: 4px; font-size: var(--fs-10); font-weight: 700; color: var(--color-cyan); display: flex; align-items: center; justify-content: center; gap: var(--sp-4); border: 1px solid var(--t-line-weak, rgba(255,255,255,0.05)); background: rgba(255,255,255,0.02);" title="Marcar Início (Atalho I)">
+                                <button id="btn-interview-modal-mark-in" class="btn-control" style="flex: 1; height: 28px; border-radius: 4px; font-size: var(--fs-10); font-weight: 700; color: var(--accent); display: flex; align-items: center; justify-content: center; gap: var(--sp-4); border: 1px solid var(--t-line-weak, rgba(255,255,255,0.05)); background: rgba(255,255,255,0.02);" title="Marcar Início (Atalho I)">
                                     <i class="fa-solid fa-right-to-bracket"></i> [ I ] IN
                                 </button>
-                                <button id="btn-interview-modal-mark-out" class="btn-control" style="flex: 1; height: 28px; border-radius: 4px; font-size: var(--fs-10); font-weight: 700; color: var(--color-cyan); display: flex; align-items: center; justify-content: center; gap: var(--sp-4); border: 1px solid var(--t-line-weak, rgba(255,255,255,0.05)); background: rgba(255,255,255,0.02);" title="Marcar Fim (Atalho O)">
+                                <button id="btn-interview-modal-mark-out" class="btn-control" style="flex: 1; height: 28px; border-radius: 4px; font-size: var(--fs-10); font-weight: 700; color: var(--accent); display: flex; align-items: center; justify-content: center; gap: var(--sp-4); border: 1px solid var(--t-line-weak, rgba(255,255,255,0.05)); background: rgba(255,255,255,0.02);" title="Marcar Fim (Atalho O)">
                                     <i class="fa-solid fa-right-from-bracket"></i> [ O ] OUT
                                 </button>
                                 <button id="btn-interview-modal-set-thumb" class="btn-control" style="width: 32px; height: 28px; border-radius: 4px; font-size: var(--fs-11); color: var(--text-secondary); display: flex; align-items: center; justify-content: center; border: 1px solid var(--t-line-weak, rgba(255,255,255,0.05)); background: rgba(255,255,255,0.02);" title="Definir Frame atual como Miniatura">
@@ -3248,8 +3248,8 @@
                             </div>
                             
                             <div style="display: flex; justify-content: space-between; align-items: center; font-size: var(--fs-10); color: var(--text-muted); font-family: monospace;">
-                                <span>IN: <strong id="lbl-interview-modal-in" style="color:var(--color-cyan);">00:00:00</strong></span>
-                                <span>OUT: <strong id="lbl-interview-modal-out" style="color:var(--color-cyan);">00:00:00</strong></span>
+                                <span>IN: <strong id="lbl-interview-modal-in" style="color:var(--accent);">00:00:00</strong></span>
+                                <span>OUT: <strong id="lbl-interview-modal-out" style="color:var(--accent);">00:00:00</strong></span>
                             </div>
 
                             <button id="btn-interview-modal-append" class="btn-primary" style="width: 100%; height: 32px; font-size: var(--fs-11); font-weight: 700; display: flex; align-items: center; justify-content: center; gap: var(--sp-6); cursor: pointer; border-radius: 4px;" title="Adicionar sub-clipe selecionado à Timeline (Atalho E)">
@@ -3259,7 +3259,7 @@
                     </div>
                     
                     <div class="glassmorphism" style="padding: var(--sp-14); border-radius: 8px; background: rgba(255,255,255,0.02); display: flex; flex-direction: column; gap: var(--sp-8);">
-                        <div style="font-size: var(--fs-11); font-weight: 700; color: var(--color-cyan); text-transform: uppercase; letter-spacing: 0.5px;">Resumo Executivo</div>
+                        <div style="font-size: var(--fs-11); font-weight: 700; color: var(--accent); text-transform: uppercase; letter-spacing: 0.5px;">Resumo Executivo</div>
                         <div id="interview-modal-summary" style="font-size: var(--fs-12); color: var(--text-secondary); line-height: 1.5; white-space: pre-line;">Nenhum resumo disponível.</div>
                     </div>
 
@@ -3316,13 +3316,13 @@
 
     <!-- Modal Interativo de Configuração de Workspace (Drag & Drop) -->
     <div id="workspace-config-modal" class="modal-overlay" style="display: none; background: var(--t-surface-1, rgba(10, 8, 14, 0.85)); backdrop-filter: blur(14px); position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; align-items: center; justify-content: center; z-index: 10500;">
-        <div class="modal-content glassmorphism" style="width: 760px; max-width: 95vw; max-height: 90vh; display: flex; flex-direction: column; padding: var(--sp-20); gap: var(--sp-16); border: 1px solid var(--t-line-strong, rgba(6, 182, 212, 0.4)); border-radius: 14px; background: var(--t-surface-2, rgba(18, 18, 24, 0.98)); box-shadow: 0 12px 48px rgba(0,0,0,0.85); overflow-y: auto;">
+        <div class="modal-content glassmorphism" style="width: 760px; max-width: 95vw; max-height: 90vh; display: flex; flex-direction: column; padding: var(--sp-20); gap: var(--sp-16); border: 1px solid var(--t-line-strong, color-mix(in srgb, var(--t-accent, rgb(6, 182, 212)) 40%, transparent)); border-radius: 14px; background: var(--t-surface-2, rgba(18, 18, 24, 0.98)); box-shadow: 0 12px 48px rgba(0,0,0,0.85); overflow-y: auto;">
             
             <!-- Cabeçalho da Modal -->
             <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-glass); padding-bottom: var(--sp-12);">
                 <div style="display: flex; align-items: center; gap: var(--sp-10);">
-                    <div style="width: 32px; height: 32px; border-radius: 8px; background: var(--t-tint-3, rgba(6, 182, 212, 0.15)); border: 1px solid var(--t-line-strong, rgba(6, 182, 212, 0.35)); display: flex; align-items: center; justify-content: center;">
-                        <i class="fa-solid fa-table-columns" style="color: var(--color-cyan); font-size: var(--fs-16);"></i>
+                    <div style="width: 32px; height: 32px; border-radius: 8px; background: var(--t-tint-3, color-mix(in srgb, var(--t-accent, rgb(6, 182, 212)) 15%, transparent)); border: 1px solid var(--t-line-strong, color-mix(in srgb, var(--t-accent, rgb(6, 182, 212)) 35%, transparent)); display: flex; align-items: center; justify-content: center;">
+                        <i class="fa-solid fa-table-columns" style="color: var(--accent); font-size: var(--fs-16);"></i>
                     </div>
                     <div>
                         <h3 style="color: #fff; margin: 0; font-family: var(--font-heading); font-size: var(--fs-16); font-weight: 600; display: flex; align-items: center; gap: var(--sp-8);">
@@ -3339,7 +3339,7 @@
             <!-- Seção 1: Miniatura Interativa dos Painéis (Trilho com Drag & Drop) -->
             <div style="display: flex; flex-direction: column; gap: var(--sp-8);">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <label style="font-size: var(--fs-11); font-weight: 700; color: var(--color-cyan); text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: var(--sp-6);">
+                    <label style="font-size: var(--fs-11); font-weight: 700; color: var(--accent); text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: var(--sp-6);">
                         <i class="fa-solid fa-up-down-left-right"></i> Disposição Horizontal das Janelas Superiores
                     </label>
                     <span style="font-size: var(--fs-10); color: var(--text-muted);">Clique nas setas ◀ ▶ ou arraste com o mouse</span>
@@ -3361,7 +3361,7 @@
                         <span style="font-size: var(--fs-9); opacity: 0.75;">Bibl ➔ Ajustes ➔ Preview ➔ Transcr</span>
                     </button>
                     <button class="ws-preset-btn" id="btn-preset-inspector-right" data-preset="inspector-right">
-                        <div style="font-weight: 600; display: flex; align-items: center; gap: var(--sp-6);"><i class="fa-solid fa-sliders" style="color: var(--color-cyan);"></i> Inspetor à Direita</div>
+                        <div style="font-weight: 600; display: flex; align-items: center; gap: var(--sp-6);"><i class="fa-solid fa-sliders" style="color: var(--accent);"></i> Inspetor à Direita</div>
                         <span style="font-size: var(--fs-9); opacity: 0.75;">Bibl ➔ Preview ➔ Ajustes ➔ Transcr</span>
                     </button>
                     <button class="ws-preset-btn" id="btn-preset-decupagem" data-preset="decupagem">
@@ -3401,7 +3401,7 @@
                 <!-- Opção Monitores -->
                 <div style="display: flex; flex-direction: column; gap: var(--sp-8); background: rgba(255,255,255,0.02); padding: var(--sp-12); border-radius: 8px; border: 1px solid var(--border-glass);">
                     <label style="font-size: var(--fs-11); font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: var(--sp-6);">
-                        <i class="fa-solid fa-table-columns" style="color: var(--color-cyan);"></i> Disposição dos Monitores
+                        <i class="fa-solid fa-table-columns" style="color: var(--accent);"></i> Disposição dos Monitores
                     </label>
                     <div style="display: flex; gap: var(--sp-6);">
                         <button type="button" class="ws-layout-option-btn" id="btn-opt-monitors-auto" data-monitors-layout="auto">
@@ -3426,7 +3426,7 @@
                     <button id="btn-save-as-new-workspace" class="btn-outline" style="font-size: var(--fs-11); padding: var(--sp-6) var(--sp-14); border-color: var(--t-line-strong, rgba(168, 85, 247, 0.4)); color: #c084fc; display: flex; align-items: center; gap: var(--sp-6);">
                         <i class="fa-solid fa-floppy-disk"></i> Salvar como Nova...
                     </button>
-                    <button id="btn-apply-workspace-config" class="btn-primary" style="font-size: var(--fs-12); font-weight: 600; padding: var(--sp-8) var(--sp-18); display: flex; align-items: center; gap: var(--sp-8); background: var(--t-tint-3, rgba(6, 182, 212, 0.25)); border: 1px solid rgba(6, 182, 212, 0.6); color: #cff4fc;">
+                    <button id="btn-apply-workspace-config" class="btn-primary" style="font-size: var(--fs-12); font-weight: 600; padding: var(--sp-8) var(--sp-18); display: flex; align-items: center; gap: var(--sp-8); background: var(--t-tint-3, color-mix(in srgb, var(--t-accent, rgb(6, 182, 212)) 25%, transparent)); border: 1px solid color-mix(in srgb, var(--t-accent, rgb(6, 182, 212)) 60%, transparent); color: var(--t-accent, #cff4fc);">
                         <i class="fa-solid fa-check"></i> Aplicar no Workspace Ativo
                     </button>
                 </div>
@@ -3468,7 +3468,7 @@
                         <span style="font-size: var(--fs-9); opacity: 0.8; color: var(--text-secondary);">Edição & Transcrição</span>
                     </button>
                     <button class="dual-preset-btn" id="btn-dual-preset-library-inspector" type="button">
-                        <div style="font-weight: 600; display: flex; align-items: center; gap: var(--sp-6); font-size: var(--fs-11); color: #f8fafc;"><i class="fa-solid fa-sliders" style="color: var(--color-cyan);"></i> Biblioteca + Ajustes</div>
+                        <div style="font-weight: 600; display: flex; align-items: center; gap: var(--sp-6); font-size: var(--fs-11); color: #f8fafc;"><i class="fa-solid fa-sliders" style="color: var(--accent);"></i> Biblioteca + Ajustes</div>
                         <span style="font-size: var(--fs-9); opacity: 0.8; color: var(--text-secondary);">Mídias & Correções</span>
                     </button>
                     <button class="dual-preset-btn" id="btn-dual-preset-library-right" type="button">
@@ -3500,12 +3500,12 @@
 
             <!-- Modo de Disposição (Lado a Lado vs Empilhados) -->
             <div style="display: flex; flex-direction: column; gap: var(--sp-8);">
-                <label style="font-size: var(--fs-11); font-weight: 700; color: var(--color-cyan); text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: var(--sp-6);">
+                <label style="font-size: var(--fs-11); font-weight: 700; color: var(--accent); text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: var(--sp-6);">
                     <i class="fa-solid fa-table-cells-large"></i> Disposição Inicial da Janela
                 </label>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-10);">
                     <button class="dual-layout-choice-btn active" id="btn-choice-side-by-side" type="button">
-                        <i class="fa-solid fa-table-columns" style="font-size: var(--fs-18); color: var(--color-cyan);"></i>
+                        <i class="fa-solid fa-table-columns" style="font-size: var(--fs-18); color: var(--accent);"></i>
                         <div>
                             <div style="font-weight: 600; font-size: var(--fs-12); color: #fff;">Lado a Lado (Horizontal)</div>
                             <div style="font-size: var(--fs-10); color: var(--text-secondary);">Dois menus em colunas ajustáveis</div>
@@ -3567,7 +3567,7 @@
 
                 <!-- Opção 2: Criar Nova Workspace -->
                 <div style="display: flex; flex-direction: column; gap: var(--sp-8); background: rgba(255,255,255,0.02); padding: var(--sp-12); border-radius: 8px; border: 1px solid var(--border-glass);">
-                    <label for="modal-input-new-ws-name" style="font-size: var(--fs-11); font-weight: 700; color: var(--color-cyan); text-transform: uppercase; letter-spacing: 0.5px;">Criar Nova Workspace Customizada</label>
+                    <label for="modal-input-new-ws-name" style="font-size: var(--fs-11); font-weight: 700; color: var(--accent); text-transform: uppercase; letter-spacing: 0.5px;">Criar Nova Workspace Customizada</label>
                     <input type="text" id="modal-input-new-ws-name" placeholder="Digite o nome da nova workspace..." style="width: 100%; padding: var(--sp-8) var(--sp-10); font-size: var(--fs-12); background: var(--t-surface-1, rgba(10, 10, 15, 0.8)); color: #fff; border: 1px solid var(--border-glass); border-radius: 6px; outline: none; box-sizing: border-box;">
                     <div style="display: flex; align-items: center; justify-content: space-between; gap: var(--sp-8); margin-top: var(--sp-2);">
                         <label for="modal-select-slot" style="font-size: var(--fs-11); color: var(--text-secondary);"><i class="fa-solid fa-keyboard" style="color: #c084fc; margin-right: var(--sp-4);"></i>Vincular a Slot Rápido:</label>
@@ -3584,7 +3584,7 @@
                             <option value="9">Slot 9 (Ctrl + Alt + 9)</option>
                         </select>
                     </div>
-                    <button id="btn-modal-do-save-new" class="btn-primary" style="margin-top: var(--sp-4); background: var(--t-tint-3, rgba(6, 182, 212, 0.25)); border: 1px solid var(--t-line-strong, rgba(6, 182, 212, 0.5)); color: #cff4fc; font-weight: 600; font-size: var(--fs-12); padding: var(--sp-8); border-radius: 6px; cursor: pointer; transition: all 0.2s;">
+                    <button id="btn-modal-do-save-new" class="btn-primary" style="margin-top: var(--sp-4); background: var(--t-tint-3, color-mix(in srgb, var(--t-accent, rgb(6, 182, 212)) 25%, transparent)); border: 1px solid var(--t-line-strong, color-mix(in srgb, var(--t-accent, rgb(6, 182, 212)) 50%, transparent)); color: var(--t-accent, #cff4fc); font-weight: 600; font-size: var(--fs-12); padding: var(--sp-8); border-radius: 6px; cursor: pointer; transition: all 0.2s;">
                         <i class="fa-solid fa-plus"></i> Salvar Como Nova Workspace
                     </button>
                 </div>
@@ -3611,9 +3611,9 @@
         <div class="view-options-slider-group" id="group-timeline-smooth-anchor" style="display: none; flex-direction: column; gap: var(--sp-4); padding: var(--sp-4) 0 var(--sp-6) 0; border-bottom: 1px solid var(--border-glass);">
             <div style="display: flex; justify-content: space-between; align-items: center; font-size: var(--fs-11);">
                 <span style="color: var(--text-secondary);">Âncora da Agulha (Suave):</span>
-                <span id="label-smooth-anchor-pct" style="color: var(--color-cyan); font-weight: 600; font-family: monospace;">50%</span>
+                <span id="label-smooth-anchor-pct" style="color: var(--accent); font-weight: 600; font-family: monospace;">50%</span>
             </div>
-            <input type="range" id="slider-timeline-smooth-anchor" min="30" max="70" step="1" value="50" style="width: 100%; accent-color: var(--color-cyan); cursor: pointer;">
+            <input type="range" id="slider-timeline-smooth-anchor" min="30" max="70" step="1" value="50" style="width: 100%; accent-color: var(--accent); cursor: pointer;">
         </div>
         <label>
             <input type="checkbox" id="chk-timeline-hover-preview" checked> Ativar Hover Preview
@@ -3703,7 +3703,7 @@
                         <!-- Indicadores de Recursos 2026 SOTA -->
                         <div class="welcome-features-grid">
                             <div class="feature-item">
-                                <i class="fa-solid fa-bolt" style="color: var(--color-cyan);"></i>
+                                <i class="fa-solid fa-bolt" style="color: var(--accent);"></i>
                                 <div>
                                     <strong>Sistema 1 Dual</strong>
                                     <span>Triagem em 22ms com Laya local & Jev RLCD</span>
@@ -3779,12 +3779,12 @@
             <div id="welcome-api-keys-modal" class="welcome-submodal" style="display: none;">
                 <div class="welcome-submodal-content glassmorphism" style="max-width: 540px;">
                     <div class="welcome-submodal-header">
-                        <h3><i class="fa-solid fa-shield-halved" style="color: var(--color-cyan);"></i> Chaves de API & Modelos de IA</h3>
+                        <h3><i class="fa-solid fa-shield-halved" style="color: var(--accent);"></i> Chaves de API & Modelos de IA</h3>
                         <button type="button" id="btn-close-welcome-keys-modal" class="btn-close-modal">&times;</button>
                     </div>
                     <div class="welcome-keys-body">
                         <div class="welcome-security-notice">
-                            <i class="fa-solid fa-lock" style="color: var(--color-cyan); margin-right: var(--sp-6);"></i>
+                            <i class="fa-solid fa-lock" style="color: var(--accent); margin-right: var(--sp-6);"></i>
                             <strong>Armazenamento Seguro:</strong> Suas chaves são gravadas diretamente no banco de dados local da aplicação (<code>app_setting</code>) e nunca são expostas no histórico do chat, logadas ou enviadas a outros modelos.
                         </div>
 

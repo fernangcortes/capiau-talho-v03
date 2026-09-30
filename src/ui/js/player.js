@@ -373,7 +373,7 @@ export function setupInteractiveTimecode(el, getContextFn, onCommitFn) {
                 }
                 setTimeout(() => {
                     if (input.parentNode) {
-                        input.style.borderColor = "var(--color-cyan, #06b6d4)";
+                        input.style.borderColor = "var(--accent, #06b6d4)";
                         input.style.boxShadow = "0 0 8px rgba(6, 182, 212, 0.5)";
                     }
                 }, 800);
@@ -1320,7 +1320,7 @@ export class SourcePlayer {
         if (!osd) {
             osd = document.createElement("div");
             osd.className = "player-shuttle-osd";
-            osd.style.cssText = "position:absolute; top:45px; left:50%; transform:translateX(-50%); background:var(--t-surface-2, rgba(18,18,24,0.85)); color:var(--color-cyan); padding:4px 12px; border-radius:12px; font-size:var(--fs-11); font-weight:700; font-family:var(--font-heading); letter-spacing:0.5px; border:1px solid var(--t-line-strong, rgba(6,182,212,0.4)); backdrop-filter:blur(8px); box-shadow:0 4px 12px rgba(0,0,0,0.5); pointer-events:none; z-index:99; transition:opacity 0.2s ease; opacity:0;";
+            osd.style.cssText = "position:absolute; top:45px; left:50%; transform:translateX(-50%); background:var(--t-surface-2, rgba(18,18,24,0.85)); color:var(--accent); padding:4px 12px; border-radius:12px; font-size:var(--fs-11); font-weight:700; font-family:var(--font-heading); letter-spacing:0.5px; border:1px solid var(--t-line-strong, rgba(6,182,212,0.4)); backdrop-filter:blur(8px); box-shadow:0 4px 12px rgba(0,0,0,0.5); pointer-events:none; z-index:99; transition:opacity 0.2s ease; opacity:0;";
             panel.appendChild(osd);
         }
         osd.textContent = text;
@@ -2048,7 +2048,7 @@ export class SourcePlayer {
 
         this.drawingBox = document.createElement("div");
         this.drawingBox.className = "face-box overlap-bubble";
-        this.drawingBox.style.border = "2px dashed var(--color-cyan)";
+        this.drawingBox.style.border = "2px dashed var(--accent)";
         this.drawingBox.style.background = "rgba(6, 182, 212, 0.1)";
         this.drawingBox.style.left = `${this.startX}px`;
         this.drawingBox.style.top = `${this.startY}px`;
@@ -3227,8 +3227,8 @@ export class ProgramPlayer {
         if (btnLoop) {
             if (isLooping) {
                 btnLoop.classList.add("active");
-                btnLoop.style.color = "var(--color-cyan)";
-                btnLoop.style.borderColor = "var(--color-cyan)";
+                btnLoop.style.color = "var(--accent)";
+                btnLoop.style.borderColor = "var(--accent)";
             } else {
                 btnLoop.classList.remove("active");
                 btnLoop.style.color = "";
@@ -7121,12 +7121,12 @@ export class VideoPlayer {
             item.dataset.index = String(idx);
             item.innerHTML = `
                 <div style="display: flex; align-items: center; gap: var(--sp-6);">
-                    <span style="color: var(--color-cyan, #06b6d4); font-weight: bold; font-family: monospace;">${idx + 1}.</span>
+                    <span style="color: var(--accent, #06b6d4); font-weight: bold; font-family: monospace;">${idx + 1}.</span>
                     <span style="background: rgba(255,255,255,0.08); padding: var(--sp-1) var(--sp-4); border-radius: 3px; font-size: var(--fs-10);">${track}</span>
                     <span style="font-family: monospace; font-size: var(--fs-11);">${tc}</span>
                     <span style="color: var(--text-secondary, #94a3b8); max-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${clipName}</span>
                 </div>
-                <span class="rm-item-check-slot">${idx === currentIndex ? '<i class="fa-solid fa-check" style="color: var(--color-cyan, #06b6d4); font-size: var(--fs-11);"></i>' : ''}</span>
+                <span class="rm-item-check-slot">${idx === currentIndex ? '<i class="fa-solid fa-check" style="color: var(--accent, #06b6d4); font-size: var(--fs-11);"></i>' : ''}</span>
             `;
             item.addEventListener("click", (e) => {
                 e.stopPropagation();
@@ -7137,7 +7137,7 @@ export class VideoPlayer {
                     const checkSlot = el.querySelector(".rm-item-check-slot");
                     if (elIdx === idx) {
                         el.classList.add("is-active");
-                        if (checkSlot) checkSlot.innerHTML = '<i class="fa-solid fa-check" style="color: var(--color-cyan, #06b6d4); font-size: var(--fs-11);"></i>';
+                        if (checkSlot) checkSlot.innerHTML = '<i class="fa-solid fa-check" style="color: var(--accent, #06b6d4); font-size: var(--fs-11);"></i>';
                     } else {
                         el.classList.remove("is-active");
                         if (checkSlot) checkSlot.innerHTML = '';
@@ -7220,7 +7220,7 @@ export function showAnnotationModal(speakers, initialValue = "") {
         header.style.paddingBottom = "10px";
         header.innerHTML = `
             <h2 style="margin:0; font-size:var(--fs-16); color:#fff; display:flex; align-items:center; gap:var(--sp-8);">
-                <i class="fa-solid fa-tags" style="color:var(--color-cyan);"></i> Identificar Elemento
+                <i class="fa-solid fa-tags" style="color:var(--accent);"></i> Identificar Elemento
             </h2>
             <button class="btn-close-modal" style="font-size:var(--fs-24); color:var(--text-secondary); background:transparent; border:none; cursor:pointer;">&times;</button>
         `;
@@ -7277,7 +7277,7 @@ export function showAnnotationModal(speakers, initialValue = "") {
                 btn.textContent = speaker;
                 btn.style.background = "rgba(6, 182, 212, 0.1)";
                 btn.style.border = "1px solid rgba(6, 182, 212, 0.3)";
-                btn.style.color = "var(--color-cyan)";
+                btn.style.color = "var(--accent)";
                 btn.style.padding = "3px 8px";
                 btn.style.borderRadius = "15px";
                 btn.style.fontSize = "var(--fs-10)";
@@ -7290,7 +7290,7 @@ export function showAnnotationModal(speakers, initialValue = "") {
                 });
                 btn.addEventListener("mouseout", () => {
                     btn.style.background = "rgba(6, 182, 212, 0.1)";
-                    btn.style.color = "var(--color-cyan)";
+                    btn.style.color = "var(--accent)";
                 });
                 btn.addEventListener("click", (ev) => {
                     ev.stopPropagation();
@@ -7323,7 +7323,7 @@ export function showAnnotationModal(speakers, initialValue = "") {
         btnConfirm.style.padding = "6px 12px";
         btnConfirm.style.borderRadius = "6px";
         btnConfirm.style.border = "none";
-        btnConfirm.style.background = "var(--color-cyan)";
+        btnConfirm.style.background = "var(--accent)";
         btnConfirm.style.color = "#000";
         btnConfirm.style.fontWeight = "600";
         btnConfirm.style.cursor = "pointer";

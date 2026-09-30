@@ -1130,10 +1130,10 @@ export class FaceManager {
                             const badge = c.querySelector(".fullscreen-face-select-badge");
                             const icon = badge.querySelector("i");
                             if (targetState) {
-                                badge.style.background = "var(--color-cyan)";
-                                badge.style.borderColor = "var(--color-cyan)";
+                                badge.style.background = "var(--accent)";
+                                badge.style.borderColor = "var(--accent)";
                                 icon.style.display = "block";
-                                c.style.outline = "2px solid var(--color-cyan)";
+                                c.style.outline = "2px solid var(--accent)";
                             } else {
                                 badge.style.background = "rgba(0,0,0,0.6)";
                                 badge.style.borderColor = "rgba(255,255,255,0.3)";
@@ -1147,10 +1147,10 @@ export class FaceManager {
                     const selectBadge = card.querySelector(".fullscreen-face-select-badge");
                     const checkIcon = selectBadge.querySelector("i");
                     if (card.classList.contains("selected")) {
-                        selectBadge.style.background = "var(--color-cyan)";
-                        selectBadge.style.borderColor = "var(--color-cyan)";
+                        selectBadge.style.background = "var(--accent)";
+                        selectBadge.style.borderColor = "var(--accent)";
                         checkIcon.style.display = "block";
-                        card.style.outline = "2px solid var(--color-cyan)";
+                        card.style.outline = "2px solid var(--accent)";
                     } else {
                         selectBadge.style.background = "rgba(0,0,0,0.6)";
                         selectBadge.style.borderColor = "rgba(255,255,255,0.3)";
@@ -1180,7 +1180,7 @@ export class FaceManager {
             
             const btn = doc.createElement("button");
             btn.className = "btn-secondary";
-            btn.style.cssText = "padding: 10px 24px; font-size: var(--fs-13); font-weight: 600; cursor: pointer; border-color: var(--t-line-strong, rgba(6, 182, 212, 0.3)); color: var(--color-cyan);";
+            btn.style.cssText = "padding: 10px 24px; font-size: var(--fs-13); font-weight: 600; cursor: pointer; border-color: var(--t-line-strong, rgba(6, 182, 212, 0.3)); color: var(--accent);";
             btn.innerHTML = `<i class="fa-solid fa-angles-down"></i> Carregar Mais Rostos (${this.unlabeledFaces.length - endIdx} restantes)`;
             
             btn.addEventListener("click", () => this.renderNextPage());
@@ -1411,7 +1411,7 @@ export class FaceManager {
 
         popover.innerHTML = `
             <div style="font-size:var(--fs-10); color:var(--text-secondary); text-transform:uppercase; font-weight:600; display:flex; align-items:center; gap:var(--sp-4);">
-                <i class="fa-solid fa-eye" style="color:var(--color-cyan);"></i> Visualização do Contexto
+                <i class="fa-solid fa-eye" style="color:var(--accent);"></i> Visualização do Contexto
             </div>
             <div id="popover-media-container" style="width:100%; height:180px; border-radius:6px; overflow:hidden; background:#000; position:relative; display:flex; align-items:center; justify-content:center;">
                 <div class="loading-state-text" style="font-size:var(--fs-11);">Carregando mídia...</div>

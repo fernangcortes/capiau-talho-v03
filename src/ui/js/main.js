@@ -144,7 +144,7 @@ function showSearchResultPreview(r, card) {
         
         popover.innerHTML = `
             <div style="font-size:var(--fs-10); color:var(--text-secondary); text-transform:uppercase; font-weight:600; display:flex; align-items:center; gap:var(--sp-4);">
-                <i class="fa-solid fa-eye" style="color:var(--color-cyan);"></i> Preview da Busca
+                <i class="fa-solid fa-eye" style="color:var(--accent);"></i> Preview da Busca
             </div>
             <div id="search-popover-media" style="width:100%; height:180px; border-radius:6px; overflow:hidden; background:#000; position:relative; display:flex; align-items:center; justify-content:center;">
                 <div class="loading-state-text" style="font-size:var(--fs-11); color:var(--text-muted);">Carregando preview...</div>
@@ -462,8 +462,8 @@ function updateContextPills() {
         if (hasMoreTags) {
             const togglePill = document.createElement("div");
             togglePill.className = "context-pill";
-            togglePill.style.borderColor = "var(--color-cyan)";
-            togglePill.style.color = "var(--color-cyan)";
+            togglePill.style.borderColor = "var(--accent)";
+            togglePill.style.color = "var(--accent)";
             togglePill.style.fontWeight = "600";
             if (SEARCH_STATE.showAllTags) {
                 togglePill.innerHTML = `<i class="fa-solid fa-minus"></i> Menos`;
@@ -663,7 +663,7 @@ function applyFiltersAndRenderCards() {
                 const selectIcon = selectBtn ? selectBtn.querySelector("i") : null;
                 if (selectIcon) {
                     selectIcon.className = "fa-solid fa-square-check";
-                    selectIcon.style.color = "var(--color-cyan)";
+                    selectIcon.style.color = "var(--accent)";
                 }
             }
             
@@ -692,7 +692,7 @@ function applyFiltersAndRenderCards() {
         } else {
             const isInterview = mediaType === "interview";
             const icon = isInterview ? "fa-microphone" : "fa-video";
-            const color = isInterview ? "var(--color-cyan)" : "var(--color-violet)";
+            const color = isInterview ? "var(--accent)" : "var(--color-violet)";
             const title = isInterview ? (r.payload.speaker_id || "Entrevistado") : "Bastidores B-Roll";
             const timecode = formatTimecode(r.payload.start_time || 0);
             const vidId = r.payload.video_id;
@@ -709,7 +709,7 @@ function applyFiltersAndRenderCards() {
                 <div class="bubble-meta" style="margin-bottom: var(--sp-4); display: flex; justify-content: space-between; align-items: center; gap: var(--sp-6);">
                     <span class="speaker-name" style="color:${color}; font-weight:600; font-size:var(--fs-10); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:120px;" data-tooltip="${escapeHtml(title)}"><i class="fa-solid ${icon}"></i> ${title}</span>
                     <div style="display:flex; align-items:center; gap:var(--sp-6); flex-shrink: 0;">
-                        <span style="font-weight:600; font-size:var(--fs-10); color:var(--color-cyan); display:flex; align-items:center; gap:var(--sp-2);">
+                        <span style="font-weight:600; font-size:var(--fs-10); color:var(--accent); display:flex; align-items:center; gap:var(--sp-2);">
                             <i class="fa-solid fa-circle-play"></i> ${timecode}
                         </span>
                         ${scoreBadge}
@@ -722,7 +722,7 @@ function applyFiltersAndRenderCards() {
                         <button class="btn-select-similar-item" data-tooltip="Selecionar para busca por similaridade" style="background:none; border:none; color:var(--text-muted); cursor:pointer; padding:var(--sp-2); font-size:var(--fs-10); display:none; align-items:center; justify-content:center; border-radius:50%; width:20px; height:20px;">
                             <i class="fa-regular fa-square"></i>
                         </button>
-                        <button class="view-context-btn" data-tooltip="Ver no Contexto" style="background:none; border:none; color:var(--color-cyan); cursor:pointer; padding:var(--sp-2); font-size:var(--fs-11); display:flex; align-items:center; justify-content:center; border-radius:50%; width:20px; height:20px;">
+                        <button class="view-context-btn" data-tooltip="Ver no Contexto" style="background:none; border:none; color:var(--accent); cursor:pointer; padding:var(--sp-2); font-size:var(--fs-11); display:flex; align-items:center; justify-content:center; border-radius:50%; width:20px; height:20px;">
                             <i class="fa-solid fa-eye"></i>
                         </button>
                     </div>
@@ -746,7 +746,7 @@ function applyFiltersAndRenderCards() {
                 const selectIcon = selectBtn ? selectBtn.querySelector("i") : null;
                 if (selectIcon) {
                     selectIcon.className = "fa-solid fa-square-check";
-                    selectIcon.style.color = "var(--color-cyan)";
+                    selectIcon.style.color = "var(--accent)";
                 }
             }
             
@@ -793,10 +793,10 @@ function applyFiltersAndRenderCards() {
                 occWrapper.style.paddingTop = "6px";
                 
                 occWrapper.innerHTML = `
-                    <button class="btn-toggle-occurrences" style="background: none; border: none; color: var(--color-cyan); font-size: var(--fs-10); cursor: pointer; display: flex; align-items: center; gap: var(--sp-4); padding: var(--sp-2) 0; outline: none; font-weight: 600;">
+                    <button class="btn-toggle-occurrences" style="background: none; border: none; color: var(--accent); font-size: var(--fs-10); cursor: pointer; display: flex; align-items: center; gap: var(--sp-4); padding: var(--sp-2) 0; outline: none; font-weight: 600;">
                         <i class="fa-solid fa-chevron-down"></i> Ver mais ocorrências (${r.other_occurrences.length})
                     </button>
-                    <div class="occurrences-list" style="display: none; flex-direction: column; gap: var(--sp-6); margin-top: var(--sp-6); padding-left: var(--sp-8); border-left: 2px solid var(--t-line-strong, rgba(6, 182, 212, 0.25));">
+                    <div class="occurrences-list" style="display: none; flex-direction: column; gap: var(--sp-6); margin-top: var(--sp-6); padding-left: var(--sp-8); border-left: 2px solid var(--t-line-strong, color-mix(in srgb, var(--t-accent, rgb(6, 182, 212)) 25%, transparent));">
                     </div>
                 `;
                 
@@ -835,12 +835,12 @@ function applyFiltersAndRenderCards() {
                     
                     subCard.innerHTML = `
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--sp-4);">
-                            <span style="color: var(--color-cyan); font-weight: 600; font-size: var(--fs-10); display: flex; align-items: center; gap: var(--sp-4);">
+                            <span style="color: var(--accent); font-weight: 600; font-size: var(--fs-10); display: flex; align-items: center; gap: var(--sp-4);">
                                 <i class="fa-solid fa-circle-play"></i> ${formatTimecode(occ.start_time)}
                             </span>
                             <div style="display: flex; gap: var(--sp-6); align-items: center;">
                                 <span class="match-badge ${subScoreClass}" style="font-size: var(--fs-8); padding: var(--sp-1) var(--sp-4); line-height: 1;"><i class="fa-solid fa-fire"></i> ${(occ.score * 100).toFixed(0)}%</span>
-                                <button class="view-occ-context-btn" data-tooltip="Ver no Contexto" style="background:none; border:none; color:var(--color-cyan); cursor:pointer; font-size:var(--fs-10); padding:var(--sp-2); display:flex; align-items:center; justify-content:center;">
+                                <button class="view-occ-context-btn" data-tooltip="Ver no Contexto" style="background:none; border:none; color:var(--accent); cursor:pointer; font-size:var(--fs-10); padding:var(--sp-2); display:flex; align-items:center; justify-content:center;">
                                     <i class="fa-solid fa-eye"></i>
                                 </button>
                             </div>
@@ -979,7 +979,7 @@ function renderSearchResults(query) {
 
     searchContainer.innerHTML = `
         <div class="transcription-actions" style="border:none; padding: var(--sp-6) var(--sp-12); display: flex; align-items: center; justify-content: space-between; gap: var(--sp-8); flex-shrink: 0;">
-            <h4 style="font-size:var(--fs-11); color:var(--color-cyan); display: flex; align-items: center; gap: var(--sp-4); margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 140px;" data-tooltip="Resultados para: &quot;${escapeHtml(query)}&quot;">
+            <h4 style="font-size:var(--fs-11); color:var(--accent); display: flex; align-items: center; gap: var(--sp-4); margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 140px;" data-tooltip="Resultados para: &quot;${escapeHtml(query)}&quot;">
                 <i class="fa-solid fa-wand-magic-sparkles"></i> "${query}"
             </h4>
             <div class="search-type-tabs" style="margin: 0; padding: 0; border: none; gap: var(--sp-4); display: flex; align-items: center; flex-shrink: 0;">
@@ -1008,7 +1008,7 @@ function renderSearchResults(query) {
                 </div>
                 <div class="search-playlist-options" style="display: none; align-items: center; margin: 0; padding: 0;">
                     <label style="display: flex; align-items: center; gap: var(--sp-4); font-size: var(--fs-10); color: var(--text-secondary); cursor: pointer; user-select: none;" data-tooltip="Abrir fotos no player de vídeo">
-                        <input type="checkbox" id="chk-search-photos-in-player" style="cursor: pointer; width: 11px; height: 11px; accent-color: var(--color-cyan);">
+                        <input type="checkbox" id="chk-search-photos-in-player" style="cursor: pointer; width: 11px; height: 11px; accent-color: var(--accent);">
                         <span>Abrir fotos</span>
                     </label>
                 </div>
@@ -1238,7 +1238,7 @@ window.toggleSelectSimilarItem = function(kind, id, title, cardEl, timestamp = n
         const icon = cardEl.querySelector(".btn-select-similar-item i");
         if (icon) {
             icon.className = "fa-solid fa-square-check";
-            icon.style.color = "var(--color-cyan)";
+            icon.style.color = "var(--accent)";
         }
     }
     
@@ -1300,7 +1300,7 @@ window.updateSimilarSelectionUI = function() {
             el.classList.add("selected-for-similar");
             if (icon) {
                 icon.className = "fa-solid fa-square-check";
-                icon.style.color = "var(--color-cyan)";
+                icon.style.color = "var(--accent)";
             }
         } else {
             el.classList.remove("selected-for-similar");
@@ -1918,7 +1918,7 @@ window.addEventListener("DOMContentLoaded", () => {
     function updatePhotoPlayerBtnStyle(btn, active) {
         if (!btn) return;
         if (active) {
-            btn.style.color = "var(--color-cyan)";
+            btn.style.color = "var(--accent)";
             btn.style.borderColor = "rgba(6,182,212,0.4)";
         } else {
             btn.style.color = "var(--text-muted)";
@@ -2864,7 +2864,7 @@ window.addEventListener("DOMContentLoaded", () => {
                 return;
             }
             if (confirm("Deseja realizar o backup manual do banco de dados relacional (capiau.db) para o Amazon S3?")) {
-                s3Indicator.style.color = "var(--color-cyan)";
+                s3Indicator.style.color = "var(--accent)";
                 s3Indicator.title = "Realizando backup do banco de dados...";
                 try {
                     const res = await CapIAuAPI.backupDatabase();

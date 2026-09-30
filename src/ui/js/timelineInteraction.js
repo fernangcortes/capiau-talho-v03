@@ -3514,7 +3514,7 @@ export class CapiauTimelineInteraction {
         title.style.padding = "6px 12px";
         title.style.fontSize = "var(--fs-10)";
         title.style.fontWeight = "bold";
-        title.style.color = "var(--color-cyan)";
+        title.style.color = "var(--accent)";
         title.style.borderBottom = "1px solid var(--border-glass)";
         title.style.marginBottom = "4px";
         title.style.display = "flex";
@@ -3525,7 +3525,7 @@ export class CapiauTimelineInteraction {
 
         const currentFrame = Math.round(targetFrame !== undefined ? targetFrame : TIMELINE_STATE.playheadFrame);
 
-        const addItem = (icon, label, kbd, action, isEnabled = true, iconColor = "var(--color-cyan)") => {
+        const addItem = (icon, label, kbd, action, isEnabled = true, iconColor = "var(--accent)") => {
             const item = document.createElement("div");
             item.className = "menu-item";
             item.style.display = "flex";
@@ -3610,7 +3610,7 @@ export class CapiauTimelineInteraction {
 
         addItem("fa-solid fa-repeat", TIMELINE_STATE.isLooping ? "Desativar Loop" : "Ativar Loop IN-OUT", "Ctrl+L", () => {
             TIMELINE_STATE.toggleLoop();
-        }, true, TIMELINE_STATE.isLooping ? "var(--color-cyan)" : "inherit");
+        }, true, TIMELINE_STATE.isLooping ? "var(--accent)" : "inherit");
 
         addDivider();
 
@@ -3626,7 +3626,7 @@ export class CapiauTimelineInteraction {
                 } else {
                     if (typeof window.showToast === "function") window.showToast("Ripple Delete: espaço fechado", "info");
                 }
-            }, true, "var(--color-cyan)");
+            }, true, "var(--accent)");
         }
 
         addItem("fa-solid fa-scissors", "Lift no Intervalo IN–OUT", ";", () => {
@@ -3680,7 +3680,7 @@ export class CapiauTimelineInteraction {
         title.style.padding = "6px 12px";
         title.style.fontSize = "var(--fs-10)";
         title.style.fontWeight = "bold";
-        title.style.color = "var(--color-cyan)";
+        title.style.color = "var(--accent)";
         title.style.borderBottom = "1px solid var(--border-glass)";
         title.style.marginBottom = "4px";
         title.style.display = "flex";
@@ -3707,7 +3707,7 @@ export class CapiauTimelineInteraction {
         itemRippleHead.style.opacity = isPlayheadInside ? "1" : "0.5";
         itemRippleHead.innerHTML = `
             <span style="display:flex; align-items:center; gap:var(--sp-8);">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color:var(--color-cyan); flex-shrink:0;"><line x1="5" y1="4" x2="5" y2="20"></line><line x1="19" y1="12" x2="6" y2="12"></line><polyline points="12 6 6 12 12 18"></polyline></svg>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color:var(--accent); flex-shrink:0;"><line x1="5" y1="4" x2="5" y2="20"></line><line x1="19" y1="12" x2="6" y2="12"></line><polyline points="12 6 6 12 12 18"></polyline></svg>
                 <span>Ripple Início ➔ Agulha</span>
             </span>
             <kbd style="font-size:var(--fs-9); background:rgba(255,255,255,0.08); padding:var(--sp-1) var(--sp-4); border-radius:3px;">Q</kbd>
@@ -3736,7 +3736,7 @@ export class CapiauTimelineInteraction {
         itemRippleTail.style.opacity = isPlayheadInside ? "1" : "0.5";
         itemRippleTail.innerHTML = `
             <span style="display:flex; align-items:center; gap:var(--sp-8);">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color:var(--color-cyan); flex-shrink:0;"><line x1="19" y1="4" x2="19" y2="20"></line><line x1="5" y1="12" x2="18" y2="12"></line><polyline points="12 6 18 12 12 18"></polyline></svg>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color:var(--accent); flex-shrink:0;"><line x1="19" y1="4" x2="19" y2="20"></line><line x1="5" y1="12" x2="18" y2="12"></line><polyline points="12 6 18 12 12 18"></polyline></svg>
                 <span>Ripple Agulha ➔ Fim</span>
             </span>
             <kbd style="font-size:var(--fs-9); background:rgba(255,255,255,0.08); padding:var(--sp-1) var(--sp-4); border-radius:3px;">W</kbd>
@@ -3830,7 +3830,7 @@ export class CapiauTimelineInteraction {
         itemSpeed.style.cursor = "pointer";
         itemSpeed.innerHTML = `
             <span style="display:flex; align-items:center; gap:var(--sp-8);">
-                <i class="fa-solid fa-gauge-high" style="color:var(--color-cyan);"></i>
+                <i class="fa-solid fa-gauge-high" style="color:var(--accent);"></i>
                 <span>Velocidade / Duração...</span>
             </span>
             <kbd style="font-size:var(--fs-9); background:rgba(255,255,255,0.08); padding:var(--sp-1) var(--sp-4); border-radius:3px;">Ctrl+R</kbd>
@@ -3923,7 +3923,7 @@ export class CapiauTimelineInteraction {
                 itemBoth.setAttribute("data-tooltip", itemBoth.title);
                 itemBoth.innerHTML = `
                     <span style="display:flex; align-items:center; gap:var(--sp-8);">
-                        <i class="fa-solid fa-arrows-left-right" style="color:var(--color-cyan);"></i>
+                        <i class="fa-solid fa-arrows-left-right" style="color:var(--accent);"></i>
                         <span>Preencher Ambos</span>
                     </span>
                     <kbd style="font-size:var(--fs-9); background:rgba(255,255,255,0.08); padding:var(--sp-1) var(--sp-4); border-radius:3px;">Ctrl+Alt+R</kbd>
@@ -3946,7 +3946,7 @@ export class CapiauTimelineInteraction {
                 itemRight.setAttribute("data-tooltip", itemRight.title);
                 itemRight.innerHTML = `
                     <span style="display:flex; align-items:center; gap:var(--sp-8);">
-                        <i class="fa-solid fa-arrow-right" style="color:var(--color-cyan);"></i>
+                        <i class="fa-solid fa-arrow-right" style="color:var(--accent);"></i>
                         <span>Preencher Frente</span>
                     </span>
                     <kbd style="font-size:var(--fs-9); background:rgba(255,255,255,0.06); color:var(--text-secondary); padding:var(--sp-1) var(--sp-4); border-radius:3px;">+${gapRightCtx}f</kbd>
@@ -3969,7 +3969,7 @@ export class CapiauTimelineInteraction {
                 itemLeft.setAttribute("data-tooltip", itemLeft.title);
                 itemLeft.innerHTML = `
                     <span style="display:flex; align-items:center; gap:var(--sp-8);">
-                        <i class="fa-solid fa-arrow-left" style="color:var(--color-cyan);"></i>
+                        <i class="fa-solid fa-arrow-left" style="color:var(--accent);"></i>
                         <span>Preencher Trás</span>
                     </span>
                     <kbd style="font-size:var(--fs-9); background:rgba(255,255,255,0.06); color:var(--text-secondary); padding:var(--sp-1) var(--sp-4); border-radius:3px;">+${gapLeftCtx}f</kbd>
@@ -3991,7 +3991,7 @@ export class CapiauTimelineInteraction {
                 itemRight.setAttribute("data-tooltip", itemRight.title);
                 itemRight.innerHTML = `
                     <span style="display:flex; align-items:center; gap:var(--sp-8);">
-                        <i class="fa-solid fa-arrow-right" style="color:var(--color-cyan);"></i>
+                        <i class="fa-solid fa-arrow-right" style="color:var(--accent);"></i>
                         <span>Preencher Frente</span>
                     </span>
                     <kbd style="font-size:var(--fs-9); background:rgba(255,255,255,0.08); padding:var(--sp-1) var(--sp-4); border-radius:3px;">Ctrl+Alt+R</kbd>
@@ -4013,7 +4013,7 @@ export class CapiauTimelineInteraction {
                 itemLeft.setAttribute("data-tooltip", itemLeft.title);
                 itemLeft.innerHTML = `
                     <span style="display:flex; align-items:center; gap:var(--sp-8);">
-                        <i class="fa-solid fa-arrow-left" style="color:var(--color-cyan);"></i>
+                        <i class="fa-solid fa-arrow-left" style="color:var(--accent);"></i>
                         <span>Preencher Trás</span>
                     </span>
                     <kbd style="font-size:var(--fs-9); background:rgba(255,255,255,0.08); padding:var(--sp-1) var(--sp-4); border-radius:3px;">Ctrl+Alt+R</kbd>
@@ -4132,7 +4132,7 @@ export class CapiauTimelineInteraction {
                 itemResyncSlip.style.cursor = "pointer";
                 itemResyncSlip.innerHTML = `
                     <span style="display:flex; align-items:center; gap:var(--sp-8);">
-                        <i class="fa-solid fa-sliders" style="color:var(--color-cyan);"></i>
+                        <i class="fa-solid fa-sliders" style="color:var(--accent);"></i>
                         <span>Deslizar para Sincronia (Slip)</span>
                     </span>
                     <span style="font-size:var(--fs-9); color:var(--text-secondary);">manter posição</span>
@@ -4160,7 +4160,7 @@ export class CapiauTimelineInteraction {
             itemUnlink.style.cursor = "pointer";
             itemUnlink.innerHTML = `
                 <span style="display:flex; align-items:center; gap:var(--sp-8);">
-                    <i class="fa-solid fa-link-slash" style="color:var(--color-cyan);"></i>
+                    <i class="fa-solid fa-link-slash" style="color:var(--accent);"></i>
                     <span>Desvincular Par A/V</span>
                 </span>
                 <kbd style="font-size:var(--fs-9); background:rgba(255,255,255,0.08); padding:var(--sp-1) var(--sp-4); border-radius:3px;">U</kbd>
@@ -4208,7 +4208,7 @@ export class CapiauTimelineInteraction {
                 itemLink.style.cursor = "pointer";
                 itemLink.innerHTML = `
                     <span style="display:flex; align-items:center; gap:var(--sp-8);">
-                        <i class="fa-solid fa-link" style="color:var(--color-cyan);"></i>
+                        <i class="fa-solid fa-link" style="color:var(--accent);"></i>
                         <span>Vincular Par Áudio/Vídeo</span>
                     </span>
                     <kbd style="font-size:var(--fs-9); background:rgba(255,255,255,0.08); padding:var(--sp-1) var(--sp-4); border-radius:3px;">Ctrl+L</kbd>
@@ -4244,7 +4244,7 @@ export class CapiauTimelineInteraction {
             itemSyncEdit.style.cursor = "pointer";
             itemSyncEdit.innerHTML = `
                 <span style="display:flex; align-items:center; gap:var(--sp-8);">
-                    <i class="fa-solid fa-link" style="color:var(--color-cyan);"></i>
+                    <i class="fa-solid fa-link" style="color:var(--accent);"></i>
                     <span>Editar Cortes Juntos (${totalMediaCuts})</span>
                 </span>
             `;
@@ -4327,7 +4327,7 @@ export class CapiauTimelineInteraction {
         title.style.padding = "6px 12px";
         title.style.fontSize = "var(--fs-10)";
         title.style.fontWeight = "bold";
-        title.style.color = "var(--color-cyan)";
+        title.style.color = "var(--accent)";
         title.style.borderBottom = "1px solid var(--border-glass)";
         title.style.marginBottom = "4px";
         title.style.display = "flex";
@@ -4355,7 +4355,7 @@ export class CapiauTimelineInteraction {
             }
         };
 
-        const addItem = (icon, label, kbd, action, isEnabled = true, iconColor = "var(--color-cyan)") => {
+        const addItem = (icon, label, kbd, action, isEnabled = true, iconColor = "var(--accent)") => {
             const item = document.createElement("div");
             item.className = "menu-item";
             item.style.display = "flex";
@@ -4405,7 +4405,7 @@ export class CapiauTimelineInteraction {
                 }
             }
             if (this.renderer) this.renderer.requestRedraw();
-        }, true, "var(--color-cyan)");
+        }, true, "var(--accent)");
 
         addDivider();
 
@@ -4476,7 +4476,7 @@ export class CapiauTimelineInteraction {
         title.style.padding = "6px 12px";
         title.style.fontSize = "var(--fs-10)";
         title.style.fontWeight = "bold";
-        title.style.color = "var(--color-cyan)";
+        title.style.color = "var(--accent)";
         title.style.borderBottom = "1px solid var(--border-glass)";
         title.style.marginBottom = "4px";
         title.style.display = "flex";
@@ -4509,10 +4509,10 @@ export class CapiauTimelineInteraction {
             const isActive = currentCurve === p.id;
             item.innerHTML = `
                 <span style="display:flex; align-items:center; gap:var(--sp-8);">
-                    <i class="fa-solid ${p.icon}" style="width:14px; color:${isActive ? 'var(--color-cyan)' : 'var(--text-muted)'};"></i>
+                    <i class="fa-solid ${p.icon}" style="width:14px; color:${isActive ? 'var(--accent)' : 'var(--text-muted)'};"></i>
                     <span style="color:${isActive ? '#ffffff' : 'var(--text-secondary)'}; font-weight:${isActive ? '600' : 'normal'};">${p.name}</span>
                 </span>
-                ${isActive ? '<i class="fa-solid fa-check" style="color:var(--color-cyan); font-size:var(--fs-10);"></i>' : ''}
+                ${isActive ? '<i class="fa-solid fa-check" style="color:var(--accent); font-size:var(--fs-10);"></i>' : ''}
             `;
 
             item.onclick = () => {
@@ -4599,7 +4599,7 @@ export class CapiauTimelineInteraction {
         title.style.padding = "6px 12px";
         title.style.fontSize = "var(--fs-10)";
         title.style.fontWeight = "bold";
-        title.style.color = "var(--color-cyan, #06b6d4)";
+        title.style.color = "var(--accent, #06b6d4)";
         title.style.borderBottom = "1px solid var(--border-glass, rgba(255,255,255,0.1))";
         title.style.marginBottom = "4px";
         title.style.display = "flex";
@@ -4681,7 +4681,7 @@ export class CapiauTimelineInteraction {
             tip.style.boxShadow = "0 4px 12px rgba(0,0,0,0.5)";
             this._uiDoc().body.appendChild(tip);
         }
-        tip.innerHTML = `<span style="color:var(--color-cyan); font-weight:600;">${title}:</span> <span style="font-family:monospace; font-weight:500;">${value}</span>`;
+        tip.innerHTML = `<span style="color:var(--accent); font-weight:600;">${title}:</span> <span style="font-family:monospace; font-weight:500;">${value}</span>`;
         tip.style.display = "block";
         tip.style.left = `${x + 12}px`;
         tip.style.top = `${y - 28}px`;
@@ -4723,14 +4723,14 @@ export class CapiauTimelineInteraction {
         const halfB = tr.halfBFrames !== undefined ? tr.halfBFrames : Math.round(durF / 2);
         const modeLabel = isAltKey 
             ? '<span style="color:#f59e0b; font-weight:600;">Modo Assimétrico (Alt)</span>' 
-            : '<span style="color:var(--color-cyan, #06b6d4); font-weight:600;">Modo Simétrico</span> (Segure Alt para lado único)';
+            : '<span style="color:var(--accent, #06b6d4); font-weight:600;">Modo Simétrico</span> (Segure Alt para lado único)';
 
         const limitWarning = tr.hitLimit 
             ? '<div style="font-size:var(--fs-10); color:#ef4444; font-weight:700; margin-top:var(--sp-2);">⚠️ (Limite do clipe)</div>' 
             : '';
 
         tip.innerHTML = `
-            <div style="font-weight:700; color:var(--color-cyan, #06b6d4); margin-bottom:var(--sp-2);">Transição: Potência Constante</div>
+            <div style="font-weight:700; color:var(--accent, #06b6d4); margin-bottom:var(--sp-2);">Transição: Potência Constante</div>
             <div>Duração: <span style="font-family:monospace; font-weight:600;">${durS}s (${durF}q)</span></div>
             <div style="font-size:var(--fs-10); color:#94a3b8;">Lado A (Fade Out): ${halfA}q &nbsp;|&nbsp; Lado B (Fade In): ${halfB}q</div>
             <div style="font-size:var(--fs-10); margin-top:var(--sp-2);">${modeLabel}</div>
@@ -4773,7 +4773,7 @@ export class CapiauTimelineInteraction {
         const deltaSec = (deltaFrames / fps).toFixed(2);
         const secSign = deltaFrames > 0 ? "+" : (deltaFrames < 0 ? "" : "±");
         const label = isIndependent ? "Slip (Alt/J-L):" : "Slip:";
-        tip.innerHTML = `<span style="color:var(--color-cyan); font-weight:600;"><i class="fa-solid fa-arrows-left-right" style="margin-right:var(--sp-4);"></i>${label}</span> <span style="font-family:monospace; font-weight:500;">${sign}${deltaFrames}f (${secSign}${deltaSec}s)</span>`;
+        tip.innerHTML = `<span style="color:var(--accent); font-weight:600;"><i class="fa-solid fa-arrows-left-right" style="margin-right:var(--sp-4);"></i>${label}</span> <span style="font-family:monospace; font-weight:500;">${sign}${deltaFrames}f (${secSign}${deltaSec}s)</span>`;
         tip.style.display = "block";
         tip.style.left = `${x + 14}px`;
         tip.style.top = `${y - 28}px`;
@@ -5443,7 +5443,7 @@ export class CapiauTimelineInteraction {
         typeBtns.forEach(btn => {
             if (btn.dataset.type === activeType) {
                 btn.classList.add("active");
-                btn.style.background = "var(--color-cyan)";
+                btn.style.background = "var(--accent)";
                 btn.style.color = "#000";
                 btn.style.fontWeight = "700";
             } else {
@@ -7615,7 +7615,7 @@ export class CapiauTimelineInteraction {
 
         const stopwatchClass = active ? "btn-kf-stopwatch active" : "btn-kf-stopwatch";
         const diamondIcon = atKf ? "fa-solid fa-diamond" : "fa-regular fa-diamond";
-        const diamondColor = atKf ? "color: var(--color-cyan);" : (active ? "color: rgba(6, 182, 212, 0.5);" : "color: var(--text-muted);");
+        const diamondColor = atKf ? "color: var(--accent);" : (active ? "color: rgba(6, 182, 212, 0.5);" : "color: var(--text-muted);");
 
         let easingSelect = "";
         if (atKf) {
@@ -7918,10 +7918,10 @@ export class CapiauTimelineInteraction {
         }
 
         let html = `
-            <div style="font-size:var(--fs-11); font-weight:bold; color:var(--color-cyan); display:flex; gap: var(--sp-6); align-items:center; border-bottom: 1px solid var(--border-glass); padding-bottom: var(--sp-8); margin-bottom: var(--sp-4);">
+            <div style="font-size:var(--fs-11); font-weight:bold; color:var(--accent); display:flex; gap: var(--sp-6); align-items:center; border-bottom: 1px solid var(--border-glass); padding-bottom: var(--sp-8); margin-bottom: var(--sp-4);">
                 <i class="fa-solid fa-sliders"></i>
                 <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1;" title="${realFilename}">${displayTitle}</span>
-                <span style="font-size:var(--fs-9); padding:var(--sp-2) var(--sp-6); border-radius:4px; font-weight:bold; background:var(--t-tint-2, rgba(6,182,212,0.1)); color:var(--color-cyan); text-transform:uppercase; letter-spacing:0.5px; margin-right: var(--sp-4);">${clip.track}</span>
+                <span style="font-size:var(--fs-9); padding:var(--sp-2) var(--sp-6); border-radius:4px; font-weight:bold; background:var(--t-tint-2, color-mix(in srgb, var(--t-accent, rgb(6, 182, 212)) 10%, transparent)); color:var(--accent); text-transform:uppercase; letter-spacing:0.5px; margin-right: var(--sp-4);">${clip.track}</span>
                 ${!isAudioTrack ? `
                 <div style="display:flex; gap:var(--sp-8); align-items:center; border-left: 1px solid var(--border-glass); padding-left:var(--sp-8);">
                     <button class="nle-select-btn ${fitMode === 'fill' ? 'active' : ''}" data-action="fit:fill" title="Preencher (Fill)"><i class="fa-solid fa-expand"></i></button>
@@ -8000,7 +8000,7 @@ export class CapiauTimelineInteraction {
                         </div>
                         <div class="adj-header-actions" onclick="event.stopPropagation()">
                             <button id="btn-open-font-catalog" class="lib-action-btn" title="Catálogo de Fontes, Specimen & Moods" style="color:#f59e0b; padding:var(--sp-2) var(--sp-6); font-size:var(--fs-10);"><i class="fa-solid fa-swatchbook"></i> Fontes</button>
-                            <button id="btn-open-brandkit-modal" class="lib-action-btn" title="Brand Kit do Projeto" style="color:var(--color-cyan); padding:var(--sp-2) var(--sp-6); font-size:var(--fs-10);"><i class="fa-solid fa-palette"></i> Brand Kit</button>
+                            <button id="btn-open-brandkit-modal" class="lib-action-btn" title="Brand Kit do Projeto" style="color:var(--accent); padding:var(--sp-2) var(--sp-6); font-size:var(--fs-10);"><i class="fa-solid fa-palette"></i> Brand Kit</button>
                         </div>
                     </div>
                     <div class="adjustments-section-body" style="${isTextOpen ? '' : 'display:none;'}">
@@ -8132,7 +8132,7 @@ export class CapiauTimelineInteraction {
                             ${isDiagMod ? '<span class="adj-modified-dot" title="Ajustes modificados"></span>' : ''}
                         </div>
                         <div class="adj-header-actions" onclick="event.stopPropagation()">
-                            <button id="adj-audio-diag-run" title="Analisar" style="background:none; border:none; color:var(--color-cyan); cursor:pointer; font-size:var(--fs-10); display:flex; gap:var(--sp-4); align-items:center;"><i class="fa-solid fa-wave-square"></i> Analisar</button>
+                            <button id="adj-audio-diag-run" title="Analisar" style="background:none; border:none; color:var(--accent); cursor:pointer; font-size:var(--fs-10); display:flex; gap:var(--sp-4); align-items:center;"><i class="fa-solid fa-wave-square"></i> Analisar</button>
                         </div>
                     </div>
                     <div id="adj-audio-diag-body" class="adjustments-section-body" style="${isDiagOpen ? '' : 'display:none;'}">${cachedDiag ? this._audioDiagResultInner(cachedDiag) : diagEmptyInner}</div>
@@ -8169,7 +8169,7 @@ export class CapiauTimelineInteraction {
                             <span class="adj-title-text"><i class="fa-solid fa-sliders"></i> Equalizador</span>
                             ${isEqMod ? '<span class="adj-modified-dot" title="Ajustes modificados"></span>' : ''}
                         </div>
-                        ${aoVivoOk ? `<div class="adj-header-actions" onclick="event.stopPropagation()"><button class="btn-adj-bypass" data-section="audio_eq" data-tooltip="${eqDisabled ? 'Ativar equalizador' : 'Desativar equalizador'}" style="color:${eqDisabled ? 'var(--text-muted)' : 'var(--color-cyan)'};"><i class="fa-solid ${eqDisabled ? 'fa-eye-slash' : 'fa-eye'}"></i></button><button class="btn-adj-reset" data-section="audio_eq" data-tooltip="Resetar equalizador"><i class="fa-solid fa-arrow-rotate-left"></i></button></div>` : ''}
+                        ${aoVivoOk ? `<div class="adj-header-actions" onclick="event.stopPropagation()"><button class="btn-adj-bypass" data-section="audio_eq" data-tooltip="${eqDisabled ? 'Ativar equalizador' : 'Desativar equalizador'}" style="color:${eqDisabled ? 'var(--text-muted)' : 'var(--accent)'};"><i class="fa-solid ${eqDisabled ? 'fa-eye-slash' : 'fa-eye'}"></i></button><button class="btn-adj-reset" data-section="audio_eq" data-tooltip="Resetar equalizador"><i class="fa-solid fa-arrow-rotate-left"></i></button></div>` : ''}
                     </div>
                     <div class="adjustments-section-body" style="${isEqOpen ? '' : 'display:none;'} opacity:${aoVivoOk && eqDisabled ? 0.4 : 1};">${aoVivoOk ? (linhaAoVivo("data-aeq", "hpf", "HPF", 0, 300, 10, Math.round(eqVals.hpf)) + linhaAoVivo("data-aeq", "low", "Graves", -12, 12, 0.5, Number(eqVals.low)) + linhaAoVivo("data-aeq", "mid", "Médios", -12, 12, 0.5, Number(eqVals.mid)) + linhaAoVivo("data-aeq", "high", "Agudos", -12, 12, 0.5, Number(eqVals.high))) : avisoSemWebAudio}</div>
                 </div>
@@ -8186,7 +8186,7 @@ export class CapiauTimelineInteraction {
                             <span class="adj-title-text"><i class="fa-solid fa-compress"></i> Dinâmica</span>
                             ${isDynMod ? '<span class="adj-modified-dot" title="Ajustes modificados"></span>' : ''}
                         </div>
-                        ${aoVivoOk ? `<div class="adj-header-actions" onclick="event.stopPropagation()"><button class="btn-adj-bypass" data-section="audio_dynamics" data-tooltip="${dynDisabled ? 'Ativar dinâmica' : 'Desativar dinâmica'}" style="color:${dynDisabled ? 'var(--text-muted)' : 'var(--color-cyan)'};"><i class="fa-solid ${dynDisabled ? 'fa-eye-slash' : 'fa-eye'}"></i></button><button class="btn-adj-reset" data-section="audio_dynamics" data-tooltip="Resetar dinâmica"><i class="fa-solid fa-arrow-rotate-left"></i></button></div>` : ''}
+                        ${aoVivoOk ? `<div class="adj-header-actions" onclick="event.stopPropagation()"><button class="btn-adj-bypass" data-section="audio_dynamics" data-tooltip="${dynDisabled ? 'Ativar dinâmica' : 'Desativar dinâmica'}" style="color:${dynDisabled ? 'var(--text-muted)' : 'var(--accent)'};"><i class="fa-solid ${dynDisabled ? 'fa-eye-slash' : 'fa-eye'}"></i></button><button class="btn-adj-reset" data-section="audio_dynamics" data-tooltip="Resetar dinâmica"><i class="fa-solid fa-arrow-rotate-left"></i></button></div>` : ''}
                     </div>
                     <div class="adjustments-section-body" style="${isDynOpen ? '' : 'display:none;'} opacity:${aoVivoOk && dynDisabled ? 0.4 : 1};">${aoVivoOk ? ((gatePossivel ? linhaAoVivo("data-adyn", "gate_db", "Gate", -90, -20, 1, Math.round(dynVals.gate_db)) + (gatePronto ? '' : gateNota) : gateAviso) + linhaAoVivo("data-adyn", "comp_ratio", "Razão", 1, 20, 0.5, Number(dynVals.comp_ratio)) + linhaAoVivo("data-adyn", "comp_thresh_db", "Limiar", -60, 0, 1, Math.round(dynVals.comp_thresh_db)) + linhaAoVivo("data-adyn", "makeup_db", "Ganho", -12, 12, 0.5, Number(dynVals.makeup_db))) : avisoSemWebAudio}</div>
                 </div>
@@ -8202,7 +8202,7 @@ export class CapiauTimelineInteraction {
             const caixaPasso = (id, rotulo, marcado, explicaChaves, ctrlId) => `
                 <div class="adjustments-row" data-control-id="${ctrlId || id}">
                     <label style="display:flex; gap:var(--sp-6); align-items:center; padding:var(--sp-2) 0; font-size:var(--fs-10); color:var(--text-secondary); cursor:pointer; width:100%; max-width:none;">
-                        <input id="${id}" type="checkbox" ${marcado ? "checked" : ""} style="accent-color: var(--color-cyan); margin:0; cursor:pointer;">
+                        <input id="${id}" type="checkbox" ${marcado ? "checked" : ""} style="accent-color: var(--accent); margin:0; cursor:pointer;">
                         <span>${rotulo}${this._slotExplica(explicaChaves)}</span>
                     </label>
                 </div>
@@ -8239,7 +8239,7 @@ export class CapiauTimelineInteraction {
                         <div class="adjustments-row" data-control-id="ar_loudnorm">
                             <label></label>
                             <div class="control-wrap" style="display:flex; gap:var(--sp-6); align-items:center; flex-wrap:wrap;">
-                                <input id="adj-ar-loudnorm" type="checkbox" ${opcoesIniciais.loudnorm ? "checked" : ""} style="accent-color: var(--color-cyan); margin:0; cursor:pointer;">
+                                <input id="adj-ar-loudnorm" type="checkbox" ${opcoesIniciais.loudnorm ? "checked" : ""} style="accent-color: var(--accent); margin:0; cursor:pointer;">
                                 <span style="font-size:var(--fs-10); color:var(--text-secondary); white-space:nowrap;">Loudness alvo</span>${this._slotExplica("loudnorm lufs alvo_loudness")}
                                 <select id="adj-ar-lufs" style="${selEstilo}">
                                     ${optSel("-16", "-16 LUFS", opcoesIniciais.lufs)}
@@ -8258,7 +8258,7 @@ export class CapiauTimelineInteraction {
                         <div class="adjustments-row" data-control-id="ar_motor" style="margin-top:var(--sp-6);">
                             <label>Motor</label>
                             <div class="control-wrap" style="display:flex; gap:var(--sp-10); align-items:center; flex-wrap:wrap; font-size:var(--fs-10); color:var(--text-secondary);">
-                                <label style="display:flex; gap:var(--sp-4); align-items:center; cursor:pointer;"><input type="radio" name="adj-ar-motor" value="local" checked style="accent-color: var(--color-cyan); cursor:pointer;"> Local</label>
+                                <label style="display:flex; gap:var(--sp-4); align-items:center; cursor:pointer;"><input type="radio" name="adj-ar-motor" value="local" checked style="accent-color: var(--accent); cursor:pointer;"> Local</label>
                                 <label data-motor-auphonic style="display:flex; gap:var(--sp-4); align-items:center; opacity:0.45; cursor:not-allowed;" title="Consultando a cota no servidor..."><input type="radio" name="adj-ar-motor" value="auphonic" disabled style="cursor:not-allowed;"> Auphonic${this._slotExplica("auphonic nuvem_auphonic")}</label>
                                 <label style="display:flex; gap:var(--sp-4); align-items:center; opacity:0.45; cursor:not-allowed;" title="Disponível na Etapa 6"><input type="radio" name="adj-ar-motor" value="daw" disabled style="cursor:not-allowed;"> DAW</label>
                             </div>
@@ -8269,10 +8269,10 @@ export class CapiauTimelineInteraction {
                             <div id="adj-ar-nuvem-out" style="display:none;"></div>
                         </div>
                         <div style="font-size:var(--fs-9); color:var(--text-muted); padding:var(--sp-2) 0 var(--sp-4);">Local roda ffmpeg offline, sem custo. Auphonic usa sua cota mensal na nuvem. Enviar para DAW chega na Etapa 6.</div>
-                        <div id="adj-ar-estimativa" style="font-size:var(--fs-10); color:var(--color-cyan); padding:var(--sp-2) 0;"></div>
+                        <div id="adj-ar-estimativa" style="font-size:var(--fs-10); color:var(--accent); padding:var(--sp-2) 0;"></div>
                         <div id="adj-ar-aviso-ia" style="display:none; font-size:var(--fs-10); color:#facc15; padding:var(--sp-2) 0;">Este preset usa IA: o render pode levar vários minutos, não segundos. Vale começar pelo 'Prever 15 s' para ouvir o resultado antes de aplicar o trecho todo.</div>
                         <div style="display:flex; gap:var(--sp-12); align-items:center; padding:var(--sp-4) 0;">
-                            <button id="adj-ar-previa" title="Processa só 15 s a partir do In do clipe, para decidir antes de comprometer o trecho todo" style="background:none; border:none; color:var(--color-cyan); cursor:pointer; font-size:var(--fs-10); display:flex; gap:var(--sp-4); align-items:center;"><i class="fa-solid fa-play"></i> Prever 15 s</button>
+                            <button id="adj-ar-previa" title="Processa só 15 s a partir do In do clipe, para decidir antes de comprometer o trecho todo" style="background:none; border:none; color:var(--accent); cursor:pointer; font-size:var(--fs-10); display:flex; gap:var(--sp-4); align-items:center;"><i class="fa-solid fa-play"></i> Prever 15 s</button>
                             <button id="adj-ar-aplicar" title="Entra numa fila de render e grava um WAV tratado; o original nunca é tocado" style="background:none; border:none; color:var(--color-emerald); cursor:pointer; font-size:var(--fs-10); display:flex; gap:var(--sp-4); align-items:center;"><i class="fa-solid fa-gears"></i> Aplicar</button>
                         </div>
                         <div id="adj-ar-previa-out"></div>
@@ -8312,7 +8312,7 @@ export class CapiauTimelineInteraction {
                             ${isVolMod ? '<span class="adj-modified-dot" title="Ajustes modificados"></span>' : ''}
                         </div>
                         <div class="adj-header-actions" onclick="event.stopPropagation()">
-                            <button class="btn-adj-bypass" data-section="volume" data-tooltip="${volDisabled ? 'Ativar volume' : 'Desativar volume'}" style="color:${volDisabled ? 'var(--text-muted)' : 'var(--color-cyan)'};"><i class="fa-solid ${volDisabled ? 'fa-eye-slash' : 'fa-eye'}"></i></button>
+                            <button class="btn-adj-bypass" data-section="volume" data-tooltip="${volDisabled ? 'Ativar volume' : 'Desativar volume'}" style="color:${volDisabled ? 'var(--text-muted)' : 'var(--accent)'};"><i class="fa-solid ${volDisabled ? 'fa-eye-slash' : 'fa-eye'}"></i></button>
                             <button class="btn-adj-reset" data-section="volume" data-tooltip="Resetar volume"><i class="fa-solid fa-arrow-rotate-left"></i></button>
                         </div>
                     </div>
@@ -8342,7 +8342,7 @@ export class CapiauTimelineInteraction {
                         ${isTfMod ? '<span class="adj-modified-dot" title="Ajustes modificados"></span>' : ''}
                     </div>
                     <div class="adj-header-actions" onclick="event.stopPropagation()">
-                        <button class="btn-adj-bypass" data-section="transform" data-tooltip="${tfDisabled ? 'Ativar transformações' : 'Desativar transformações'}" style="color:${tfDisabled ? 'var(--text-muted)' : 'var(--color-cyan)'};"><i class="fa-solid ${tfDisabled ? 'fa-eye-slash' : 'fa-eye'}"></i></button>
+                        <button class="btn-adj-bypass" data-section="transform" data-tooltip="${tfDisabled ? 'Ativar transformações' : 'Desativar transformações'}" style="color:${tfDisabled ? 'var(--text-muted)' : 'var(--accent)'};"><i class="fa-solid ${tfDisabled ? 'fa-eye-slash' : 'fa-eye'}"></i></button>
                         <button class="btn-adj-reset" data-section="transform" data-tooltip="Resetar transformações"><i class="fa-solid fa-arrow-rotate-left"></i></button>
                     </div>
                 </div>
@@ -8404,7 +8404,7 @@ export class CapiauTimelineInteraction {
                         ${isCropMod ? '<span class="adj-modified-dot" title="Ajustes modificados"></span>' : ''}
                     </div>
                     <div class="adj-header-actions" onclick="event.stopPropagation()">
-                        <button class="btn-adj-bypass" data-section="crop" data-tooltip="${cropDisabled ? 'Ativar recorte' : 'Desativar recorte'}" style="color:${cropDisabled ? 'var(--text-muted)' : 'var(--color-cyan)'};"><i class="fa-solid ${cropDisabled ? 'fa-eye-slash' : 'fa-eye'}"></i></button>
+                        <button class="btn-adj-bypass" data-section="crop" data-tooltip="${cropDisabled ? 'Ativar recorte' : 'Desativar recorte'}" style="color:${cropDisabled ? 'var(--text-muted)' : 'var(--accent)'};"><i class="fa-solid ${cropDisabled ? 'fa-eye-slash' : 'fa-eye'}"></i></button>
                         <button class="btn-adj-reset" data-section="crop" data-tooltip="Resetar recorte"><i class="fa-solid fa-arrow-rotate-left"></i></button>
                     </div>
                 </div>
@@ -8481,7 +8481,7 @@ export class CapiauTimelineInteraction {
                         ${isColMod ? '<span class="adj-modified-dot" title="Ajustes modificados"></span>' : ''}
                     </div>
                     <div class="adj-header-actions" onclick="event.stopPropagation()">
-                        <button class="btn-adj-bypass" data-section="color" data-tooltip="${colDisabled ? 'Ativar efeitos de cor' : 'Desativar efeitos de cor'}" style="color:${colDisabled ? 'var(--text-muted)' : 'var(--color-cyan)'};"><i class="fa-solid ${colDisabled ? 'fa-eye-slash' : 'fa-eye'}"></i></button>
+                        <button class="btn-adj-bypass" data-section="color" data-tooltip="${colDisabled ? 'Ativar efeitos de cor' : 'Desativar efeitos de cor'}" style="color:${colDisabled ? 'var(--text-muted)' : 'var(--accent)'};"><i class="fa-solid ${colDisabled ? 'fa-eye-slash' : 'fa-eye'}"></i></button>
                         <button class="btn-adj-reset" data-section="color" data-tooltip="Resetar efeitos de cor"><i class="fa-solid fa-arrow-rotate-left"></i></button>
                     </div>
                 </div>
@@ -8552,7 +8552,7 @@ export class CapiauTimelineInteraction {
                         ${isFadesMod ? '<span class="adj-modified-dot" title="Ajustes modificados"></span>' : ''}
                     </div>
                     <div class="adj-header-actions" onclick="event.stopPropagation()">
-                        <button class="btn-adj-bypass" data-section="fades" data-tooltip="${fadesDisabled ? 'Ativar transições' : 'Desativar transições'}" style="color:${fadesDisabled ? 'var(--text-muted)' : 'var(--color-cyan)'};"><i class="fa-solid ${fadesDisabled ? 'fa-eye-slash' : 'fa-eye'}"></i></button>
+                        <button class="btn-adj-bypass" data-section="fades" data-tooltip="${fadesDisabled ? 'Ativar transições' : 'Desativar transições'}" style="color:${fadesDisabled ? 'var(--text-muted)' : 'var(--accent)'};"><i class="fa-solid ${fadesDisabled ? 'fa-eye-slash' : 'fa-eye'}"></i></button>
                         <button class="btn-adj-reset" data-section="fades" data-tooltip="Resetar transições"><i class="fa-solid fa-arrow-rotate-left"></i></button>
                     </div>
                 </div>
@@ -8561,7 +8561,7 @@ export class CapiauTimelineInteraction {
                         <label style="font-size:var(--fs-11); color:var(--text-secondary);">Fade In</label>
                         <div style="display:flex; align-items:center; gap:var(--sp-6);">
                             <div class="control-wrap" style="display:flex; align-items:center; gap:var(--sp-2);">
-                                <input id="adj-fadein" type="number" class="nle-input-flat" min="0" step="0.1" value="${fadeInDur}" data-tooltip="Fade In: ${fadeInDur}s" style="background:transparent; border:none; outline:none; color:var(--color-cyan); font-size:var(--fs-11); font-weight:600; text-align:right; width:34px; font-family:monospace; padding:0;">
+                                <input id="adj-fadein" type="number" class="nle-input-flat" min="0" step="0.1" value="${fadeInDur}" data-tooltip="Fade In: ${fadeInDur}s" style="background:transparent; border:none; outline:none; color:var(--accent); font-size:var(--fs-11); font-weight:600; text-align:right; width:34px; font-family:monospace; padding:0;">
                                 <span style="font-size:var(--fs-10); color:var(--text-muted); user-select:none;">s</span>
                                 <div class="flat-number-stepper" style="display:flex; flex-direction:column; gap:var(--sp-1); margin-left:var(--sp-2);">
                                     <button class="btn-fade-step" data-target="adj-fadein" data-dir="up" title="Aumentar (0.1s)" style="background:transparent; border:none; padding:0; margin:0; color:var(--text-muted); font-size:var(--fs-8); height:6px; line-height:6px; cursor:pointer; display:flex; align-items:center; justify-content:center;"><i class="fa-solid fa-chevron-up"></i></button>
@@ -8581,7 +8581,7 @@ export class CapiauTimelineInteraction {
                         <label style="font-size:var(--fs-11); color:var(--text-secondary);">Fade Out</label>
                         <div style="display:flex; align-items:center; gap:var(--sp-6);">
                             <div class="control-wrap" style="display:flex; align-items:center; gap:var(--sp-2);">
-                                <input id="adj-fadeout" type="number" class="nle-input-flat" min="0" step="0.1" value="${fadeOutDur}" data-tooltip="Fade Out: ${fadeOutDur}s" style="background:transparent; border:none; outline:none; color:var(--color-cyan); font-size:var(--fs-11); font-weight:600; text-align:right; width:34px; font-family:monospace; padding:0;">
+                                <input id="adj-fadeout" type="number" class="nle-input-flat" min="0" step="0.1" value="${fadeOutDur}" data-tooltip="Fade Out: ${fadeOutDur}s" style="background:transparent; border:none; outline:none; color:var(--accent); font-size:var(--fs-11); font-weight:600; text-align:right; width:34px; font-family:monospace; padding:0;">
                                 <span style="font-size:var(--fs-10); color:var(--text-muted); user-select:none;">s</span>
                                 <div class="flat-number-stepper" style="display:flex; flex-direction:column; gap:var(--sp-1); margin-left:var(--sp-2);">
                                     <button class="btn-fade-step" data-target="adj-fadeout" data-dir="up" title="Aumentar (0.1s)" style="background:transparent; border:none; padding:0; margin:0; color:var(--text-muted); font-size:var(--fs-8); height:6px; line-height:6px; cursor:pointer; display:flex; align-items:center; justify-content:center;"><i class="fa-solid fa-chevron-up"></i></button>
@@ -8732,7 +8732,7 @@ export class CapiauTimelineInteraction {
         ` : "";
 
         const presetLinha = avaliacao.preset_sugerido ? `
-            <div style="border-top:1px solid var(--border-glass); margin-top:var(--sp-4); padding-top:var(--sp-4); font-size:var(--fs-10); line-height:1.4; color:var(--color-cyan); display:flex; gap:var(--sp-6); align-items:flex-start;">
+            <div style="border-top:1px solid var(--border-glass); margin-top:var(--sp-4); padding-top:var(--sp-4); font-size:var(--fs-10); line-height:1.4; color:var(--accent); display:flex; gap:var(--sp-6); align-items:flex-start;">
                 <i class="fa-solid fa-wand-magic-sparkles" style="margin-top:var(--sp-1);"></i>
                 <span>Sugestão: ${this._audioDiagEsc(avaliacao.preset_sugerido)}</span>
             </div>
@@ -8809,7 +8809,7 @@ export class CapiauTimelineInteraction {
         const restantes = lista.length - visiveis.length;
         let toggleBtn = "";
         if (restantes > 0) {
-            toggleBtn = `<button type="button" class="adj-diag-more" style="background:none; border:none; padding:var(--sp-2) var(--sp-4); color:var(--color-cyan); cursor:pointer; font-size:var(--fs-9);">Ver mais (${restantes})</button>`;
+            toggleBtn = `<button type="button" class="adj-diag-more" style="background:none; border:none; padding:var(--sp-2) var(--sp-4); color:var(--accent); cursor:pointer; font-size:var(--fs-9);">Ver mais (${restantes})</button>`;
         } else if ((expandido === true) && lista.length > MAX_VISIVEIS) {
             toggleBtn = `<button type="button" class="adj-diag-more" style="background:none; border:none; padding:var(--sp-2) var(--sp-4); color:var(--text-muted); cursor:pointer; font-size:var(--fs-9);">Ver menos</button>`;
         }
@@ -9112,7 +9112,7 @@ export class CapiauTimelineInteraction {
                     <i class="fa-solid fa-circle-notch fa-spin"></i>
                     <span>${efeito.status === "running" ? "Renderizando..." : "Na fila do render..."}${pct !== null ? ` ${pct}%` : ""}</span>
                 </div>
-                ${pct !== null ? `<div style="height:4px; border-radius:2px; background:rgba(255,255,255,0.08); overflow:hidden;"><div style="height:100%; width:${pct}%; background:var(--color-cyan); transition:width 0.4s;"></div></div>` : ""}
+                ${pct !== null ? `<div style="height:4px; border-radius:2px; background:rgba(255,255,255,0.08); overflow:hidden;"><div style="height:100%; width:${pct}%; background:var(--accent); transition:width 0.4s;"></div></div>` : ""}
                 ${erroRede ? `<div style="margin-top:var(--sp-2); font-size:var(--fs-9); color:#facc15;">${esc(erroRede)}</div>` : ""}
                 <div style="font-size:var(--fs-9); color:var(--text-muted); padding-top:var(--sp-2);">Sem números "depois" enquanto o render não termina.</div>
             `;
@@ -9128,7 +9128,7 @@ export class CapiauTimelineInteraction {
             const tamanhoTratado = this._tamanhoFormatado(this._tamanhoTratadoDe(caminhoTratado));
             const radio = (valor, rotulo, marcado) => `
                         <label style="display:flex; gap:var(--sp-4); align-items:center; cursor:pointer; font-size:var(--fs-10); color:var(--text-secondary);">
-                            <input type="radio" name="adj-ar-ab" value="${valor}" ${marcado ? "checked" : ""} style="accent-color: var(--color-cyan); cursor:pointer;"> ${rotulo}
+                            <input type="radio" name="adj-ar-ab" value="${valor}" ${marcado ? "checked" : ""} style="accent-color: var(--accent); cursor:pointer;"> ${rotulo}
                         </label>
             `;
             return `
@@ -9600,7 +9600,7 @@ export class CapiauTimelineInteraction {
                     <span>Cota quase esgotada${mes}: só restam ${esc(restante.toLocaleString("pt-BR"))} dos ${esc(total.toLocaleString("pt-BR"))} min deste mês. Um render longo pode estourar o limite e parar no meio.</span>
                 </div>` : ""}
                 <div style="height:4px; border-radius:2px; background:rgba(255,255,255,0.08); overflow:hidden;" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}">
-                    <div style="height:100%; width:${pct}%; background:${alerta ? "var(--color-rose)" : "var(--color-cyan)"}; transition:width 0.4s;"></div>
+                    <div style="height:100%; width:${pct}%; background:${alerta ? "var(--color-rose)" : "var(--accent)"}; transition:width 0.4s;"></div>
                 </div>
                 <div style="font-size:var(--fs-9); color:var(--text-secondary); padding-top:var(--sp-2);">Auphonic${mes}: usados ${esc(usados.toLocaleString("pt-BR"))} de ${esc(total.toLocaleString("pt-BR"))} min — restam ${esc(restante.toLocaleString("pt-BR"))} min.</div>
             </div>
@@ -9673,7 +9673,7 @@ export class CapiauTimelineInteraction {
                 <div style="display:flex; gap:var(--sp-6); align-items:center;">
                     <i class="fa-solid fa-folder-open" style="color:var(--color-emerald); font-size:var(--fs-10); flex-shrink:0;"></i>
                     <span id="adj-ar-caminho" style="font-family:monospace; font-size:var(--fs-10); color:var(--text-primary); word-break:break-all; user-select:all;">${esc(caminho)}</span>
-                    <button id="adj-ar-copiar-caminho" data-copia="${esc(caminho)}" title="Copia o caminho relativo do WAV tratado para a área de transferência" style="background:none; border:none; color:var(--color-cyan); cursor:pointer; font-size:var(--fs-9); display:flex; gap:var(--sp-2); align-items:center; flex-shrink:0;"><i class="fa-solid fa-copy"></i> Copiar</button>
+                    <button id="adj-ar-copiar-caminho" data-copia="${esc(caminho)}" title="Copia o caminho relativo do WAV tratado para a área de transferência" style="background:none; border:none; color:var(--accent); cursor:pointer; font-size:var(--fs-9); display:flex; gap:var(--sp-2); align-items:center; flex-shrink:0;"><i class="fa-solid fa-copy"></i> Copiar</button>
                     ${tam}
                 </div>
                 <div style="font-size:var(--fs-9); color:var(--text-muted); padding-top:var(--sp-2); line-height:1.4;">O nome é o hash SHA-256 da cadeia de tratamento — é a chave de cache: reaplicar a mesma cadeia reusa este arquivo em vez de reprocessar.</div>
@@ -13234,7 +13234,7 @@ export class CapiauTimelineInteraction {
         }
 
         popup.innerHTML = `
-            <div style="font-size: var(--fs-11); color: var(--color-cyan); font-weight: bold; margin-bottom: var(--sp-2);">SUGESTÃO DE CORTE IA</div>
+            <div style="font-size: var(--fs-11); color: var(--accent); font-weight: bold; margin-bottom: var(--sp-2);">SUGESTÃO DE CORTE IA</div>
             <div style="font-size: var(--fs-12); color: #fff; line-height: 1.4; margin-bottom: var(--sp-6);">"${ghost.reason}"</div>
             <div style="display: flex; gap: var(--sp-8);">
                 <button id="btn-popup-accept" class="btn-primary" style="flex: 1; height: 26px; font-size: var(--fs-11); font-weight: bold; padding: 0 var(--sp-10); display: flex; align-items: center; justify-content: center; gap: var(--sp-4); border-radius: 4px;">
@@ -13496,7 +13496,7 @@ export class CapiauTimelineInteraction {
                 left: 50%;
                 transform: translate(-50%, -50%);
                 background: var(--t-surface-3, rgba(15, 23, 42, 0.98));
-                border: 1px solid var(--color-cyan);
+                border: 1px solid var(--accent);
                 border-radius: 12px;
                 padding: 20px;
                 display: none;
@@ -13545,7 +13545,7 @@ export class CapiauTimelineInteraction {
                             <button class="btn-alt-swap-fixed btn-icon" data-video-id="${alt.video_id}" data-in="${alt.in_s}" data-out="${alt.out_s}" title="Slot Fixo (substitui mantendo a duração atual)" style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; font-size: var(--fs-16); background: rgba(255,255,255,0.05); border: 1px solid var(--t-line-strong, rgba(255,255,255,0.15)); border-radius: 6px; color: #fff; cursor: pointer; outline: none; transition: all 0.2s;">
                                 <i class="fa-solid fa-arrows-left-right"></i>
                             </button>
-                            <button class="btn-alt-swap-ripple btn-icon" data-video-id="${alt.video_id}" data-in="${alt.in_s}" data-out="${alt.out_s}" title="Ripple (aplica duração ideal e empurra os seguintes)" style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; font-size: var(--fs-16); background: var(--t-tint-2, rgba(6,182,212,0.1)); border: 1px solid var(--t-line-strong, rgba(6,182,212,0.3)); border-radius: 6px; color: var(--color-cyan); cursor: pointer; outline: none; transition: all 0.2s;">
+                            <button class="btn-alt-swap-ripple btn-icon" data-video-id="${alt.video_id}" data-in="${alt.in_s}" data-out="${alt.out_s}" title="Ripple (aplica duração ideal e empurra os seguintes)" style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; font-size: var(--fs-16); background: var(--t-tint-2, color-mix(in srgb, var(--t-accent, rgb(6, 182, 212)) 10%, transparent)); border: 1px solid var(--t-line-strong, color-mix(in srgb, var(--t-accent, rgb(6, 182, 212)) 30%, transparent)); border-radius: 6px; color: var(--accent); cursor: pointer; outline: none; transition: all 0.2s;">
                                 <i class="fa-solid fa-angles-right"></i>
                             </button>
                         </div>
@@ -13568,7 +13568,7 @@ export class CapiauTimelineInteraction {
                     color: #fff !important;
                 }
             </style>
-            <div style="font-size: var(--fs-14); color: var(--color-cyan); font-weight: bold; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--t-line-strong, rgba(255,255,255,0.1)); padding-bottom: var(--sp-10);">
+            <div style="font-size: var(--fs-14); color: var(--accent); font-weight: bold; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--t-line-strong, rgba(255,255,255,0.1)); padding-bottom: var(--sp-10);">
                 <span><i class="fa-solid fa-wand-magic-sparkles"></i> Opções Alternativas da IA</span>
                 <span style="font-size: var(--fs-11); color: var(--text-secondary); cursor: pointer; padding: var(--sp-4);" class="btn-close-alts"><i class="fa-solid fa-xmark"></i></span>
             </div>

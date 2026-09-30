@@ -1740,7 +1740,7 @@ export class WorkspaceManager {
         let monitorsTooltip;
 
         if (isAuto) {
-            monitorsIconHtml = `<i class="fa-solid fa-wand-magic-sparkles" style="color: var(--color-cyan);"></i>`;
+            monitorsIconHtml = `<i class="fa-solid fa-wand-magic-sparkles" style="color: var(--accent);"></i>`;
             monitorsTooltip = `Disposição dos Monitores: Automático (Ativo: ${isStacked ? 'Empilhados' : 'Lado a Lado'}) - Clique para alternar`;
         } else if (isStacked) {
             monitorsIconHtml = `<i class="fa-solid fa-table-columns"></i>`;

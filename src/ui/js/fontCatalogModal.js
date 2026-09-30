@@ -98,8 +98,8 @@ export class FontCatalogModal {
                         <!-- Pílulas de Clima / Mood -->
                         <div style="display: flex; gap: var(--sp-6); overflow-x: auto; padding-bottom: var(--sp-2);">
                             ${FONT_MOODS.map(m => `
-                                <button class="mood-pill-btn ${this.selectedMood === m.id ? 'active' : ''}" data-mood="${m.id}" style="padding: var(--sp-4) var(--sp-10); font-size: var(--fs-11); border-radius: 20px; border: 1px solid ${this.selectedMood === m.id ? 'var(--color-cyan)' : 'var(--border-glass)'}; background: ${this.selectedMood === m.id ? 'rgba(6,182,212,0.15)' : 'rgba(255,255,255,0.03)'}; color: ${this.selectedMood === m.id ? '#fff' : 'var(--text-secondary)'}; cursor: pointer; white-space: nowrap; display: flex; align-items: center; gap: var(--sp-6); transition: all 0.15s;">
-                                    <i class="${m.icon}" style="font-size: var(--fs-9); color: ${this.selectedMood === m.id ? 'var(--color-cyan)' : 'var(--text-muted)'};"></i>
+                                <button class="mood-pill-btn ${this.selectedMood === m.id ? 'active' : ''}" data-mood="${m.id}" style="padding: var(--sp-4) var(--sp-10); font-size: var(--fs-11); border-radius: 20px; border: 1px solid ${this.selectedMood === m.id ? 'var(--accent)' : 'var(--border-glass)'}; background: ${this.selectedMood === m.id ? 'color-mix(in srgb, var(--t-accent, rgb(6, 182, 212)) 15%, transparent)' : 'rgba(255,255,255,0.03)'}; color: ${this.selectedMood === m.id ? '#fff' : 'var(--text-secondary)'}; cursor: pointer; white-space: nowrap; display: flex; align-items: center; gap: var(--sp-6); transition: all 0.15s;">
+                                    <i class="${m.icon}" style="font-size: var(--fs-9); color: ${this.selectedMood === m.id ? 'var(--accent)' : 'var(--text-muted)'};"></i>
                                     ${m.label}
                                 </button>
                             `).join('')}
@@ -113,7 +113,7 @@ export class FontCatalogModal {
                             </div>
                             <input type="text" id="font-sample-input" placeholder="Texto de amostra..." value="${this.previewSampleText}" style="width: 220px; height: 30px; background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); border-radius: 4px; padding: 0 var(--sp-8); font-size: var(--fs-11); color: #e2e8f0; outline: none;">
                             
-                            <button id="btn-load-system-fonts" class="lib-action-btn" title="Detectar fontes instaladas no sistema operacional (queryLocalFonts)" style="display: flex; align-items: center; gap: var(--sp-6); padding: 0 var(--sp-10); height: 30px; font-size: var(--fs-11); color: var(--color-cyan);">
+                            <button id="btn-load-system-fonts" class="lib-action-btn" title="Detectar fontes instaladas no sistema operacional (queryLocalFonts)" style="display: flex; align-items: center; gap: var(--sp-6); padding: 0 var(--sp-10); height: 30px; font-size: var(--fs-11); color: var(--accent);">
                                 <i class="fa-solid fa-desktop"></i> Fontes do PC
                             </button>
                             
@@ -144,7 +144,7 @@ export class FontCatalogModal {
                                 <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px dashed var(--border-glass); padding-top: var(--sp-8); margin-top: var(--sp-4);">
                                     <span style="font-size: var(--fs-9); color: var(--text-muted);">${font.weights ? font.weights.length + ' pesos' : 'Normal'}</span>
                                     <div style="display: flex; gap: var(--sp-6);">
-                                        <button class="btn-select-font-clip" data-font-id="${font.id}" title="Aplicar ao clipe selecionado" style="font-size: var(--fs-10); font-weight: 600; padding: var(--sp-2) var(--sp-8); border-radius: 4px; border: 1px solid var(--t-line-strong, rgba(6,182,212,0.4)); background: var(--t-tint-2, rgba(6,182,212,0.1)); color: var(--color-cyan); cursor: pointer;">
+                                        <button class="btn-select-font-clip" data-font-id="${font.id}" title="Aplicar ao clipe selecionado" style="font-size: var(--fs-10); font-weight: 600; padding: var(--sp-2) var(--sp-8); border-radius: 4px; border: 1px solid var(--t-line-strong, color-mix(in srgb, var(--t-accent, rgb(6, 182, 212)) 40%, transparent)); background: var(--t-tint-2, color-mix(in srgb, var(--t-accent, rgb(6, 182, 212)) 10%, transparent)); color: var(--accent); cursor: pointer;">
                                             Aplicar
                                         </button>
                                         <button class="btn-set-brandkit-font" data-font-id="${font.id}" title="Definir como fonte padrão no Brand Kit" style="font-size: var(--fs-10); padding: var(--sp-2) var(--sp-6); border-radius: 4px; border: 1px solid var(--border-glass); background: transparent; color: var(--text-secondary); cursor: pointer;">
@@ -169,7 +169,7 @@ export class FontCatalogModal {
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-20);">
                         <!-- Coluna 1: Tipografia Oficial -->
                         <div style="display: flex; flex-direction: column; gap: var(--sp-14); background: rgba(0,0,0,0.2); border: 1px solid var(--border-glass); border-radius: 6px; padding: var(--sp-16);">
-                            <h3 style="font-size: var(--fs-12); font-weight: 700; color: var(--color-cyan); margin: 0; text-transform: uppercase; letter-spacing: 0.5px;"><i class="fa-solid fa-font"></i> Tipografia Oficial</h3>
+                            <h3 style="font-size: var(--fs-12); font-weight: 700; color: var(--accent); margin: 0; text-transform: uppercase; letter-spacing: 0.5px;"><i class="fa-solid fa-font"></i> Tipografia Oficial</h3>
                             
                             <div style="display: flex; flex-direction: column; gap: var(--sp-6);">
                                 <label style="font-size: var(--fs-11); color: var(--text-secondary);">Fonte de Títulos & Cartelas de Capítulo</label>
@@ -231,7 +231,7 @@ export class FontCatalogModal {
                         <button id="btn-apply-brandkit-all" class="btn-secondary" style="height: 32px; font-size: var(--fs-11); font-weight: 600; padding: 0 var(--sp-14); border: 1px solid var(--t-line-strong, rgba(245,158,11,0.4)); background: var(--t-tint-2, rgba(245,158,11,0.08)); color: #f59e0b; cursor: pointer; border-radius: 4px; display: flex; align-items: center; gap: var(--sp-6);">
                             <i class="fa-solid fa-wand-magic"></i> Padronizar Todos os Textos da Timeline
                         </button>
-                        <button id="btn-save-brandkit" class="btn-primary" style="height: 32px; font-size: var(--fs-11); font-weight: 700; padding: 0 var(--sp-18); border: none; --primary-bg: var(--color-cyan); --primary-ink: #000; cursor: pointer; border-radius: 4px; display: flex; align-items: center; gap: var(--sp-6);">
+                        <button id="btn-save-brandkit" class="btn-primary" style="height: 32px; font-size: var(--fs-11); font-weight: 700; padding: 0 var(--sp-18); border: none; --primary-bg: var(--accent); --primary-ink: #000; cursor: pointer; border-radius: 4px; display: flex; align-items: center; gap: var(--sp-6);">
                             <i class="fa-solid fa-check"></i> Salvar Brand Kit do Projeto
                         </button>
                     </div>

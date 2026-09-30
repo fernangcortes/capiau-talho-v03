@@ -17,6 +17,7 @@ import {
 } from "./tema_cores.mjs";
 import { temaArquivos, temaAchados } from "../scripts/tema_tokenizar.mjs";
 import { SP_STEPS, spStep, scanSpacing, applySpacing, unwrapSpacing, roundSpacing, espacosArquivos } from "../scripts/tema_espacos.mjs";
+import { acentuar, acentuarCss, acentuarMarcacao, acentoArquivos } from "../scripts/tema_acento.mjs";
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -312,5 +313,37 @@ console.log("✔ 8.1 passou: px de espaçamento → var(--sp-N).");
     }
 }
 console.log("✔ 8.2 passou: a UI só usa degraus de espaçamento definidos em theme.css.");
+
+// ======================================================================
+// PARTE 9: Ciano da UI segue a cor de interação (scripts/tema_acento.mjs)
+// ======================================================================
+console.log("\n--- PARTE 9: Cor de interação no lugar do ciano fixo ---");
+{
+    assert.equal(acentuar("color: var(--color-cyan); border: 1px solid var(--color-cyan, #06b6d4)"),
+        "color: var(--accent); border: 1px solid var(--accent, var(--t-accent, #06b6d4))");
+    assert.equal(acentuar("background: rgba(6, 182, 212, 0.15)"),
+        "background: color-mix(in srgb, var(--t-accent, rgb(6, 182, 212)) 15%, transparent)", "sem escolha, a mesma cor");
+    assert.equal(acentuar(acentuar("color: #22d3ee")), "color: var(--t-accent, #22d3ee)", "idempotente");
+    const css = ":root { --accent: var(--color-cyan); }\n.clue-badge.face { color: var(--color-cyan); }\n.a { color: var(--color-cyan); }";
+    assert.equal(acentuarCss(css).texto,
+        ":root { --accent: var(--color-cyan); }\n.clue-badge.face { color: var(--color-cyan); }\n.a { color: var(--accent); }",
+        "definição e cor por tipo ficam");
+    const js = `const bin = { color: "var(--color-cyan)" }; el.style.color = "var(--color-cyan)"; const h = \`<i style="color: rgba(6,182,212,0.5)"></i>\`; const tag = "#06b6d4";`;
+    assert.equal(acentuarMarcacao(js, { isJs: true }).texto,
+        `const bin = { color: "var(--color-cyan)" }; el.style.color = "var(--accent)"; const h = \`<i style="color: color-mix(in srgb, var(--t-accent, rgb(6, 182, 212)) 50%, transparent)"></i>\`; const tag = "#06b6d4";`,
+        "cor guardada como dado e hex no JS ficam");
+    const swatch = `<button data-color="#06b6d4" style="background-color: #06b6d4"></button>`;
+    assert.equal(acentuarMarcacao(swatch).texto, swatch, "amostra de paleta fica");
+
+    // Na UI não sobra ciano fixo fora do que tem significado.
+    const sobras = [];
+    for (const { file, kind } of acentoArquivos()) {
+        const raw = readFileSync(file, "utf8");
+        const r = kind === "css" ? acentuarCss(raw) : acentuarMarcacao(raw, { isJs: kind === "js" });
+        if (r.trocas) sobras.push(`${path.relative(rootDir, file)}: ${r.trocas}`);
+    }
+    assert.deepEqual(sobras, [], "ciano fixo na UI (rode: node scripts/tema_acento.mjs --write)");
+}
+console.log("✔ 9 passou: controles e títulos seguem a cor de interação; dados e cores por tipo ficam.");
 
 console.log("\n=== AUTOTESTE TOKENS DE TEMA CONCLUÍDO COM SUCESSO ===");

@@ -1244,7 +1244,7 @@ export function showMediaContextMenu(e, item, kind, cardEl) {
     const addTlMenuItem = document.createElement("div");
     addTlMenuItem.className = "menu-item menu-item-has-submenu";
     addTlMenuItem.innerHTML = `
-        <i class="fa-solid fa-plus" style="color:var(--color-cyan);"></i>
+        <i class="fa-solid fa-plus" style="color:var(--accent);"></i>
         <span class="menu-item-text" style="font-weight:600;">Adicionar à Timeline</span>
         <i class="fa-solid fa-chevron-right menu-item-chevron"></i>
         <div class="menu-submenu" style="min-width: 290px;"></div>
@@ -1304,7 +1304,7 @@ export function showMediaContextMenu(e, item, kind, cardEl) {
     if (totalMediaCutsOnTl > 0) {
         const adjustAllItem = document.createElement("div");
         adjustAllItem.className = "menu-item";
-        adjustAllItem.innerHTML = `<i class="fa-solid fa-sliders" style="color:var(--color-cyan);"></i><span class="menu-item-text" style="font-weight:600; color:var(--color-cyan);">Ajustar Cortes na Timeline (${totalMediaCutsOnTl})</span>`;
+        adjustAllItem.innerHTML = `<i class="fa-solid fa-sliders" style="color:var(--accent);"></i><span class="menu-item-text" style="font-weight:600; color:var(--accent);">Ajustar Cortes na Timeline (${totalMediaCutsOnTl})</span>`;
         adjustAllItem.addEventListener("click", () => {
             menu.remove();
             const interaction = window.timelineInteraction || window.panelsManager?.timelineInteraction;
@@ -1441,7 +1441,7 @@ export function showMediaContextMenu(e, item, kind, cardEl) {
     const aiLayersMenuItem = document.createElement("div");
     aiLayersMenuItem.className = "menu-item menu-item-has-submenu";
     aiLayersMenuItem.innerHTML = `
-        <i class="fa-solid fa-wand-magic-sparkles" style="color:var(--color-cyan);"></i>
+        <i class="fa-solid fa-wand-magic-sparkles" style="color:var(--accent);"></i>
         <span class="menu-item-text" style="font-weight:600;">Camadas de IA & Decupagem</span>
         <i class="fa-solid fa-chevron-right menu-item-chevron"></i>
         <div class="menu-submenu" style="min-width: 250px;"></div>
@@ -1455,8 +1455,8 @@ export function showMediaContextMenu(e, item, kind, cardEl) {
     runAllItem.style.borderBottom = "1px solid var(--t-line-weak, rgba(255, 255, 255, 0.08))";
     runAllItem.style.marginBottom = "4px";
     runAllItem.innerHTML = `
-        <i class="fa-solid fa-bolt" style="color:var(--color-cyan);"></i>
-        <span class="menu-item-text" style="color:var(--color-cyan); font-weight:600;">Executar Todas as Camadas de IA</span>
+        <i class="fa-solid fa-bolt" style="color:var(--accent);"></i>
+        <span class="menu-item-text" style="color:var(--accent); font-weight:600;">Executar Todas as Camadas de IA</span>
     `;
     runAllItem.addEventListener("click", async () => {
         menu.remove();
@@ -1599,7 +1599,7 @@ export function showMediaContextMenu(e, item, kind, cardEl) {
         const isCurrent = (item.category || "").toLowerCase() === catKey.toLowerCase();
         subItem.innerHTML = `
             <span class="menu-item-text">${catName}</span>
-            ${isCurrent ? '<i class="fa-solid fa-check" style="color:var(--color-cyan); font-size:var(--fs-10); margin-left:auto; width:auto;"></i>' : ''}
+            ${isCurrent ? '<i class="fa-solid fa-check" style="color:var(--accent); font-size:var(--fs-10); margin-left:auto; width:auto;"></i>' : ''}
         `;
         subItem.addEventListener("click", async (ev) => {
             ev.stopPropagation();
@@ -1638,7 +1638,7 @@ export function showMediaContextMenu(e, item, kind, cardEl) {
     // Item: Mostrar no Windows Explorer
     const explorerItem = document.createElement("div");
     explorerItem.className = "menu-item";
-    explorerItem.innerHTML = `<i class="fa-solid fa-folder-open" style="color:var(--color-cyan);"></i><span class="menu-item-text">Mostrar no Windows Explorer</span>`;
+    explorerItem.innerHTML = `<i class="fa-solid fa-folder-open" style="color:var(--accent);"></i><span class="menu-item-text">Mostrar no Windows Explorer</span>`;
     explorerItem.addEventListener("click", async () => {
         menu.remove();
         try {
@@ -1688,7 +1688,7 @@ export function showMediaContextMenu(e, item, kind, cardEl) {
     const smartBinMenuItem = document.createElement("div");
     smartBinMenuItem.className = "menu-item menu-item-has-submenu";
     smartBinMenuItem.innerHTML = `
-        <i class="fa-solid fa-brain" style="color:var(--color-cyan);"></i>
+        <i class="fa-solid fa-brain" style="color:var(--accent);"></i>
         <span class="menu-item-text">Atribuir Smart Bin (IA)</span>
         <i class="fa-solid fa-chevron-right menu-item-chevron"></i>
         <div class="menu-submenu" style="min-width: 250px;"></div>
@@ -1703,9 +1703,9 @@ export function showMediaContextMenu(e, item, kind, cardEl) {
     const autoItem = document.createElement("div");
     autoItem.className = "menu-item";
     autoItem.innerHTML = `
-        <i class="fa-solid fa-wand-magic-sparkles" style="color:var(--color-cyan);"></i>
+        <i class="fa-solid fa-wand-magic-sparkles" style="color:var(--accent);"></i>
         <span class="menu-item-text">🤖 Automático (Classificação IA)</span>
-        ${!hasManualOverride ? '<i class="fa-solid fa-check" style="color:var(--color-cyan); font-size:var(--fs-10); margin-left:auto; width:auto;"></i>' : ''}
+        ${!hasManualOverride ? '<i class="fa-solid fa-check" style="color:var(--accent); font-size:var(--fs-10); margin-left:auto; width:auto;"></i>' : ''}
     `;
     autoItem.addEventListener("click", (ev) => {
         ev.stopPropagation();
@@ -1731,7 +1731,7 @@ export function showMediaContextMenu(e, item, kind, cardEl) {
         const isCurrent = currentSmartBin === bin.id;
         subItem.innerHTML = `
             <span class="menu-item-text">${bin.label}</span>
-            ${isCurrent ? '<i class="fa-solid fa-check" style="color:var(--color-cyan); font-size:var(--fs-10); margin-left:auto; width:auto;"></i>' : ''}
+            ${isCurrent ? '<i class="fa-solid fa-check" style="color:var(--accent); font-size:var(--fs-10); margin-left:auto; width:auto;"></i>' : ''}
         `;
         subItem.addEventListener("click", (ev) => {
             ev.stopPropagation();
@@ -1761,7 +1761,7 @@ export function showMediaContextMenu(e, item, kind, cardEl) {
     // Item: Relincar Arquivo Original
     const relinkItem = document.createElement("div");
     relinkItem.className = "menu-item";
-    relinkItem.innerHTML = `<i class="fa-solid fa-link" style="color:var(--color-cyan);"></i><span class="menu-item-text">Relincar Mídias / Buscar no Disco...</span>`;
+    relinkItem.innerHTML = `<i class="fa-solid fa-link" style="color:var(--accent);"></i><span class="menu-item-text">Relincar Mídias / Buscar no Disco...</span>`;
     relinkItem.addEventListener("click", () => {
         menu.remove();
         promptRelinkMediaDialog(item.filepath ? item.filepath.substring(0, item.filepath.lastIndexOf('/')) : "");
@@ -1771,7 +1771,7 @@ export function showMediaContextMenu(e, item, kind, cardEl) {
     // Item: Girar Mídia (+90°)
     const rotateItem = document.createElement("div");
     rotateItem.className = "menu-item";
-    rotateItem.innerHTML = `<i class="fa-solid fa-rotate-right" style="color:var(--color-cyan);"></i><span class="menu-item-text">Girar Mídia (+90°)</span><span style="margin-left:auto; font-size:var(--fs-10); color:var(--text-muted); padding-left:var(--sp-12);">R</span>`;
+    rotateItem.innerHTML = `<i class="fa-solid fa-rotate-right" style="color:var(--accent);"></i><span class="menu-item-text">Girar Mídia (+90°)</span><span style="margin-left:auto; font-size:var(--fs-10); color:var(--text-muted); padding-left:var(--sp-12);">R</span>`;
     rotateItem.addEventListener("click", async () => {
         menu.remove();
         try {
@@ -2020,7 +2020,7 @@ export function promptExternalPathIngest(targetFolderPath = "root") {
         <div class="modal-content glassmorphism" style="max-width: 460px; padding: var(--sp-20); border-radius: 8px;">
             <div class="modal-header" style="margin-bottom: var(--sp-14); display: flex; justify-content: space-between; align-items: center;">
                 <h2 style="font-size: var(--fs-14); color: var(--text-primary); display: flex; align-items: center; gap: var(--sp-8); margin: 0;">
-                    <i class="fa-solid fa-link" style="color: var(--color-cyan);"></i> Vincular Pasta Local / HD Externo
+                    <i class="fa-solid fa-link" style="color: var(--accent);"></i> Vincular Pasta Local / HD Externo
                 </h2>
                 <button class="btn-close-modal" id="btn-close-external-ingest" style="background: none; border: none; color: var(--text-secondary); cursor: pointer; font-size: var(--fs-16);">&times;</button>
             </div>
@@ -2041,7 +2041,7 @@ export function promptExternalPathIngest(targetFolderPath = "root") {
             </div>
             <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: var(--sp-8); margin-top: var(--sp-18);">
                 <button id="btn-cancel-external-ingest" class="btn-outline">Cancelar</button>
-                <button id="btn-confirm-external-ingest" class="btn-primary" style="--primary-bg: var(--color-cyan); --primary-ink: #000; font-weight: 600;">Vincular In-Place</button>
+                <button id="btn-confirm-external-ingest" class="btn-primary" style="--primary-bg: var(--accent); --primary-ink: #000; font-weight: 600;">Vincular In-Place</button>
             </div>
         </div>
     `;
@@ -2194,7 +2194,7 @@ export function showImportChoicesMenu(anchorEl, targetFolderPath = "root") {
     // Opção 3: Vincular Pasta Local / HD Externo (In-place Link)
     const folderLinkItem = targetDoc.createElement("div");
     folderLinkItem.className = "menu-item";
-    folderLinkItem.innerHTML = `<i class="fa-solid fa-link" style="color:var(--color-cyan);"></i><span class="menu-item-text">Vincular Pasta / HD Externo (In-Place)...</span>`;
+    folderLinkItem.innerHTML = `<i class="fa-solid fa-link" style="color:var(--accent);"></i><span class="menu-item-text">Vincular Pasta / HD Externo (In-Place)...</span>`;
     folderLinkItem.addEventListener("click", () => {
         menu.remove();
         promptExternalPathIngest(targetFolderPath);
@@ -2308,7 +2308,7 @@ export function promptRenameFolder(folderPath, currentName) {
         <div class="modal-content glassmorphism" style="max-width: 380px; padding: var(--sp-18);">
             <div class="modal-header" style="margin-bottom: var(--sp-12);">
                 <h2 style="font-size: var(--fs-14); color: var(--text-primary); display: flex; align-items: center; gap: var(--sp-8);">
-                    <i class="fa-solid fa-pen-to-square" style="color: var(--color-cyan);"></i> Renomear Pasta
+                    <i class="fa-solid fa-pen-to-square" style="color: var(--accent);"></i> Renomear Pasta
                 </h2>
                 <button class="btn-close-modal" id="btn-close-rename-folder">&times;</button>
             </div>
@@ -2404,8 +2404,8 @@ export function confirmDeleteVirtualFolder(folderPath, folderName) {
             </div>
             <div class="modal-body" style="font-size: var(--fs-12); color: var(--text-secondary); line-height: 1.5;">
                 <p>Tem certeza de que deseja remover a pasta <b>"${escapeHtml(folderName)}"</b> da sua biblioteca?</p>
-                <p style="font-size: var(--fs-11); color: var(--text-muted); background: rgba(255,255,255,0.03); padding: var(--sp-8); border-radius: 4px; border-left: 2px solid var(--color-cyan); margin-top: var(--sp-10);">
-                    <i class="fa-solid fa-circle-info" style="color: var(--color-cyan);"></i> Esta ação remove apenas a pasta virtual do projeto. <b>Nenhum arquivo físico original no seu disco rígido será apagado.</b> Você pode desfazer a qualquer momento com <b>Ctrl + Z</b>.
+                <p style="font-size: var(--fs-11); color: var(--text-muted); background: rgba(255,255,255,0.03); padding: var(--sp-8); border-radius: 4px; border-left: 2px solid var(--accent); margin-top: var(--sp-10);">
+                    <i class="fa-solid fa-circle-info" style="color: var(--accent);"></i> Esta ação remove apenas a pasta virtual do projeto. <b>Nenhum arquivo físico original no seu disco rígido será apagado.</b> Você pode desfazer a qualquer momento com <b>Ctrl + Z</b>.
                 </p>
             </div>
             <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: var(--sp-8); margin-top: var(--sp-16);">
@@ -2487,7 +2487,7 @@ export function showFolderContextMenu(e, node, folderHeader) {
     // 1. Importar Mídias para esta Pasta
     const importItem = targetDoc.createElement("div");
     importItem.className = "menu-item";
-    importItem.innerHTML = `<i class="fa-solid fa-cloud-arrow-up" style="color:var(--color-cyan);"></i><span class="menu-item-text">Importar Mídias para esta Pasta...</span>`;
+    importItem.innerHTML = `<i class="fa-solid fa-cloud-arrow-up" style="color:var(--accent);"></i><span class="menu-item-text">Importar Mídias para esta Pasta...</span>`;
     importItem.addEventListener("click", async () => {
         menu.remove();
         showImportChoicesMenu(folderHeader, node.path);
@@ -2641,7 +2641,7 @@ export function promptFolderImportTarget(folderName, targetFolderPath, onChoice)
         <div class="modal-content glassmorphism" style="max-width: 440px; padding: var(--sp-20);">
             <div class="modal-header" style="margin-bottom: var(--sp-14);">
                 <h2 style="font-size: var(--fs-14); color: var(--text-primary); display: flex; align-items: center; gap: var(--sp-8);">
-                    <i class="fa-solid fa-folder-tree" style="color: var(--color-cyan);"></i> Importação de Pasta
+                    <i class="fa-solid fa-folder-tree" style="color: var(--accent);"></i> Importação de Pasta
                 </h2>
                 <button class="btn-close-modal" id="btn-close-import-choice">&times;</button>
             </div>
@@ -2656,7 +2656,7 @@ export function promptFolderImportTarget(folderName, targetFolderPath, onChoice)
                         </div>
                     </button>
                     <button id="btn-choice-current-folder" class="btn-secondary" style="padding: var(--sp-10) var(--sp-14); display: flex; align-items: center; gap: var(--sp-10); text-align: left; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border-glass); color: #fff; cursor: pointer; border-radius: 6px;">
-                        <i class="fa-solid fa-folder-open" style="font-size: var(--fs-16); color: var(--color-cyan);"></i>
+                        <i class="fa-solid fa-folder-open" style="font-size: var(--fs-16); color: var(--accent);"></i>
                         <div>
                             <div style="font-weight: 700;">Importar na Pasta Atual (${escapeHtml(currentDisplayName)})</div>
                             <div style="font-size: var(--fs-10); color: var(--text-muted);">Coloca as mídias diretamente na pasta selecionada</div>
@@ -2919,7 +2919,7 @@ export function promptRelinkMediaDialog(prefillFolder = "") {
         <div class="modal-content glassmorphism" style="max-width: 480px; padding: var(--sp-20);">
             <div class="modal-header" style="margin-bottom: var(--sp-14);">
                 <h2 style="font-size: var(--fs-14); color: var(--text-primary); display: flex; align-items: center; gap: var(--sp-8);">
-                    <i class="fa-solid fa-link" style="color: var(--color-cyan);"></i> Relincar Mídias / Buscar no Disco
+                    <i class="fa-solid fa-link" style="color: var(--accent);"></i> Relincar Mídias / Buscar no Disco
                 </h2>
                 <button class="btn-close-modal" id="btn-close-relink">&times;</button>
             </div>
@@ -2977,7 +2977,7 @@ export function promptRelinkMediaDialog(prefillFolder = "") {
         startBtn.disabled = true;
         startBtn.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> Buscando arquivos...`;
         statusBox.style.display = "block";
-        statusBox.innerHTML = `<div style="color: var(--color-cyan);"><i class="fa-solid fa-magnifying-glass fa-spin"></i> Escaneando pasta e subpastas...</div>`;
+        statusBox.innerHTML = `<div style="color: var(--accent);"><i class="fa-solid fa-magnifying-glass fa-spin"></i> Escaneando pasta e subpastas...</div>`;
 
         try {
             const res = await CapIAuAPI.relinkProjectMedia(projectId, folder);
@@ -3974,7 +3974,7 @@ function renderTreeNode(node, container, depth = 0) {
                 <span class="folder-name" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;">${node.name}</span>
             </div>
             <div class="folder-actions" style="display: flex; gap: var(--sp-4); margin-right: var(--sp-6);">
-                <button class="btn-folder-action" data-action="add-media" title="Importar mídias para esta pasta" style="background: none; border: none; padding: var(--sp-2) var(--sp-4); color: var(--color-cyan); cursor: pointer; font-size: var(--fs-10); display: flex; align-items: center; justify-content: center;">
+                <button class="btn-folder-action" data-action="add-media" title="Importar mídias para esta pasta" style="background: none; border: none; padding: var(--sp-2) var(--sp-4); color: var(--accent); cursor: pointer; font-size: var(--fs-10); display: flex; align-items: center; justify-content: center;">
                     <i class="fa-solid fa-plus"></i>
                 </button>
                 <button class="btn-folder-action btn-folder-toggle ${toggleStateClass}" data-action="toggle-subfolders" title="${toggleTitle}" style="background: none; border: none; padding: var(--sp-2); cursor: pointer; display: flex; align-items: center; justify-content: center;">
@@ -4148,10 +4148,10 @@ function renderTreeNode(node, container, depth = 0) {
         const isConverting = STATE.activeConversions && STATE.activeConversions[v.id];
         
         if (v.status === "pending") {
-            statusGlow = `<i class="fa-solid fa-circle-notch fa-spin proxy-spin-icon" style="color: var(--color-cyan);" data-tooltip="Gerando proxy..."></i>`;
+            statusGlow = `<i class="fa-solid fa-circle-notch fa-spin proxy-spin-icon" style="color: var(--accent);" data-tooltip="Gerando proxy..."></i>`;
         } else if (v.status === "transcribing" || v.status === "processing") {
             if (isConverting) {
-                statusGlow = `<i class="fa-solid fa-circle-notch fa-spin proxy-spin-icon" style="color: var(--color-cyan);" data-tooltip="Convertendo..."></i>`;
+                statusGlow = `<i class="fa-solid fa-circle-notch fa-spin proxy-spin-icon" style="color: var(--accent);" data-tooltip="Convertendo..."></i>`;
                 actionBtn = `<button class="btn-card-action" style="background:transparent; border:none; color:var(--color-rose); cursor:pointer; padding:var(--sp-2);" onclick="event.stopPropagation(); window.cancelConversion(${v.id})" data-tooltip="Cancelar Conversão"><i class="fa-solid fa-circle-stop" style="font-size:var(--fs-10);"></i></button>`;
             } else {
                 statusGlow = `<span class="waveform-anim-icon" data-tooltip="Processando áudio / ASR..."><span class="waveform-anim-bar"></span><span class="waveform-anim-bar"></span><span class="waveform-anim-bar"></span><span class="waveform-anim-bar"></span></span>`;
@@ -4160,7 +4160,7 @@ function renderTreeNode(node, container, depth = 0) {
             statusGlow = `<i class="fa-solid fa-circle-notch fa-spin" style="color: var(--color-violet);" data-tooltip="Analisando visão com IA..."></i>`;
             actionBtn = `<button class="btn-card-action" style="background:transparent; border:none; color:var(--color-rose); cursor:pointer; padding:var(--sp-2);" onclick="event.stopPropagation(); window.cancelConversion(${v.id})" data-tooltip="Cancelar Análise"><i class="fa-solid fa-circle-stop" style="font-size:var(--fs-10);"></i></button>`;
         } else if (v.status === "transcribed") {
-            statusBadge = `<span class="badge" style="color: var(--color-cyan); border-color: var(--t-line-strong, rgba(6, 182, 212, 0.3));">ASR</span>`;
+            statusBadge = `<span class="badge" style="color: var(--accent); border-color: var(--t-line-strong, color-mix(in srgb, var(--t-accent, rgb(6, 182, 212)) 30%, transparent));">ASR</span>`;
             actionBtn = `<button class="btn-card-action btn-hover-only" style="background:transparent; border:none; color:var(--text-muted); cursor:pointer; padding: var(--sp-2);" onclick="event.stopPropagation(); window.deleteProxy(${v.id})" data-tooltip="Deletar Proxy"><i class="fa-solid fa-trash-can" style="font-size: var(--fs-10);"></i></button>`;
         } else if (v.status === "analyzed") {
             if (hasVisionError) {
@@ -4279,7 +4279,7 @@ function renderTreeNode(node, container, depth = 0) {
             const selectIcon = selectBtn ? selectBtn.querySelector("i") : null;
             if (selectIcon) {
                 selectIcon.className = "fa-solid fa-square-check";
-                selectIcon.style.color = "var(--color-cyan)";
+                selectIcon.style.color = "var(--accent)";
             }
         }
 
@@ -4551,7 +4551,7 @@ function renderTreeNode(node, container, depth = 0) {
         let statusGlow = "";
         
         if (p.status === 'pending') {
-            statusGlow = `<i class="fa-solid fa-circle-notch fa-spin" style="color: var(--color-cyan);" data-tooltip="Gerando Proxy..."></i>`;
+            statusGlow = `<i class="fa-solid fa-circle-notch fa-spin" style="color: var(--accent);" data-tooltip="Gerando Proxy..."></i>`;
             imgHtml = `<div class="photo-placeholder-loading"><i class="fa-solid fa-circle-notch fa-spin"></i><span>Proxy...</span></div>`;
             if (isRaw) clickEnabled = false;
         } else if (p.status === 'error') {
@@ -4560,7 +4560,7 @@ function renderTreeNode(node, container, depth = 0) {
             if (isRaw) clickEnabled = false;
         } else {
             if (isRaw && !p.proxy_path) {
-                statusGlow = `<i class="fa-solid fa-circle-notch fa-spin" style="color: var(--color-cyan);" data-tooltip="Processando RAW..."></i>`;
+                statusGlow = `<i class="fa-solid fa-circle-notch fa-spin" style="color: var(--accent);" data-tooltip="Processando RAW..."></i>`;
                 imgHtml = `<div class="photo-placeholder-loading"><i class="fa-solid fa-circle-notch fa-spin"></i><span>RAW...</span></div>`;
                 clickEnabled = false;
             } else {
@@ -4571,7 +4571,7 @@ function renderTreeNode(node, container, depth = 0) {
         if (isRaw) {
             statusBadge = `<span class="badge" style="color: var(--color-purple); border-color: var(--t-line-strong, rgba(168, 85, 247, 0.3));">RAW</span>`;
         } else {
-            statusBadge = `<span class="badge" style="color: var(--color-cyan); border-color: var(--t-line-strong, rgba(6, 182, 212, 0.3));">FOTO</span>`;
+            statusBadge = `<span class="badge" style="color: var(--accent); border-color: var(--t-line-strong, color-mix(in srgb, var(--t-accent, rgb(6, 182, 212)) 30%, transparent));">FOTO</span>`;
         }
         
         const friendlyTitle = p.title || p.description || p.filename;
@@ -4626,7 +4626,7 @@ function renderTreeNode(node, container, depth = 0) {
             const selectIcon = selectBtn ? selectBtn.querySelector("i") : null;
             if (selectIcon) {
                 selectIcon.className = "fa-solid fa-square-check";
-                selectIcon.style.color = "var(--color-cyan)";
+                selectIcon.style.color = "var(--accent)";
             }
         }
         
@@ -5902,7 +5902,7 @@ export class GalleryInteractionController {
         if (showKeyword) {
             const kw = getMediaKeyword(item);
             if (kw) {
-                keywordHtml = `<div class="gallery-hud-keyword" style="font-size: var(--fs-10); color: var(--color-cyan); margin-bottom: var(--sp-4); display: flex; align-items: center; gap: var(--sp-4);"><i class="fa-solid fa-tag" style="font-size: var(--fs-8);"></i> <span>${escapeHtml(kw)}</span></div>`;
+                keywordHtml = `<div class="gallery-hud-keyword" style="font-size: var(--fs-10); color: var(--accent); margin-bottom: var(--sp-4); display: flex; align-items: center; gap: var(--sp-4);"><i class="fa-solid fa-tag" style="font-size: var(--fs-8);"></i> <span>${escapeHtml(kw)}</span></div>`;
             }
         }
         let filenameHtml = (showFilename && item.filename && item.filename !== item.title) ? `<div class="gallery-hud-filename">${escapeHtml(item.filename)}</div>` : "";
@@ -8322,7 +8322,7 @@ export class LibraryManager {
 
             card.innerHTML = `
                 <div style="display:flex; align-items:center; gap:var(--sp-8); min-width:0; flex:1;">
-                    <i class="fa-solid ${docIcon}" style="color: var(--color-cyan); font-size: var(--fs-14);"></i>
+                    <i class="fa-solid ${docIcon}" style="color: var(--accent); font-size: var(--fs-14);"></i>
                     <div style="display:flex; flex-direction:column; min-width:0; flex:1;">
                         <span style="font-size:var(--fs-12); font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text-primary);" title="${doc.filename}">${doc.filename}</span>
                         <span style="font-size:var(--fs-9); color:var(--text-muted); text-transform:capitalize;">${doc.doc_type === 'script' ? 'Roteiro' : doc.doc_type}</span>
@@ -10262,7 +10262,7 @@ export class LibraryManager {
                 input.type = "text";
                 input.className = "inline-inspector-title-input";
                 input.value = currentVal;
-                input.style.cssText = "width: 100%; max-width: 280px; background: rgba(0,0,0,0.85); color: #fff; border: 1px solid var(--color-cyan); border-radius: 4px; padding: 2px 6px; font-size: var(--fs-11); font-family: inherit; outline: none; box-shadow: 0 0 10px var(--t-glow, rgba(6,182,212,0.4));";
+                input.style.cssText = "width: 100%; max-width: 280px; background: rgba(0,0,0,0.85); color: #fff; border: 1px solid var(--accent); border-radius: 4px; padding: 2px 6px; font-size: var(--fs-11); font-family: inherit; outline: none; box-shadow: 0 0 10px var(--t-glow, rgba(6,182,212,0.4));";
                 
                 titleTextEl.innerHTML = "";
                 titleTextEl.appendChild(input);
@@ -10438,7 +10438,7 @@ export class LibraryManager {
 
         const selo = document.createElement("span");
         selo.style.cssText = "font-size: var(--fs-9); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; padding: 2px 6px; border-radius: 4px; " +
-            (atual ? "color: var(--color-cyan); background: rgba(6,182,212,0.12);"
+            (atual ? "color: var(--accent); background: rgba(6,182,212,0.12);"
                    : "color: var(--text-muted); background: rgba(255,255,255,0.05);");
         selo.textContent = atual ? "no ar agora" : this.formatarDataHistorico(dados.created_at);
         header.appendChild(selo);
@@ -10457,7 +10457,7 @@ export class LibraryManager {
             const wrap = document.createElement("div");
             wrap.style.cssText = "display: flex; flex-direction: column; gap: 2px;";
             const lbl = document.createElement("div");
-            lbl.style.cssText = "font-size: var(--fs-9); font-weight: 700; color: var(--color-cyan); text-transform: uppercase; letter-spacing: 0.5px;";
+            lbl.style.cssText = "font-size: var(--fs-9); font-weight: 700; color: var(--accent); text-transform: uppercase; letter-spacing: 0.5px;";
             lbl.textContent = rotulo;
             const txt = document.createElement("div");
             txt.style.cssText = "font-size: var(--fs-11); line-height: 1.45; white-space: pre-line; color: " +
@@ -10606,7 +10606,7 @@ export class LibraryManager {
                             const timecode = formatTimecode(d.start_time).substring(3, 11);
                             item.innerHTML = `
                                 <span class="timeline-chapter-time" data-time="${d.start_time}">${timecode}</span>
-                                <div style="font-weight: 700; font-size: var(--fs-11); color: var(--color-cyan); margin-bottom: var(--sp-2);">${d.speaker_id}</div>
+                                <div style="font-weight: 700; font-size: var(--fs-11); color: var(--accent); margin-bottom: var(--sp-2);">${d.speaker_id}</div>
                                 <div class="timeline-chapter-text">"${d.text.substring(0, 80)}${d.text.length > 80 ? '...' : ''}"</div>
                             `;
                             
@@ -10647,7 +10647,7 @@ export class LibraryManager {
                         block.innerHTML = `
                             <div class="inspector-dialogue-header">
                                 <div class="inspector-dialogue-speaker">
-                                    <i class="fa-solid fa-user" style="color:var(--color-cyan); font-size: var(--fs-9);"></i>
+                                    <i class="fa-solid fa-user" style="color:var(--accent); font-size: var(--fs-9);"></i>
                                     <select class="nle-select sel-dialogue-speaker" style="padding: var(--sp-2) var(--sp-6); font-size: var(--fs-10); width: 120px;">
                                         ${optionsHtml}
                                     </select>
@@ -10658,7 +10658,7 @@ export class LibraryManager {
                             <textarea class="inspector-dialogue-text-area txt-dialogue-text">${d.text}</textarea>
                             <div class="inspector-dialogue-actions">
                                 <button class="btn-flat-action cyan btn-dialogue-split" style="font-size: var(--fs-9);" title="Dividir fala neste ponto"><i class="fa-solid fa-scissors"></i> Dividir</button>
-                                <button class="btn-primary btn-dialogue-save" style="font-size: var(--fs-9); padding: var(--sp-2) var(--sp-8); border-radius: 4px; border:none; background:var(--t-tint-3, rgba(6,182,212,0.15)); color:var(--color-cyan); font-weight:bold; cursor:pointer;"><i class="fa-solid fa-floppy-disk"></i> Salvar</button>
+                                <button class="btn-primary btn-dialogue-save" style="font-size: var(--fs-9); padding: var(--sp-2) var(--sp-8); border-radius: 4px; border:none; background:var(--t-tint-3, color-mix(in srgb, var(--t-accent, rgb(6, 182, 212)) 15%, transparent)); color:var(--accent); font-weight:bold; cursor:pointer;"><i class="fa-solid fa-floppy-disk"></i> Salvar</button>
                             </div>
                         `;
 
@@ -10900,7 +10900,7 @@ export class LibraryManager {
                             <img src="/api/faces/face/${face.id}/thumbnail" class="inspector-face-thumb" onerror="this.src='https://placehold.co/60x60/11131a/cyan?text=Face'">
                             <span class="inspector-face-time" title="Buscar no Source Player">${timecode}</span>
                             <input type="text" class="inspector-face-input" value="${face.name || 'Pessoa Desconhecida'}" placeholder="Nome do rosto...">
-                            <button class="btn-primary btn-face-save" style="font-size: var(--fs-8); padding: var(--sp-2) var(--sp-6); border-radius: 4px; border:none; background:var(--t-tint-2, rgba(6,182,212,0.1)); color:var(--color-cyan); font-weight:bold; cursor:pointer; width: 100%; margin-top:var(--sp-2);">Salvar Rótulo</button>
+                            <button class="btn-primary btn-face-save" style="font-size: var(--fs-8); padding: var(--sp-2) var(--sp-6); border-radius: 4px; border:none; background:var(--t-tint-2, color-mix(in srgb, var(--t-accent, rgb(6, 182, 212)) 10%, transparent)); color:var(--accent); font-weight:bold; cursor:pointer; width: 100%; margin-top:var(--sp-2);">Salvar Rótulo</button>
                         `;
 
                         card.querySelector(".inspector-face-time").addEventListener("click", () => {
@@ -10946,7 +10946,7 @@ window.showToast = function(message, type = "info") {
     const toast = document.createElement("div");
     toast.className = "nle-toast";
     const iconMap = {
-        success: '<i class="fa-solid fa-circle-check" style="color: var(--color-cyan);"></i>',
+        success: '<i class="fa-solid fa-circle-check" style="color: var(--accent);"></i>',
         error: '<i class="fa-solid fa-circle-xmark" style="color: var(--color-rose);"></i>',
         info: '<i class="fa-solid fa-circle-info" style="color: var(--color-violet);"></i>'
     };
@@ -11061,7 +11061,7 @@ window.setVideoThumbnail = async function(videoId, timestamp, triggerBtn = null)
             STATE.emit("videoThumbnailUpdated", { videoId, version: ver, video: target });
             
             if (triggerBtn) {
-                triggerBtn.innerHTML = '<i class="fa-solid fa-check" style="color: var(--color-cyan);"></i>';
+                triggerBtn.innerHTML = '<i class="fa-solid fa-check" style="color: var(--accent);"></i>';
             }
             
             window.showToast("Miniatura definida com sucesso!", "success");
@@ -13075,7 +13075,7 @@ export class LibraryScrollIndexTracker {
                     if (thumbIcon) {
                         thumbIcon.style.display = "none";
                         thumbIcon.className = (isInterview ? "fa-solid fa-microphone-lines" : "fa-solid fa-film") + " scroll-index-icon";
-                        thumbIcon.style.color = isInterview ? "var(--color-cyan)" : "var(--color-violet)";
+                        thumbIcon.style.color = isInterview ? "var(--accent)" : "var(--color-violet)";
                     }
 
                     if (summaryEl) summaryEl.textContent = video.summary || video.description || "Sem resumo narrativo gerado.";

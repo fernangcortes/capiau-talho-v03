@@ -514,7 +514,7 @@ Direção de Arte — JÚLIA LIBÂNIO · Figurino — JÚLIA STAVROS
                     <!-- Coluna da Direita: Tabela de Pré-visualização & Ajustes -->
                     <div style="flex: 1.25; display: flex; flex-direction: column; gap: var(--sp-10); min-width: 0; background: rgba(0,0,0,0.2); border: 1px solid var(--border-glass); border-radius: 6px; padding: var(--sp-12);">
                         <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-glass); padding-bottom: var(--sp-8);">
-                            <div style="font-size: var(--fs-11); font-weight: 700; color: var(--color-cyan);">
+                            <div style="font-size: var(--fs-11); font-weight: 700; color: var(--accent);">
                                 ${count > 0 ? `${count} Pessoa(s) e Cargo(s) Detectados` : 'Aguardando Análise'}
                             </div>
                             ${count > 0 ? `
@@ -553,7 +553,7 @@ Direção de Arte — JÚLIA LIBÂNIO · Figurino — JÚLIA STAVROS
                                                     <input type="text" class="nle-input-flat extract-edit-name" data-idx="${idx}" value="${item.name}" style="width: 100%; background: transparent; border: 1px solid transparent; border-radius: 4px; padding: var(--sp-2) var(--sp-4); font-size: var(--fs-11); color: #fff; font-weight: 600;">
                                                 </td>
                                                 <td style="padding: var(--sp-4) var(--sp-6);">
-                                                    <input type="text" class="nle-input-flat extract-edit-role" data-idx="${idx}" value="${item.role}" style="width: 100%; background: transparent; border: 1px solid transparent; border-radius: 4px; padding: var(--sp-2) var(--sp-4); font-size: var(--fs-11); color: var(--color-cyan);">
+                                                    <input type="text" class="nle-input-flat extract-edit-role" data-idx="${idx}" value="${item.role}" style="width: 100%; background: transparent; border: 1px solid transparent; border-radius: 4px; padding: var(--sp-2) var(--sp-4); font-size: var(--fs-11); color: var(--accent);">
                                                 </td>
                                                 <td style="padding: var(--sp-4); text-align: center;">
                                                     <button class="btn-remove-extract-item" data-idx="${idx}" style="background: none; border: none; color: var(--color-rose); cursor: pointer; padding: var(--sp-2) var(--sp-4); font-size: var(--fs-10);"><i class="fa-solid fa-xmark"></i></button>
@@ -584,7 +584,7 @@ Direção de Arte — JÚLIA LIBÂNIO · Figurino — JÚLIA STAVROS
                         <button id="btn-cancel-extraction" class="btn-secondary" style="font-size: var(--fs-11); height: 32px; padding: 0 var(--sp-14); border: 1px solid var(--border-glass); color: #fff; cursor: pointer; border-radius: 4px;">
                             Cancelar
                         </button>
-                        <button id="btn-confirm-import-credits" class="btn-primary" ${count === 0 ? 'disabled style="opacity: 0.5; cursor: not-allowed;"' : ''} style="font-size: var(--fs-11); font-weight: 700; height: 32px; padding: 0 var(--sp-18); border: none; --primary-bg: var(--color-cyan); --primary-ink: #000; cursor: pointer; border-radius: 4px; display: flex; align-items: center; gap: var(--sp-6);">
+                        <button id="btn-confirm-import-credits" class="btn-primary" ${count === 0 ? 'disabled style="opacity: 0.5; cursor: not-allowed;"' : ''} style="font-size: var(--fs-11); font-weight: 700; height: 32px; padding: 0 var(--sp-18); border: none; --primary-bg: var(--accent); --primary-ink: #000; cursor: pointer; border-radius: 4px; display: flex; align-items: center; gap: var(--sp-6);">
                             <i class="fa-solid fa-file-import"></i> Importar para a Ficha Técnica
                         </button>
                     </div>
@@ -739,7 +739,7 @@ Direção de Arte — JÚLIA LIBÂNIO · Figurino — JÚLIA STAVROS
                         <div style="font-size: var(--fs-11); color: var(--text-secondary); line-height: 1.4;">
                             A lista oficial de créditos é utilizada pela Inteligência Artificial para identificar entrevistados na agulha e padronizar nomes e cargos em Lower Thirds (GCs).
                         </div>
-                        <button id="btn-download-credits-template" class="btn-secondary" style="font-size: var(--fs-11); height: 28px; padding: 0 var(--sp-10); display: flex; align-items: center; gap: var(--sp-6); white-space: nowrap; border: 1px solid var(--border-glass); color: var(--color-cyan); cursor: pointer; border-radius: 4px;">
+                        <button id="btn-download-credits-template" class="btn-secondary" style="font-size: var(--fs-11); height: 28px; padding: 0 var(--sp-10); display: flex; align-items: center; gap: var(--sp-6); white-space: nowrap; border: 1px solid var(--border-glass); color: var(--accent); cursor: pointer; border-radius: 4px;">
                             <i class="fa-solid fa-download"></i> Baixar Modelo TXT
                         </button>
                     </div>
@@ -789,8 +789,8 @@ Direção de Arte — JÚLIA LIBÂNIO · Figurino — JÚLIA STAVROS
                                         <td style="padding: var(--sp-8) var(--sp-10); font-weight: 600; color: #fff;">
                                             <input type="text" class="nle-input-flat edit-credit-name" data-id="${item.id}" value="${item.name}" style="width: 100%; background: transparent; border: 1px solid transparent; border-radius: 4px; padding: var(--sp-2) var(--sp-4); font-size: var(--fs-12); color: #fff; outline: none;">
                                         </td>
-                                        <td style="padding: var(--sp-8) var(--sp-10); color: var(--color-cyan);">
-                                            <input type="text" class="nle-input-flat edit-credit-role" data-id="${item.id}" value="${item.role || ''}" placeholder="Ex: Entrevistado / Diretor" style="width: 100%; background: transparent; border: 1px solid transparent; border-radius: 4px; padding: var(--sp-2) var(--sp-4); font-size: var(--fs-11); color: var(--color-cyan); outline: none;">
+                                        <td style="padding: var(--sp-8) var(--sp-10); color: var(--accent);">
+                                            <input type="text" class="nle-input-flat edit-credit-role" data-id="${item.id}" value="${item.role || ''}" placeholder="Ex: Entrevistado / Diretor" style="width: 100%; background: transparent; border: 1px solid transparent; border-radius: 4px; padding: var(--sp-2) var(--sp-4); font-size: var(--fs-11); color: var(--accent); outline: none;">
                                         </td>
                                         <td style="padding: var(--sp-8) var(--sp-10); color: var(--text-muted); font-size: var(--fs-10);">
                                             ${(item.variations || []).join(', ') || '--'}
@@ -816,7 +816,7 @@ Direção de Arte — JÚLIA LIBÂNIO · Figurino — JÚLIA STAVROS
                         <button id="btn-normalize-all-gcs" class="btn-secondary" style="font-size: var(--fs-11); height: 32px; padding: 0 var(--sp-14); border: 1px solid var(--t-line-strong, rgba(245,158,11,0.4)); background: var(--t-tint-2, rgba(245,158,11,0.08)); color: #f59e0b; cursor: pointer; border-radius: 4px; display: flex; align-items: center; gap: var(--sp-6);">
                             <i class="fa-solid fa-wand-magic-sparkles"></i> Validar e Corrigir Todos os GCs da Timeline
                         </button>
-                        <button id="btn-save-credits-done" class="btn-primary" style="font-size: var(--fs-11); font-weight: 700; height: 32px; padding: 0 var(--sp-18); border: none; --primary-bg: var(--color-cyan); --primary-ink: #000; cursor: pointer; border-radius: 4px; display: flex; align-items: center; gap: var(--sp-6);">
+                        <button id="btn-save-credits-done" class="btn-primary" style="font-size: var(--fs-11); font-weight: 700; height: 32px; padding: 0 var(--sp-18); border: none; --primary-bg: var(--accent); --primary-ink: #000; cursor: pointer; border-radius: 4px; display: flex; align-items: center; gap: var(--sp-6);">
                             <i class="fa-solid fa-check"></i> Concluir
                         </button>
                     </div>

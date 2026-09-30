@@ -351,7 +351,7 @@ export class ChatManager {
                     <p style="font-weight: 600;">Como posso ajudar no seu documentário?</p>
                     <p style="font-size: var(--fs-11); color: var(--text-muted); margin-top: var(--sp-4); line-height: 1.5; padding: 0 var(--sp-10); text-align: center;">
                         Pesquise por falantes, momentos de ação de B-rolls ou trechos de roteiro. <br>
-                        Pergunte coisas como: <span style="font-style: italic; font-weight: 500; color: var(--color-cyan);">"O que o diretor fala sobre lentes?"</span> ou <span style="font-style: italic; font-weight: 500; color: var(--color-cyan);">"Sugira clipes sobre iluminação"</span>.
+                        Pergunte coisas como: <span style="font-style: italic; font-weight: 500; color: var(--accent);">"O que o diretor fala sobre lentes?"</span> ou <span style="font-style: italic; font-weight: 500; color: var(--accent);">"Sugira clipes sobre iluminação"</span>.
                     </p>
                 </div>
             `;
@@ -673,7 +673,7 @@ export class ChatManager {
                         window.applyRevealPulse(card);
                     } else {
                         card.style.background = "rgba(6, 182, 212, 0.3)";
-                        card.style.borderColor = "var(--color-cyan)";
+                        card.style.borderColor = "var(--accent)";
                         setTimeout(() => {
                             card.style.background = "";
                             card.style.borderColor = "";
@@ -693,7 +693,7 @@ export class ChatManager {
                         window.applyRevealPulse(card);
                     } else {
                         card.style.background = "rgba(6, 182, 212, 0.3)";
-                        card.style.borderColor = "var(--color-cyan)";
+                        card.style.borderColor = "var(--accent)";
                         setTimeout(() => {
                             card.style.background = "";
                             card.style.borderColor = "";
@@ -710,7 +710,7 @@ export class ChatManager {
                 if (card) {
                     card.scrollIntoView({ behavior: "smooth", block: "center" });
                     card.style.background = "rgba(6, 182, 212, 0.3)";
-                    card.style.borderColor = "var(--color-cyan)";
+                    card.style.borderColor = "var(--accent)";
                     setTimeout(() => {
                         card.style.background = "";
                         card.style.borderColor = "";
@@ -752,12 +752,12 @@ export class ChatManager {
         html = html.replace(/\*(.*?)\*/g, '<em>$1</em>');
         
         // Cabeçalhos: ### texto -> h4, ## texto -> h3, # texto -> h2
-        html = html.replace(/^###\s*(.*?)$/gm, '<h4 style="margin: var(--sp-6) 0; color: var(--color-cyan); font-size:var(--fs-12);">$1</h4>');
+        html = html.replace(/^###\s*(.*?)$/gm, '<h4 style="margin: var(--sp-6) 0; color: var(--accent); font-size:var(--fs-12);">$1</h4>');
         html = html.replace(/^##\s*(.*?)$/gm, '<h3 style="margin: var(--sp-8) 0; color: var(--color-violet); font-size:var(--fs-13);">$1</h3>');
         html = html.replace(/^#\s*(.*?)$/gm, '<h2 style="margin: var(--sp-10) 0; color: #fff; font-size:var(--fs-14);">$1</h2>');
 
         // Listas: - item ou * item
-        html = html.replace(/^\s*[-*]\s*(.*?)$/gm, '<div style="display:flex; align-items:flex-start; gap:var(--sp-6); margin: var(--sp-4) 0 var(--sp-4) var(--sp-12);"><i class="fa-solid fa-circle" style="font-size:var(--fs-4); color:var(--color-cyan); margin-top: var(--sp-6);"></i> <span>$1</span></div>');
+        html = html.replace(/^\s*[-*]\s*(.*?)$/gm, '<div style="display:flex; align-items:flex-start; gap:var(--sp-6); margin: var(--sp-4) 0 var(--sp-4) var(--sp-12);"><i class="fa-solid fa-circle" style="font-size:var(--fs-4); color:var(--accent); margin-top: var(--sp-6);"></i> <span>$1</span></div>');
 
         // Linha Horizontal: ---
         html = html.replace(/^---$/gm, '<hr style="border:none; border-top: 1px solid var(--border-glass); margin: var(--sp-10) 0;">');

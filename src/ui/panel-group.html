@@ -9,7 +9,7 @@
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
     <link rel="stylesheet" href="fonts/fonts.css?v=1">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="styles.css?v=89">
+    <link rel="stylesheet" href="styles.css?v=90">
     <link rel="stylesheet" href="theme.css?v=5">
     <script src="js/themeBoot.js?v=2"></script>
     <style>
@@ -52,7 +52,7 @@
             cursor: pointer;
         }
         .group-btn:hover { background: rgba(255, 255, 255, 0.06); color: #fff; }
-        .group-btn.active { border-color: rgba(34, 211, 238, 0.5); color: var(--color-cyan, #22d3ee); background: rgba(34, 211, 238, 0.1); }
+        .group-btn.active { border-color: rgba(34, 211, 238, 0.5); color: var(--accent, #22d3ee); background: rgba(34, 211, 238, 0.1); }
         .group-btn[disabled] { opacity: 0.35; cursor: default; }
         #group-workspace { flex: 1; min-height: 0; display: flex; }
         .group-box { display: flex; flex: 1 1 0%; min-width: 0; min-height: 0; }
@@ -74,7 +74,7 @@
         .group-splitter { flex: 0 0 5px; background: var(--border-glass, rgba(255, 255, 255, 0.08)); touch-action: none; }
         .group-box.row > .group-splitter { cursor: col-resize; }
         .group-box.column > .group-splitter { cursor: row-resize; }
-        .group-splitter:hover, .group-splitter.active { background: var(--color-cyan, #22d3ee); }
+        .group-splitter:hover, .group-splitter.active { background: var(--accent, #22d3ee); }
         /* Recolhido: o espaço vira a linha de expandir, no mesmo lugar; os outros ocupam o resto. */
         .group-slot.group-slot-collapsed { flex: 0 0 4px !important; min-width: 0; min-height: 0; }
         .group-slot.group-slot-collapsed > :not(.group-restore-line) { display: none !important; }

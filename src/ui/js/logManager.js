@@ -402,7 +402,7 @@ class LogManager {
         }
 
         this.aiOutput.innerHTML = `
-            <div style="display:flex; align-items:center; gap:var(--sp-8); color:var(--color-cyan); font-size:var(--fs-12);">
+            <div style="display:flex; align-items:center; gap:var(--sp-8); color:var(--accent); font-size:var(--fs-12);">
                 <i class="fa-solid fa-spinner fa-spin"></i> Processando análise de logs com a IA...
             </div>
         `;

@@ -233,7 +233,7 @@ export class SettingsPanelManager {
 
         const title = document.createElement("h3");
         title.className = "settings-category-title";
-        title.innerHTML = `<i class="fa-solid ${cat.icon}" style="color: var(--color-cyan);"></i> ${cat.label}`;
+        title.innerHTML = `<i class="fa-solid ${cat.icon}" style="color: var(--accent);"></i> ${cat.label}`;
         this.contentEl.appendChild(title);
 
         const hint = document.createElement("p");

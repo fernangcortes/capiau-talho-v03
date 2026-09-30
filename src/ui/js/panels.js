@@ -430,7 +430,7 @@ export class PanelsManager {
                         b.style.fontWeight = "500";
                     });
                     btn.classList.add("active");
-                    btn.style.background = "var(--color-cyan)";
+                    btn.style.background = "var(--accent)";
                     btn.style.color = "#000";
                     btn.style.fontWeight = "700";
                     modalEditMarker.dataset.userChoice = btn.dataset.type;
@@ -906,7 +906,7 @@ export class PanelsManager {
                 });
                 
                 bubble.classList.add("scissors-active");
-                splitBtn.style.color = "var(--color-cyan)";
+                splitBtn.style.color = "var(--accent)";
                 STATE.emit("statusChanged", { text: "Clique em uma palavra do balão para selecionar o ponto de divisão.", active: true });
             } else {
                 if (selectedWordForSplit) {
@@ -1028,7 +1028,7 @@ export class PanelsManager {
                     if (speakerSpan) {
                         const trackBadge = document.createElement("span");
                         trackBadge.className = "track-badge";
-                        trackBadge.style.cssText = "font-size: var(--fs-9); padding: 1px 4px; border-radius: 3px; margin-left: 6px; background: var(--t-tint-3, rgba(6, 182, 212, 0.15)); color: var(--color-cyan);";
+                        trackBadge.style.cssText = "font-size: var(--fs-9); padding: 1px 4px; border-radius: 3px; margin-left: 6px; background: var(--t-tint-3, rgba(6, 182, 212, 0.15)); color: var(--accent);";
                         trackBadge.textContent = itemIdx === 0 ? "Pista A1" : "Pista A2 (Fala Concorrente)";
                         speakerSpan.appendChild(trackBadge);
                     }
@@ -1081,10 +1081,10 @@ export class PanelsManager {
                 gap: 8px;
             `;
             hud.innerHTML = `
-                <span class="hud-info" style="color: var(--color-cyan); font-weight: 500;">0.0s</span>
+                <span class="hud-info" style="color: var(--accent); font-weight: 500;">0.0s</span>
                 <span class="hud-track-badge" style="background: var(--t-tint-3, rgba(139, 92, 246, 0.2)); color: #c4b5fd; padding: var(--sp-2) var(--sp-4); border-radius: 3px; font-size: var(--fs-10);">A1</span>
                 <button type="button" class="btn-insert-selection" style="background: transparent; border: none; color: #fff; cursor: pointer; padding: var(--sp-2) var(--sp-6); border-radius: 4px; display: inline-flex; align-items: center; gap: var(--sp-4);">
-                    <i class="fa-solid fa-arrow-down-to-bracket" style="color: var(--color-cyan);"></i> Inserir na Timeline
+                    <i class="fa-solid fa-arrow-down-to-bracket" style="color: var(--accent);"></i> Inserir na Timeline
                 </button>
             `;
             document.body.appendChild(hud);
@@ -1312,7 +1312,7 @@ export class PanelsManager {
                     </div>
                     <div class="clue-context" style="font-style:italic; color:var(--text-muted); font-size:var(--fs-10); line-height:1.3; overflow:hidden; text-overflow:ellipsis; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;">"${clue.context}"</div>
                     <div class="clue-actions" style="display:flex; gap:var(--sp-6); margin-top:var(--sp-6);">
-                        <button class="btn-flat-action cyan btn-listen-clue" style="font-size:var(--fs-9); padding:var(--sp-2) var(--sp-4); background:var(--t-tint-2, rgba(6, 182, 212, 0.1)) !important; border-radius:3px;"><i class="fa-solid fa-play"></i> Ouvir</button>
+                        <button class="btn-flat-action cyan btn-listen-clue" style="font-size:var(--fs-9); padding:var(--sp-2) var(--sp-4); background:var(--t-tint-2, color-mix(in srgb, var(--t-accent, rgb(6, 182, 212)) 10%, transparent)) !important; border-radius:3px;"><i class="fa-solid fa-play"></i> Ouvir</button>
                         <button class="btn-flat-action rose btn-inspect-clue" style="font-size:var(--fs-9); padding:var(--sp-2) var(--sp-4); background:var(--t-tint-2, rgba(244, 63, 94, 0.1)) !important; border-radius:3px;"><i class="fa-solid fa-magnifying-glass"></i> Ajustar</button>
                     </div>
                 `;
@@ -1430,7 +1430,7 @@ export class PanelsManager {
         // Seção 1: Texto selecionado
         const secText = document.createElement("div");
         secText.innerHTML = `
-            <div class="inspector-section-title"><i class="fa-solid fa-quote-left" style="color:var(--color-cyan);"></i> Trecho Selecionado</div>
+            <div class="inspector-section-title"><i class="fa-solid fa-quote-left" style="color:var(--accent);"></i> Trecho Selecionado</div>
             <div style="font-size:var(--fs-11); color:#fff; line-height:1.4; padding:var(--sp-8); background:rgba(255,255,255,0.03); border:1px solid var(--border-glass); border-radius:6px; font-style:italic;">
                 "${d.text}"
             </div>
@@ -1448,7 +1448,7 @@ export class PanelsManager {
         secWave.innerHTML = `
             <div class="inspector-section-title" style="display:flex; justify-content:space-between; align-items:center;">
                 <span><i class="fa-solid fa-chart-simple" style="color:var(--color-rose);"></i> Waveform de Fala & Silêncio</span>
-                <button id="btn-toggle-inspector-words" class="btn-flat-action" style="font-size:var(--fs-10); padding:var(--sp-2) var(--sp-8); border-radius:4px; cursor:pointer; background:${this.inspectorShowWords ? 'rgba(6, 182, 212, 0.2)' : 'rgba(255,255,255,0.06)'}; color:${this.inspectorShowWords ? '#22d3ee' : '#94a3b8'}; border:1px solid ${this.inspectorShowWords ? 'rgba(6, 182, 212, 0.4)' : 'var(--t-line-weak, rgba(255,255,255,0.08))'};" title="Mostrar/Esconder marcação de palavras sobre a onda">
+                <button id="btn-toggle-inspector-words" class="btn-flat-action" style="font-size:var(--fs-10); padding:var(--sp-2) var(--sp-8); border-radius:4px; cursor:pointer; background:${this.inspectorShowWords ? 'color-mix(in srgb, var(--t-accent, rgb(6, 182, 212)) 20%, transparent)' : 'rgba(255,255,255,0.06)'}; color:${this.inspectorShowWords ? '#22d3ee' : '#94a3b8'}; border:1px solid ${this.inspectorShowWords ? 'color-mix(in srgb, var(--t-accent, rgb(6, 182, 212)) 40%, transparent)' : 'var(--t-line-weak, rgba(255,255,255,0.08))'};" title="Mostrar/Esconder marcação de palavras sobre a onda">
                     <i class="fa-solid fa-font"></i> Palavras
                 </button>
             </div>
@@ -1487,7 +1487,7 @@ export class PanelsManager {
                     <input type="checkbox" id="chk-global-rename"> Aplicar a TODOS os blocos de "${d.speaker_id}" neste vídeo
                 </label>
                 <div style="display:flex; gap:var(--sp-6); margin-top:var(--sp-4);">
-                    <button id="btn-save-speaker-name" class="btn-flat-action cyan" style="font-weight:600; padding:var(--sp-6) var(--sp-12); background:var(--t-tint-3, rgba(6, 182, 212, 0.15)) !important; border-radius:4px;"><i class="fa-solid fa-floppy-disk"></i> Salvar Rótulo</button>
+                    <button id="btn-save-speaker-name" class="btn-flat-action cyan" style="font-weight:600; padding:var(--sp-6) var(--sp-12); background:var(--t-tint-3, color-mix(in srgb, var(--t-accent, rgb(6, 182, 212)) 15%, transparent)) !important; border-radius:4px;"><i class="fa-solid fa-floppy-disk"></i> Salvar Rótulo</button>
                 </div>
             </div>
         `;
@@ -1506,7 +1506,7 @@ export class PanelsManager {
         // Seção 5: Rostos Detectados
         const secFaces = document.createElement("div");
         secFaces.innerHTML = `
-            <div class="inspector-section-title"><i class="fa-solid fa-face-smile" style="color:var(--color-cyan);"></i> Rostos na Tela (Coincidências)</div>
+            <div class="inspector-section-title"><i class="fa-solid fa-face-smile" style="color:var(--accent);"></i> Rostos na Tela (Coincidências)</div>
             <div id="inspector-faces-grid" class="faces-grid">
                 <div style="font-style:italic; color:var(--text-muted); font-size:var(--fs-9); text-align:center; grid-column: 1 / -1;">Buscando rostos coincidentes no banco de dados...</div>
             </div>
@@ -1535,7 +1535,7 @@ export class PanelsManager {
         optNew.value = "_new_";
         optNew.textContent = "+ Novo Falante...";
         optNew.style.backgroundColor = "var(--t-surface-2, #121218)";
-        optNew.style.color = "var(--color-cyan)";
+        optNew.style.color = "var(--accent)";
         selectSpk.appendChild(optNew);
         
         selectSpk.addEventListener("change", (e) => {
@@ -1909,7 +1909,7 @@ export class PanelsManager {
                 card.innerHTML = `
                     <img src="/api/face/${face.id}/thumbnail" alt="${label}" onerror="this.src='https://placehold.co/45x45/181824/ffffff?text=?'">
                     <span style="font-size:var(--fs-9); text-overflow:ellipsis; overflow:hidden; width:100%; white-space:nowrap;">${label}</span>
-                    <button class="btn-flat-action cyan" style="font-size: var(--fs-9); padding: var(--sp-2) var(--sp-4); margin-top:var(--sp-2); background:var(--t-tint-2, rgba(6, 182, 212, 0.1)) !important; border-radius:3px; cursor:pointer;" title="Usar este nome"><i class="fa-solid fa-check"></i> Atribuir</button>
+                    <button class="btn-flat-action cyan" style="font-size: var(--fs-9); padding: var(--sp-2) var(--sp-4); margin-top:var(--sp-2); background:var(--t-tint-2, color-mix(in srgb, var(--t-accent, rgb(6, 182, 212)) 10%, transparent)) !important; border-radius:3px; cursor:pointer;" title="Usar este nome"><i class="fa-solid fa-check"></i> Atribuir</button>
                 `;
                 
                 const actionBtn = card.querySelector("button");
@@ -2044,7 +2044,7 @@ export class PanelsManager {
         tagsHeader.style.background = "rgba(0, 0, 0, 0.2)";
         tagsHeader.innerHTML = `
             <div style="font-size:var(--fs-11); color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.5px; font-weight:600; display:flex; align-items:center; gap:var(--sp-6);">
-                <i class="fa-solid fa-tags" style="color:var(--color-cyan);"></i> Pessoas/Objetos Marcados:
+                <i class="fa-solid fa-tags" style="color:var(--accent);"></i> Pessoas/Objetos Marcados:
             </div>
             <div class="vision-tags-list" style="display:flex; flex-wrap:wrap; gap:var(--sp-6);">
                 <span style="font-size:var(--fs-11); color:var(--text-secondary); font-style:italic;">Carregando marcações...</span>
@@ -2069,7 +2069,7 @@ export class PanelsManager {
             row.style.cursor = "pointer";
             row.innerHTML = `
                 <div class="bubble-meta" style="margin-bottom: var(--sp-6); display: flex; align-items: center; width: 100%;">
-                    <span class="speaker-name" style="color: var(--color-cyan); font-weight:700;"><i class="fa-solid fa-eye" style="font-size: var(--fs-9); margin-right: var(--sp-4);"></i> VISÃO IA</span>
+                    <span class="speaker-name" style="color: var(--accent); font-weight:700;"><i class="fa-solid fa-eye" style="font-size: var(--fs-9); margin-right: var(--sp-4);"></i> VISÃO IA</span>
                     <span class="bubble-time" style="font-family: monospace; font-size:var(--fs-10); color: var(--text-secondary); margin-left: auto;">${formatTimecode(f.timestamp)}</span>
                     <button class="btn-card-action btn-play-vision" style="margin-left: var(--sp-10); color: var(--text-muted); background: transparent; border:none; cursor:pointer;" title="Assistir"><i class="fa-solid fa-play"></i></button>
                 </div>
@@ -2121,7 +2121,7 @@ export class PanelsManager {
                         tag.style.borderRadius = "12px";
                         tag.style.background = "rgba(6, 182, 212, 0.15)";
                         tag.style.border = "1px solid rgba(6, 182, 212, 0.4)";
-                        tag.style.color = "var(--color-cyan)";
+                        tag.style.color = "var(--accent)";
                         tagsListEl.appendChild(tag);
                     });
                 }
@@ -2250,7 +2250,7 @@ export class PanelsManager {
                 : "";
 
             card.innerHTML = `
-                <h4 style="color: var(--color-cyan); margin: 0; font-size: var(--fs-12); font-weight: 600; display:flex; align-items:center; gap:var(--sp-6); width: 100%;"><i class="fa-solid fa-brain"></i> <span style="flex:1;">${t.title}</span> ${segmentsBadge}</h4>
+                <h4 style="color: var(--accent); margin: 0; font-size: var(--fs-12); font-weight: 600; display:flex; align-items:center; gap:var(--sp-6); width: 100%;"><i class="fa-solid fa-brain"></i> <span style="flex:1;">${t.title}</span> ${segmentsBadge}</h4>
                 <p style="font-size: var(--fs-11); color: var(--text-secondary); margin: 0; line-height: 1.4; text-align: left;">${t.description}</p>
                 <div style="display:flex; gap:var(--sp-6); margin-top:var(--sp-6); width: 100%; flex-wrap: wrap;">
                     ${t.segments_count ? `<button class="btn-secondary btn-theme-segments" style="padding: var(--sp-4) var(--sp-8); font-size: var(--fs-9); height: 22px; display: flex; align-items: center; gap: var(--sp-4); border-radius: 4px; cursor: pointer; color: var(--color-emerald); border: 1px solid var(--t-line-strong, rgba(16,185,129,0.3)); background: var(--t-tint-1, rgba(16,185,129,0.06));" data-theme-id="${t.id}">
@@ -2294,7 +2294,7 @@ export class PanelsManager {
                                 ? `<i class="fa-solid fa-image"></i> ${seg.photo_filename || 'Foto ' + seg.photo_id}`
                                 : `<i class="fa-solid fa-film"></i> ${seg.video_filename || 'Vídeo ' + seg.video_id} · ${formatTimecode(seg.start_time || 0).substring(3)}${seg.speaker_id ? ' · ' + seg.speaker_id : ''}`;
                             item.innerHTML = `
-                                <span style="font-size: var(--fs-9); font-weight: 700; color: var(--color-cyan);">${mediaLabel}</span>
+                                <span style="font-size: var(--fs-9); font-weight: 700; color: var(--accent);">${mediaLabel}</span>
                                 <span style="font-size: var(--fs-10); color: var(--text-secondary); line-height: 1.35;">${(seg.text_excerpt || '').substring(0, 140)}${(seg.text_excerpt || '').length > 140 ? '…' : ''}</span>
                             `;
                             item.addEventListener("mouseenter", () => item.style.background = "rgba(6,182,212,0.08)");
@@ -2453,7 +2453,7 @@ export class PanelsManager {
             radio.name = "export-timeline-pick";
             radio.value = String(tl.id);
             radio.checked = idx === 0;
-            radio.style.cssText = "accent-color: var(--color-cyan); cursor: pointer;";
+            radio.style.cssText = "accent-color: var(--accent); cursor: pointer;";
             radio.addEventListener("change", () => this.updateExportHint());
 
             const texto = document.createElement("div");
@@ -3169,7 +3169,7 @@ export class PanelsManager {
         btn.style.left = `${x}px`;
         btn.style.top = `${y - 40}px`;
         btn.style.zIndex = "1000";
-        btn.style.background = "var(--color-cyan)";
+        btn.style.background = "var(--accent)";
         btn.style.color = "#000";
         btn.style.border = "none";
         btn.style.padding = "6px 12px";
@@ -3268,7 +3268,7 @@ export class PanelsManager {
         const originalTitleHTML = headerTitle ? headerTitle.innerHTML : "";
 
         if (headerTitle) {
-            headerTitle.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin" style="color: var(--color-cyan);"></i> IA ${capsPersona} analisando o corte real...`;
+            headerTitle.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin" style="color: var(--accent);"></i> IA ${capsPersona} analisando o corte real...`;
         }
         TIMELINE_STATE.aiAnalysisRunning = true;
         this.timelineRenderer.requestRedraw();
@@ -3534,13 +3534,13 @@ export class PanelsManager {
                 ? `<i class="fa-solid fa-lock" style="color: ${lockColor};"></i>`
                 : `<i class="fa-solid fa-lock-open" style="color: ${lockColor};"></i>`;
             const isSyncLocked = track.syncLocked !== undefined ? !!track.syncLocked : true;
-            const syncColor = isSyncLocked ? "var(--color-cyan)" : "var(--text-muted)";
+            const syncColor = isSyncLocked ? "var(--accent)" : "var(--text-muted)";
             const syncBtn = `<button class="btn-track-sync-lock btn-track-action" title="${isSyncLocked ? 'Sync Lock ativado: esta pista acompanha operações de Ripple e Inserção' : 'Sync Lock desativado: esta pista permanece fixa no tempo'}" style="color: ${syncColor}; font-size: var(--fs-9);"><i class="fa-solid fa-arrows-left-right-to-line"></i></button>`;
             const lockBtn = `<button class="btn-track-lock btn-track-action ${isLocked ? 'locked' : 'unlocked'}" title="${isLocked ? 'Pista travada (clique para destravar)' : 'Pista destravada (clique para travar)'}" style="color: ${lockColor}; font-size: var(--fs-9);">${lockIcon}</button>`;
 
             const visibilityIcon = `<i class="fa-solid fa-eye"></i>`;
             const thumbIcon = track.thumbnailsEnabled
-                ? `<i class="fa-solid fa-image" style="color: var(--color-cyan);"></i>`
+                ? `<i class="fa-solid fa-image" style="color: var(--accent);"></i>`
                 : `<i class="fa-regular fa-image" style="color: var(--text-secondary); opacity: 0.5;"></i>`;
 
             let kindIcon = "";
@@ -3569,7 +3569,7 @@ export class PanelsManager {
                             ${lockBtn}
                             ${muteBtn}
                         </div>
-                        ${volumeSlider ? `<div class="track-volume-wrapper" title="Volume: ${volPct}% (Duplo clique para 100%)" style="flex: 1; display: flex; align-items: center; min-width: 40px; gap: var(--sp-4); margin-left: var(--sp-2);">${volumeSlider}<span class="track-volume-val" style="font-size: var(--fs-9); font-family: monospace; color: var(--color-cyan); min-width: 26px; text-align: right; flex-shrink: 0; user-select: none;">${volPct}%</span></div>` : ''}
+                        ${volumeSlider ? `<div class="track-volume-wrapper" title="Volume: ${volPct}% (Duplo clique para 100%)" style="flex: 1; display: flex; align-items: center; min-width: 40px; gap: var(--sp-4); margin-left: var(--sp-2);">${volumeSlider}<span class="track-volume-val" style="font-size: var(--fs-9); font-family: monospace; color: var(--accent); min-width: 26px; text-align: right; flex-shrink: 0; user-select: none;">${volPct}%</span></div>` : ''}
                     </div>
                 `;
             } else {
@@ -3585,7 +3585,7 @@ export class PanelsManager {
                             <button class="btn-track-remove btn-track-action" title="Remover pista (clipes vão para outra pista do mesmo tipo)" style="color: var(--text-muted); font-size: var(--fs-9);"><i class="fa-solid fa-xmark"></i></button>
                         </div>
                     </div>
-                    ${volumeSlider ? `<div class="track-volume-wrapper" title="Volume: ${volPct}% (Duplo clique para 100%)" style="width: 100%; display: flex; align-items: center; gap: var(--sp-4); margin-top: var(--sp-2);">${volumeSlider}<span class="track-volume-val" style="font-size: var(--fs-9); font-family: monospace; color: var(--color-cyan); min-width: 26px; text-align: right; flex-shrink: 0; user-select: none;">${volPct}%</span></div>` : ''}
+                    ${volumeSlider ? `<div class="track-volume-wrapper" title="Volume: ${volPct}% (Duplo clique para 100%)" style="width: 100%; display: flex; align-items: center; gap: var(--sp-4); margin-top: var(--sp-2);">${volumeSlider}<span class="track-volume-val" style="font-size: var(--fs-9); font-family: monospace; color: var(--accent); min-width: 26px; text-align: right; flex-shrink: 0; user-select: none;">${volPct}%</span></div>` : ''}
                 `;
             }
 
@@ -3842,7 +3842,7 @@ export class PanelsManager {
                 file,
                 this.importNameInput ? this.importNameInput.value : null
             );
-            this.btnConfirmImport.innerHTML = '<i class="fa-solid fa-check" style="color: var(--color-cyan);"></i>';
+            this.btnConfirmImport.innerHTML = '<i class="fa-solid fa-check" style="color: var(--accent);"></i>';
             if (window.showToast) {
                 window.showToast(`Timeline "${summary.name}" importada (${summary.clips_imported} clipes).`, "success");
             }
@@ -4094,7 +4094,7 @@ export class PanelsManager {
                 keyEl.classList.add(`vk-cat-${cmd.category}`);
                 const dot = document.createElement("span");
                 dot.className = "vk-key-dot";
-                if (cmd.category === "playback") dot.style.backgroundColor = "var(--color-cyan)";
+                if (cmd.category === "playback") dot.style.backgroundColor = "var(--accent)";
                 else if (cmd.category === "tools") dot.style.backgroundColor = "var(--color-amber)";
                 else if (cmd.category === "edit") dot.style.backgroundColor = "var(--color-violet)";
                 else if (cmd.category === "markers") dot.style.backgroundColor = "var(--color-sky)";
@@ -4139,7 +4139,7 @@ export class PanelsManager {
             const cleanKey = KEYMAP_SERVICE.formatCombo(combo);
             const cmdName = cmd.label || cmd.name || cmd.id;
 
-            let badgeColor = "var(--color-cyan)";
+            let badgeColor = "var(--accent)";
             if (cmd.category === "edit") badgeColor = "var(--color-violet)";
             else if (cmd.category === "tools") badgeColor = "var(--color-amber)";
             else if (cmd.category === "workspace_numpad") badgeColor = "#34d399";
@@ -4246,7 +4246,7 @@ export class PanelsManager {
 
         if (cmd) {
             const cmdName = cmd.label || cmd.name || cmd.id;
-            if (title) title.innerHTML = `<i class="fa-solid fa-circle-check" style="color: var(--color-cyan);"></i> <span>${cmdName}</span>`;
+            if (title) title.innerHTML = `<i class="fa-solid fa-circle-check" style="color: var(--accent);"></i> <span>${cmdName}</span>`;
             if (desc) desc.textContent = cmd.description || "Comando atribuído.";
         } else {
             if (title) title.innerHTML = `<i class="fa-solid fa-circle-xmark" style="color: var(--text-muted);"></i> <span style="color: var(--text-muted);">Nenhuma ação mapeada</span>`;
@@ -4291,7 +4291,7 @@ export class PanelsManager {
                 if (badge) badge.textContent = cleanCombo;
                 if (cmd) {
                     const cmdName = cmd.label || cmd.name || cmd.id;
-                    if (title) title.innerHTML = `<i class="fa-solid fa-circle-info" style="color: var(--color-cyan);"></i> <span>${cmdName}</span>`;
+                    if (title) title.innerHTML = `<i class="fa-solid fa-circle-info" style="color: var(--accent);"></i> <span>${cmdName}</span>`;
                     if (desc) desc.textContent = cmd.description || "";
                 } else {
                     if (title) title.innerHTML = `<span style="color: var(--text-muted);">Tecla [${cleanCombo}]</span>`;
@@ -4393,8 +4393,8 @@ export class PanelsManager {
             if (btn.dataset.layer === layer) {
                 btn.classList.add("active");
                 btn.style.background = "rgba(6,182,212,0.2)";
-                btn.style.borderColor = "var(--color-cyan)";
-                btn.style.color = "var(--color-cyan)";
+                btn.style.borderColor = "var(--accent)";
+                btn.style.color = "var(--accent)";
             } else {
                 btn.classList.remove("active");
                 btn.style.background = "rgba(255,255,255,0.04)";
@@ -4433,7 +4433,7 @@ export class PanelsManager {
             html += `
             <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--t-line-weak, rgba(255,255,255,0.05)); border-radius: 8px; padding: var(--sp-10) var(--sp-12);">
                 <h4 style="color: #fff; margin: 0 0 var(--sp-8) 0; font-size: var(--fs-12); font-weight: 700; display: flex; align-items: center; gap: var(--sp-6);">
-                    <i class="fa-solid ${icon}" style="color: var(--color-cyan); font-size: var(--fs-10);"></i> ${catTitle}
+                    <i class="fa-solid ${icon}" style="color: var(--accent); font-size: var(--fs-10);"></i> ${catTitle}
                 </h4>
                 <div style="display: grid; grid-template-columns: minmax(190px, 240px) 1fr; gap: var(--sp-8) var(--sp-12); font-size: var(--fs-12); align-items: start;">
             `;
@@ -4460,7 +4460,7 @@ export class PanelsManager {
         html += `
         <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--t-line-weak, rgba(255,255,255,0.05)); border-radius: 8px; padding: var(--sp-10) var(--sp-12);">
             <h4 style="color: #fff; margin: 0 0 var(--sp-6) 0; font-size: var(--fs-12); font-weight: 700; display: flex; align-items: center; gap: var(--sp-6);">
-                <i class="fa-solid fa-layer-group" style="color: var(--color-cyan); font-size: var(--fs-10);"></i> 8. Pistas Dinâmicas (Multipista)
+                <i class="fa-solid fa-layer-group" style="color: var(--accent); font-size: var(--fs-10);"></i> 8. Pistas Dinâmicas (Multipista)
             </h4>
             <p style="margin: 0; font-size: var(--fs-12); color: rgba(255,255,255,0.85); line-height: 1.5;">
                 Crie quantas pistas precisar pelo botão <strong>+</strong> no topo da sidebar de trilhas. Cada faixa possui <strong>volume, mute, trava (cadeado)</strong> e o modo <strong>ímã <i class="fa-solid fa-magnet" style="font-size: var(--fs-9);"></i></strong>: faixas magnéticas mantêm clipes grudados em sequência contínua; faixas livres permitem posicionamento em qualquer ponto no tempo.
@@ -4512,7 +4512,7 @@ export class PanelsManager {
                 const catTitle = catMeta ? (catMeta.label || catMeta.name) : currentCat;
                 html += `
                     <tr style="background: rgba(255,255,255,0.03);">
-                        <td colspan="4" style="padding: var(--sp-6) var(--sp-12); font-weight: 700; color: var(--color-cyan); font-size: var(--fs-11); text-transform: uppercase; letter-spacing: 0.5px;">
+                        <td colspan="4" style="padding: var(--sp-6) var(--sp-12); font-weight: 700; color: var(--accent); font-size: var(--fs-11); text-transform: uppercase; letter-spacing: 0.5px;">
                             ${catTitle}
                         </td>
                     </tr>
@@ -4527,7 +4527,7 @@ export class PanelsManager {
                 <tr data-cmd-id="${cmd.id}">
                     <td style="font-weight: 600; color: #fff;">
                         ${cmdDisplayName}
-                        ${isOverridden ? '<span style="font-size: var(--fs-9); color: var(--color-cyan); margin-left: var(--sp-4); background: var(--t-tint-3, rgba(6,182,212,0.15)); padding: var(--sp-1) var(--sp-4); border-radius: 3px;">MODIFICADO</span>' : ''}
+                        ${isOverridden ? '<span style="font-size: var(--fs-9); color: var(--accent); margin-left: var(--sp-4); background: var(--t-tint-3, color-mix(in srgb, var(--t-accent, rgb(6, 182, 212)) 15%, transparent)); padding: var(--sp-1) var(--sp-4); border-radius: 3px;">MODIFICADO</span>' : ''}
                     </td>
                     <td style="color: var(--text-secondary); font-size: var(--fs-11);">
                         ${cmd.description}
