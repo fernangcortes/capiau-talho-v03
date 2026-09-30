@@ -1259,6 +1259,18 @@ button {
     display: none !important;
 }
 
+/* Colunas do editor dividem o espaço: com o centro no mínimo, crescer um painel encolhe os
+   vizinhos (até o mínimo do divisor de cada um) em vez de empurrar o último para fora da tela.
+   O divisor grava flex: 0 0 Npx no style; o !important só libera o encolher. */
+.workspace > #sidebar-left:not(.collapsed),
+.workspace > #inspector-panel:not(.collapsed),
+.workspace > #sidebar-right:not(.collapsed) {
+    flex-shrink: 1 !important;
+}
+.workspace > #sidebar-left:not(.collapsed) { min-width: 200px; }
+.workspace > #inspector-panel:not(.collapsed) { min-width: 240px; }
+.workspace > #sidebar-right:not(.collapsed) { min-width: 220px; }
+
 /* Adjustments for borders to separate sidebars when docked in workspace or studio-top */
 .workspace > .sidebar-left,
 .studio-top > .sidebar-left {
