@@ -525,6 +525,20 @@ textarea {
 }
 .hsplit {
     display: inline-flex;
+    position: relative;
+}
+/* Há mídias com análise em falha (headerMenus.js showAiFailures): ponto rosa, sem número. */
+.hsplit[data-failures]::after {
+    content: "";
+    position: absolute;
+    top: 3px;
+    right: 3px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--color-rose);
+    box-shadow: 0 0 0 2px var(--bg-base);
+    pointer-events: none;
 }
 .hsplit > .hbtn {
     border-radius: 4px 0 0 4px;

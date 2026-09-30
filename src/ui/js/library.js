@@ -8204,6 +8204,7 @@ export class LibraryManager {
             const res = await fetch(`/api/media/failed-count?project_id=${STATE.currentProjectId || ''}`);
             if (!res.ok) return;
             const data = await res.json();
+            document.dispatchEvent(new CustomEvent("capiau:failed-count", { detail: { count: data.count || 0 } }));
             
             const btn = document.getElementById("btn-reanalyze-failed");
             const badge = document.getElementById("failed-count-badge");

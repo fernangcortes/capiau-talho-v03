@@ -168,7 +168,28 @@ function initWorkspaces() {
     renderWorkspaces(select, box);
 }
 
+// ── Aviso de falhas no botão de IA ──────────────────────────────────────────
+// A biblioteca conta as mídias com análise em falha (GET /api/media/failed-count) e avisa com
+// "capiau:failed-count"; aqui o grupo de IA ganha um ponto rosa e o total no rótulo do menu.
+
+export function showAiFailures(count) {
+    const group = document.getElementById("hsplit-ia");
+    if (!group) return;
+    const n = Math.max(0, Number(count) || 0);
+    const caret = group.querySelector(".hmenu-trigger");
+    if (n > 0) {
+        group.dataset.failures = String(n);
+        caret?.setAttribute("aria-label", `Mais ações de IA — ${n} ${n === 1 ? "mídia com falha" : "mídias com falha"}`);
+        caret?.setAttribute("data-tooltip", `${n} ${n === 1 ? "mídia com análise em falha" : "mídias com análise em falha"}`);
+    } else {
+        delete group.dataset.failures;
+        caret?.setAttribute("aria-label", "Mais ações de IA");
+        caret?.removeAttribute("data-tooltip");
+    }
+}
+
 export function initHeaderMenus() {
     initMenus();
     initWorkspaces();
+    document.addEventListener("capiau:failed-count", (e) => showAiFailures(e.detail?.count));
 }
