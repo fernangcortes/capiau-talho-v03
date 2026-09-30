@@ -225,6 +225,9 @@ CREATE TABLE IF NOT EXISTS entity_mention (
     source TEXT CHECK(source IN ('vision_auto','face_recognition','human_audit','text_link')) DEFAULT 'human_audit',
     status TEXT CHECK(status IN ('auto','confirmed','rejected')) DEFAULT 'confirmed',
     text_to_replace TEXT, -- trecho literal da descricao a substituir pelo nome (opcional)
+    bounding_box TEXT,
+    confidence REAL DEFAULT 1.0,
+    detected_label TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -414,7 +417,171 @@ CREATE TABLE IF NOT EXISTS audio_render (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 CREATE UNIQUE INDEX IF NOT EXISTS idx_audio_render_hash ON audio_render(video_id, chain_hash);
+
+-- Detecções Espaciais de Objetos e Props de Cena (Grounding Canônico Gemini 2026)
+CREATE TABLE IF NOT EXISTS detected_object (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER NOT NULL REFERENCES project(id) ON DELETE CASCADE,
+    photo_id INTEGER REFERENCES photo(id) ON DELETE CASCADE,
+    video_id INTEGER REFERENCES video(id) ON DELETE CASCADE,
+    timestamp REAL,                          -- Timestamp no vídeo em segundos (NULL para fotos still)
+    
+    -- Identificação e Classificação
+    label TEXT NOT NULL,                     -- Rótulo detectado (ex: "câmera", "claquete", "chapéu", "revólver")
+    category TEXT CHECK(category IN ('equipamento', 'prop_cena', 'figurino', 'veiculo', 'documento', 'cenario', 'outro')) DEFAULT 'outro',
+    realm TEXT CHECK(realm IN ('production', 'story')) DEFAULT 'production', -- Isolamento ficção vs realidade
+    
+    -- Geometria Espacial Canônica (0 a 1000)
+    bounding_box TEXT NOT NULL,              -- JSON [ymin, xmin, ymax, xmax] estritamente no padrão canônico inteiro Gemini (0-1000)
+    confidence REAL NOT NULL,                -- Score de certeza (0.0 a 1.0)
+    
+    -- Rastreabilidade de Inferência
+    detector_model TEXT NOT NULL,            -- 'gemini_spatial', 'yolo_world_onnx', 'florence_2', 'grounding_dino'
+    detector_version TEXT,                   -- Versão/tag do modelo
+    execution_mode TEXT CHECK(execution_mode IN ('local_cpu', 'local_gpu', 'cloud_api')) DEFAULT 'cloud_api',
+    
+    -- Vínculo Canônico e Curadoria Humana
+    entity_id INTEGER REFERENCES entity(id) ON DELETE SET NULL,
+    scene_id INTEGER REFERENCES scene(id) ON DELETE SET NULL,
+    crop_path TEXT,
+    status TEXT CHECK(status IN ('auto', 'confirmed', 'rejected')) DEFAULT 'auto',
+    
+    -- Telemetria e Auditoria
+    raw_payload TEXT,
+    cost_usd REAL DEFAULT 0.0,
+    processing_time_ms INTEGER,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_obj_project ON detected_object(project_id);
+CREATE INDEX IF NOT EXISTS idx_obj_video ON detected_object(video_id, timestamp);
+CREATE INDEX IF NOT EXISTS idx_obj_photo ON detected_object(photo_id);
+CREATE INDEX IF NOT EXISTS idx_obj_label ON detected_object(project_id, label);
+CREATE INDEX IF NOT EXISTS idx_obj_entity ON detected_object(entity_id);
+CREATE INDEX IF NOT EXISTS idx_obj_scene ON detected_object(scene_id);
+CREATE INDEX IF NOT EXISTS idx_obj_realm ON detected_object(project_id, realm);
+
+-- Modelagem Relacional de Falas Sobrepostas (Overlapping Speech)
+CREATE TABLE IF NOT EXISTS dialogue_utterance (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    video_id INTEGER NOT NULL REFERENCES video(id) ON DELETE CASCADE,
+    speaker_id TEXT NOT NULL,
+    start_s REAL NOT NULL,
+    end_s REAL NOT NULL,
+    text TEXT NOT NULL,
+    confidence REAL DEFAULT 1.0,
+    audio_channel INTEGER DEFAULT 0, -- 0=mix/padrão, 1=A1, 2=A2
+    is_overlapping BOOLEAN DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_utterance_video ON dialogue_utterance(video_id, start_s, end_s);
+CREATE INDEX IF NOT EXISTS idx_utterance_speaker ON dialogue_utterance(video_id, speaker_id);
+
+CREATE TABLE IF NOT EXISTS dialogue_word (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    utterance_id INTEGER REFERENCES dialogue_utterance(id) ON DELETE CASCADE,
+    video_id INTEGER NOT NULL REFERENCES video(id) ON DELETE CASCADE,
+    word TEXT NOT NULL,
+    start_s REAL NOT NULL,
+    end_s REAL NOT NULL,
+    confidence REAL DEFAULT 1.0
+);
+CREATE INDEX IF NOT EXISTS idx_dialogue_word_time ON dialogue_word(video_id, start_s, end_s);
+CREATE INDEX IF NOT EXISTS idx_dialogue_word_utt ON dialogue_word(utterance_id);
 """
+
+
+def migrate_storage_schema(conn: sqlite3.Connection) -> None:
+    """Aplica migrações dinâmicas de schema no SQLite com retrocompatibilidade garantida."""
+    cursor = conn.cursor()
+
+    # 1. Criação da tabela detected_object e índices se não existirem
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='detected_object'")
+    if not cursor.fetchone():
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS detected_object (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project_id INTEGER NOT NULL REFERENCES project(id) ON DELETE CASCADE,
+                photo_id INTEGER REFERENCES photo(id) ON DELETE CASCADE,
+                video_id INTEGER REFERENCES video(id) ON DELETE CASCADE,
+                timestamp REAL,
+                label TEXT NOT NULL,
+                category TEXT CHECK(category IN ('equipamento', 'prop_cena', 'figurino', 'veiculo', 'documento', 'cenario', 'outro')) DEFAULT 'outro',
+                realm TEXT CHECK(realm IN ('production', 'story')) DEFAULT 'production',
+                bounding_box TEXT NOT NULL,
+                confidence REAL NOT NULL,
+                detector_model TEXT NOT NULL,
+                detector_version TEXT,
+                execution_mode TEXT CHECK(execution_mode IN ('local_cpu', 'local_gpu', 'cloud_api')) DEFAULT 'cloud_api',
+                entity_id INTEGER REFERENCES entity(id) ON DELETE SET NULL,
+                scene_id INTEGER REFERENCES scene(id) ON DELETE SET NULL,
+                crop_path TEXT,
+                status TEXT CHECK(status IN ('auto', 'confirmed', 'rejected')) DEFAULT 'auto',
+                raw_payload TEXT,
+                cost_usd REAL DEFAULT 0.0,
+                processing_time_ms INTEGER,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_obj_project ON detected_object(project_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_obj_video ON detected_object(video_id, timestamp)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_obj_photo ON detected_object(photo_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_obj_label ON detected_object(project_id, label)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_obj_entity ON detected_object(entity_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_obj_scene ON detected_object(scene_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_obj_realm ON detected_object(project_id, realm)")
+
+    # 2. Criação das tabelas de diálogo / fala sobreposta se não existirem
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='dialogue_utterance'")
+    if not cursor.fetchone():
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS dialogue_utterance (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                video_id INTEGER NOT NULL REFERENCES video(id) ON DELETE CASCADE,
+                speaker_id TEXT NOT NULL,
+                start_s REAL NOT NULL,
+                end_s REAL NOT NULL,
+                text TEXT NOT NULL,
+                confidence REAL DEFAULT 1.0,
+                audio_channel INTEGER DEFAULT 0,
+                is_overlapping BOOLEAN DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_utterance_video ON dialogue_utterance(video_id, start_s, end_s)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_utterance_speaker ON dialogue_utterance(video_id, speaker_id)")
+
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='dialogue_word'")
+    if not cursor.fetchone():
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS dialogue_word (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                utterance_id INTEGER REFERENCES dialogue_utterance(id) ON DELETE CASCADE,
+                video_id INTEGER NOT NULL REFERENCES video(id) ON DELETE CASCADE,
+                word TEXT NOT NULL,
+                start_s REAL NOT NULL,
+                end_s REAL NOT NULL,
+                confidence REAL DEFAULT 1.0
+            )
+        """)
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_dialogue_word_time ON dialogue_word(video_id, start_s, end_s)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_dialogue_word_utt ON dialogue_word(utterance_id)")
+
+    # 3. Extensão condicional de colunas em entity_mention
+    cursor.execute("PRAGMA table_info(entity_mention)")
+    existing_cols = {row[1] for row in cursor.fetchall()}
+    if "bounding_box" not in existing_cols:
+        cursor.execute("ALTER TABLE entity_mention ADD COLUMN bounding_box TEXT")
+        print("[MIGRATION] Coluna 'bounding_box' adicionada em entity_mention.")
+    if "confidence" not in existing_cols:
+        cursor.execute("ALTER TABLE entity_mention ADD COLUMN confidence REAL DEFAULT 1.0")
+        print("[MIGRATION] Coluna 'confidence' adicionada em entity_mention.")
+    if "detected_label" not in existing_cols:
+        cursor.execute("ALTER TABLE entity_mention ADD COLUMN detected_label TEXT")
+        print("[MIGRATION] Coluna 'detected_label' adicionada em entity_mention.")
+
+    conn.commit()
+
 
 def init_db(db_path: Path = None):
     """Inicializa o banco de dados SQLite com as tabelas do schema e realiza migracoes dinamicas."""
@@ -430,6 +597,7 @@ def init_db(db_path: Path = None):
         
         # Migracao dinamica de colunas para o banco de dados existente
         cursor = conn.cursor()
+        migrate_storage_schema(conn)
         
         # Migracoes para tabela project
         cursor.execute("PRAGMA table_info(project)")
