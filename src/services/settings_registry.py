@@ -17,6 +17,7 @@ from src.config import CONFIG
 
 CATEGORIES = [
     {"id": "models_keys",   "label": "Modelos & Chaves",     "icon": "fa-key"},
+    {"id": "objects_props", "label": "Objetos & Props",      "icon": "fa-shapes"},
     {"id": "transcription", "label": "Transcrição",          "icon": "fa-comment-dots"},
     {"id": "vision",        "label": "Visão & Resumos",      "icon": "fa-eye"},
     {"id": "timeline",      "label": "Timeline & Sugestões", "icon": "fa-film"},
@@ -57,6 +58,48 @@ SETTINGS_REGISTRY: List[Dict[str, Any]] = [
         "help": "Chave de API do serviço de nuvem Auphonic, que faz o que falta aqui dentro: tira reverb, equilibra o timbre e melhora voz de arquivo (plano gratuito de 2 h por mês). Fica guardada só neste computador; se ficar vazia, os recursos de nuvem ficam desligados.",
         "help_tech": "Bearer token no POST https://auphonic.com/api/simple/productions.json (AuphonicProvider em src/services/audio_cloud.py). Mesma política das demais secrets: exibição via mask_secret e o valor real nunca volta ao cliente nem vira override por máscara.",
         "category": "models_keys", "level": "simple", "scope": "global", "requires_reprocess": False,
+    },
+    {
+        "key": "api.gemini_key", "type": "secret", "default": "",
+        "label": "Chave Google Gemini",
+        "help": "Chave direta para Gemini 3.8 Flash, 3.8 Pro e Spatial Grounding.",
+        "help_tech": "Usado nas chamadas da API Gemini e Grounding Espacial nativo.",
+        "category": "models_keys", "level": "simple", "scope": "global", "requires_reprocess": False,
+    },
+    {
+        "key": "api.anthropic_key", "type": "secret", "default": "",
+        "label": "Chave Anthropic Claude",
+        "help": "Chave direta para Claude 5.5 Sonnet e raciocínio estendido.",
+        "help_tech": "Usado para inferência direta via API Anthropic.",
+        "category": "models_keys", "level": "simple", "scope": "global", "requires_reprocess": False,
+    },
+    {
+        "key": "api.deepseek_key", "type": "secret", "default": "",
+        "label": "Chave DeepSeek",
+        "help": "Chave direta para DeepSeek 4.1 Flash/Pro com custo ultra-baixo.",
+        "help_tech": "Usado para inferência direta via API DeepSeek.",
+        "category": "models_keys", "level": "simple", "scope": "global", "requires_reprocess": False,
+    },
+    {
+        "key": "api.typesafe_key", "type": "secret", "default": "",
+        "label": "Chave TypeSafe AI",
+        "help": "Chave para o Jev (Sistema 1 comercial de baixa latência e safety gatekeeper).",
+        "help_tech": "Usado no System1JevClient para auditoria e triagem de baixa latência.",
+        "category": "models_keys", "level": "simple", "scope": "global", "requires_reprocess": False,
+    },
+    {
+        "key": "api.nvidia_nim_key", "type": "secret", "default": "",
+        "label": "Chave NVIDIA NIM",
+        "help": "Chave para acessar microsserviços NVIDIA NIM (Nemotron 3, Canary, Cosmos 3) na nuvem corporativa.",
+        "help_tech": "Usado para acesso a microsserviços NIM na nuvem NVIDIA.",
+        "category": "models_keys", "level": "simple", "scope": "global", "requires_reprocess": False,
+    },
+    {
+        "key": "api.local_vlm_endpoint", "type": "string", "default": "http://localhost:11434/v1",
+        "label": "Endpoint de VLM Local (Ollama/vLLM)",
+        "help": "URL base para inferência local de visão sem custos de nuvem.",
+        "help_tech": "Base URL para endpoints locais compatíveis com a API OpenAI.",
+        "category": "models_keys", "level": "pro", "scope": "global", "requires_reprocess": False,
     },
     {
         "key": "llm.text_model", "type": "string", "default": CONFIG.TEXT_MODEL,
@@ -105,6 +148,29 @@ SETTINGS_REGISTRY: List[Dict[str, Any]] = [
 
     # -- Transcrição ----------------------------------------------------------
     {
+        "key": "transcription.engine", "type": "enum", "default": "nvidia_canary",
+        "enum": ["nvidia_canary", "whisper_turbo", "sensevoice", "assemblyai_universal_35", "deepgram_nova_3"],
+        "label": "Motor de Transcrição Primária",
+        "help": "Motor de reconhecimento de fala primário.",
+        "help_tech": "Seleciona o pipeline de transcrição ASR.",
+        "category": "transcription", "level": "simple", "scope": "both", "requires_reprocess": True,
+    },
+    {
+        "key": "diarization.engine", "type": "enum", "default": "nemotron_3_diarization",
+        "enum": ["nemotron_3_diarization", "pyannote_40", "assemblyai_universal_35", "none"],
+        "label": "Motor de Diarização de Vozes",
+        "help": "Motor responsável por separar e identificar quem está falando, incluindo fala sobreposta.",
+        "help_tech": "Pipeline de diarização de locutores.",
+        "category": "transcription", "level": "simple", "scope": "both", "requires_reprocess": True,
+    },
+    {
+        "key": "diarization.max_speakers", "type": "int", "default": 8, "min": 1, "max": 16, "step": 1,
+        "label": "Número Máximo de Locutores",
+        "help": "Limite superior de vozes distintas a procurar.",
+        "help_tech": "Restrição de agrupamento de locutores.",
+        "category": "transcription", "level": "pro", "scope": "both", "requires_reprocess": True,
+    },
+    {
         "key": "asr.language", "type": "enum", "default": "pt",
         "enum": ["pt", "en", "es"],
         "label": "Idioma da transcrição",
@@ -148,7 +214,67 @@ SETTINGS_REGISTRY: List[Dict[str, Any]] = [
         "category": "transcription", "level": "pro", "scope": "both", "requires_reprocess": True,
     },
 
+    # -- Objetos & Props ------------------------------------------------------
+    {
+        "key": "object.detector_engine", "type": "enum", "default": "gemini_spatial",
+        "enum": ["gemini_spatial", "yolo_world", "dino_x", "florence_2", "none"],
+        "label": "Motor de Detecção de Props",
+        "help": "Modelo responsável por detectar objetos, adereços e figurinos.",
+        "help_tech": "Define o backend de detecção de objetos zero-shot.",
+        "category": "objects_props", "level": "simple", "scope": "both", "requires_reprocess": True,
+    },
+    {
+        "key": "object.min_confidence", "type": "float", "default": 0.50, "min": 0.10, "max": 0.95, "step": 0.05,
+        "label": "Confiança Mínima",
+        "help": "Score mínimo para aceitar um objeto detectado.",
+        "help_tech": "Filtro de probabilidade na detecção.",
+        "category": "objects_props", "level": "pro", "scope": "both", "requires_reprocess": True,
+    },
+    {
+        "key": "object.classes_filter", "type": "string", "default": "camera,microfone boom,claquete,monitor,tripé,figurino,prop",
+        "label": "Classes Alvo Padrão",
+        "help": "Lista separada por vírgula de classes prioritárias para catalogação.",
+        "help_tech": "Filtro de prompts zero-shot.",
+        "category": "objects_props", "level": "pro", "scope": "both", "requires_reprocess": False,
+    },
+    {
+        "key": "object.execution_mode", "type": "enum", "default": "cloud_api",
+        "enum": ["cloud_api", "local_cpu", "local_gpu"],
+        "label": "Modo de Execução",
+        "help": "Onde executar o motor de detecção de adereços.",
+        "help_tech": "cloud_api | local_cpu | local_gpu",
+        "category": "objects_props", "level": "pro", "scope": "global", "requires_reprocess": False,
+    },
+    {
+        "key": "object.auto_crop", "type": "bool", "default": True,
+        "label": "Gerar Recortes de Imagem (Thumbnails)",
+        "help": "Se verdadeiro, extrai crops automáticos dos objetos detectados para cache visual.",
+        "help_tech": "Salva crops em data/cache/crops/objects.",
+        "category": "objects_props", "level": "pro", "scope": "both", "requires_reprocess": False,
+    },
+    {
+        "key": "object.link_script_props", "type": "bool", "default": True,
+        "label": "Vincular com Props do Roteiro",
+        "help": "Vincula automaticamente objetos detectados com adereços extraídos das cenas do roteiro.",
+        "help_tech": "Faz matching semântico com scene.props_json.",
+        "category": "objects_props", "level": "simple", "scope": "both", "requires_reprocess": False,
+    },
+
     # -- Visão & Resumos ------------------------------------------------------
+    {
+        "key": "triage.system1_enabled", "type": "bool", "default": True,
+        "label": "Triagem Instantânea Local (Sistema 1 - Laya)",
+        "help": "Usa o modelo de decisão ONNX ultrarrápido para classificar mídias na ingestão em <40ms sem gastar tokens.",
+        "help_tech": "Ativa System1LayaEngine na ingestão.",
+        "category": "vision", "level": "simple", "scope": "both", "requires_reprocess": True,
+    },
+    {
+        "key": "triage.escalation_threshold", "type": "float", "default": 0.88, "min": 0.50, "max": 0.98, "step": 0.02,
+        "label": "Limiar de Escalação para Sistema 2",
+        "help": "Se a confiança calibrada do Sistema 1 for menor que este limiar, escala para o Gemini 3.8 Flash.",
+        "help_tech": "Limiar RLCD de escalação deliberativa.",
+        "category": "vision", "level": "pro", "scope": "both", "requires_reprocess": False,
+    },
     {
         "key": "vision.frame_interval", "type": "int", "default": 10, "min": 2, "max": 60, "step": 1,
         "label": "Intervalo entre frames analisados (s)",

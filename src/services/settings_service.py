@@ -37,12 +37,49 @@ class ResolvedSettings:
         return self._values[key]
 
     def api_key(self, provider: str) -> str:
-        """Chave de API resolvida: valor do banco se não-vazio, senão fallback do .env."""
-        if provider == "openrouter":
-            return self._values.get("api.openrouter_key") or CONFIG.OPENROUTER_API_KEY
-        if provider == "assemblyai":
-            return self._values.get("api.assemblyai_key") or CONFIG.ASSEMBLYAI_API_KEY
-        raise KeyError(f"Provedor de API desconhecido: '{provider}'")
+        """Chave de API resolvida: valor do banco se não-vazio, senão fallback de CONFIG/.env."""
+        import os
+        provider_key_map = {
+            "gemini": "api.gemini_key",
+            "anthropic": "api.anthropic_key",
+            "deepseek": "api.deepseek_key",
+            "assemblyai": "api.assemblyai_key",
+            "typesafe": "api.typesafe_key",
+            "nvidia_nim": "api.nvidia_nim_key",
+            "openrouter": "api.openrouter_key",
+            "auphonic": "api.auphonic_key",
+        }
+        env_fallback_map = {
+            "gemini": "GEMINI_API_KEY",
+            "anthropic": "ANTHROPIC_API_KEY",
+            "deepseek": "DEEPSEEK_API_KEY",
+            "assemblyai": "ASSEMBLYAI_API_KEY",
+            "typesafe": "TYPESAFE_API_KEY",
+            "nvidia_nim": "NVIDIA_NIM_KEY",
+            "openrouter": "OPENROUTER_API_KEY",
+            "auphonic": "AUPHONIC_API_KEY",
+        }
+
+        prov = provider.lower().strip()
+        key_name = provider_key_map.get(prov)
+        if not key_name:
+            raise KeyError(f"Provedor de API desconhecido: '{provider}'")
+
+        val = self._values.get(key_name)
+        if val:
+            return str(val).strip()
+
+        # Fallback para atributo correspondente em CONFIG
+        config_attr = f"{prov.upper()}_API_KEY"
+        if hasattr(CONFIG, config_attr) and getattr(CONFIG, config_attr):
+            return str(getattr(CONFIG, config_attr)).strip()
+
+        # Fallback para variável de ambiente correspondente
+        env_var = env_fallback_map.get(prov, "")
+        if env_var and os.getenv(env_var):
+            return os.environ[env_var].strip()
+
+        return ""
 
 
 class SettingsService:
