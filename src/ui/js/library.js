@@ -9839,6 +9839,17 @@ export class LibraryManager {
             });
         }
 
+        // "+ vincular" (seção Temas deste clipe, no Índice): mostra ou esconde o formulário ali mesmo
+        const btnToggleLink = document.getElementById("btn-inspector-toggle-link-theme");
+        const linkForm = document.getElementById("inspector-link-theme-form");
+        if (btnToggleLink && linkForm) {
+            btnToggleLink.addEventListener("click", () => {
+                linkForm.hidden = !linkForm.hidden;
+                btnToggleLink.setAttribute("aria-expanded", String(!linkForm.hidden));
+                if (!linkForm.hidden) document.getElementById("sel-inspector-link-theme")?.focus();
+            });
+        }
+
         // Link Theme Submit
         const btnLinkTheme = document.getElementById("btn-inspector-link-theme-submit");
         if (btnLinkTheme) {
@@ -10858,7 +10869,7 @@ export class LibraryManager {
                 }
 
                 if (!hasThemes) {
-                    themesList.innerHTML = `<div style="font-size:var(--fs-11); color:var(--text-muted);">Nenhum tema narrativo vinculado a este vídeo. Utilize o formulário acima para vincular.</div>`;
+                    themesList.innerHTML = `<div style="font-size:var(--fs-11); color:var(--text-muted);">Nenhum tema vinculado a este clipe. Use “+ vincular” para ligar um.</div>`;
                 }
             }
 

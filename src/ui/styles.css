@@ -8252,6 +8252,46 @@ select option, .nle-select option {
     flex-direction: column;
     gap: 12px;
 }
+/* Inspetor · Índice: seções Temas e Rostos deste clipe (eram abas próprias). */
+.insp-sec {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding-top: 10px;
+    border-top: 1px solid var(--t-line-weak, rgba(255, 255, 255, 0.06));
+}
+.insp-sec-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+.insp-sec-title {
+    font-size: var(--fs-9);
+    font-weight: 700;
+    color: var(--color-cyan);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+.insp-sec-btn {
+    height: 20px;
+    padding: 0 8px;
+    border: 1px solid var(--t-line-strong, rgba(255, 255, 255, 0.14));
+    border-radius: 4px;
+    background: transparent;
+    color: var(--text-secondary);
+    font-family: inherit;
+    font-size: var(--fs-10);
+    font-weight: 500;
+}
+.insp-sec-btn:hover,
+.insp-sec-btn[aria-expanded="true"] {
+    color: var(--text-primary);
+    border-color: var(--accent);
+}
+#inspector-link-theme-form[hidden] {
+    display: none;
+}
 .inspector-section-title {
     font-size: var(--fs-10);
     text-transform: uppercase;

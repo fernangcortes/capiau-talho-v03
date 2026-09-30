@@ -687,8 +687,6 @@
                     <div class="media-tabs" id="inspector-tabs" style="flex-shrink: 0; display: flex; gap: 2px; border-bottom: 1px solid var(--border-glass);">
                         <button class="tab-btn active" data-inspector-tab="inspector-tab-index" style="flex: 1; min-width: 0; padding: 6px 4px; font-size: var(--fs-10);" title="Resumo e Índices"><i class="fa-solid fa-indent"></i> <span class="tab-text">Índice</span></button>
                         <button class="tab-btn" data-inspector-tab="inspector-tab-transcript" style="flex: 1; min-width: 0; padding: 6px 4px; font-size: var(--fs-10);" title="Transcrição e Subtítulos"><i class="fa-solid fa-closed-captioning"></i> <span class="tab-text">Legenda</span></button>
-                        <button class="tab-btn" data-inspector-tab="inspector-tab-themes" style="flex: 1; min-width: 0; padding: 6px 4px; font-size: var(--fs-10);" title="Temas Narrativos"><i class="fa-solid fa-tags"></i> <span class="tab-text">Temas</span></button>
-                        <button class="tab-btn" data-inspector-tab="inspector-tab-faces" style="flex: 1; min-width: 0; padding: 6px 4px; font-size: var(--fs-10);" title="Rostos Detectados"><i class="fa-solid fa-user-friends"></i> <span class="tab-text">Rostos</span></button>
                         <button class="tab-btn" data-inspector-tab="inspector-tab-ai" style="flex: 1; min-width: 0; padding: 6px 4px; font-size: var(--fs-10);" title="Análise IA e Processamento"><i class="fa-solid fa-brain"></i> <span class="tab-text">IA</span></button>
                     </div>
 
@@ -723,6 +721,49 @@
                             <div class="timeline-vertical" id="inspector-chapters-list" style="position: relative; padding-left: 15px; display: flex; flex-direction: column; gap: 10px;">
                                 <!-- Índice gerado por JS -->
                             </div>
+                            <!-- Temas e Rostos deste clipe (eram abas; na Biblioteca ficam os do projeto) -->
+                            <div class="insp-sec" id="inspector-sec-themes">
+                                <div class="insp-sec-head">
+                                    <span class="insp-sec-title">Temas deste clipe</span>
+                                    <button type="button" id="btn-inspector-toggle-link-theme" class="insp-sec-btn" aria-expanded="false" aria-controls="inspector-link-theme-form"><i class="fa-solid fa-plus"></i> vincular</button>
+                                </div>
+                                <div id="inspector-link-theme-form" hidden>
+                                    <!-- Formulário rápido para vincular tema -->
+                                    <div class="glassmorphism" style="padding: 12px; border-radius: 6px; background: var(--t-tint-1, rgba(6, 182, 212, 0.03)); border: 1px solid var(--t-line-weak, rgba(6, 182, 212, 0.15)); display: flex; flex-direction: column; gap: 8px;">
+                                        <div style="font-size: var(--fs-9); font-weight: 700; color: var(--color-cyan); text-transform: uppercase; letter-spacing: 0.5px;"><i class="fa-solid fa-link"></i> Vincular Novo Tema Narrativo</div>
+                                        <div style="display: flex; flex-direction: column; gap: 4px;">
+                                            <label style="font-size: var(--fs-9); color: var(--text-secondary); margin: 0;">Tema Narrativo:</label>
+                                            <select id="sel-inspector-link-theme" class="nle-select" style="width: 100%; padding: 4px; font-size: var(--fs-10);"></select>
+                                        </div>
+                                        <div style="display: flex; gap: 6px;">
+                                            <div style="flex: 1; display: flex; flex-direction: column; gap: 4px;">
+                                                <label style="font-size: var(--fs-9); color: var(--text-secondary); margin: 0;">Início (s):</label>
+                                                <input type="number" id="num-inspector-link-start" step="0.1" style="width: 100%; background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); border-radius: 4px; padding: 2px 6px; font-size: var(--fs-10); color:#fff; outline:none;">
+                                            </div>
+                                            <div style="flex: 1; display: flex; flex-direction: column; gap: 4px;">
+                                                <label style="font-size: var(--fs-9); color: var(--text-secondary); margin: 0;">Fim (s):</label>
+                                                <input type="number" id="num-inspector-link-end" step="0.1" style="width: 100%; background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); border-radius: 4px; padding: 2px 6px; font-size: var(--fs-10); color:#fff; outline:none;">
+                                            </div>
+                                        </div>
+                                        <div style="display: flex; flex-direction: column; gap: 4px;">
+                                            <label style="font-size: var(--fs-9); color: var(--text-secondary); margin: 0;">Trecho Falado (Opcional):</label>
+                                            <textarea id="txt-inspector-link-excerpt" placeholder="Trecho falado correspondente..." rows="2" style="width: 100%; background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); border-radius: 4px; padding: 4px 6px; font-size: var(--fs-10); color:#fff; outline:none; font-family:var(--font-body); resize:vertical;"></textarea>
+                                        </div>
+                                        <button id="btn-inspector-link-theme-submit" class="btn-primary" style="height: 26px; font-size: var(--fs-10); font-weight: bold; width: 100%; margin-top: 4px; border-radius: 4px; --primary-bg: var(--color-cyan); --primary-ink: #000; border: none; cursor: pointer;"><i class="fa-solid fa-plus-circle"></i> Confirmar Vínculo</button>
+                                    </div>
+                                </div>
+                                <div id="inspector-themes-list" style="display: flex; flex-direction: column; gap: 8px;">
+                                    <!-- Temas populados via JS -->
+                                </div>
+                            </div>
+                            <div class="insp-sec" id="inspector-sec-faces">
+                                <div class="insp-sec-head">
+                                    <span class="insp-sec-title">Rostos deste clipe</span>
+                                </div>
+                                <div id="inspector-faces-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px;">
+                                    <!-- Rostos dinâmicos por JS -->
+                                </div>
+                            </div>
                         </div>
                         
                         <!-- Aba: Legenda / Transcrição Editável -->
@@ -733,46 +774,6 @@
                             </div>
                             <div id="inspector-transcript-editor" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; padding-right: 4px; min-height: 0;">
                                 <!-- Blocos editáveis dinâmicos por JS -->
-                            </div>
-                        </div>
-                        
-                        <!-- Aba: Temas Narrativos -->
-                        <div class="inspector-tab-page" id="inspector-tab-themes" style="display: none; flex-direction: column; gap: 12px;">
-                            <!-- Formulário rápido para vincular tema -->
-                            <div class="glassmorphism" style="padding: 12px; border-radius: 6px; background: var(--t-tint-1, rgba(6, 182, 212, 0.03)); border: 1px solid var(--t-line-weak, rgba(6, 182, 212, 0.15)); display: flex; flex-direction: column; gap: 8px;">
-                                <div style="font-size: var(--fs-9); font-weight: 700; color: var(--color-cyan); text-transform: uppercase; letter-spacing: 0.5px;"><i class="fa-solid fa-link"></i> Vincular Novo Tema Narrativo</div>
-                                <div style="display: flex; flex-direction: column; gap: 4px;">
-                                    <label style="font-size: var(--fs-9); color: var(--text-secondary); margin: 0;">Tema Narrativo:</label>
-                                    <select id="sel-inspector-link-theme" class="nle-select" style="width: 100%; padding: 4px; font-size: var(--fs-10);"></select>
-                                </div>
-                                <div style="display: flex; gap: 6px;">
-                                    <div style="flex: 1; display: flex; flex-direction: column; gap: 4px;">
-                                        <label style="font-size: var(--fs-9); color: var(--text-secondary); margin: 0;">Início (s):</label>
-                                        <input type="number" id="num-inspector-link-start" step="0.1" style="width: 100%; background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); border-radius: 4px; padding: 2px 6px; font-size: var(--fs-10); color:#fff; outline:none;">
-                                    </div>
-                                    <div style="flex: 1; display: flex; flex-direction: column; gap: 4px;">
-                                        <label style="font-size: var(--fs-9); color: var(--text-secondary); margin: 0;">Fim (s):</label>
-                                        <input type="number" id="num-inspector-link-end" step="0.1" style="width: 100%; background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); border-radius: 4px; padding: 2px 6px; font-size: var(--fs-10); color:#fff; outline:none;">
-                                    </div>
-                                </div>
-                                <div style="display: flex; flex-direction: column; gap: 4px;">
-                                    <label style="font-size: var(--fs-9); color: var(--text-secondary); margin: 0;">Trecho Falado (Opcional):</label>
-                                    <textarea id="txt-inspector-link-excerpt" placeholder="Trecho falado correspondente..." rows="2" style="width: 100%; background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); border-radius: 4px; padding: 4px 6px; font-size: var(--fs-10); color:#fff; outline:none; font-family:var(--font-body); resize:vertical;"></textarea>
-                                </div>
-                                <button id="btn-inspector-link-theme-submit" class="btn-primary" style="height: 26px; font-size: var(--fs-10); font-weight: bold; width: 100%; margin-top: 4px; border-radius: 4px; --primary-bg: var(--color-cyan); --primary-ink: #000; border: none; cursor: pointer;"><i class="fa-solid fa-plus-circle"></i> Confirmar Vínculo</button>
-                            </div>
-                            
-                            <div style="font-size: var(--fs-9); font-weight: 700; color: var(--color-cyan); text-transform: uppercase; margin-top: 6px; letter-spacing: 0.5px;">Temas Vinculados a este Clipe</div>
-                            <div id="inspector-themes-list" style="display: flex; flex-direction: column; gap: 8px;">
-                                <!-- Temas populados via JS -->
-                            </div>
-                        </div>
-                        
-                        <!-- Aba: Rostos / Faces -->
-                        <div class="inspector-tab-page" id="inspector-tab-faces" style="display: none; flex-direction: column; gap: 10px;">
-                            <div style="font-size: var(--fs-9); font-weight: 700; color: var(--color-cyan); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Rostos Detectados</div>
-                            <div id="inspector-faces-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px;">
-                                <!-- Rostos dinâmicos por JS -->
                             </div>
                         </div>
                         
