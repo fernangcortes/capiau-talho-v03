@@ -18,6 +18,7 @@ from typing import Any, Callable, Dict, List, Optional
 MOTOR_ASSEMBLYAI = "assemblyai_universal_35"
 MOTOR_DEEPGRAM = "deepgram_nova_3"
 MOTOR_WHISPER = "whisper_turbo"
+MOTOR_CANARY = "nvidia_canary"
 DIARIZADOR_NEMOTRON = "nemotron_3_diarization"
 SEM_DIARIZACAO = "none"
 DIARIZACAO_MESMO_MOTOR = "mesmo_motor"  # opção das Configurações: a do motor de transcrição
@@ -37,7 +38,7 @@ TIPOS_AUDIO = {".mp3": "audio/mpeg", ".wav": "audio/wav", ".m4a": "audio/mp4", "
 
 # Motores de transcrição com código hoje, e se trazem diarização junto.
 # Um motor novo só entra aqui junto com o código dele e o teste.
-TRANSCRICAO_COM_DIARIZACAO = {MOTOR_ASSEMBLYAI: True, MOTOR_DEEPGRAM: True, MOTOR_WHISPER: False}
+TRANSCRICAO_COM_DIARIZACAO = {MOTOR_ASSEMBLYAI: True, MOTOR_DEEPGRAM: True, MOTOR_WHISPER: False, MOTOR_CANARY: False}
 TRANSCRICAO_LIGADOS = set(TRANSCRICAO_COM_DIARIZACAO)
 # Diarizadores separados (rodam sobre o áudio, depois da transcrição).
 DIARIZADORES_SEPARADOS = {DIARIZADOR_NEMOTRON}
@@ -319,7 +320,7 @@ def python_venv_nemo() -> Path:
     return base / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
 
 
-def _rodar_worker_nemo(tarefa: str, audio: Path) -> Dict[str, Any]:
+def _rodar_worker_nemo(tarefa: str, audio: Path, *extra: str) -> Dict[str, Any]:
     import json
     import subprocess
     import tempfile
@@ -335,7 +336,7 @@ def _rodar_worker_nemo(tarefa: str, audio: Path) -> Dict[str, Any]:
         if conv.returncode != 0:
             raise ErroASR(f"ffmpeg não converteu o áudio para o {tarefa}: {conv.stderr.decode(errors='replace')[:200]}")
         try:
-            r = subprocess.run([str(py), str(WORKER_NEMO), tarefa, str(wav), str(saida)],
+            r = subprocess.run([str(py), str(WORKER_NEMO), tarefa, str(wav), str(saida), *extra],
                                capture_output=True, timeout=NEMO_TIMEOUT_S, **kw)
         except subprocess.TimeoutExpired as e:
             raise ErroASR(f"{tarefa} no .venv-nemo passou de {NEMO_TIMEOUT_S} s") from e
@@ -349,6 +350,17 @@ def diarizar_nemotron(audio: Path):
     """Segmentos [{inicio, fim, falante}] do Nemotron 3 Diarization (até 8 falantes, fala sobreposta)."""
     r = _rodar_worker_nemo("diarizar", audio)
     return r["segmentos"], r.get("modelo") or "nemotron-3-diarization"
+
+
+def transcrever_canary(audio: Path, plano: PlanoASR, opcoes: OpcoesASR, chave: Optional[str] = None) -> ResultadoASR:
+    """NVIDIA Canary 1B v2 pelo NeMo no .venv-nemo (CPU). Sem diarização própria."""
+    r = _rodar_worker_nemo("canary", audio, opcoes.idioma)
+    palavras = [{"word": w["word"], "start_time": w["start"], "end_time": w["end"],
+                 "speaker_id": "Desconhecido", "confidence": 1.0} for w in r["palavras"]]
+    avisos = ["O Canary não informa confiança por palavra; gravada como 1.0."]
+    if opcoes.detectar_entidades:
+        avisos.append("Detecção de entidades faladas só existe na AssemblyAI; ficou de fora nesta transcrição.")
+    return ResultadoASR(palavras=palavras, motor=MOTOR_CANARY, modelo_usado=r.get("modelo"), avisos=avisos)
 
 
 def atribuir_falantes(palavras: List[Dict[str, Any]], segmentos: List[Dict[str, Any]],
@@ -377,12 +389,34 @@ def atribuir_falantes(palavras: List[Dict[str, Any]], segmentos: List[Dict[str, 
     return saida
 
 
+# -- Checagem de alucinação ---------------------------------------------------------
+
+def repeticao_em_loop(palavras: List[Dict[str, Any]], max_n: int = 4, limite: int = 6) -> Optional[str]:
+    """Trecho de 1 a ``max_n`` palavras repetido em sequência ``limite`` vezes ou mais.
+
+    Modelos de ASR entram em loop em áudio ruidoso (medido: Canary repetiu
+    "Não é possível." dezenas de vezes num clipe de making of). Devolve o trecho.
+    """
+    textos = [str(p.get("word", "")).strip().lower().strip(".,!?;:") for p in palavras]
+    for n in range(1, max_n + 1):
+        i = 0
+        while i + n <= len(textos):
+            bloco, reps, j = textos[i:i + n], 1, i + n
+            while textos[j:j + n] == bloco:
+                reps, j = reps + 1, j + n
+            if reps >= limite and any(bloco):
+                return " ".join(bloco)
+            i += 1
+    return None
+
+
 # -- Despacho -----------------------------------------------------------------------
 
 MOTORES: Dict[str, Callable[..., ResultadoASR]] = {
     MOTOR_ASSEMBLYAI: transcrever_assemblyai,
     MOTOR_DEEPGRAM: transcrever_deepgram,
     MOTOR_WHISPER: transcrever_whisper,
+    MOTOR_CANARY: transcrever_canary,
 }
 
 
@@ -393,6 +427,9 @@ def transcrever(audio: Path, plano: PlanoASR, opcoes: OpcoesASR, chave: Optional
         raise ErroASR(f"Chave '{provedor}' não configurada (painel de configurações da IA ou .env)")
     resultado = MOTORES[plano.transcricao](audio, plano, opcoes, chave)
     resultado.avisos = list(plano.avisos) + list(resultado.avisos)
+    loop = repeticao_em_loop(resultado.palavras)
+    if loop:
+        resultado.avisos.append(f"Possível alucinação do {resultado.motor}: '{loop}' repetido em sequência; confira o trecho.")
     if plano.diarizacao in DIARIZADORES_SEPARADOS and resultado.palavras:
         segmentos, modelo = diarizar_nemotron(audio)
         resultado.palavras = atribuir_falantes(resultado.palavras, segmentos)

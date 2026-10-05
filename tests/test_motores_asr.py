@@ -59,11 +59,11 @@ def test_diarizacao_de_outro_motor_de_nuvem_usa_a_do_motor_escolhido_e_avisa():
 
 
 def test_motor_sem_codigo_cai_na_assemblyai_e_avisa():
-    plano = resolver_motores("nvidia_canary", "pyannote_40")
+    plano = resolver_motores("sensevoice", "pyannote_40")
     assert plano.transcricao == MOTOR_ASSEMBLYAI
     assert plano.diarizacao == DIARIZACAO_PROPRIA
     assert len(plano.avisos) == 2
-    assert "nvidia_canary" in plano.avisos[0]
+    assert "sensevoice" in plano.avisos[0]
     assert "pyannote_40" in plano.avisos[1]
 
 
@@ -277,3 +277,39 @@ def test_sem_venv_nemo_o_erro_diz_onde_procurou(monkeypatch, tmp_path, audio):
     monkeypatch.setenv("CAPIAU_VENV_NEMO", str(tmp_path / "nao_existe"))
     with pytest.raises(ErroASR, match=".venv-nemo não encontrado"):
         motores.diarizar_nemotron(audio)
+
+
+# -- Canary e checagem de alucinação ---------------------------------------------------------
+
+def test_canary_ligado_sem_diarizacao_propria():
+    plano = resolver_motores("nvidia_canary", "mesmo_motor")
+    assert plano.transcricao == "nvidia_canary" and plano.diarizacao == SEM_DIARIZACAO
+
+
+def test_canary_converte_a_saida_do_worker(monkeypatch, audio):
+    from src.transcription import motores
+    monkeypatch.setattr(motores, "_rodar_worker_nemo", lambda tarefa, a, *extra: {
+        "modelo": "nvidia/canary-1b-v2", "palavras": [{"word": "Mas", "start": 0.0, "end": 0.08}]})
+    r = motores.transcrever_canary(audio, resolver_motores("nvidia_canary", "none"), OpcoesASR(idioma="pt"))
+    assert r.palavras == [{"word": "Mas", "start_time": 0.0, "end_time": 0.08,
+                           "speaker_id": "Desconhecido", "confidence": 1.0}]
+    assert any("confiança" in a for a in r.avisos)
+
+
+def _p(texto):
+    return [{"word": w} for w in texto.split()]
+
+
+def test_repeticao_em_loop_acha_o_trecho_e_ignora_fala_normal():
+    from src.transcription.motores import repeticao_em_loop
+    assert repeticao_em_loop(_p("eu " + "Não é possível. " * 8)) == "não é possível"
+    assert repeticao_em_loop(_p("sim sim sim, pode ir que eu vou depois")) is None
+    assert repeticao_em_loop(_p("a b " * 5)) is None  # 5 < limite de 6
+
+
+def test_transcrever_avisa_alucinacao(monkeypatch, audio):
+    from src.transcription import motores
+    monkeypatch.setattr(motores, "_rodar_worker_nemo", lambda tarefa, a, *extra: {
+        "modelo": "c", "palavras": [{"word": "Não", "start": i, "end": i + 0.1} for i in range(10)]})
+    r = motores.transcrever(audio, resolver_motores("nvidia_canary", "none"), OpcoesASR(), None)
+    assert any("alucinação" in a for a in r.avisos)

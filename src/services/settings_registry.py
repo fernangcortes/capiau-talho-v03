@@ -160,7 +160,7 @@ SETTINGS_REGISTRY: List[Dict[str, Any]] = [
         "enum": ["assemblyai_universal_35", "nvidia_canary", "whisper_turbo", "sensevoice", "deepgram_nova_3"],
         "enum_labels": {
             "assemblyai_universal_35": "AssemblyAI Universal-3.5 Pro (nuvem)",
-            "nvidia_canary": "NVIDIA Canary (em teste; por ora usa AssemblyAI)",
+            "nvidia_canary": "NVIDIA Canary 1B v2 (local, CPU, lento; sem separar falantes por conta própria)",
             "whisper_turbo": "Whisper Turbo (local, CPU; sem separar falantes por conta própria)",
             "sensevoice": "SenseVoice (em teste; por ora usa AssemblyAI)",
             "deepgram_nova_3": "Deepgram Nova-3 (nuvem)",
