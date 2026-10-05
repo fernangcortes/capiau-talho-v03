@@ -237,11 +237,20 @@ SETTINGS_REGISTRY: List[Dict[str, Any]] = [
 
     # -- Objetos & Props ------------------------------------------------------
     {
-        "key": "object.detector_engine", "type": "enum", "default": "gemini_spatial",
-        "enum": ["gemini_spatial", "yolo_world", "dino_x", "florence_2", "none"],
+        "key": "object.detector_engine", "type": "enum", "default": "none",
+        "enum": ["gemini_spatial", "yolo_world", "owlv2", "grounding_dino", "florence_2", "dino_x", "none"],
+        "enum_labels": {
+            "gemini_spatial": "Gemini (nuvem, chave da OpenRouter)",
+            "yolo_world": "YOLO-World v2 (local, CPU, rápido; notas baixas, use mínimo ~0,1)",
+            "owlv2": "OWLv2 base (local, CPU)",
+            "grounding_dino": "Grounding DINO tiny (local, CPU)",
+            "florence_2": "Florence-2 base (local, CPU; sem confiança, marca toda classe pedida)",
+            "dino_x": "DINO-X (nuvem; em teste: sem chave ainda)",
+            "none": "Não detectar objetos",
+        },
         "label": "Motor de Detecção de Props",
-        "help": "Modelo responsável por detectar objetos, adereços e figurinos.",
-        "help_tech": "Define o backend de detecção de objetos zero-shot.",
+        "help": "Modelo que procura na imagem os objetos da lista de classes. Os locais rodam na CPU e baixam o modelo no primeiro uso.",
+        "help_tech": "src/vision/detectores.py; caixas no padrão canônico 0-1000.",
         "category": "objects_props", "level": "simple", "scope": "both", "requires_reprocess": True,
     },
     {

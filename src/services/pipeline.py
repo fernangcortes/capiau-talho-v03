@@ -236,6 +236,46 @@ class PipelineService:
                 pass
 
     @staticmethod
+    def _detectar_objetos_frame(project_id: int, video_id: int, timestamp: float, frame_path: Path, S,
+                                motor: str, avisos_ja_dados: set) -> int:
+        """Roda o detector no keyframe e grava as caixas em detected_object. Devolve quantas gravou.
+
+        Indisponível (sem chave, pacote, modelo) vira aviso uma vez por vídeo, não erro.
+        """
+        from src.vision.detectores import (CONFIANCA_NAO_INFORMADA, EXECUCAO, DetectorIndisponivel,
+                                           categoria_da_classe, classes_da_configuracao, detectar)
+        try:
+            r = detectar(motor, frame_path, classes_da_configuracao(S.get("object.classes_filter")),
+                         float(S.get("object.min_confidence")), project_id)
+        except DetectorIndisponivel as e:
+            if str(e) not in avisos_ja_dados:
+                avisos_ja_dados.add(str(e))
+                print(f"[Objetos] AVISO: detector '{motor}' indisponível ({e}); vídeo {video_id} segue sem caixas.")
+                TASK_MANAGER.update_progress(str(video_id), 0.0, "running", task_type="vision",
+                                             log_message=f"Aviso: detector de objetos indisponível: {e}")
+            return 0
+        except Exception as e:
+            print(f"[Objetos] Falha no detector '{motor}' no frame {timestamp:.1f}s: {e}")
+            return 0
+        for aviso in r.avisos:
+            if aviso not in avisos_ja_dados:
+                avisos_ja_dados.add(aviso)
+                print(f"[Objetos] AVISO: {aviso}")
+        with get_db() as conn:
+            for d in r.deteccoes:
+                conn.execute(
+                    "INSERT INTO detected_object (project_id, video_id, timestamp, label, category, bounding_box, "
+                    "confidence, detector_model, detector_version, execution_mode, raw_payload, processing_time_ms) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    (project_id, video_id, timestamp, d.label, categoria_da_classe(d.label), json.dumps(d.box),
+                     d.confidence if d.confidence is not None else CONFIANCA_NAO_INFORMADA,
+                     motor, r.modelo, EXECUCAO.get(motor, "local_cpu"),
+                     json.dumps({"confianca_informada": d.confidence is not None}),
+                     int(r.latencia_ms)))
+            conn.commit()
+        return len(r.deteccoes)
+
+    @staticmethod
     def triage_system1(video_id: int, filepath: Path, duration: float, project_id: int) -> Optional[str]:
         """Triagem local (Laya) antes da visão. Devolve a categoria SÓ no modo 'decide' com confiança
         acima do limiar; em sombra, desligada ou indisponível devolve None e a visão decide.
@@ -787,6 +827,15 @@ class PipelineService:
         except Exception as ent_err:
             print(f"[Vision] Falha ao carregar entidades conhecidas: {ent_err}")
 
+        # Detector de objetos: reanálise apaga só as caixas automáticas (curadoria humana fica)
+        detector_obj = S.get("object.detector_engine")
+        detector_obj = None if detector_obj in (None, "", "none") else detector_obj
+        avisos_detector: set = set()
+        if detector_obj:
+            with get_db() as conn:
+                conn.execute("DELETE FROM detected_object WHERE video_id = ? AND status = 'auto'", (video_id,))
+                conn.commit()
+
         try:
             total_stamps = len(frame_jobs)
             frames_ok = 0
@@ -809,6 +858,11 @@ class PipelineService:
                     process_video_frame_faces(project_id, video_id, timestamp, frame_path)
                 except Exception as fe:
                     print(f"[Vision] Falha facial no frame {timestamp}s: {fe}")
+
+                # Objetos da lista de classes (object.detector_engine); falha não para a análise
+                if detector_obj:
+                    PipelineService._detectar_objetos_frame(project_id, video_id, timestamp, frame_path, S,
+                                                            detector_obj, avisos_detector)
 
                 # Pessoas confirmadas por rosto neste frame
                 detected_people = []
