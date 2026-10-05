@@ -195,3 +195,43 @@ def test_deepgram_avisa_que_entidades_so_existem_na_assemblyai(audio):
     r = transcrever_deepgram(audio, resolver_motores(MOTOR_DEEPGRAM, "mesmo_motor"),
                              OpcoesASR(detectar_entidades=True), CHAVE_DG, http=http)
     assert any("entidades" in a for a in r.avisos) and r.entidades == []
+
+
+# -- Whisper Turbo (local) ------------------------------------------------------------
+
+class _PalavraW:
+    def __init__(self, word, start, end, probability):
+        self.word, self.start, self.end, self.probability = word, start, end, probability
+
+
+class _SegW:
+    def __init__(self, words):
+        self.words = words
+
+
+class _WhisperFalso:
+    def __init__(self):
+        self.chamadas = []
+
+    def transcribe(self, audio, **kw):
+        self.chamadas.append((audio, kw))
+        segs = (s for s in [_SegW([_PalavraW(" Oi,", 0.0, 0.3, 0.9), _PalavraW(" ", 0.3, 0.3, 0.1)]),
+                            _SegW([_PalavraW(" tudo", 0.4, 0.7, 0.8)])])
+        return segs, None
+
+
+def test_whisper_sem_diarizacao_propria_avisa_e_fica_sem_falante(monkeypatch, audio):
+    from src.transcription import motores
+    monkeypatch.setattr(motores, "audio_16k", lambda a: "AMOSTRAS")
+    plano = resolver_motores("whisper_turbo", "mesmo_motor")
+    assert plano.diarizacao == SEM_DIARIZACAO
+    assert any("não separa falantes" in a for a in plano.avisos)
+
+    falso = _WhisperFalso()
+    r = motores.transcrever_whisper(audio, plano, OpcoesASR(idioma="pt"), modelo=falso)
+    amostras, kw = falso.chamadas[0]
+    assert amostras == "AMOSTRAS"
+    assert kw["language"] == "pt" and kw["word_timestamps"] is True
+    assert [p["word"] for p in r.palavras] == ["Oi,", "tudo"]
+    assert {p["speaker_id"] for p in r.palavras} == {"Desconhecido"}
+    assert r.motor == "whisper_turbo"

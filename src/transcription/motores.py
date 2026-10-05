@@ -9,12 +9,15 @@ com palavras no formato do banco (word, start_time, end_time, speaker_id,
 confidence; tempos em segundos). O pipeline não sabe qual motor rodou.
 """
 import mimetypes
+import os
+import threading
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
 MOTOR_ASSEMBLYAI = "assemblyai_universal_35"
 MOTOR_DEEPGRAM = "deepgram_nova_3"
+MOTOR_WHISPER = "whisper_turbo"
 SEM_DIARIZACAO = "none"
 DIARIZACAO_MESMO_MOTOR = "mesmo_motor"  # opção das Configurações: a do motor de transcrição
 DIARIZACAO_PROPRIA = "propria"  # no plano: a do próprio motor de transcrição
@@ -33,7 +36,7 @@ TIPOS_AUDIO = {".mp3": "audio/mpeg", ".wav": "audio/wav", ".m4a": "audio/mp4", "
 
 # Motores de transcrição com código hoje, e se trazem diarização junto.
 # Um motor novo só entra aqui junto com o código dele e o teste.
-TRANSCRICAO_COM_DIARIZACAO = {MOTOR_ASSEMBLYAI: True, MOTOR_DEEPGRAM: True}
+TRANSCRICAO_COM_DIARIZACAO = {MOTOR_ASSEMBLYAI: True, MOTOR_DEEPGRAM: True, MOTOR_WHISPER: False}
 TRANSCRICAO_LIGADOS = set(TRANSCRICAO_COM_DIARIZACAO)
 # Diarizadores separados (rodam sobre o áudio, depois da transcrição).
 DIARIZADORES_SEPARADOS: set = set()
@@ -235,11 +238,79 @@ def transcrever_deepgram(audio: Path, plano: PlanoASR, opcoes: OpcoesASR, chave:
                         modelo_usado=modelo_deepgram(resposta), avisos=avisos)
 
 
+# -- Whisper Turbo (local, CPU) --------------------------------------------------------
+
+WHISPER_MODELO = "large-v3-turbo"  # faster-whisper: mobiuslabsgmbh/faster-whisper-large-v3-turbo
+_whisper_modelo = None
+_whisper_trava = threading.Lock()
+
+
+def _carregar_whisper():
+    global _whisper_modelo
+    with _whisper_trava:
+        if _whisper_modelo is None:
+            try:
+                from faster_whisper import WhisperModel
+            except ImportError as e:
+                raise ErroASR("pacote 'faster-whisper' não instalado (uv pip install faster-whisper)") from e
+            threads = max(1, (os.cpu_count() or 2) // 2)
+            _whisper_modelo = WhisperModel(WHISPER_MODELO, device="cpu", compute_type="int8", cpu_threads=threads)
+        return _whisper_modelo
+
+
+def palavras_whisper(segmentos) -> List[Dict[str, Any]]:
+    """Segmentos do faster-whisper -> palavras do banco. Sem diarização: falante desconhecido."""
+    palavras = []
+    for seg in segmentos:
+        for w in (getattr(seg, "words", None) or []):
+            texto = (w.word or "").strip()
+            if texto:
+                palavras.append({"word": texto, "start_time": float(w.start), "end_time": float(w.end),
+                                 "speaker_id": "Desconhecido", "confidence": float(w.probability)})
+    return palavras
+
+
+def audio_16k(audio: Path):
+    """Decodifica com o ffmpeg para float32 mono 16 kHz.
+
+    O faster-whisper 1.2.1 decodificaria pelo PyAV, mas chama av.open com um
+    argumento (metadata_errors) que o PyAV 19 removeu; o ffmpeg do projeto evita isso.
+    """
+    import subprocess
+    import numpy as np
+    cmd = ["ffmpeg", "-nostdin", "-v", "error", "-i", str(audio), "-f", "f32le", "-ac", "1", "-ar", "16000", "pipe:1"]
+    kw = {}
+    if os.name == "nt":
+        kw["creationflags"] = subprocess.CREATE_NO_WINDOW
+    r = subprocess.run(cmd, capture_output=True, **kw)
+    if r.returncode != 0:
+        raise ErroASR(f"ffmpeg não decodificou o áudio: {r.stderr.decode(errors='replace')[:200]}")
+    return np.frombuffer(r.stdout, dtype=np.float32)
+
+
+def transcrever_whisper(audio: Path, plano: PlanoASR, opcoes: OpcoesASR, chave: Optional[str] = None,
+                        modelo: Any = None) -> ResultadoASR:
+    modelo = modelo or _carregar_whisper()
+    amostras = audio_16k(audio)
+    try:
+        segmentos, info = modelo.transcribe(amostras, language=opcoes.idioma, word_timestamps=True,
+                                            vad_filter=True, beam_size=5)
+        palavras = palavras_whisper(segmentos)  # o gerador só roda aqui
+    except Exception as e:
+        raise ErroASR(f"Falha no Whisper local: {e}") from e
+    avisos = []
+    if opcoes.detectar_entidades:
+        avisos.append("Detecção de entidades faladas só existe na AssemblyAI; ficou de fora nesta transcrição.")
+    return ResultadoASR(palavras=palavras, motor=MOTOR_WHISPER, modelo_usado=f"faster-whisper {WHISPER_MODELO}",
+                        avisos=avisos)
+
+
 # -- Despacho -----------------------------------------------------------------------
 
 MOTORES: Dict[str, Callable[..., ResultadoASR]] = {
     MOTOR_ASSEMBLYAI: transcrever_assemblyai,
     MOTOR_DEEPGRAM: transcrever_deepgram,
+    MOTOR_WHISPER: transcrever_whisper,
 }
 
 
