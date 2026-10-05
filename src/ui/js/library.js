@@ -9220,7 +9220,7 @@ export class LibraryManager {
 
         const aviso = `Transcrever ${previa.count} clipe(s) pendentes do projeto?\n\n` +
             `Duração: ${previa.horas} h de áudio\n` +
-            `Custo estimado: US$ ${Number(previa.custo_estimado_usd).toFixed(2)} (AssemblyAI)\n\n` +
+            `Custo estimado: US$ ${Number(previa.custo_estimado_usd).toFixed(2)} (${previa.motor || "AssemblyAI"})\n\n` +
             "A rodada acontece em um processo separado — a interface continua funcionando.\n\n" +
             "ATENÇÃO: a BUSCA SEMÂNTICA fica indisponível até o fim da rodada " +
             "(o banco vetorial é embutido e só aceita um processo por vez). " +

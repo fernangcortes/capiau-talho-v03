@@ -41,10 +41,6 @@ from src.search.semantic import SemanticSearch
 
 router = APIRouter(tags=["Media & Ingestion"])
 
-# Preco por hora da configuracao atual do AssemblyAI (Universal-3.5 Pro):
-# transcricao 0,21 + diarizacao 0,02 + entity_detection 0,08. Serve so para a
-# previa do botao -- ver docs/PLANO_HISTORICO_METADADOS_E_WORKER_ASR.md.
-ASR_PRECO_HORA_USD = 0.31
 
 # Teto de tamanho do analysis_json gravado no cache (audio_render.analysis_json).
 # Medido: 600 baldes de envelope + 200 momentos somam ~62 kB (o diag antigo tinha
@@ -902,8 +898,13 @@ def launch_transcription_worker(
         return {"status": "success", "count": 0,
                 "message": "Nenhum clipe elegível para transcrição."}
 
+    # Prévia pelo motor que vai rodar de fato (Configurações), não por um preço fixo
+    from src.transcription.motores import OpcoesASR, preco_hora_usd, resolver_motores
+    S = SettingsService.get_settings(project_id)
+    plano = resolver_motores(S.get("transcription.engine"), S.get("diarization.engine"))
+    opcoes = OpcoesASR(diarizar=S.get("asr.speaker_labels"), detectar_entidades=S.get("asr.entity_detection"))
     horas = sum((r["duration"] or 0) for r in fila) / 3600
-    custo = round(horas * ASR_PRECO_HORA_USD, 2)
+    custo = round(horas * preco_hora_usd(plano, opcoes), 2)
 
     if dry_run:
         return {
@@ -912,7 +913,8 @@ def launch_transcription_worker(
             "count": len(fila),
             "horas": round(horas, 2),
             "custo_estimado_usd": custo,
-            "message": f"{len(fila)} clipe(s), {horas:.2f} h de áudio, ~US$ {custo:.2f}.",
+            "motor": plano.transcricao,
+            "message": f"{len(fila)} clipe(s), {horas:.2f} h de áudio, ~US$ {custo:.2f} ({plano.transcricao}).",
         }
 
     carimbo = time.strftime("%Y%m%d_%H%M%S")

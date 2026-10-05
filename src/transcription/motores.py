@@ -180,8 +180,9 @@ def transcrever_assemblyai(audio: Path, plano: PlanoASR, opcoes: OpcoesASR, chav
 # -- Deepgram -----------------------------------------------------------------------
 
 def parametros_deepgram(plano: PlanoASR, opcoes: OpcoesASR) -> Dict[str, str]:
-    params = {"model": DEEPGRAM_MODELO, "language": opcoes.idioma,
-              "punctuate": "true", "smart_format": "true"}
+    # Sem smart_format: ele liga a conversão para numerais, que em português troca o
+    # artigo "uma" por "1" ("1 marca chinesa") -- medido em clipe real em 05/10/2026.
+    params = {"model": DEEPGRAM_MODELO, "language": opcoes.idioma, "punctuate": "true"}
     if opcoes.diarizar and plano.diarizacao == DIARIZACAO_PROPRIA:
         params["diarize_model"] = "latest"
     return params
@@ -408,6 +409,30 @@ def repeticao_em_loop(palavras: List[Dict[str, Any]], max_n: int = 4, limite: in
                 return " ".join(bloco)
             i += 1
     return None
+
+
+# -- Preço (só para a prévia do botão de transcrever) -----------------------------------
+
+# US$ por hora de áudio, conferidos nas páginas de preço em 05/10/2026.
+# AssemblyAI Universal-3.5 Pro: transcrição 0,21 + diarização 0,02 + entidades 0,08.
+# Deepgram Nova-3 pré-gravado, monolíngue: US$ 0,0043/min, diarização incluída.
+PRECO_HORA_USD = {
+    MOTOR_ASSEMBLYAI: {"base": 0.21, "diarizacao": 0.02, "entidades": 0.08},
+    MOTOR_DEEPGRAM: {"base": 0.0043 * 60},
+}
+
+
+def preco_hora_usd(plano: PlanoASR, opcoes: OpcoesASR) -> float:
+    """Custo por hora de áudio do plano; motores locais custam 0 (só CPU)."""
+    tabela = PRECO_HORA_USD.get(plano.transcricao)
+    if not tabela:
+        return 0.0
+    total = tabela["base"]
+    if opcoes.diarizar and plano.diarizacao == DIARIZACAO_PROPRIA:
+        total += tabela.get("diarizacao", 0.0)
+    if opcoes.detectar_entidades:
+        total += tabela.get("entidades", 0.0)
+    return round(total, 4)
 
 
 # -- Despacho -----------------------------------------------------------------------

@@ -161,8 +161,8 @@ def audio(tmp_path) -> Path:
 
 def test_deepgram_parametros_documentados():
     params = parametros_deepgram(resolver_motores(MOTOR_DEEPGRAM, "mesmo_motor"), OpcoesASR(idioma="pt"))
-    assert params == {"model": "nova-3", "language": "pt", "punctuate": "true",
-                      "smart_format": "true", "diarize_model": "latest"}
+    assert params == {"model": "nova-3", "language": "pt", "punctuate": "true", "diarize_model": "latest"}
+    assert "smart_format" not in params  # numerais: "uma" virava "1"
     sem = parametros_deepgram(resolver_motores(MOTOR_DEEPGRAM, "none"), OpcoesASR(idioma="pt"))
     assert "diarize_model" not in sem
 
@@ -313,3 +313,13 @@ def test_transcrever_avisa_alucinacao(monkeypatch, audio):
         "modelo": "c", "palavras": [{"word": "Não", "start": i, "end": i + 0.1} for i in range(10)]})
     r = motores.transcrever(audio, resolver_motores("nvidia_canary", "none"), OpcoesASR(), None)
     assert any("alucinação" in a for a in r.avisos)
+
+
+def test_preco_por_hora_segue_o_motor_escolhido():
+    from src.transcription.motores import preco_hora_usd
+    completo = OpcoesASR(diarizar=True, detectar_entidades=True)
+    assert preco_hora_usd(resolver_motores(MOTOR_ASSEMBLYAI, "mesmo_motor"), completo) == 0.31
+    # Nemotron separa os falantes: a AssemblyAI não cobra a diarização dela
+    assert preco_hora_usd(resolver_motores(MOTOR_ASSEMBLYAI, "nemotron_3_diarization"), completo) == 0.29
+    assert preco_hora_usd(resolver_motores(MOTOR_DEEPGRAM, "mesmo_motor"), completo) == 0.258
+    assert preco_hora_usd(resolver_motores("whisper_turbo", "nemotron_3_diarization"), completo) == 0.0
