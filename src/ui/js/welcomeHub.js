@@ -22,7 +22,7 @@ export const WELCOME_HUB_STATES = Object.freeze({
 export const WELCOME_HUB_PROFILES = Object.freeze({
     doc_offline_eco: {
         id: "doc_offline_eco",
-        label: "Documentário Offline Econômico",
+        label: "Documentário Econômico",
         badge: "Econômico",
         icon: "fa-leaf",
         themeColor: "var(--color-emerald)",
@@ -918,7 +918,7 @@ export class WelcomeHub {
                     });
 
                     this.setChips([
-                        { label: "Documentário Offline Econômico", value: "doc_offline_eco" },
+                        { label: "Documentário Econômico", value: "doc_offline_eco" },
                         { label: "Entrevista Ágil", value: "entrevista_agil" },
                         { label: "Cinema Nuvem SOTA", value: "cinema_nuvem_sota" }
                     ]);

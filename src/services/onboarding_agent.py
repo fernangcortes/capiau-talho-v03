@@ -39,7 +39,7 @@ CONHECIMENTO COMPLETO DA ARQUITETURA E RECURSOS DO CAPIAU-TALHO:
      * Timeline Diff & Safety Gatekeeper: Mutações propostas pelo agente geram prévias em trilhas fantasmas translúcidas (ghostTrack) e resumo visual de diff no chat. Nenhuma alteração é gravada no MLT XML sem confirmação explícita do editor. Opcionalmente, o Jev dá uma segunda opinião quando a proposta tira trechos com fala.
 
 3. Os 3 Perfis de Intenção Conversacionais (2026 SOTA):
-   - "Documentário Offline Econômico" (doc_offline_eco): apesar do nome, NÃO é offline: usa os modelos mais baratos na nuvem (DeepSeek V4.1 Flash no texto, Gemini 2.5 Flash na visão) e analisa um quadro a cada 20 s. Quem quiser transcrever na máquina escolhe Whisper Turbo nas Configurações. Se perguntarem, diga isso com franqueza.
+   - "Documentário Econômico" (doc_offline_eco): os modelos mais baratos na nuvem (DeepSeek V4.1 Flash no texto, Gemini 2.5 Flash na visão), um quadro a cada 20 s. Custo zero só com tudo local escolhido à mão nas Configurações (Whisper Turbo, Nemotron, detectores locais), e mesmo assim sem todas as análises: a descrição visual continua precisando de modelo na nuvem, e na CPU tudo fica lento sem uma placa de vídeo boa.
    - "Entrevista Ágil" (entrevista_agil): equilíbrio entre custo e qualidade (DeepSeek V4.1 Flash no texto, Gemini 3.8 Flash na visão, um quadro a cada 10 s).
    - "Cinema Nuvem SOTA" (cinema_nuvem_sota): máxima precisão (Claude Sonnet 5.5 no texto, Gemini 3.1 Pro na visão, um quadro a cada 5 s e mais candidatos por sugestão).
 
@@ -130,7 +130,7 @@ class OnboardingAgentService:
                 "• **🎬 Copilot de Montagem:** Sugere cortes preliminares (*rough cut*) e projeta prévias em trilhas fantasmas transparentes "
                 "para você aprovar antes de alterar sua timeline real.\n\n"
                 "Para começarmos, precisamos apenas de um **título ou tema** para a sua produção e da escolha do **perfil de IA** "
-                "(ex: 100% gratuito e offline em CPU, ou usando modelos de nuvem). Que tipo de projeto você vai montar hoje?"
+                "(do mais barato ao de máxima precisão). Que tipo de projeto você vai montar hoje?"
             )
             return {
                 "reply": reply,
@@ -140,7 +140,7 @@ class OnboardingAgentService:
                 "ready_to_create": False,
                 "api_status": "offline_mode",
                 "chips": [
-                    {"label": "🍃 Usar Perfil Offline Econômico", "value": "Quero usar o perfil Documentário Offline Econômico"},
+                    {"label": "🍃 Usar Perfil Econômico", "value": "Quero usar o perfil Documentário Econômico"},
                     {"label": "⚡ Usar Perfil Entrevista Ágil", "value": "Quero o perfil Entrevista Ágil"},
                     {"label": "🎬 Usar Perfil Cinema Nuvem", "value": "Quero usar Cinema Nuvem SOTA"},
                     {"label": "💡 Sugerir Nome de Projeto", "value": "Me dê 3 sugestões de títulos para documentário"},
@@ -194,7 +194,7 @@ class OnboardingAgentService:
         if "offline" in lower or "economico" in lower or "econômico" in lower or "doc_offline" in lower:
             chosen_profile = "doc_offline_eco"
             reply = (
-                "Excelente escolha! O perfil **🍃 Documentário Offline Econômico** foi selecionado.\n\n"
+                "Excelente escolha! O perfil **🍃 Documentário Econômico** foi selecionado.\n\n"
                 "Ele opera 100% de forma local na sua CPU com ONNX Runtime (custo $0.00 de API), utilizando o Sistema 1 Laya, "
                 "reconhecimento facial ArcFace 512-d e diarização local. Perfeito para acervos extensos com privacidade total.\n\n"
                 "Agora, **arraste sua pasta de mídias brutas ou cartões de câmera** para a área ao lado, ou clique em pular se quiser importar depois no editor."
@@ -269,7 +269,7 @@ class OnboardingAgentService:
                 "ready_to_create": False,
                 "api_status": "offline_mode",
                 "chips": [
-                    {"label": "🍃 Documentário Offline Econômico", "value": "doc_offline_eco"},
+                    {"label": "🍃 Documentário Econômico", "value": "doc_offline_eco"},
                     {"label": "⚡ Entrevista Ágil", "value": "entrevista_agil"},
                     {"label": "🎬 Cinema Nuvem SOTA", "value": "cinema_nuvem_sota"}
                 ]
@@ -306,7 +306,7 @@ class OnboardingAgentService:
                     "ready_to_create": False,
                     "api_status": "offline_mode",
                     "chips": [
-                        {"label": "🍃 Documentário Offline Econômico", "value": "Documentário Offline Econômico"},
+                        {"label": "🍃 Documentário Econômico", "value": "Documentário Econômico"},
                         {"label": "⚡ Entrevista Ágil", "value": "Entrevista Ágil"},
                         {"label": "🎬 Cinema Nuvem SOTA", "value": "Cinema Nuvem SOTA"}
                     ]
@@ -326,7 +326,7 @@ class OnboardingAgentService:
             "api_status": "offline_mode",
             "chips": [
                 {"label": "Como o Talho me ajuda?", "value": "me explique melhor como o programa funciona"},
-                {"label": "🍃 Começar com Modo Offline", "value": "Quero o perfil Documentário Offline Econômico"},
+                {"label": "🍃 Começar no Econômico", "value": "Quero o perfil Documentário Econômico"},
                 {"label": "⏭️ Pular para o Editor", "action": "skip_nle"}
             ]
         }
@@ -378,7 +378,7 @@ class OnboardingAgentService:
                     "model": None,
                     "chips": [
                         {"label": "Chaves e modelos", "action": "open_api_keys"},
-                        {"label": "Usar modo offline", "value": "Documentário Offline Econômico"},
+                        {"label": "Usar perfil econômico", "value": "Documentário Econômico"},
                         {"label": "Usar Cinema Nuvem", "value": "Cinema Nuvem SOTA"}
                     ]
                 }}
@@ -468,12 +468,12 @@ class OnboardingAgentService:
             if not current_project_name and not suggested_name:
                 chips = [
                     {"label": "Como o Talho me ajuda?", "value": "me explique melhor como o programa funciona"},
-                    {"label": "Usar modo offline", "value": "Quero o perfil Documentário Offline Econômico"},
+                    {"label": "Usar perfil econômico", "value": "Quero o perfil Documentário Econômico"},
                     {"label": "Pular para o editor", "action": "skip_nle"}
                 ]
             elif not current_profile and not detected_prof:
                 chips = [
-                    {"label": "Documentário Offline Econômico", "value": "Documentário Offline Econômico"},
+                    {"label": "Documentário Econômico", "value": "Documentário Econômico"},
                     {"label": "Entrevista Ágil", "value": "Entrevista Ágil"},
                     {"label": "Cinema Nuvem SOTA", "value": "Cinema Nuvem SOTA"}
                 ]

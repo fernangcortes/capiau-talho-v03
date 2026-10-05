@@ -274,7 +274,7 @@ console.log("\n--- 3. Fluxo Principal da FSM e Onboarding Conversacional ---");
     assert.equal(invalidProfileRes, false, "Perfil inexistente deve ser rejeitado");
     assert.equal(hub.state, WELCOME_HUB_STATES.AWAITING_PROFILE);
 
-    // Seleção de perfil válido (Documentário Offline Econômico)
+    // Seleção de perfil válido (Documentário Econômico)
     const profileRes = await hub.handleUserInput("doc_offline_eco");
     assert.equal(profileRes, true);
     assert.equal(hub.selectedProfile.id, "doc_offline_eco");
@@ -308,7 +308,7 @@ console.log("\n--- 3. Fluxo Principal da FSM e Onboarding Conversacional ---");
     assert.equal(lastMsg.role, "assistant");
     assert(lastMsg.content.includes("Onboarding Concluído"), "Última mensagem deve ser resumo do onboarding");
     assert(lastMsg.content.includes("Cerrado Sagrado 4K"), "Resumo deve conter nome do projeto");
-    assert(lastMsg.content.includes("Documentário Offline Econômico"), "Resumo deve conter perfil de IA");
+    assert(lastMsg.content.includes("Documentário Econômico"), "Resumo deve conter perfil de IA");
 
     // Validação de emissão de eventos
     const rightTabEvent = env.emittedEvents.find(e => e.event === "rightTabChanged");
@@ -469,13 +469,13 @@ console.log("\n--- 7. Chat Inteligente: Perguntas do Usuário, Explicações e C
                 detected_profile: null,
                 step: "name_set",
                 chips: [
-                    { label: "🍃 Documentário Offline Econômico", value: "doc_offline_eco" }
+                    { label: "🍃 Documentário Econômico", value: "doc_offline_eco" }
                 ]
             };
         }
         if (lower.includes("doc_offline_eco")) {
             return {
-                reply: "Perfil Offline Econômico ativado!",
+                reply: "Perfil Econômico ativado!",
                 suggested_project_name: currentProjectName,
                 detected_profile: "doc_offline_eco",
                 step: "profile_set",
