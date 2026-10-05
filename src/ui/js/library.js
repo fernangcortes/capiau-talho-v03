@@ -11661,7 +11661,7 @@ export class LibraryScrollIndexTracker {
 
         this.isEnabled = localStorage.getItem("library_scroll_index_enabled") !== "false";
         this.dwellDelay = parseInt(localStorage.getItem("library_scroll_index_dwell") || "1000", 10);
-        this.thumbWidth = parseInt(localStorage.getItem("library_scroll_preview_thumb_width") || "128", 10);
+        this.thumbWidth = Math.max(80, Math.min(320, parseInt(localStorage.getItem("library_scroll_preview_thumb_width") || "128", 10)));
 
         // Supressão do card após clique (permanece oculto até o próximo movimento intencional do mouse)
         this._suppressedUntilMove = false;
@@ -12124,24 +12124,23 @@ export class LibraryScrollIndexTracker {
             doc.body.appendChild(el);
         }
         el.style.setProperty("--scroll-thumb-width", `${this.thumbWidth}px`);
-        if (!el.querySelector(".scroll-index-top")) {
+        if (!el.querySelector(".scroll-index-thumb-badge") || el.querySelector(".scroll-index-meta")) {
             el.innerHTML = `
                 <div class="scroll-index-top">
                     <div class="scroll-index-thumb-wrapper">
                         <img class="scroll-index-thumb" src="" alt="" style="display:none;">
                         <i class="fa-solid fa-photo-film scroll-index-icon"></i>
-                    </div>
-                    <div class="scroll-index-meta">
-                        <div class="scroll-index-folder"><i class="fa-solid fa-folder"></i> <span>Biblioteca</span></div>
-                        <div class="scroll-index-title">Título da Mídia</div>
-                        <div class="scroll-index-sub">
-                            <span class="scroll-index-badge tag-interview">Fala</span>
-                            <span class="scroll-index-duration" style="font-family: monospace; font-size: var(--fs-9); color: var(--text-muted);"></span>
-                            <span class="scroll-index-color-chip" style="display:none;"><span class="scroll-index-color-dot"></span><span class="scroll-index-color-text"></span></span>
-                        </div>
+                        <div class="scroll-index-thumb-badge" style="display:none;">0:00</div>
+                        <div class="scroll-index-thumb-progress" style="display:none;"><div class="scroll-index-thumb-progress-bar"></div></div>
                     </div>
                 </div>
                 <div class="scroll-index-details">
+                    <div class="scroll-index-folder"><i class="fa-solid fa-folder"></i> <span>Biblioteca</span></div>
+                    <div class="scroll-index-title">Título da Mídia</div>
+                    <div class="scroll-index-sub">
+                        <span class="scroll-index-badge tag-interview">Fala</span>
+                        <span class="scroll-index-duration"></span>
+                    </div>
                     <div class="scroll-index-summary"></div>
                     <div class="scroll-index-tags-row"></div>
                     <div class="scroll-index-footer">
@@ -12153,15 +12152,18 @@ export class LibraryScrollIndexTracker {
         }
         this.tooltipEl = el;
         this.dom = {
+            thumbWrapper: el.querySelector(".scroll-index-thumb-wrapper"),
             thumbImg: el.querySelector(".scroll-index-thumb"),
             thumbIcon: el.querySelector(".scroll-index-icon"),
+            thumbBadge: el.querySelector(".scroll-index-thumb-badge"),
+            thumbProgress: el.querySelector(".scroll-index-thumb-progress"),
+            thumbProgressBar: el.querySelector(".scroll-index-thumb-progress-bar"),
+            detailsBox: el.querySelector(".scroll-index-details"),
             folderSpan: el.querySelector(".scroll-index-folder span"),
+            folderIcon: el.querySelector(".scroll-index-folder i"),
             titleEl: el.querySelector(".scroll-index-title"),
             badgeEl: el.querySelector(".scroll-index-badge"),
             durationEl: el.querySelector(".scroll-index-duration"),
-            colorChip: el.querySelector(".scroll-index-color-chip"),
-            colorDot: el.querySelector(".scroll-index-color-dot"),
-            colorText: el.querySelector(".scroll-index-color-text"),
             summaryEl: el.querySelector(".scroll-index-summary"),
             tagsRow: el.querySelector(".scroll-index-tags-row"),
             posEl: el.querySelector(".scroll-index-pos")
@@ -12736,7 +12738,7 @@ export class LibraryScrollIndexTracker {
         if (rawDelta === 0) return;
 
         const delta = rawDelta < 0 ? 12 : -12;
-        this.thumbWidth = Math.max(80, Math.min(260, this.thumbWidth + delta));
+        this.thumbWidth = Math.max(80, Math.min(320, this.thumbWidth + delta));
         if (this.tooltipEl) {
             this.tooltipEl.style.setProperty("--scroll-thumb-width", `${this.thumbWidth}px`);
         }
@@ -12926,40 +12928,19 @@ export class LibraryScrollIndexTracker {
     renderItemData(itemEl, allItems, activeTabId, currentFrameTime = null) {
         if (!this.tooltipEl || !this.dom) return;
 
-        const { thumbImg, thumbIcon, folderSpan, titleEl, badgeEl, durationEl, summaryEl, tagsRow, posEl } = this.dom;
+        const { thumbImg, thumbIcon, thumbBadge, thumbProgress, thumbProgressBar, folderSpan, folderIcon, titleEl, badgeEl, durationEl, summaryEl, tagsRow, posEl } = this.dom;
 
         const isFolder = itemEl.classList.contains("tree-folder-header") || itemEl.classList.contains("gallery-sticky-header");
         const cardIndex = allItems.indexOf(itemEl);
         if (posEl) posEl.textContent = `Posição: ${cardIndex + 1} de ${allItems.length}`;
 
         const itemColor = this.colorExtractor ? this.colorExtractor.getColor(itemEl, STATE.allVideos || [], STATE.allPhotos || []) : null;
-        if (itemColor && this.dom.colorChip) {
-            this.dom.colorChip.style.display = "inline-flex";
-            if (this.dom.colorDot) this.dom.colorDot.style.background = itemColor;
-            if (this.dom.colorText) {
-                const clean = (itemColor || "").replace("#", "");
-                const val = parseInt(clean.length === 3 ? clean.split("").map(c => c + c).join("") : clean, 16) || 0;
-                const r = (val >> 16) & 255;
-                const g = (val >> 8) & 255;
-                const b = val & 255;
-                const max = Math.max(r, g, b);
-                const min = Math.min(r, g, b);
-                const isWarm = (r > b + 25) && (r > g * 0.85);
-                const isCold = (b > r + 20) || (g > r + 30 && b > r);
-                const isNeutral = (max - min) < 30;
-
-                let tempLabel = "Cena";
-                if (isFolder) tempLabel = itemEl.classList.contains("gallery-sticky-header") ? "Grupo" : "Pasta";
-                else if (isNeutral) tempLabel = "Neutro";
-                else if (isWarm) tempLabel = "Luz Quente";
-                else if (isCold) tempLabel = "Luz Fria";
-                else tempLabel = "Cromática";
-
-                this.dom.colorText.textContent = tempLabel;
-            }
-        } else if (this.dom.colorChip) {
-            this.dom.colorChip.style.display = "none";
+        let cardAccent = itemColor;
+        if (!cardAccent || cardAccent === "#64748b" || cardAccent === "#475569") {
+            cardAccent = isFolder ? "#8b5cf6" : "var(--color-cyan)";
         }
+        this.tooltipEl.style.setProperty("--card-accent-color", cardAccent);
+        if (folderIcon) folderIcon.style.color = cardAccent;
 
         if (isFolder) {
             const isStickyHeader = itemEl.classList.contains("gallery-sticky-header");
@@ -12972,6 +12953,7 @@ export class LibraryScrollIndexTracker {
             }
             const metaCount = isStickyHeader ? itemEl.querySelector(".gallery-header-meta")?.textContent?.trim() : "";
             if (durationEl) durationEl.textContent = metaCount || "";
+            if (thumbBadge) thumbBadge.style.display = "none";
             if (thumbImg) {
                 thumbImg.dataset.activeSrc = "";
                 thumbImg.style.display = "none";
@@ -12981,6 +12963,7 @@ export class LibraryScrollIndexTracker {
                 thumbIcon.className = (isStickyHeader ? "fa-solid fa-layer-group" : "fa-solid fa-folder") + " scroll-index-icon";
                 thumbIcon.style.color = "var(--color-violet)";
             }
+            if (thumbProgress) thumbProgress.style.display = "none";
 
             if (summaryEl) summaryEl.textContent = isStickyHeader ? (metaCount ? `Grupo contendo ${metaCount}.` : `Grupo de mídias da galeria.`) : `Pasta contendo mídias organizadas.`;
             if (tagsRow) tagsRow.innerHTML = "";
@@ -13009,21 +12992,45 @@ export class LibraryScrollIndexTracker {
                         badgeEl.textContent = isInterview ? "Fala" : "Bastidores";
                     }
 
-                    if (durationEl) {
-                        if (video.duration) {
-                            if (currentFrameTime !== null && currentFrameTime >= 0) {
-                                const curM = Math.floor(currentFrameTime / 60);
-                                const curS = Math.floor(currentFrameTime % 60);
-                                const totM = Math.floor(video.duration / 60);
-                                const totS = Math.floor(video.duration % 60);
-                                durationEl.textContent = `${curM}:${curS.toString().padStart(2, '0')} / ${totM}:${totS.toString().padStart(2, '0')}`;
-                            } else {
-                                const m = Math.floor(video.duration / 60);
-                                const s = Math.floor(video.duration % 60);
-                                durationEl.textContent = `${m}:${s.toString().padStart(2, '0')}`;
+                    if (video.duration) {
+                        const formatSec = (sec) => {
+                            const totalSec = Math.max(0, Math.floor(sec || 0));
+                            const hrs = Math.floor(totalSec / 3600);
+                            const mins = Math.floor((totalSec % 3600) / 60);
+                            const s = totalSec % 60;
+                            if (hrs > 0) {
+                                return `${hrs}:${mins.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+                            }
+                            return `${mins}:${s.toString().padStart(2, '0')}`;
+                        };
+
+                        const totalDurStr = formatSec(video.duration);
+                        if (this.videoScrubTime !== null && currentFrameTime !== null && currentFrameTime >= 0) {
+                            const curStr = formatSec(currentFrameTime);
+                            if (durationEl) durationEl.innerHTML = `<i class="fa-regular fa-clock"></i> <span>${curStr} / ${totalDurStr}</span>`;
+                            if (thumbBadge) {
+                                thumbBadge.textContent = `${curStr} / ${totalDurStr}`;
+                                thumbBadge.style.display = "block";
                             }
                         } else {
-                            durationEl.textContent = "";
+                            if (durationEl) durationEl.innerHTML = `<i class="fa-regular fa-clock"></i> <span>${totalDurStr}</span>`;
+                            if (thumbBadge) {
+                                thumbBadge.textContent = totalDurStr;
+                                thumbBadge.style.display = "block";
+                            }
+                        }
+                    } else {
+                        if (durationEl) durationEl.textContent = "";
+                        if (thumbBadge) thumbBadge.style.display = "none";
+                    }
+
+                    if (thumbProgress && thumbProgressBar) {
+                        if (video.duration > 0 && currentFrameTime !== null && currentFrameTime >= 0) {
+                            const pct = Math.max(0, Math.min(100, (currentFrameTime / video.duration) * 100));
+                            thumbProgressBar.style.width = `${pct}%`;
+                            thumbProgress.style.display = "block";
+                        } else {
+                            thumbProgress.style.display = "none";
                         }
                     }
 
@@ -13117,6 +13124,9 @@ export class LibraryScrollIndexTracker {
                         thumbIcon.style.display = "block";
                         thumbIcon.className = "fa-solid fa-film scroll-index-icon";
                     }
+                    if (thumbBadge) thumbBadge.style.display = "none";
+                    if (thumbProgress) thumbProgress.style.display = "none";
+                    if (durationEl) durationEl.textContent = "";
                 }
             } else if (isPhoto) {
                 const photoId = parseInt(itemEl.getAttribute("data-photo-id") || itemEl.dataset?.photoId, 10);
@@ -13130,6 +13140,8 @@ export class LibraryScrollIndexTracker {
                         badgeEl.textContent = CATEGORY_LABELS[photo.category] || "Foto";
                     }
                     if (durationEl) durationEl.textContent = "";
+                    if (thumbBadge) thumbBadge.style.display = "none";
+                    if (thumbProgress) thumbProgress.style.display = "none";
 
                     const src = photo.proxy_path || (photo.filepath && (photo.filepath.startsWith('http') || photo.filepath.startsWith('/')) ? photo.filepath : `/originals/${photo.filename}`);
                     if (thumbImg) {
@@ -13177,6 +13189,9 @@ export class LibraryScrollIndexTracker {
                         thumbIcon.style.display = "block";
                         thumbIcon.className = "fa-solid fa-camera scroll-index-icon";
                     }
+                    if (thumbBadge) thumbBadge.style.display = "none";
+                    if (thumbProgress) thumbProgress.style.display = "none";
+                    if (durationEl) durationEl.textContent = "";
                 }
             }
         }
@@ -13190,8 +13205,9 @@ export class LibraryScrollIndexTracker {
         this.tooltipEl.classList.add("visible");
 
         const tooltipRect = this.tooltipEl.getBoundingClientRect();
-        const tooltipWidth = tooltipRect.width || (this.thumbWidth + 160);
-        const tooltipHeight = tooltipRect.height || 70;
+        const thumbHeight = Math.round(this.thumbWidth * 9 / 16);
+        const expectedWidth = Math.max(tooltipRect.width || 0, this.thumbWidth, 320);
+        const expectedHeight = tooltipRect.height || (thumbHeight + 150);
 
         const viewportHeight = Math.min(
             win.innerHeight || 99999,
@@ -13203,11 +13219,11 @@ export class LibraryScrollIndexTracker {
         );
 
         const margin = 10;
-        let top = mouseEvent.clientY - (tooltipHeight / 2);
+        let top = mouseEvent.clientY - (thumbHeight / 2);
         
         // Garante que o card nunca ultrapasse a borda inferior da tela ao expandir com descrição
-        if (top + tooltipHeight > viewportHeight - margin) {
-            top = viewportHeight - tooltipHeight - margin;
+        if (top + expectedHeight > viewportHeight - margin) {
+            top = viewportHeight - expectedHeight - margin;
         }
         // Garante que o card nunca ultrapasse o topo da janela
         top = Math.max(margin, top);
@@ -13216,8 +13232,8 @@ export class LibraryScrollIndexTracker {
         let left = containerRect.right + 6;
 
         // Se passar da borda direita da janela ou estiver maximizado: inverte para a esquerda da barra
-        if (left + tooltipWidth > viewportWidth - margin) {
-            left = containerRect.right - 16 - tooltipWidth - 6;
+        if (left + expectedWidth > viewportWidth - margin) {
+            left = containerRect.right - 16 - expectedWidth - 6;
         }
         left = Math.max(margin, left);
 
