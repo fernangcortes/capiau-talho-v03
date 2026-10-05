@@ -18,6 +18,7 @@ from typing import Any, Callable, Dict, List, Optional
 MOTOR_ASSEMBLYAI = "assemblyai_universal_35"
 MOTOR_DEEPGRAM = "deepgram_nova_3"
 MOTOR_WHISPER = "whisper_turbo"
+DIARIZADOR_NEMOTRON = "nemotron_3_diarization"
 SEM_DIARIZACAO = "none"
 DIARIZACAO_MESMO_MOTOR = "mesmo_motor"  # opção das Configurações: a do motor de transcrição
 DIARIZACAO_PROPRIA = "propria"  # no plano: a do próprio motor de transcrição
@@ -39,7 +40,7 @@ TIPOS_AUDIO = {".mp3": "audio/mpeg", ".wav": "audio/wav", ".m4a": "audio/mp4", "
 TRANSCRICAO_COM_DIARIZACAO = {MOTOR_ASSEMBLYAI: True, MOTOR_DEEPGRAM: True, MOTOR_WHISPER: False}
 TRANSCRICAO_LIGADOS = set(TRANSCRICAO_COM_DIARIZACAO)
 # Diarizadores separados (rodam sobre o áudio, depois da transcrição).
-DIARIZADORES_SEPARADOS: set = set()
+DIARIZADORES_SEPARADOS = {DIARIZADOR_NEMOTRON}
 # Valores antigos de diarization.engine que significam "a da própria transcrição X".
 DIARIZACAO_DE_TRANSCRICAO = {MOTOR_ASSEMBLYAI, MOTOR_DEEPGRAM}
 DIARIZACAO_LIGADOS = {DIARIZACAO_MESMO_MOTOR, SEM_DIARIZACAO} | DIARIZADORES_SEPARADOS
@@ -305,6 +306,77 @@ def transcrever_whisper(audio: Path, plano: PlanoASR, opcoes: OpcoesASR, chave: 
                         avisos=avisos)
 
 
+# -- Diarizador separado: Nemotron 3 (no .venv-nemo) -------------------------------------
+
+RAIZ = Path(__file__).resolve().parents[2]
+WORKER_NEMO = Path(__file__).with_name("venv_nemo_worker.py")
+NEMO_TIMEOUT_S = 1800
+
+
+def python_venv_nemo() -> Path:
+    """Intérprete do ambiente separado (transformers >= 5.18). CAPIAU_VENV_NEMO troca o caminho."""
+    base = Path(os.getenv("CAPIAU_VENV_NEMO") or (RAIZ / ".venv-nemo"))
+    return base / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
+
+
+def _rodar_worker_nemo(tarefa: str, audio: Path) -> Dict[str, Any]:
+    import json
+    import subprocess
+    import tempfile
+
+    py = python_venv_nemo()
+    if not py.exists():
+        raise ErroASR(f"Ambiente .venv-nemo não encontrado em {py.parent.parent} (ver docs: ambiente separado do NeMo)")
+    with tempfile.TemporaryDirectory(prefix="capiau_nemo_") as tmp:
+        wav, saida = Path(tmp) / "audio.wav", Path(tmp) / "saida.json"
+        kw = {"creationflags": subprocess.CREATE_NO_WINDOW} if os.name == "nt" else {}
+        conv = subprocess.run(["ffmpeg", "-nostdin", "-v", "error", "-y", "-i", str(audio),
+                               "-ac", "1", "-ar", "16000", str(wav)], capture_output=True, **kw)
+        if conv.returncode != 0:
+            raise ErroASR(f"ffmpeg não converteu o áudio para o {tarefa}: {conv.stderr.decode(errors='replace')[:200]}")
+        try:
+            r = subprocess.run([str(py), str(WORKER_NEMO), tarefa, str(wav), str(saida)],
+                               capture_output=True, timeout=NEMO_TIMEOUT_S, **kw)
+        except subprocess.TimeoutExpired as e:
+            raise ErroASR(f"{tarefa} no .venv-nemo passou de {NEMO_TIMEOUT_S} s") from e
+        if r.returncode != 0 or not saida.exists():
+            cauda = r.stderr.decode(errors="replace").strip().splitlines()[-3:]
+            raise ErroASR(f"{tarefa} no .venv-nemo falhou: {' | '.join(cauda)[:300]}")
+        return json.loads(saida.read_text(encoding="utf-8"))
+
+
+def diarizar_nemotron(audio: Path):
+    """Segmentos [{inicio, fim, falante}] do Nemotron 3 Diarization (até 8 falantes, fala sobreposta)."""
+    r = _rodar_worker_nemo("diarizar", audio)
+    return r["segmentos"], r.get("modelo") or "nemotron-3-diarization"
+
+
+def atribuir_falantes(palavras: List[Dict[str, Any]], segmentos: List[Dict[str, Any]],
+                      folga_s: float = 0.5) -> List[Dict[str, Any]]:
+    """Cada palavra recebe o falante com mais sobreposição no tempo.
+
+    Sem sobreposição, vale o segmento mais próximo até ``folga_s``; além disso,
+    "Desconhecido". Na fala sobreposta vence quem cobre mais da palavra.
+    """
+    saida = []
+    for p in palavras:
+        ini, fim = float(p["start_time"]), float(p["end_time"])
+        melhor, melhor_sobre, perto, perto_dist = None, 0.0, None, folga_s
+        for s in segmentos:
+            sobre = min(fim, s["fim"]) - max(ini, s["inicio"])
+            if sobre > melhor_sobre:
+                melhor, melhor_sobre = s["falante"], sobre
+            elif melhor is None:
+                dist = max(s["inicio"] - fim, ini - s["fim"], 0.0)
+                if dist <= perto_dist:
+                    perto, perto_dist = s["falante"], dist
+        falante = melhor if melhor is not None else perto
+        nova = dict(p)
+        nova["speaker_id"] = _falante_deepgram(falante)  # mesmo formato: 0 -> "Falante A"
+        saida.append(nova)
+    return saida
+
+
 # -- Despacho -----------------------------------------------------------------------
 
 MOTORES: Dict[str, Callable[..., ResultadoASR]] = {
@@ -321,4 +393,8 @@ def transcrever(audio: Path, plano: PlanoASR, opcoes: OpcoesASR, chave: Optional
         raise ErroASR(f"Chave '{provedor}' não configurada (painel de configurações da IA ou .env)")
     resultado = MOTORES[plano.transcricao](audio, plano, opcoes, chave)
     resultado.avisos = list(plano.avisos) + list(resultado.avisos)
+    if plano.diarizacao in DIARIZADORES_SEPARADOS and resultado.palavras:
+        segmentos, modelo = diarizar_nemotron(audio)
+        resultado.palavras = atribuir_falantes(resultado.palavras, segmentos)
+        resultado.modelo_usado = f"{resultado.modelo_usado or resultado.motor} + {modelo}"
     return resultado

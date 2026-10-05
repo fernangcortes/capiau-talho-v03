@@ -1,0 +1,15 @@
+# Ambiente separado .venv-nemo: modelos NVIDIA que exigem transformers >= 5.18
+# (Nemotron 3 Diarization; Canary). O .venv principal fica no 5.15 para não
+# arriscar a Laya e o resto. Usado por src/transcription/venv_nemo_worker.py.
+#
+# Criar (Windows, na raiz do repo):
+#   uv venv .venv-nemo --python 3.12
+#   uv pip install --python .venv-nemo\Scripts\python.exe torch --index-url https://download.pytorch.org/whl/cpu
+#   uv pip install --python .venv-nemo\Scripts\python.exe -r requirements-nemo.txt
+#
+# Outro lugar: variável CAPIAU_VENV_NEMO apontando para a pasta do ambiente.
+# Montado em 05/10/2026 com torch 2.14.1+cpu, transformers 5.18.0, librosa 1.0.0
+# (na época veio junto do nemo-toolkit 3.0.0, que NÃO é necessário: o 3.0.0 nem
+# carrega o Nemotron 3, que usa atenção 'rope').
+transformers>=5.18.0
+librosa>=0.10

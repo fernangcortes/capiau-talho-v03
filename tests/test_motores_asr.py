@@ -59,12 +59,12 @@ def test_diarizacao_de_outro_motor_de_nuvem_usa_a_do_motor_escolhido_e_avisa():
 
 
 def test_motor_sem_codigo_cai_na_assemblyai_e_avisa():
-    plano = resolver_motores("nvidia_canary", "nemotron_3_diarization")
+    plano = resolver_motores("nvidia_canary", "pyannote_40")
     assert plano.transcricao == MOTOR_ASSEMBLYAI
     assert plano.diarizacao == DIARIZACAO_PROPRIA
     assert len(plano.avisos) == 2
     assert "nvidia_canary" in plano.avisos[0]
-    assert "nemotron_3_diarization" in plano.avisos[1]
+    assert "pyannote_40" in plano.avisos[1]
 
 
 def test_valor_vazio_usa_assemblyai_sem_aviso():
@@ -235,3 +235,45 @@ def test_whisper_sem_diarizacao_propria_avisa_e_fica_sem_falante(monkeypatch, au
     assert [p["word"] for p in r.palavras] == ["Oi,", "tudo"]
     assert {p["speaker_id"] for p in r.palavras} == {"Desconhecido"}
     assert r.motor == "whisper_turbo"
+
+
+# -- Nemotron 3 Diarization (diarizador separado) ----------------------------------------
+
+def test_nemotron_com_whisper_e_com_assemblyai():
+    plano = resolver_motores("whisper_turbo", "nemotron_3_diarization")
+    assert plano.diarizacao == "nemotron_3_diarization" and plano.avisos == []
+    plano_aai = resolver_motores(MOTOR_ASSEMBLYAI, "nemotron_3_diarization")
+    # A AssemblyAI não cobra a diarização dela quando o Nemotron vai separar os falantes
+    assert montar_config_assemblyai(plano_aai, "pt", True, False, 8)["speaker_labels"] is False
+
+
+def test_atribuir_falantes_por_sobreposicao_e_folga():
+    from src.transcription.motores import atribuir_falantes
+    palavras = [
+        {"word": "a", "start_time": 0.0, "end_time": 0.4, "speaker_id": "x", "confidence": 1},
+        {"word": "b", "start_time": 1.0, "end_time": 1.6, "speaker_id": "x", "confidence": 1},  # sobreposta
+        {"word": "c", "start_time": 2.3, "end_time": 2.5, "speaker_id": "x", "confidence": 1},  # 0,3 s depois
+        {"word": "d", "start_time": 9.0, "end_time": 9.2, "speaker_id": "x", "confidence": 1},  # longe
+    ]
+    segmentos = [{"inicio": 0.0, "fim": 1.2, "falante": 0}, {"inicio": 1.1, "fim": 2.0, "falante": 1}]
+    r = atribuir_falantes(palavras, segmentos)
+    assert [p["speaker_id"] for p in r] == ["Falante A", "Falante B", "Falante B", "Desconhecido"]
+    assert palavras[0]["speaker_id"] == "x"  # não altera a lista original
+
+
+def test_transcrever_aplica_o_diarizador_separado(monkeypatch, audio):
+    from src.transcription import motores
+    monkeypatch.setattr(motores, "audio_16k", lambda a: "AMOSTRAS")
+    monkeypatch.setattr(motores, "_carregar_whisper", lambda: _WhisperFalso())
+    monkeypatch.setattr(motores, "diarizar_nemotron",
+                        lambda a: ([{"inicio": 0.0, "fim": 1.0, "falante": 2}], "nvidia/Nemotron-3-Diarization"))
+    r = motores.transcrever(audio, resolver_motores("whisper_turbo", "nemotron_3_diarization"), OpcoesASR(), None)
+    assert {p["speaker_id"] for p in r.palavras} == {"Falante C"}
+    assert r.modelo_usado.endswith("+ nvidia/Nemotron-3-Diarization")
+
+
+def test_sem_venv_nemo_o_erro_diz_onde_procurou(monkeypatch, tmp_path, audio):
+    from src.transcription import motores
+    monkeypatch.setenv("CAPIAU_VENV_NEMO", str(tmp_path / "nao_existe"))
+    with pytest.raises(ErroASR, match=".venv-nemo não encontrado"):
+        motores.diarizar_nemotron(audio)

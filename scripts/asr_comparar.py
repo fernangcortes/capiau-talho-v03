@@ -59,6 +59,8 @@ def main():
     ap.add_argument("--project", type=int, default=2)
     ap.add_argument("--n", type=int, default=5)
     ap.add_argument("--motores", default="assemblyai_universal_35,deepgram_nova_3")
+    ap.add_argument("--diarizacao", default="mesmo_motor",
+                    help="mesmo_motor, nemotron_3_diarization ou none (vale para todos os motores)")
     args = ap.parse_args()
 
     ids = [int(x) for x in args.ids.split(",") if x.strip()] or selecionar(args.project, args.n)
@@ -82,8 +84,9 @@ def main():
                            max_falantes=S.get("diarization.max_speakers"), detectar_entidades=False)
         referencia = None
         for motor in motores:
-            plano = resolver_motores(motor, "mesmo_motor")
-            if plano.transcricao != motor:
+            plano = resolver_motores(motor, args.diarizacao)
+            if plano.transcricao != motor or (args.diarizacao in ("nemotron_3_diarization",)
+                                              and plano.diarizacao != args.diarizacao):
                 print(f"  {motor:<26} não ligado ainda")
                 totais[motor]["falhas"] += 1
                 continue
