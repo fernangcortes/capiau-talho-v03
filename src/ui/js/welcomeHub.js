@@ -23,10 +23,10 @@ export const WELCOME_HUB_PROFILES = Object.freeze({
     doc_offline_eco: {
         id: "doc_offline_eco",
         label: "Documentário Offline Econômico",
-        badge: "Offline / Custo $0.00",
+        badge: "Econômico",
         icon: "fa-leaf",
         themeColor: "var(--color-emerald)",
-        desc: "Triagem com Laya ONNX CPU local (22ms), visão YOLO-World v2, biometria SCRFD 512-d CPU e DeepSeek V4.1 Flash. Custo zero de nuvem e privacidade máxima.",
+        desc: "Modelos baratos: DeepSeek V4.1 Flash no texto e Gemini 2.5 Flash na visão, um quadro a cada 20 s. Ainda usa nuvem; para transcrever na máquina, escolha Whisper Turbo nas Configurações.",
         settings: {
             "llm.text_model": "deepseek/deepseek-v4.1-flash",
             "llm.vision_model": "google/gemini-2.5-flash",
@@ -44,7 +44,7 @@ export const WELCOME_HUB_PROFILES = Object.freeze({
         badge: "Equilibrado / Rápido",
         icon: "fa-bolt",
         themeColor: "var(--color-cyan)",
-        desc: "Triagem dual (Laya local + escalação Sistema 2), Gemini 3.8 Flash, Nemotron 3 com fala sobreposta e DeepSeek V4.1 Flash. Otimizado para agilidade jornalística.",
+        desc: "Equilíbrio entre custo e qualidade: DeepSeek V4.1 Flash no texto e Gemini 3.8 Flash na visão, um quadro a cada 10 s.",
         settings: {
             "llm.text_model": "deepseek/deepseek-v4.1-flash",
             "llm.vision_model": "google/gemini-3.8-flash",
@@ -62,7 +62,7 @@ export const WELCOME_HUB_PROFILES = Object.freeze({
         badge: "Alta Fidelidade 2026",
         icon: "fa-film",
         themeColor: "var(--color-violet)",
-        desc: "Triagem nuvem Jev RLCD, Gemini 3.1 Pro com bboxes canônicos, biometria Buffalo_l 512-d, áudio AssemblyAI 3.5 e Claude Sonnet 5.5. Máxima precisão cinematográfica.",
+        desc: "Máxima precisão: Claude Sonnet 5.5 no texto e Gemini 3.1 Pro (prévia) na visão, um quadro a cada 5 s e mais candidatos por sugestão.",
         settings: {
             "llm.text_model": "anthropic/claude-sonnet-5.5",
             "llm.vision_model": "google/gemini-3.1-pro-preview",
