@@ -173,26 +173,86 @@ def detect_faces_in_image(image_path: Path) -> list:
     results = detect_and_embed_faces(image_path)
     return [r["box"] for r in results]
 
+# Reprocessar um frame/foto só troca as faces automáticas. Face com nome real, descarte
+# ('Não Relevante', 'Não é Rosto') ou reconhecimento humano é curadoria e fica; a detecção
+# nova que cai na mesma caixa (IoU) é a mesma pessoa e não vira duplicata sem nome.
+FACE_IOU_MESMA_PESSOA = 0.5
+# Mesma tolerância que a visão usa para buscar pessoas confirmadas no keyframe
+FACE_JANELA_TIMESTAMP_S = 0.5
+
+_FACE_CURADA_SQL = """(
+    (f.name IS NOT NULL AND TRIM(f.name) != '' AND f.name NOT LIKE 'Pessoa Desconhecida%')
+    OR EXISTS (SELECT 1 FROM face_recognition fr WHERE fr.face_id = f.id
+               AND fr.status IN ('confirmed', 'rejected', 'reviewed'))
+)"""
+
+
+def _iou(a, b) -> float:
+    """IoU de duas caixas relativas [x, y, w, h]."""
+    try:
+        ax, ay, aw, ah = (float(v) for v in a)
+        bx, by, bw, bh = (float(v) for v in b)
+    except (TypeError, ValueError):
+        return 0.0
+    ix = max(0.0, min(ax + aw, bx + bw) - max(ax, bx))
+    iy = max(0.0, min(ay + ah, by + bh) - max(ay, by))
+    inter = ix * iy
+    uniao = aw * ah + bw * bh - inter
+    return inter / uniao if uniao > 0 else 0.0
+
+
+def _substituir_faces_automaticas(cursor, project_id: int, results: list, *, photo_id=None,
+                                  video_id=None, timestamp=None) -> tuple:
+    """Apaga só as faces automáticas do frame/foto e insere as detecções novas.
+
+    Retorna (inseridas, casadas_com_curadas). Detecção que casa com face curada é
+    descartada: a face antiga (com nome, id e reconhecimentos) continua valendo.
+    """
+    if photo_id is not None:
+        alvo, params = "f.photo_id = ?", (photo_id,)
+        curadas_where, curadas_params = alvo, params
+    else:
+        alvo, params = "f.video_id = ? AND f.timestamp = ?", (video_id, timestamp)
+        curadas_where = "f.video_id = ? AND ABS(f.timestamp - ?) <= ?"
+        curadas_params = (video_id, timestamp, FACE_JANELA_TIMESTAMP_S)
+
+    cursor.execute(f"DELETE FROM face WHERE id IN (SELECT f.id FROM face f WHERE {alvo} "
+                   f"AND NOT {_FACE_CURADA_SQL})", params)
+    cursor.execute(f"SELECT f.bounding_box FROM face f WHERE {curadas_where} AND {_FACE_CURADA_SQL}",
+                   curadas_params)
+    caixas_curadas = []
+    for row in cursor.fetchall():
+        try:
+            caixas_curadas.append(json.loads(row[0]))
+        except (TypeError, ValueError):
+            pass
+
+    inseridas = casadas = 0
+    for res in results:
+        caixa = [float(v) for v in res["box"]]
+        if any(_iou(caixa, c) >= FACE_IOU_MESMA_PESSOA for c in caixas_curadas):
+            casadas += 1
+            continue
+        cursor.execute("""
+            INSERT INTO face (project_id, name, bounding_box, photo_id, video_id, timestamp, embedding)
+            VALUES (?, NULL, ?, ?, ?, ?, ?)
+        """, (project_id, json.dumps(caixa), photo_id, video_id, timestamp, json.dumps(res["embedding"])))
+        inseridas += 1
+    return inseridas, casadas
+
+
 def process_photo_faces(project_id: int, photo_id: int, image_path: Path) -> None:
     """Detecta rostos na foto de set, extrai embeddings e salva no SQLite."""
     try:
         results = detect_and_embed_faces(image_path)
-        
+
         with get_db() as conn:
-            cursor = conn.cursor()
-            cursor.execute("DELETE FROM face WHERE photo_id = ?", (photo_id,))
-            
-            for res in results:
-                rx, ry, rw, rh = res["box"]
-                bounding_box_json = json.dumps([rx, ry, rw, rh])
-                embedding_json = json.dumps(res["embedding"])
-                cursor.execute("""
-                    INSERT INTO face (project_id, name, bounding_box, photo_id, video_id, timestamp, embedding)
-                    VALUES (?, NULL, ?, ?, NULL, NULL, ?)
-                """, (project_id, bounding_box_json, photo_id, embedding_json))
+            inseridas, casadas = _substituir_faces_automaticas(conn.cursor(), project_id, results,
+                                                               photo_id=photo_id)
             conn.commit()
             if results:
-                print(f"[FACE_ENGINE] {len(results)} rostos indexados na foto ID {photo_id}")
+                print(f"[FACE_ENGINE] {len(results)} rostos na foto ID {photo_id}: "
+                      f"{inseridas} novos, {casadas} já curados")
     except Exception as e:
         print(f"[FACE_ENGINE] Erro ao salvar rostos da foto ID {photo_id}: {e}")
 
@@ -200,22 +260,14 @@ def process_video_frame_faces(project_id: int, video_id: int, timestamp: float, 
     """Detecta rostos em um frame de B-roll, extrai embeddings e registra no SQLite."""
     try:
         results = detect_and_embed_faces(image_path)
-        
+
         with get_db() as conn:
-            cursor = conn.cursor()
-            cursor.execute("DELETE FROM face WHERE video_id = ? AND timestamp = ?", (video_id, timestamp))
-            
-            for res in results:
-                rx, ry, rw, rh = res["box"]
-                bounding_box_json = json.dumps([rx, ry, rw, rh])
-                embedding_json = json.dumps(res["embedding"])
-                cursor.execute("""
-                    INSERT INTO face (project_id, name, bounding_box, photo_id, video_id, timestamp, embedding)
-                    VALUES (?, NULL, ?, NULL, ?, ?, ?)
-                """, (project_id, bounding_box_json, video_id, timestamp, embedding_json))
+            inseridas, casadas = _substituir_faces_automaticas(conn.cursor(), project_id, results,
+                                                               video_id=video_id, timestamp=timestamp)
             conn.commit()
             if results:
-                print(f"[FACE_ENGINE] {len(results)} rostos indexados no frame {timestamp}s do vídeo ID {video_id}")
+                print(f"[FACE_ENGINE] {len(results)} rostos no frame {timestamp}s do vídeo ID {video_id}: "
+                      f"{inseridas} novos, {casadas} já curados")
     except Exception as e:
         print(f"[FACE_ENGINE] Erro ao salvar rostos do frame {timestamp}s do vídeo ID {video_id}: {e}")
 

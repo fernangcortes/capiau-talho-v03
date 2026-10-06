@@ -758,12 +758,14 @@ class PipelineService:
         # Cada job de frame carrega a janela real do trecho (para o payload do Qdrant)
         frame_jobs: List[Dict[str, Any]] = []
         seg_log = ""
+        # Fora do bloco de segmentação: o extract_frame dos keyframes usa o proxy como
+        # fallback e, com vision.use_segments desligado, o nome não existia (NameError).
+        proxy_path = CONFIG.PROXIES_DIR / f"proxy_vid_{video_id}.mp4"
         if S.get("vision.use_segments"):
             try:
                 from src.vision.segmentation import segment_video
                 # Segmentação é decode pesado e independe de resolução: roda no proxy
                 # 720p (rápido) quando existir, senão na fonte dos keyframes.
-                proxy_path = CONFIG.PROXIES_DIR / f"proxy_vid_{video_id}.mp4"
                 seg_source = proxy_path if proxy_path.exists() else frame_source
                 # Método de deriva dos beats: HSV (rápido, default) ou CLIP (preciso, lento).
                 # O override tem prioridade sobre o setting (usado na reanálise sob demanda).
