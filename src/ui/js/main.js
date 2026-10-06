@@ -2037,6 +2037,13 @@ window.addEventListener("DOMContentLoaded", () => {
                 if (sel && sel.rangeCount > 0) {
                     sel.removeAllRanges();
                 }
+                // Ctrl + duplo clique no cabeçalho da biblioteca recolhe o cabeçalho
+                if (panelId === "sidebar-left" && (e.ctrlKey || e.metaKey)) {
+                    if (typeof window.toggleLibraryHeader === "function") {
+                        window.toggleLibraryHeader();
+                    }
+                    return;
+                }
                 const btn = header.querySelector(".btn-toggle-sidebar") || panel.querySelector(".btn-toggle-sidebar") || document.getElementById(toggleBtnId);
                 if (btn) {
                     btn.click();
@@ -2558,25 +2565,316 @@ window.addEventListener("DOMContentLoaded", () => {
         }
     }
 
-    // Alternar filtros/abas da biblioteca de mídias (hide/show)
+    // ── CONTROLE DO CABEÇALHO E FILTROS DA BIBLIOTECA (RECOLHIMENTO, BUSCA E SELETORES) ──
+    function setLibraryFiltersCollapsed(collapsed) {
+        if (!sidebarLeft) return;
+        const btnToggleFilters = document.getElementById("btn-toggle-library-filters");
+        sidebarLeft.classList.toggle("filters-collapsed", collapsed);
+        if (btnToggleFilters) {
+            const icon = btnToggleFilters.querySelector("i");
+            if (icon) {
+                icon.className = collapsed ? "fa-solid fa-eye-slash" : "fa-solid fa-eye";
+            }
+            const tip = collapsed ? "Mostrar Filtros/Abas" : "Ocultar Filtros/Abas";
+            btnToggleFilters.title = tip;
+            btnToggleFilters.setAttribute("data-tooltip", tip);
+        }
+
+        // Mover busca e seletores de tipo de mídia para o cabeçalho da biblioteca ou de volta para a barra
+        const compactControls = document.getElementById("library-header-compact-controls");
+        const searchAreaWrapper = document.getElementById("library-search-area-wrapper");
+        const mediaTypeFilterChips = document.getElementById("media-type-filter-chips");
+        const filterBarRow1 = document.getElementById("library-filter-bar-row1");
+        const btnDisplaySettings = document.getElementById("btn-library-display-settings");
+
+        if (collapsed) {
+            if (compactControls) {
+                if (searchAreaWrapper && searchAreaWrapper.parentElement !== compactControls) {
+                    compactControls.appendChild(searchAreaWrapper);
+                }
+                if (mediaTypeFilterChips && mediaTypeFilterChips.parentElement !== compactControls) {
+                    compactControls.appendChild(mediaTypeFilterChips);
+                }
+                compactControls.style.display = "flex";
+            }
+        } else {
+            if (filterBarRow1) {
+                if (searchAreaWrapper && searchAreaWrapper.parentElement !== filterBarRow1) {
+                    filterBarRow1.prepend(searchAreaWrapper);
+                }
+                if (mediaTypeFilterChips && mediaTypeFilterChips.parentElement !== filterBarRow1) {
+                    if (btnDisplaySettings && btnDisplaySettings.parentElement === filterBarRow1) {
+                        btnDisplaySettings.after(mediaTypeFilterChips);
+                    } else {
+                        filterBarRow1.appendChild(mediaTypeFilterChips);
+                    }
+                }
+            }
+            if (compactControls) {
+                compactControls.style.display = "none";
+            }
+        }
+
+        try { localStorage.setItem("capiau_library_filters_collapsed", collapsed ? "true" : "false"); } catch (e) {}
+        window.dispatchEvent(new Event("resize"));
+    }
+
+    function toggleLibraryHeader(forceState) {
+        if (!sidebarLeft) return;
+        const isCurrentlyCollapsed = sidebarLeft.classList.contains("library-header-collapsed");
+        const targetCollapsed = typeof forceState === "boolean" ? forceState : !isCurrentlyCollapsed;
+
+        if (targetCollapsed) {
+            // Ao recolher o cabeçalho: ocultar filtros e abas quando não estiverem ocultados
+            if (!sidebarLeft.classList.contains("filters-collapsed")) {
+                setLibraryFiltersCollapsed(true);
+            }
+            sidebarLeft.classList.add("library-header-collapsed");
+            const reopenLine = document.getElementById("reopen-library-header");
+            if (reopenLine) reopenLine.style.display = "flex";
+            try { localStorage.setItem("capiau_library_header_collapsed", "true"); } catch (e) {}
+        } else {
+            sidebarLeft.classList.remove("library-header-collapsed");
+            const reopenLine = document.getElementById("reopen-library-header");
+            if (reopenLine) reopenLine.style.display = "none";
+            try { localStorage.setItem("capiau_library_header_collapsed", "false"); } catch (e) {}
+        }
+        window.dispatchEvent(new Event("resize"));
+    }
+
+    window.setLibraryFiltersCollapsed = setLibraryFiltersCollapsed;
+    window.toggleLibraryHeader = toggleLibraryHeader;
+
+    // Botão de alternar filtros/abas da biblioteca
     const btnToggleFilters = document.getElementById("btn-toggle-library-filters");
     if (btnToggleFilters && sidebarLeft) {
         btnToggleFilters.addEventListener("click", (e) => {
             e.stopPropagation();
-            const isHidden = sidebarLeft.classList.toggle("filters-collapsed");
-            const icon = btnToggleFilters.querySelector("i");
-            if (icon) {
-                if (isHidden) {
-                    icon.className = "fa-solid fa-eye-slash";
-                    btnToggleFilters.title = "Mostrar Filtros/Abas";
-                } else {
-                    icon.className = "fa-solid fa-eye";
-                    btnToggleFilters.title = "Ocultar Filtros/Abas";
-                }
-            }
-            window.dispatchEvent(new Event("resize"));
+            const willCollapse = !sidebarLeft.classList.contains("filters-collapsed");
+            setLibraryFiltersCollapsed(willCollapse);
         });
     }
+
+    // Botão de setinha line icon para recolher o cabeçalho da biblioteca
+    const btnCollapseLibraryHeader = document.getElementById("btn-collapse-library-header");
+    if (btnCollapseLibraryHeader) {
+        btnCollapseLibraryHeader.addEventListener("click", (e) => {
+            e.stopPropagation();
+            toggleLibraryHeader(true);
+        });
+    }
+
+    // Botão de overflow '+' para ferramentas e ações secundárias da biblioteca quando compacto
+    const btnLibraryMoreActions = document.getElementById("btn-library-more-actions");
+    let libraryMoreFlyout = null;
+
+    function closeLibraryMoreFlyout() {
+        if (libraryMoreFlyout && libraryMoreFlyout.parentNode) {
+            libraryMoreFlyout.parentNode.removeChild(libraryMoreFlyout);
+        }
+        libraryMoreFlyout = null;
+        if (btnLibraryMoreActions) {
+            btnLibraryMoreActions.classList.remove("active");
+            btnLibraryMoreActions.setAttribute("aria-expanded", "false");
+        }
+    }
+
+    function openLibraryMoreFlyout() {
+        closeLibraryMoreFlyout();
+        if (!btnLibraryMoreActions) return;
+
+        const flyout = document.createElement("div");
+        flyout.className = "library-more-flyout";
+        flyout.setAttribute("role", "dialog");
+        flyout.setAttribute("aria-label", "Mais Ferramentas da Biblioteca");
+
+        const realSearchInput = document.getElementById("library-search-input");
+        const currentSearchVal = realSearchInput ? realSearchInput.value : "";
+        const activeChip = document.querySelector(".media-type-filter-chips .chip-filter.active");
+        const activeType = activeChip ? (activeChip.getAttribute("data-type-filter") || "all") : "all";
+
+        flyout.innerHTML = `
+            <div class="flyout-search-container">
+                <i class="fa-solid fa-magnifying-glass search-icon"></i>
+                <input type="text" class="flyout-search-input" placeholder="Buscar mídias..." value="${currentSearchVal ? currentSearchVal.replace(/"/g, '&quot;') : ''}">
+            </div>
+            <div class="flyout-section-title">Filtrar Mídia</div>
+            <div class="flyout-chips-container" style="display: flex; gap: 4px; padding: 4px 6px;">
+                <button type="button" class="flyout-media-chip ${activeType === 'all' ? 'active' : ''}" data-type-filter="all" title="Todas as Mídias">
+                    <i class="fa-solid fa-layer-group"></i> <span>Todas</span>
+                </button>
+                <button type="button" class="flyout-media-chip ${activeType === 'video' ? 'active' : ''}" data-type-filter="video" title="Vídeos">
+                    <i class="fa-solid fa-film"></i> <span>Vídeos</span>
+                </button>
+                <button type="button" class="flyout-media-chip ${activeType === 'photo' ? 'active' : ''}" data-type-filter="photo" title="Fotos">
+                    <i class="fa-solid fa-camera"></i> <span>Fotos</span>
+                </button>
+                <button type="button" class="flyout-media-chip ${activeType === 'audio' ? 'active' : ''}" data-type-filter="audio" title="Áudios">
+                    <i class="fa-solid fa-music"></i> <span>Áudios</span>
+                </button>
+            </div>
+            <div class="flyout-menu-divider"></div>
+            <div class="flyout-section-title">Ações da Biblioteca</div>
+            <button type="button" class="flyout-menu-item" data-action="reload">
+                <i class="fa-solid fa-arrows-rotate"></i>
+                <span>Recarregar Biblioteca</span>
+            </button>
+            <button type="button" class="flyout-menu-item" data-action="import">
+                <i class="fa-solid fa-plus"></i>
+                <span>Importar Pasta / HD</span>
+            </button>
+            <button type="button" class="flyout-menu-item" data-action="s3">
+                <i class="fa-solid fa-cloud"></i>
+                <span>Status da Nuvem / S3</span>
+            </button>
+            <div class="flyout-menu-divider"></div>
+            <div class="flyout-section-title">Visualização & Painel</div>
+            <button type="button" class="flyout-menu-item" data-action="studio">
+                <i class="fa-solid fa-expand"></i>
+                <span>Layout Estúdio</span>
+            </button>
+            <button type="button" class="flyout-menu-item" data-action="popout">
+                <i class="fa-solid fa-up-right-from-square"></i>
+                <span>Destacar Biblioteca</span>
+            </button>
+            <button type="button" class="flyout-menu-item" data-action="dual">
+                <i class="fa-solid fa-table-columns"></i>
+                <span>Janela Dupla</span>
+            </button>
+            <button type="button" class="flyout-menu-item" data-action="collapse-header">
+                <i class="fa-solid fa-chevron-up"></i>
+                <span>Recolher Cabeçalho</span>
+            </button>
+            <button type="button" class="flyout-menu-item" data-action="toggle-filters">
+                <i class="fa-solid fa-eye"></i>
+                <span>Alternar Filtros e Abas</span>
+            </button>
+        `;
+
+        document.body.appendChild(flyout);
+        libraryMoreFlyout = flyout;
+        btnLibraryMoreActions.classList.add("active");
+        btnLibraryMoreActions.setAttribute("aria-expanded", "true");
+
+        // Posicionamento desacoplado
+        const r = btnLibraryMoreActions.getBoundingClientRect();
+        flyout.style.top = `${Math.round(r.bottom + 4)}px`;
+        const flyoutWidth = flyout.offsetWidth || 220;
+        const left = Math.min(Math.max(8, r.left), window.innerWidth - flyoutWidth - 8);
+        flyout.style.left = `${Math.round(left)}px`;
+
+        // Eventos do campo de busca interno
+        const flyoutInput = flyout.querySelector(".flyout-search-input");
+        if (flyoutInput && realSearchInput) {
+            flyoutInput.focus();
+            flyoutInput.addEventListener("input", (e) => {
+                realSearchInput.value = e.target.value;
+                realSearchInput.dispatchEvent(new Event("input", { bubbles: true }));
+            });
+            flyoutInput.addEventListener("keydown", (e) => {
+                if (e.key === "Enter") {
+                    realSearchInput.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+                } else if (e.key === "Escape") {
+                    closeLibraryMoreFlyout();
+                }
+            });
+        }
+
+        // Itens de ação
+        flyout.addEventListener("click", (e) => {
+            const chip = e.target.closest(".flyout-media-chip");
+            if (chip) {
+                const filterType = chip.getAttribute("data-type-filter");
+                const targetRealChip = document.querySelector(`.media-type-filter-chips .chip-filter[data-type-filter="${filterType}"]`);
+                if (targetRealChip) {
+                    targetRealChip.click();
+                }
+                closeLibraryMoreFlyout();
+                return;
+            }
+
+            const item = e.target.closest(".flyout-menu-item");
+            if (!item) return;
+            const action = item.getAttribute("data-action");
+            if (action === "reload") {
+                document.getElementById("btn-reload-library")?.click();
+            } else if (action === "import") {
+                document.getElementById("btn-add-media")?.click();
+            } else if (action === "s3") {
+                document.getElementById("s3-status-indicator")?.click();
+            } else if (action === "studio") {
+                document.getElementById("btn-maximize-library")?.click();
+            } else if (action === "popout") {
+                document.getElementById("btn-popout-library")?.click();
+            } else if (action === "dual") {
+                document.getElementById("btn-dual-popout-library")?.click();
+            } else if (action === "collapse-header") {
+                toggleLibraryHeader(true);
+            } else if (action === "toggle-filters") {
+                btnToggleFilters?.click();
+            }
+            closeLibraryMoreFlyout();
+        });
+    }
+
+    if (btnLibraryMoreActions) {
+        btnLibraryMoreActions.addEventListener("click", (e) => {
+            e.stopPropagation();
+            if (libraryMoreFlyout) {
+                closeLibraryMoreFlyout();
+            } else {
+                openLibraryMoreFlyout();
+            }
+        });
+    }
+
+    document.addEventListener("click", (e) => {
+        if (libraryMoreFlyout && !libraryMoreFlyout.contains(e.target) && e.target !== btnLibraryMoreActions && !btnLibraryMoreActions?.contains(e.target)) {
+            closeLibraryMoreFlyout();
+        }
+    });
+
+    document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape" && libraryMoreFlyout) {
+            closeLibraryMoreFlyout();
+        }
+    });
+
+    window.addEventListener("resize", () => {
+        if (libraryMoreFlyout) {
+            closeLibraryMoreFlyout();
+        }
+    });
+
+    // Linha restauradora do cabeçalho da biblioteca
+    const reopenLibraryHeader = document.getElementById("reopen-library-header");
+    if (reopenLibraryHeader) {
+        reopenLibraryHeader.addEventListener("click", () => {
+            toggleLibraryHeader(false);
+        });
+    }
+
+    // Ctrl + duplo clique em espaço vazio da biblioteca para restaurar o cabeçalho se recolhido
+    if (sidebarLeft) {
+        sidebarLeft.addEventListener("dblclick", (e) => {
+            if (e.target.closest("button, input, select, option, label, a, .tab-btn, .media-tabs, .btn-icon, .btn-toggle-sidebar, .card, .media-item, #s3-status-indicator")) return;
+            if ((e.ctrlKey || e.metaKey) && sidebarLeft.classList.contains("library-header-collapsed")) {
+                e.preventDefault();
+                window.getSelection()?.removeAllRanges();
+                toggleLibraryHeader(false);
+            }
+        });
+    }
+
+    // Restaurar estados salvos na inicialização
+    try {
+        if (localStorage.getItem("capiau_library_filters_collapsed") === "true") {
+            setLibraryFiltersCollapsed(true);
+        }
+        if (localStorage.getItem("capiau_library_header_collapsed") === "true") {
+            toggleLibraryHeader(true);
+        }
+    } catch (e) {}
 
     // ── CONFIGURAÇÃO DO CABEÇALHO RETRÁTIL ──
     const appContainer = document.querySelector(".app-container");

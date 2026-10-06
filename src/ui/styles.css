@@ -1014,10 +1014,460 @@ button {
     display: none !important;
 }
 
-/* Ocultar abas e filtros/toolbar da biblioteca */
+/* Suporte a container query na sidebar esquerda */
+.sidebar-left {
+    container-type: inline-size;
+    container-name: sidebar-left-container;
+}
+
+/* Ocultar abas e filtros/toolbar da biblioteca quando filtros estão recolhidos */
 .sidebar-left.filters-collapsed .media-tabs,
 .sidebar-left.filters-collapsed #library-filter-bar {
     display: none !important;
+}
+
+/* Recolhimento do cabeçalho da biblioteca (Ctrl+Duplo clique ou setinha) */
+.sidebar-left.library-header-collapsed #library-sidebar-header,
+.sidebar-left.library-header-collapsed .sidebar-header {
+    display: none !important;
+}
+
+/* Linha finíssima restauradora do cabeçalho da biblioteca (4px ciano, sem layout shifts) */
+.library-header-restore-line {
+    width: 100%;
+    height: 4px;
+    background: var(--t-tint-3, color-mix(in srgb, var(--t-accent, rgb(6, 182, 212)) 15%, transparent));
+    border-bottom: 1px solid var(--t-line-strong, color-mix(in srgb, var(--t-accent, rgb(6, 182, 212)) 30%, transparent));
+    cursor: pointer;
+    z-index: 100;
+    transition: background 0.2s, box-shadow 0.2s;
+    flex-shrink: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+}
+
+.library-header-restore-line:hover {
+    background: color-mix(in srgb, var(--t-accent, rgb(6, 182, 212)) 85%, transparent);
+    box-shadow: 0 0 10px var(--t-glow, color-mix(in srgb, var(--t-accent, rgb(6, 182, 212)) 60%, transparent));
+}
+
+.library-header-restore-icon {
+    font-size: var(--fs-9);
+    color: var(--accent);
+    opacity: 0.7;
+    pointer-events: none;
+    transition: opacity 0.2s, transform 0.2s;
+}
+
+.library-header-restore-line:hover .library-header-restore-icon {
+    opacity: 1;
+    transform: scale(1.15);
+    color: #ffffff;
+}
+
+/* Layout anti-encavalamento do cabeçalho da biblioteca */
+.sidebar-left .sidebar-header {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 8px;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+}
+
+.sidebar-left .sidebar-header .sidebar-header-left-cluster {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    min-width: max-content !important;
+    flex: 0 0 auto !important;
+    overflow: visible !important;
+    order: 0;
+}
+
+.sidebar-left .sidebar-header h2,
+.sidebar-left .sidebar-header .sidebar-header-title {
+    margin: 0;
+    padding: 0;
+    font-family: var(--font-heading);
+    font-size: var(--fs-13);
+    font-weight: 600;
+    color: var(--text-primary);
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    flex: 0 0 auto !important;
+    min-width: max-content !important;
+    white-space: nowrap;
+}
+
+.sidebar-left .sidebar-header .header-folder-icon {
+    font-size: var(--fs-12);
+    color: var(--accent);
+    flex-shrink: 0;
+}
+
+.sidebar-left .sidebar-header .header-title-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+    flex-shrink: 1;
+}
+
+.sidebar-left .sidebar-header .sidebar-header-tools {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    flex: 0 0 auto !important;
+    min-width: max-content !important;
+    flex-shrink: 0;
+}
+
+.sidebar-left .sidebar-header .sidebar-header-tools button,
+.sidebar-left .sidebar-header .sidebar-header-tools span {
+    margin-left: 0 !important;
+    padding: 3px !important;
+    font-size: var(--fs-11) !important;
+    flex-shrink: 0 !important;
+    line-height: 1 !important;
+}
+
+/* Controles compactos no cabeçalho quando filtros/abas estão recolhidos */
+.sidebar-left .sidebar-header .library-header-compact-controls {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: 1 1 auto;
+    min-width: 0;
+    order: 1;
+    margin: 0 6px;
+    justify-content: flex-end;
+}
+
+/* Busca compacta flat: expande com o espaço disponível até 240px */
+.sidebar-header .library-header-compact-controls .library-search-area {
+    background: transparent !important;
+    border: none !important;
+    border-bottom: 1px solid var(--t-line-strong, rgba(255, 255, 255, 0.25)) !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    padding: 0 0 1px 0 !important;
+    height: 22px !important;
+    min-width: 60px !important;
+    flex: 1 1 auto !important;
+    max-width: 240px !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 4px !important;
+    transition: border-bottom-color 0.2s ease, box-shadow 0.2s ease, max-width 0.2s ease;
+}
+
+.sidebar-header .library-header-compact-controls .library-search-area:focus-within {
+    border-bottom-color: var(--accent) !important;
+    box-shadow: 0 1px 0 var(--accent) !important;
+    max-width: 280px !important;
+}
+
+.sidebar-header .library-header-compact-controls .library-search-area input {
+    font-size: var(--fs-10) !important;
+    font-family: var(--font-heading) !important;
+    color: #ffffff !important;
+    background: transparent !important;
+    border: none !important;
+    outline: none !important;
+    padding: 0 2px !important;
+    min-width: 0 !important;
+    width: 100% !important;
+    height: 20px !important;
+}
+
+.sidebar-header .library-header-compact-controls .library-search-area .search-icon {
+    font-size: var(--fs-9) !important;
+    color: var(--text-muted);
+    flex-shrink: 0;
+}
+
+/* Chips de tipo de mídia no cabeçalho */
+.sidebar-header .library-header-compact-controls .media-type-filter-chips {
+    margin-left: 0 !important;
+    gap: 2px !important;
+    flex: 0 0 auto !important;
+    min-width: max-content !important;
+    display: inline-flex !important;
+}
+
+.sidebar-header .library-header-compact-controls .media-type-filter-chips .chip-filter {
+    width: 20px !important;
+    height: 20px !important;
+    padding: 2px !important;
+    font-size: var(--fs-10) !important;
+    flex-shrink: 0 !important;
+}
+
+/* Ações no cabeçalho da biblioteca */
+.sidebar-left .sidebar-header .sidebar-header-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    flex: 0 0 auto !important;
+    min-width: max-content !important;
+    margin-left: auto;
+    order: 2;
+}
+
+.sidebar-left .sidebar-header .sidebar-header-actions button {
+    padding: 3px !important;
+    font-size: var(--fs-11) !important;
+    flex-shrink: 0 !important;
+}
+
+#btn-collapse-library-header {
+    background: transparent !important;
+    border: none !important;
+    color: var(--text-secondary);
+    font-size: var(--fs-11);
+    padding: 3px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.2s ease, transform 0.2s ease;
+}
+
+#btn-collapse-library-header:hover {
+    color: var(--accent) !important;
+    transform: scale(1.1);
+}
+
+/* Botão '+' de overflow de ferramentas e janelas */
+#btn-library-more-actions {
+    background: transparent !important;
+    border: none !important;
+    color: var(--text-secondary);
+    font-size: var(--fs-11);
+    padding: 3px;
+    cursor: pointer;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.2s ease, transform 0.2s ease;
+}
+
+#btn-library-more-actions:hover {
+    color: var(--accent) !important;
+    transform: scale(1.15);
+}
+
+/* ── HIERARQUIA PROGRESSIVA ANTI-TRUNCAMENTO (REGRA ZERO-COLLISION) ── */
+
+/* Fase 0: Filtros recolhidos OU < 520px -> Ferramentas e janelas colapsam para '+' imediatamente */
+.sidebar-left.filters-collapsed #library-header-tools,
+.sidebar-left.filters-collapsed #btn-maximize-library,
+.sidebar-left.filters-collapsed #btn-popout-library,
+.sidebar-left.filters-collapsed #btn-dual-popout-library,
+.sidebar-left.sidebar-tools-collapsed #library-header-tools,
+.sidebar-left.sidebar-tools-collapsed #btn-maximize-library,
+.sidebar-left.sidebar-tools-collapsed #btn-popout-library,
+.sidebar-left.sidebar-tools-collapsed #btn-dual-popout-library,
+.sidebar-left.sidebar-compact #library-header-tools,
+.sidebar-left.sidebar-compact #btn-maximize-library,
+.sidebar-left.sidebar-compact #btn-popout-library,
+.sidebar-left.sidebar-compact #btn-dual-popout-library,
+.sidebar-left.sidebar-minimal #library-header-tools,
+.sidebar-left.sidebar-minimal #btn-maximize-library,
+.sidebar-left.sidebar-minimal #btn-popout-library,
+.sidebar-left.sidebar-minimal #btn-dual-popout-library {
+    display: none !important;
+}
+
+.sidebar-left.filters-collapsed #btn-library-more-actions,
+.sidebar-left.sidebar-tools-collapsed #btn-library-more-actions,
+.sidebar-left.sidebar-compact #btn-library-more-actions,
+.sidebar-left.sidebar-minimal #btn-library-more-actions {
+    display: inline-flex !important;
+}
+
+@container sidebar-left-container (max-width: 520px) {
+    #library-header-tools,
+    #btn-maximize-library,
+    #btn-popout-library,
+    #btn-dual-popout-library {
+        display: none !important;
+    }
+    #btn-library-more-actions {
+        display: inline-flex !important;
+    }
+}
+
+/* Fase 1: < 440px -> Texto 'Biblioteca' some primeiro */
+.sidebar-left.sidebar-title-collapsed .sidebar-header .header-title-text,
+.sidebar-left.sidebar-compact .sidebar-header .header-title-text,
+.sidebar-left.sidebar-minimal .sidebar-header .header-title-text {
+    display: none !important;
+}
+
+@container sidebar-left-container (max-width: 440px) {
+    .header-title-text {
+        display: none !important;
+    }
+}
+
+/* Fase 2: < 370px -> Busca compacta no cabeçalho some mais rápido */
+.sidebar-left.sidebar-search-collapsed .library-header-compact-controls .library-search-area,
+.sidebar-left.sidebar-compact .library-header-compact-controls .library-search-area,
+.sidebar-left.sidebar-minimal .library-header-compact-controls .library-search-area {
+    display: none !important;
+}
+
+@container sidebar-left-container (max-width: 370px) {
+    .library-header-compact-controls .library-search-area {
+        display: none !important;
+    }
+}
+
+/* Fase 3: < 290px -> Chips de tipo de mídia recolhem-se para o '+' */
+.sidebar-left.sidebar-chips-collapsed .library-header-compact-controls .media-type-filter-chips,
+.sidebar-left.sidebar-minimal .library-header-compact-controls .media-type-filter-chips {
+    display: none !important;
+}
+
+@container sidebar-left-container (max-width: 290px) {
+    .library-header-compact-controls .media-type-filter-chips {
+        display: none !important;
+    }
+}
+
+/* Fase 4: < 160px -> Botões de recolher e alternar recolhem-se para o '+' */
+@container sidebar-left-container (max-width: 160px) {
+    #btn-collapse-library-header,
+    #btn-toggle-library-filters {
+        display: none !important;
+    }
+}
+
+/* Flyout desacoplado do botão '+' da biblioteca (Zero-Collision Flyout) */
+.library-more-flyout {
+    position: fixed;
+    z-index: 999999;
+    background: rgba(18, 18, 24, 0.96);
+    backdrop-filter: blur(14px);
+    border: 1px solid var(--t-line-strong, rgba(6, 182, 212, 0.35));
+    border-radius: 6px;
+    padding: 6px;
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.85);
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 220px;
+    animation: nleToastIn 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.library-more-flyout .flyout-media-chip {
+    flex: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    padding: 4px 6px;
+    border-radius: 4px;
+    border: 1px solid var(--t-line-weak, rgba(255, 255, 255, 0.12));
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--text-secondary);
+    font-size: var(--fs-10);
+    font-family: var(--font-heading);
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+    white-space: nowrap;
+}
+
+.library-more-flyout .flyout-media-chip:hover {
+    background: var(--t-tint-3, rgba(6, 182, 212, 0.15));
+    border-color: var(--accent);
+    color: #ffffff;
+}
+
+.library-more-flyout .flyout-media-chip.active {
+    background: var(--t-tint-2, rgba(6, 182, 212, 0.25));
+    border-color: var(--accent);
+    color: #ffffff;
+    box-shadow: 0 0 6px rgba(6, 182, 212, 0.3);
+}
+
+.library-more-flyout .flyout-media-chip i {
+    font-size: var(--fs-10);
+    color: var(--accent);
+}
+
+.library-more-flyout .flyout-search-container {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 6px;
+    border-bottom: 1px solid var(--t-line-weak, rgba(255, 255, 255, 0.12));
+    margin-bottom: 3px;
+}
+
+.library-more-flyout .flyout-search-container .search-icon {
+    font-size: var(--fs-10);
+    color: var(--text-muted);
+}
+
+.library-more-flyout .flyout-search-input {
+    background: transparent;
+    border: none;
+    outline: none;
+    color: #ffffff;
+    font-size: var(--fs-11);
+    font-family: var(--font-heading);
+    width: 100%;
+}
+
+.library-more-flyout .flyout-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    font-size: var(--fs-11);
+    font-family: var(--font-heading);
+    padding: 6px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    text-align: left;
+    width: 100%;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+.library-more-flyout .flyout-menu-item:hover {
+    background: var(--t-tint-3, rgba(6, 182, 212, 0.15));
+    color: #ffffff;
+}
+
+.library-more-flyout .flyout-menu-item i {
+    font-size: var(--fs-11);
+    width: 16px;
+    text-align: center;
+    color: var(--accent);
+}
+
+.library-more-flyout .flyout-menu-divider {
+    height: 1px;
+    background: var(--t-line-weak, rgba(255, 255, 255, 0.08));
+    margin: 2px 0;
+}
+
+.library-more-flyout .flyout-section-title {
+    font-size: var(--fs-9);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-muted);
+    padding: 2px 8px;
+    font-weight: 600;
 }
 
 

@@ -178,45 +178,61 @@
             <!-- ── LEFT SIDEBAR (COLLAPSIBLE - MEDIA LIBRARY) ─────────────── -->
             <aside class="sidebar-left glassmorphism dock-left" id="sidebar-left">
                 <div id="library-main-view" style="display: flex; flex-direction: column; height: 100%; width: 100%; overflow: hidden;">
-                    <div class="sidebar-header">
-                    <button class="btn-toggle-sidebar" id="toggle-left" data-tooltip="Recolher Painel (Esquerda)" style="margin-right: var(--sp-4); padding: var(--sp-4); font-size: var(--fs-12);">
-                        <i class="fa-solid fa-chevron-left"></i>
-                    </button>
-                    <h2 style="flex: 1; display: flex; align-items: center; gap: var(--sp-8); margin-left: var(--sp-2);">
-                        <i class="fa-solid fa-folder-open"></i> <span class="header-title-text">Biblioteca</span>
-                        <button id="btn-reload-library" class="btn-icon" title="Recarregar Biblioteca" style="margin-left: var(--sp-6); font-size: var(--fs-13); background: transparent; border: none; color: var(--text-secondary); cursor: pointer; transition: color 0.2s;">
-                            <i class="fa-solid fa-arrows-rotate"></i>
-                        </button>
-                        <button id="btn-add-media" class="btn-icon" title="Importar Pasta/HD Externo" style="margin-left: var(--sp-6); font-size: var(--fs-13); background: transparent; border: none; color: var(--text-secondary); cursor: pointer; transition: color 0.2s;">
-                            <i class="fa-solid fa-plus"></i>
-                        </button>
-                        <span id="s3-status-indicator" class="btn-icon offline" title="S3 Desconectado" style="margin-left: var(--sp-6); font-size: var(--fs-13); color: var(--text-muted); cursor: pointer; transition: color 0.3s; display: inline-flex; align-items: center;">
-                            <i class="fa-solid fa-cloud"></i>
-                        </span>
-                    </h2>
-                    <div class="sidebar-header-actions" style="display: flex; gap: var(--sp-8); align-items: center;">
-                        <button id="btn-toggle-library-filters" class="btn-icon" title="Ocultar Filtros/Abas" style="font-size: var(--fs-12); background: transparent; border: none; color: var(--text-secondary); cursor: pointer;"><i class="fa-solid fa-eye"></i></button>
-                        <button id="btn-maximize-library" class="btn-icon" title="Layout Estúdio (biblioteca + players + timeline)" style="font-size: var(--fs-12); background: transparent; border: none; color: var(--text-secondary); cursor: pointer;"><i class="fa-solid fa-expand"></i></button>
-                        <button id="btn-popout-library" class="btn-icon" title="Destacar Biblioteca" style="font-size: var(--fs-12); background: transparent; border: none; color: var(--text-secondary); cursor: pointer;"><i class="fa-solid fa-up-right-from-square"></i></button>
-                        <button id="btn-dual-popout-library" class="btn-icon" data-tooltip="Destacar em Janela Dupla (com Ajustes ou Falas)" style="font-size: var(--fs-12); background: transparent; border: none; color: var(--text-secondary); cursor: pointer;"><i class="fa-solid fa-table-columns"></i></button>
+                    <!-- Linha restauradora para o cabeçalho da biblioteca quando recolhido (Ctrl+Duplo clique) -->
+                    <div id="reopen-library-header" class="library-header-restore-line" data-tooltip="Expandir Cabeçalho (Ctrl+Duplo clique)" style="display: none;">
+                        <i class="fa-solid fa-chevron-down library-header-restore-icon"></i>
                     </div>
-                </div>
-                
-                <div class="media-tabs" id="left-tabs">
-                    <button class="tab-btn active" data-tab="tab-media" title="Mídias"><i class="fa-solid fa-photo-film"></i> <span class="tab-text">Mídias</span></button>
-                    <button class="tab-btn" data-tab="tab-themes" title="Temas"><i class="fa-solid fa-tags"></i> <span class="tab-text">Temas</span></button>
-                    <button class="tab-btn" data-tab="tab-faces" title="Rostos"><i class="fa-solid fa-user-friends"></i> <span class="tab-text">Rostos</span></button>
-                    <button class="tab-btn" data-tab="tab-titles" title="Títulos & Textos"><i class="fa-solid fa-font"></i> <span class="tab-text">Títulos</span></button>
-                    <button class="tab-btn" data-tab="tab-docs" title="Documentos"><i class="fa-solid fa-file-text"></i> <span class="tab-text">Docs</span></button>
-                </div>
-                
-                <div class="library-toolbar" id="library-filter-bar" style="padding: var(--sp-8) var(--sp-12); border-bottom: 1px solid var(--border-glass); display: flex; flex-direction: column; gap: var(--sp-6); background: rgba(0,0,0,0.15); position: relative;">
-                    <!-- Linha 1: Campo de Busca e Botões de Similaridade + Ajustes + Filtro de Mídia -->
-                    <div style="display: flex; gap: var(--sp-4); width: 100%; align-items: center;">
-                        <div class="search-area glassmorphism library-search-area" style="flex: 1; min-width: 0; display: flex; align-items: center; gap: var(--sp-6); height: 28px; width: 100%;">
-                            <i class="fa-solid fa-magnifying-glass search-icon" style="color: var(--text-muted); font-size: var(--fs-10);"></i>
-                            <input type="text" id="library-search-input" placeholder="Buscar mídias..." style="flex: 1; min-width: 0; background: transparent; border: none; outline: none; font-size: var(--fs-10); color: #fff;">
+
+                    <div class="sidebar-header" id="library-sidebar-header">
+                        <button class="btn-toggle-sidebar" id="toggle-left" data-tooltip="Recolher Painel (Esquerda)" style="margin-right: var(--sp-4); padding: var(--sp-4); font-size: var(--fs-12);">
+                            <i class="fa-solid fa-chevron-left"></i>
+                        </button>
+                        <div class="sidebar-header-left-cluster">
+                            <h2 class="sidebar-header-title">
+                                <i class="fa-solid fa-folder-open header-folder-icon"></i>
+                                <span class="header-title-text">Biblioteca</span>
+                            </h2>
+                            <div class="sidebar-header-tools" id="library-header-tools">
+                                <button id="btn-reload-library" class="btn-icon" data-tooltip="Recarregar Biblioteca" style="font-size: var(--fs-13); background: transparent; border: none; color: var(--text-secondary); cursor: pointer; transition: color 0.2s;">
+                                    <i class="fa-solid fa-arrows-rotate"></i>
+                                </button>
+                                <button id="btn-add-media" class="btn-icon" data-tooltip="Importar Pasta/HD Externo" style="font-size: var(--fs-13); background: transparent; border: none; color: var(--text-secondary); cursor: pointer; transition: color 0.2s;">
+                                    <i class="fa-solid fa-plus"></i>
+                                </button>
+                                <span id="s3-status-indicator" class="btn-icon offline" data-tooltip="S3 Desconectado" style="font-size: var(--fs-13); color: var(--text-muted); cursor: pointer; transition: color 0.3s; display: inline-flex; align-items: center;">
+                                    <i class="fa-solid fa-cloud"></i>
+                                </span>
+                            </div>
                         </div>
+
+                        <!-- Controles Compactos no Cabeçalho (busca + seletores de tipo de mídia quando filtros/abas estão ocultados) -->
+                        <div id="library-header-compact-controls" class="library-header-compact-controls" style="display: none;"></div>
+
+                        <div class="sidebar-header-actions" id="library-header-actions" style="display: flex; gap: var(--sp-8); align-items: center;">
+                            <button id="btn-library-more-actions" class="btn-icon library-more-btn" data-tooltip="Mais Ferramentas e Opções" style="display: none;"><i class="fa-solid fa-plus"></i></button>
+                            <button id="btn-collapse-library-header" class="btn-icon" data-tooltip="Recolher Cabeçalho (Ctrl+Duplo clique)" style="font-size: var(--fs-12); background: transparent; border: none; color: var(--text-secondary); cursor: pointer;"><i class="fa-solid fa-chevron-up"></i></button>
+                            <button id="btn-toggle-library-filters" class="btn-icon" data-tooltip="Ocultar Filtros/Abas" style="font-size: var(--fs-12); background: transparent; border: none; color: var(--text-secondary); cursor: pointer;"><i class="fa-solid fa-eye"></i></button>
+                            <button id="btn-maximize-library" class="btn-icon" data-tooltip="Layout Estúdio (biblioteca + players + timeline)" style="font-size: var(--fs-12); background: transparent; border: none; color: var(--text-secondary); cursor: pointer;"><i class="fa-solid fa-expand"></i></button>
+                            <button id="btn-popout-library" class="btn-icon" data-tooltip="Destacar Biblioteca" style="font-size: var(--fs-12); background: transparent; border: none; color: var(--text-secondary); cursor: pointer;"><i class="fa-solid fa-up-right-from-square"></i></button>
+                            <button id="btn-dual-popout-library" class="btn-icon" data-tooltip="Destacar em Janela Dupla (com Ajustes ou Falas)" style="font-size: var(--fs-12); background: transparent; border: none; color: var(--text-secondary); cursor: pointer;"><i class="fa-solid fa-table-columns"></i></button>
+                        </div>
+                    </div>
+                
+                    <div class="media-tabs" id="left-tabs">
+                        <button class="tab-btn active" data-tab="tab-media" title="Mídias"><i class="fa-solid fa-photo-film"></i> <span class="tab-text">Mídias</span></button>
+                        <button class="tab-btn" data-tab="tab-themes" title="Temas"><i class="fa-solid fa-tags"></i> <span class="tab-text">Temas</span></button>
+                        <button class="tab-btn" data-tab="tab-faces" title="Rostos"><i class="fa-solid fa-user-friends"></i> <span class="tab-text">Rostos</span></button>
+                        <button class="tab-btn" data-tab="tab-titles" title="Títulos & Textos"><i class="fa-solid fa-font"></i> <span class="tab-text">Títulos</span></button>
+                        <button class="tab-btn" data-tab="tab-docs" title="Documentos"><i class="fa-solid fa-file-text"></i> <span class="tab-text">Docs</span></button>
+                    </div>
+                
+                    <div class="library-toolbar" id="library-filter-bar" style="padding: var(--sp-8) var(--sp-12); border-bottom: 1px solid var(--border-glass); display: flex; flex-direction: column; gap: var(--sp-6); background: rgba(0,0,0,0.15); position: relative;">
+                        <!-- Linha 1: Campo de Busca e Botões de Similaridade + Ajustes + Filtro de Mídia -->
+                        <div id="library-filter-bar-row1" style="display: flex; gap: var(--sp-4); width: 100%; align-items: center;">
+                            <div class="search-area glassmorphism library-search-area" id="library-search-area-wrapper" style="flex: 1; min-width: 0; display: flex; align-items: center; gap: var(--sp-6); height: 28px; width: 100%;">
+                                <i class="fa-solid fa-magnifying-glass search-icon" style="color: var(--text-muted); font-size: var(--fs-10);"></i>
+                                <input type="text" id="library-search-input" placeholder="Buscar mídias..." style="flex: 1; min-width: 0; background: transparent; border: none; outline: none; font-size: var(--fs-10); color: #fff;">
+                            </div>
                         <button id="btn-search-similar-selected" data-tooltip="Buscar mídias parecidas com os itens selecionados" class="lib-action-btn" style="display: none; color: #c084fc; position: relative;">
                             <i class="fa-solid fa-images"></i>
                             <span id="similar-selected-count" class="similar-count-badge">0</span>

@@ -3658,7 +3658,8 @@ export class WorkspaceManager {
                 header: appContainer ? appContainer.classList.contains("header-collapsed") : false,
                 timelineToolbar: timelineActions ? timelineActions.classList.contains("collapsed") : false,
                 timelineHeaders: timelineHeaders ? timelineHeaders.classList.contains("collapsed") : false,
-                libraryFilters: sidebarLeft ? sidebarLeft.classList.contains("filters-collapsed") : false
+                libraryFilters: sidebarLeft ? sidebarLeft.classList.contains("filters-collapsed") : false,
+                libraryHeader: sidebarLeft ? sidebarLeft.classList.contains("library-header-collapsed") : false
             },
             maximized: {
                 sourcePlayer: sourcePanel ? sourcePanel.classList.contains("maximized") : false,
@@ -3950,6 +3951,17 @@ export class WorkspaceManager {
                         if (btnToggleHeaders) btnToggleHeaders.click(); else timelineHeaders.classList.add("collapsed");
                     } else if (!c.timelineHeaders && isCollapsed) {
                         if (reopenHeaders) reopenHeaders.click(); else timelineHeaders.classList.remove("collapsed");
+                    }
+                }
+
+                if (c.libraryFilters !== undefined) {
+                    if (typeof window.setLibraryFiltersCollapsed === "function") {
+                        window.setLibraryFiltersCollapsed(c.libraryFilters);
+                    }
+                }
+                if (c.libraryHeader !== undefined) {
+                    if (typeof window.toggleLibraryHeader === "function") {
+                        window.toggleLibraryHeader(c.libraryHeader);
                     }
                 }
             }
@@ -4837,6 +4849,12 @@ export class WorkspaceManager {
                                 const sel = win.getSelection ? win.getSelection() : window.getSelection();
                                 sel?.removeAllRanges();
                             } catch (err) {}
+                            if ((panelEl.id === "sidebar-left" || panelEl.querySelector("#library-main-view")) && (e.ctrlKey || e.metaKey)) {
+                                if (typeof window.toggleLibraryHeader === "function") {
+                                    window.toggleLibraryHeader();
+                                }
+                                return;
+                            }
                             toggleBtn.click();
                         });
                     }
@@ -5490,6 +5508,12 @@ export class WorkspaceManager {
                     el.classList.add("sidebar-minimal");
                     el.classList.remove("sidebar-normal", "sidebar-compact");
                 }
+
+                // Sub-estágios granulares para cabeçalhos anti-truncamento
+                el.classList.toggle("sidebar-tools-collapsed", width < 520);
+                el.classList.toggle("sidebar-title-collapsed", width < 440);
+                el.classList.toggle("sidebar-search-collapsed", width < 370);
+                el.classList.toggle("sidebar-chips-collapsed", width < 290);
             }
         });
         sidebars.forEach(s => {

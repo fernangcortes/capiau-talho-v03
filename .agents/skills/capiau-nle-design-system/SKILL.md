@@ -150,6 +150,28 @@ Este guia orienta futuros agentes de IA e desenvolvedores a manterem e expandire
     * **Ações de Edição e Timeline:** Violeta (`var(--color-violet)`) ou rosa (`var(--color-rose)` / glow rosa para o botão *OUT*).
     * **Efeito Hover Geral:** Aumentar ligeiramente o tamanho (`transform: scale(1.05)` ou `scale(1.1)`).
 
+### 6b. Regra Anti-Truncamento de Ícones em Barras e Cabeçalhos (Zero-Collision & Progressive Overflow Standard)
+* **Objetivo:** Garantir que, independentemente da largura horizontal de sidebars, abas, barras de ferramentas ou cabeçalhos de painéis, **NUNCA ocorra colisão, sobreposição, quebra forçada de linha ou truncamento de ícones**. A densidade de controles deve degradar graciosamente por etapas, preservando sempre uma margem horizontal de segurança.
+* **Mandato de Tolerância Zero:**
+  * É estritamente proibido que ícones se sobreponham ("encavalar"), que botões fiquem parcialmente visíveis ou cortados pela borda de um contêiner com `overflow: hidden`, ou que empurrem elementos vizinhos para fora do viewport.
+* **Redução Progressiva em 5 Fases (Progressive Collapse):**
+  1. **Fase 0 — Colapso Imediato de Ferramentas e Janelas para o Line Icon `+` ($W < 520\text{px}$ ou `.filters-collapsed`):**
+     * Quando controles extras (como busca e chips de mídia) são movidos para o cabeçalho, ou quando o espaço horizontal for inferior a $520\text{px}$, ferramentas secundárias (recarregar, importar, nuvem) e ações de janela (layout estúdio, destacar, janela dupla) **devem colapsar imediatamente** para o botão de linha `+` (`fa-solid fa-plus`, `#btn-library-more-actions`).
+  2. **Fase 1 — Ocultação de Textos e Rótulos Primeiro ($W < 440\text{px}$):**
+     * Títulos e descrições textuais (ex.: o texto "Biblioteca" no cabeçalho) desaparecem, preservando apenas o ícone de linha correspondente (ex.: ícone de pasta).
+  3. **Fase 2 — Retirada Antecipada da Caixa de Busca ($W < 370\text{px}$):**
+     * O campo de busca compacta deixa de ocupar a barra horizontal para não espremer os botões ao redor, permanecendo 100% funcional no topo do flyout do botão `+`.
+  4. **Fase 3 — Colapso dos Chips de Filtro para o `+` nas Larguras Estreitas ($W < 290\text{px}$ ou `.sidebar-minimal`):**
+     * Quando a barra se torna muito estreita ("bem curtinha", e.g. visualização de 1 coluna de miniaturas), os botões de tipo de mídia (Todos, Vídeos, Fotos, Áudios) **recolhem-se para dentro do flyout do botão `+`**. Isso elimina fisicamente o risco de o botão `+` avançar por cima do ícone de áudio ou de qualquer outro seletor.
+  5. **Fase 4 — Colapso Extremo ($W < 160\text{px}$):**
+     * Apenas a seta do painel, o ícone de pasta e o botão `+` permanecem no cabeçalho, acomodando larguras mínimas até $80\text{px}$.
+* **Flyout Desacoplado Ancorado no `<body>`:**
+  * O menu suspenso do botão `+` (`.library-more-flyout`) é montado diretamente na raiz do documento (`document.body`) com `position: fixed` e `z-index: 999999`.
+  * Ele contém a barra de busca sincronizada, botões de filtro de mídia com estado ativo destacado, e todas as ações de ferramentas e janelas.
+* **Reserva Matemática de Margem & Blindagem Flexbox:**
+  * Agrupamentos de ícones e títulos devem usar `flex: 0 0 auto !important; min-width: max-content !important;` para que flexbox nunca permita que a caixa de um elemento seja comprimida a zero enquanto o ícone interno transborda por cima de elementos vizinhos.
+  * Para qualquer contêiner horizontal de largura $W_{\min}$, a soma das larguras de todos os elementos visíveis deve manter margem de folga mínima de $\ge 30\text{px}$.
+
 ---
 
 ## III. Componentes de Controle & Ação (UI Controls & Behavior)
