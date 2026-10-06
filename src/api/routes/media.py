@@ -210,7 +210,8 @@ def update_video_category(video_id: int, payload: CategoryUpdate, conn: sqlite3.
         raise HTTPException(400, f"Categoria inválida '{category}'. Válidas: {', '.join(sorted(TRIAGE_CATEGORIES))}")
 
     cursor = conn.cursor()
-    cursor.execute("SELECT project_id, category, video_type FROM video WHERE id = ?", (video_id,))
+    cursor.execute("SELECT project_id, category, category_confidence, video_type, status, esforco_analisado "
+                   "FROM video WHERE id = ?", (video_id,))
     row = cursor.fetchone()
     if not row:
         raise HTTPException(404, "Vídeo não encontrado")
@@ -221,9 +222,11 @@ def update_video_category(video_id: int, payload: CategoryUpdate, conn: sqlite3.
 
     # 'depoimento' é fala dirigida à câmera -> interview; o resto -> broll.
     derived_type = "interview" if category == "depoimento" else "broll"
+    desatualizada = _analise_desatualizada(cursor, video_id, row, category)
     cursor.execute(
-        "UPDATE video SET category = ?, category_confidence = 1.0, video_type = ? WHERE id = ?",
-        (category, derived_type, video_id)
+        "UPDATE video SET category = ?, category_confidence = 1.0, video_type = ?, analise_desatualizada = ? "
+        "WHERE id = ?",
+        (category, derived_type, desatualizada, video_id)
     )
     conn.commit()
 
@@ -234,8 +237,39 @@ def update_video_category(video_id: int, payload: CategoryUpdate, conn: sqlite3.
     except Exception as sync_err:
         print(f"[Triage] Falha ao sincronizar faceta de categoria do video {video_id}: {sync_err}")
 
-    return {"status": "success", "id": video_id, "category": category,
-            "previous_category": old_category, "video_type": derived_type}
+    resposta = {"status": "success", "id": video_id, "category": category,
+                "previous_category": old_category, "video_type": derived_type,
+                "analise_desatualizada": desatualizada}
+    if desatualizada:
+        # Só oferece: nada roda sozinho. Reanalisar limpa a marca.
+        resposta["reanalise"] = {"metodo": "POST", "rota": f"/api/video/{video_id}/analyze-vision"}
+    return resposta
+
+
+def _analise_desatualizada(cursor, video_id: int, row, nova_categoria: str) -> Optional[str]:
+    """Motivo da marca 'análise desatualizada', ou None se a análise que existe basta.
+
+    Compara o esforço com que a visão rodou (esforco_analisado; para análises
+    antigas, o perfil que a categoria anterior dava) com o da categoria corrigida.
+    Só subir marca: descer não apaga nada, a análise maior já cobre a menor.
+    Vídeo que nunca passou pela visão não tem o que desatualizar.
+    """
+    from src.services.analysis_policy import EFFORT_RANK, get_profile
+    S = SettingsService.get_settings(row["project_id"])
+    overrides = S.get("analysis.effort_overrides")
+    analisado = row["esforco_analisado"]
+    if not analisado:
+        if row["status"] != "analyzed":
+            return None
+        from src.services.pipeline import PipelineService
+        analisado = get_profile(row["category"], overrides, confianca=row["category_confidence"],
+                                limiar=S.get("triage.min_confidence"),
+                                categoria_laya=PipelineService._categoria_laya(video_id)).effort
+    novo = get_profile(nova_categoria, overrides, confianca=1.0).effort
+    if EFFORT_RANK[novo] <= EFFORT_RANK[analisado]:
+        return None
+    return (f"categoria {row['category'] or 'sem categoria'} -> {nova_categoria}: "
+            f"analisado com esforço '{analisado}', agora pede '{novo}'")
 
 @router.patch("/api/photo/{photo_id}/category")
 def update_photo_category(photo_id: int, payload: CategoryUpdate, conn: sqlite3.Connection = Depends(get_db_conn)):

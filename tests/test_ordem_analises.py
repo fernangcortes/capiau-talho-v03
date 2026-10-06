@@ -368,3 +368,72 @@ def test_fila_de_revisao_inclui_discordancia_e_confianca_vazia(banco, monkeypatc
     fila = triage_review_queue(1, conn=banco)
     assert sorted(v["id"] for v in fila["videos"]) == [21, 22, 23]
     assert {v["id"]: v["categoria_laya"] for v in fila["videos"]}[21] == "pessoal"
+
+
+# ---------------------------------------------------------------------------
+# Item 5: correção humana de categoria marca análise desatualizada (só marca)
+# ---------------------------------------------------------------------------
+
+def _corrigir(banco, monkeypatch, categoria):
+    from src.api.routes.media import update_video_category
+    from src.api.schemas import CategoryUpdate
+
+    class SemClip:
+        @staticmethod
+        def get_instance():
+            raise RuntimeError("CLIP fora do teste")
+
+    monkeypatch.setattr(SettingsService, "get_settings", _settings())
+    monkeypatch.setattr("src.search.image_semantic.ImageSearch", SemClip)
+    return update_video_category(7, CategoryUpdate(category=categoria), conn=banco)
+
+
+def _marca(banco):
+    return banco.execute("SELECT analise_desatualizada FROM video WHERE id = 7").fetchone()[0]
+
+
+def test_subir_esforco_marca_e_oferece_reanalise_sem_rodar_nada(banco, monkeypatch):
+    banco.execute("UPDATE video SET category = 'cotidiano', category_confidence = 0.9, "
+                  "esforco_analisado = 'triagem', description = 'almoço' WHERE id = 7")
+    banco.commit()
+    r = _corrigir(banco, monkeypatch, "obra")
+    assert "triagem" in r["analise_desatualizada"] and "completo" in r["analise_desatualizada"]
+    assert r["reanalise"] == {"metodo": "POST", "rota": "/api/video/7/analyze-vision"}
+    assert _marca(banco) == r["analise_desatualizada"]
+    assert banco.execute("SELECT status, description FROM video WHERE id = 7").fetchone()[:] == ("analyzed", "almoço")
+
+    # Voltar à categoria antiga desfaz a marca
+    r = _corrigir(banco, monkeypatch, "cotidiano")
+    assert r["analise_desatualizada"] is None and "reanalise" not in r and _marca(banco) is None
+
+
+def test_descer_esforco_nao_marca_nem_apaga(banco, monkeypatch):
+    banco.execute("UPDATE video SET esforco_analisado = 'completo', description = 'take 3' WHERE id = 7")
+    banco.commit()
+    r = _corrigir(banco, monkeypatch, "cotidiano")
+    assert r["analise_desatualizada"] is None and _marca(banco) is None
+    assert banco.execute("SELECT description FROM video WHERE id = 7").fetchone()[0] == "take 3"
+
+
+def test_analise_antiga_sem_esforco_registrado_usa_o_perfil_da_categoria_anterior(banco, monkeypatch):
+    banco.execute("UPDATE video SET category = 'cotidiano', category_confidence = 0.9, esforco_analisado = NULL WHERE id = 7")
+    banco.commit()
+    assert _corrigir(banco, monkeypatch, "processo")["analise_desatualizada"]
+
+
+def test_video_que_nunca_passou_pela_visao_nao_fica_desatualizado(banco, monkeypatch):
+    banco.execute("UPDATE video SET category = 'cotidiano', category_confidence = 0.9, "
+                  "esforco_analisado = NULL, status = 'transcribed' WHERE id = 7")
+    banco.commit()
+    assert _corrigir(banco, monkeypatch, "obra")["analise_desatualizada"] is None
+
+
+def test_analise_de_visao_registra_esforco_e_limpa_a_marca(banco, monkeypatch, tmp_path):
+    from pathlib import Path
+    banco.execute("UPDATE video SET category_confidence = 1.0, analise_desatualizada = 'x' WHERE id = 7")
+    banco.commit()
+    P = _pipeline_falso(banco, monkeypatch, tmp_path, [])
+    _detector(monkeypatch, [])
+    assert P.analyze_video_vision(7, Path("C:/nao/existe/take.mp4"), 20.0) is True
+    assert banco.execute("SELECT esforco_analisado, analise_desatualizada FROM video WHERE id = 7").fetchone()[:] \
+        == ("completo", None)

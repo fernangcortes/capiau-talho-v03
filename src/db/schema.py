@@ -50,6 +50,8 @@ CREATE TABLE IF NOT EXISTS video (
     description TEXT,
     summary TEXT,
     tags TEXT, -- JSON array de tags gerais
+    esforco_analisado TEXT,       -- perfil de esforço da última análise de visão (completo|reduzido|triagem)
+    analise_desatualizada TEXT,   -- motivo quando a categoria mudou e pede mais esforço; NULL = em dia
 
     -- Status no pipeline
     status TEXT CHECK(status IN ('pending', 'ingested', 'transcribing', 'transcribed', 'analyzing', 'analyzed', 'error')) DEFAULT 'pending',
@@ -690,6 +692,14 @@ def init_db(db_path: Path = None):
         if "category_confidence" not in video_cols:
             cursor.execute("ALTER TABLE video ADD COLUMN category_confidence REAL")
             print("[MIGRATION] Coluna 'category_confidence' adicionada a tabela video.")
+        # Perfil de esforço com que a visão rodou e aviso de análise desatualizada
+        # (docs/ORDEM_DAS_ANALISES.md, item 5)
+        if "esforco_analisado" not in video_cols:
+            cursor.execute("ALTER TABLE video ADD COLUMN esforco_analisado TEXT")
+            print("[MIGRATION] Coluna 'esforco_analisado' adicionada a tabela video.")
+        if "analise_desatualizada" not in video_cols:
+            cursor.execute("ALTER TABLE video ADD COLUMN analise_desatualizada TEXT")
+            print("[MIGRATION] Coluna 'analise_desatualizada' adicionada a tabela video.")
         # Origem da decupagem CORRENTE ('ia' | 'humano' | 'importado'). Serve para
         # que video_metadata_history registre corretamente quem escreveu a versao
         # que esta sendo arquivada.

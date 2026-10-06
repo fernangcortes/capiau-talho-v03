@@ -1063,6 +1063,10 @@ class PipelineService:
             with get_db() as conn:
                 warn_msg = f"Aviso: {failed_frames} de {total_jobs} quadros falharam na análise visual." if failed_frames > 0 else None
                 MediaRepository.update_video_status(conn, video_id, 'analyzed', error_message=warn_msg)
+                # Registra o esforço desta análise; a reanálise resolve o aviso de desatualizada
+                conn.execute("UPDATE video SET esforco_analisado = ?, analise_desatualizada = NULL WHERE id = ?",
+                             (profile.effort, video_id))
+                conn.commit()
             TASK_MANAGER.update_progress(str(video_id), 100.0, "finished", task_type="vision")
             return True
         except Exception as e:
