@@ -399,8 +399,12 @@ class PipelineService:
                     pass
 
     @staticmethod
-    def transcribe_video(video_id: int, video_path: Path) -> bool:
-        """Executa o pipeline completo de transcrição AssemblyAI (nuvem) e indexação local (Qdrant)."""
+    def transcribe_video(video_id: int, video_path: Path, finalizar: bool = True) -> bool:
+        """Executa o pipeline completo de transcrição AssemblyAI (nuvem) e indexação local (Qdrant).
+
+        `finalizar=False` pula resumo e temas: quem chamou (visão, análise completa)
+        roda os dois uma vez só, no fim, com fala e imagem juntas.
+        """
         # Verifica tipo de vídeo no banco
         with get_db() as conn:
             video = MediaRepository.get_video(conn, video_id)
@@ -484,18 +488,19 @@ class PipelineService:
             search_engine = SemanticSearch.get_instance()
             search_engine.index_transcript_chunks(project_id, video_id, dialogues, video_type)
             
-            # Gera resumo automático
-            try:
-                PipelineService.generate_video_summary(video_id, "interview", project_id)
-            except Exception as sum_err:
-                print(f"[ASR] Aviso: Falha na geração do resumo: {sum_err}")
+            if finalizar:
+                # Gera resumo automático
+                try:
+                    PipelineService.generate_video_summary(video_id, "interview", project_id)
+                except Exception as sum_err:
+                    print(f"[ASR] Aviso: Falha na geração do resumo: {sum_err}")
 
-            # Atribuição incremental aos temas existentes (sem re-clusterizar tudo)
-            try:
-                from src.nlp.theme_engine import assign_media_to_themes
-                assign_media_to_themes(project_id, video_id=video_id)
-            except Exception as theme_err:
-                print(f"[ASR] Aviso: Falha na atribuição incremental de temas: {theme_err}")
+                # Atribuição incremental aos temas existentes (sem re-clusterizar tudo)
+                try:
+                    from src.nlp.theme_engine import assign_media_to_themes
+                    assign_media_to_themes(project_id, video_id=video_id)
+                except Exception as theme_err:
+                    print(f"[ASR] Aviso: Falha na atribuição incremental de temas: {theme_err}")
 
             with get_db() as conn:
                 MediaRepository.update_video_status(conn, video_id, 'transcribed')
@@ -701,6 +706,38 @@ class PipelineService:
         return PipelineService._cap_keeping_coverage(kept, max_frames)
 
     @staticmethod
+    def _tem_transcricao(video_id: int) -> bool:
+        with get_db() as conn:
+            return conn.execute("SELECT 1 FROM transcript WHERE video_id = ? LIMIT 1", (video_id,)).fetchone() is not None
+
+    @staticmethod
+    def _transcrever_antes_da_triagem(video_id: int, source: Path) -> None:
+        """A fala é o melhor contexto da triagem e da Laya: sem transcrição e com
+        áudio, transcreve antes delas. O VAD local de transcribe_video descarta
+        b-roll mudo sem custo; só vídeo com fala chega ao ASR. Falha não para a
+        visão: fica no log da tarefa que a triagem rodou sem fala."""
+        if PipelineService._tem_transcricao(video_id):
+            return
+        task_key = str(video_id)
+        try:
+            if not has_audio_stream(source):
+                TASK_MANAGER.add_log(task_key, "[ASR] Vídeo sem áudio: triagem sem transcrição.")
+                return
+            TASK_MANAGER.add_log(task_key, "[ASR] Sem transcrição: transcrevendo antes da triagem.")
+            ok = PipelineService.transcribe_video(video_id, source, finalizar=False)
+        except Exception as e:
+            ok = False
+            print(f"[Vision] ASR antes da triagem falhou no vídeo {video_id}: {e}")
+        with get_db() as conn:
+            # transcribe_video mexe no status; a visão segue em andamento
+            MediaRepository.update_video_status(conn, video_id, 'analyzing')
+            conn.commit()
+        if not ok:
+            TASK_MANAGER.add_log(task_key, "[WARN] ASR falhou: triagem_sem_transcricao.", "WARN")
+        elif not PipelineService._tem_transcricao(video_id):
+            TASK_MANAGER.add_log(task_key, "[ASR] Nenhuma fala detectada: triagem sem transcrição.")
+
+    @staticmethod
     def analyze_video_vision(video_id: int, filepath: Path, duration: float, beat_embedder: Optional[str] = None) -> bool:
         """Decupa frames-chave do vídeo B-roll enviando para LLM multimodal e Qdrant.
 
@@ -719,6 +756,9 @@ class PipelineService:
         # Fonte dos keyframes de análise: original em resolução plena por padrão;
         # cai para o proxy 720p só se o original estiver ilegível (offline, movido…)
         frame_source = PipelineService._resolve_analysis_source(video_id, filepath, duration)
+
+        # Fala primeiro: a Laya (sombra) e a triagem por visão leem a transcrição
+        PipelineService._transcrever_antes_da_triagem(video_id, frame_source)
 
         # Triagem antes da varredura: categoria (Eixo A) + título curto + video_type por conteúdo
         if not category:
@@ -1629,9 +1669,9 @@ Responda em formato JSON puro:
         return updated
 
     @staticmethod
-    def analyze_video_all(video_id: int) -> Dict[str, Any]:
+    def analyze_video_all(video_id: int, forcar_asr: bool = False) -> Dict[str, Any]:
         """Executa todas as camadas de IA para um vídeo em background:
-        1. Transcrição ASR (se depoimento ou áudio pendente)
+        1. Transcrição ASR (só se ainda não houver; `forcar_asr` retranscreve)
         2. Visão Computacional Multimodal (título, descrição, tags)
         3. Detecção e Registro Facial nos keyframes
         4. Indexação Vetorial Semântica (Qdrant)
@@ -1661,7 +1701,11 @@ Responda em formato JSON puro:
                 label=f"Transcrição ASR (Vídeo #{video_id})",
                 log_message="[ASR] Executando Camada 4: Transcrição ASR e diarização..."
             )
-            PipelineService.transcribe_video(video_id, filepath)
+            # Transcrição existente não se paga de novo (a visão também confere antes da triagem)
+            if forcar_asr or not PipelineService._tem_transcricao(video_id):
+                PipelineService.transcribe_video(video_id, filepath)
+            else:
+                TASK_MANAGER.add_log(task_key, "[ASR] Transcrição já existe: mantida.")
         except Exception as e:
             print(f"[AnalyzeAllVideo] Transcrição ASR ignorada ou falhou: {e}")
             TASK_MANAGER.add_log(task_key, f"[WARN] ASR ignorada/não aplicável: {e}", "WARN")

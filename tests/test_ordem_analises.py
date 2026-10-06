@@ -110,8 +110,9 @@ def _pipeline_falso(banco, monkeypatch, tmp_path, capturados):
         def index_broll_descriptions(self, *a, **k): pass
 
     class TarefasFalsas:
+        logs = []
         def update_progress(self, *a, **k): pass
-        def add_log(self, *a, **k): pass
+        def add_log(self, task_key, msg, level="INFO"): self.logs.append(msg)
         def is_cancelled(self, *a, **k): return False
 
     def frame_falso(video, ts, saida, proxy_fallback_path=None):
@@ -138,6 +139,9 @@ def _pipeline_falso(banco, monkeypatch, tmp_path, capturados):
     monkeypatch.setattr(P, "_register_auto_mentions", staticmethod(lambda *a, **k: None))
     monkeypatch.setattr("src.nlp.enrichment_engine.enrich_video_frames", lambda *a, **k: None)
     monkeypatch.setattr("src.nlp.theme_engine.assign_media_to_themes", lambda *a, **k: None)
+    # Padrão: vídeo mudo (sem ASR). Os testes da ordem trocam isto.
+    monkeypatch.setattr(mod, "has_audio_stream", lambda path: False)
+    P.logs = TarefasFalsas.logs
     return P
 
 
@@ -201,3 +205,96 @@ def test_analyze_video_all_extrai_frame_do_rosto_na_ordem_certa(monkeypatch, tmp
     assert chamadas == [(Path("C:/v/a.mp4"), 1.0, quadro)]
     assert rostos == [(1, 9, 1.0, quadro, True)], "o rosto desse fluxo agora roda, com o quadro no disco"
     assert not quadro.exists(), "o quadro temporário é apagado depois"
+
+
+# ---------------------------------------------------------------------------
+# Item 3: transcrição antes da Laya e da triagem
+# ---------------------------------------------------------------------------
+
+def _ordem_falsa(monkeypatch, P, ordem, asr_ok=True, grava_fala=True, banco=None):
+    def asr(video_id, path, finalizar=True):
+        ordem.append(("asr", finalizar))
+        if grava_fala and banco is not None:
+            banco.execute("INSERT INTO transcript (video_id, word, start_time, end_time, speaker_id) "
+                          "VALUES (?, 'ola', 0, 1, 'A')", (video_id,))
+        return asr_ok
+    monkeypatch.setattr(P, "transcribe_video", staticmethod(asr))
+    monkeypatch.setattr(P, "triage_system1", staticmethod(lambda *a, **k: ordem.append("laya")))
+    monkeypatch.setattr(P, "triage_video", staticmethod(
+        lambda *a, **k: (ordem.append("triagem"), {"categoria": "obra", "confianca": 0.9})[1]))
+
+
+def test_sem_transcricao_e_com_audio_transcreve_antes_da_laya_e_da_triagem(banco, monkeypatch, tmp_path):
+    from pathlib import Path
+    from src.services import pipeline as mod
+    banco.execute("UPDATE video SET category = NULL WHERE id = 7"); banco.commit()
+    P = _pipeline_falso(banco, monkeypatch, tmp_path, [])
+    monkeypatch.setattr(mod, "has_audio_stream", lambda path: True)
+    ordem = []
+    _ordem_falsa(monkeypatch, P, ordem, banco=banco)
+    assert P.analyze_video_vision(7, Path("C:/nao/existe/take.mp4"), 20.0) is True
+    assert ordem == [("asr", False), "laya", "triagem"], "fala primeiro; resumo e temas ficam para o fim"
+
+
+def test_com_transcricao_nao_transcreve_de_novo(banco, monkeypatch, tmp_path):
+    from pathlib import Path
+    from src.services import pipeline as mod
+    banco.execute("INSERT INTO transcript (video_id, word, start_time, end_time, speaker_id) VALUES (7, 'oi', 0, 1, 'A')")
+    banco.commit()
+    P = _pipeline_falso(banco, monkeypatch, tmp_path, [])
+    monkeypatch.setattr(mod, "has_audio_stream", lambda path: True)
+    ordem = []
+    _ordem_falsa(monkeypatch, P, ordem, banco=banco)
+    P.analyze_video_vision(7, Path("C:/nao/existe/take.mp4"), 20.0)
+    assert ("asr", False) not in ordem
+
+
+def test_asr_falhando_registra_triagem_sem_transcricao_e_a_visao_segue(banco, monkeypatch, tmp_path):
+    from pathlib import Path
+    from src.services import pipeline as mod
+    banco.execute("UPDATE video SET category = NULL WHERE id = 7"); banco.commit()
+    P = _pipeline_falso(banco, monkeypatch, tmp_path, [])
+    monkeypatch.setattr(mod, "has_audio_stream", lambda path: True)
+    ordem = []
+    _ordem_falsa(monkeypatch, P, ordem, asr_ok=False, grava_fala=False, banco=banco)
+    assert P.analyze_video_vision(7, Path("C:/nao/existe/take.mp4"), 20.0) is True
+    assert any("triagem_sem_transcricao" in m for m in P.logs)
+    assert ordem[1:] == ["laya", "triagem"]
+
+
+def test_video_mudo_nao_chama_asr(banco, monkeypatch, tmp_path):
+    from pathlib import Path
+    P = _pipeline_falso(banco, monkeypatch, tmp_path, [])
+    ordem = []
+    _ordem_falsa(monkeypatch, P, ordem, banco=banco)
+    P.analyze_video_vision(7, Path("C:/nao/existe/take.mp4"), 20.0)
+    assert ordem == [] and any("sem áudio" in m for m in P.logs)
+
+
+@pytest.mark.parametrize("tem_fala,forcar,espera_asr", [(True, False, False), (False, False, True), (True, True, True)])
+def test_analyze_video_all_nao_paga_asr_de_novo(monkeypatch, tem_fala, forcar, espera_asr):
+    from src.services import pipeline as mod
+    P = mod.PipelineService
+
+    class TarefasFalsas:
+        def update_progress(self, *a, **k): pass
+        def add_log(self, *a, **k): pass
+
+    @contextlib.contextmanager
+    def db():
+        conn = sqlite3.connect(":memory:")
+        conn.row_factory = sqlite3.Row
+        conn.executescript(SCHEMA_SQL)
+        conn.execute("INSERT INTO project (id, name) VALUES (1, 'p')")
+        conn.execute("INSERT INTO video (id, project_id, filename, filepath, hash, duration) VALUES (9, 1, 'a', 'a.mp4', 'h', 0)")
+        yield conn
+
+    chamadas = []
+    monkeypatch.setattr(mod, "get_db", db)
+    monkeypatch.setattr(mod, "TASK_MANAGER", TarefasFalsas())
+    monkeypatch.setattr(mod, "extract_frame", lambda *a, **k: False)
+    monkeypatch.setattr(P, "_tem_transcricao", staticmethod(lambda vid: tem_fala))
+    monkeypatch.setattr(P, "transcribe_video", staticmethod(lambda *a, **k: chamadas.append("asr")))
+    monkeypatch.setattr(P, "analyze_video_vision", staticmethod(lambda *a, **k: True))
+    P.analyze_video_all(9, forcar_asr=forcar)
+    assert (chamadas == ["asr"]) is espera_asr
