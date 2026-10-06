@@ -17,7 +17,7 @@ from src.core.tasks import TASK_MANAGER
 from src.db.schema import init_db
 from src.db.connection import get_db
 from src.db.repositories.media import MediaRepository
-from src.api.routes import projects, media, narrative, faces, entities, settings, scenes
+from src.api.routes import projects, media, narrative, faces, entities, settings, scenes, modelos
 
 # Silencia polling logs repetitivos do uvicorn no terminal
 class EndpointFilter(logging.Filter):
@@ -101,6 +101,7 @@ app.include_router(faces.router)
 app.include_router(entities.router)
 app.include_router(settings.router)
 app.include_router(scenes.router)
+app.include_router(modelos.router)
 
 from fastapi import Request
 

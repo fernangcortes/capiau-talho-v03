@@ -117,6 +117,15 @@ def traduzir_classes(classes_pt: List[str]) -> Tuple[List[str], Dict[str, str], 
 
 # -- Carga de modelos (uma vez por processo) ------------------------------------------
 
+def _exigir(modelo_id: str) -> None:
+    """Modelo fora da máquina vira DetectorIndisponivel com tamanho e onde baixar."""
+    from src.services.modelos_locais import ModeloNaoBaixado, exigir
+    try:
+        exigir(modelo_id)
+    except ModeloNaoBaixado as e:
+        raise DetectorIndisponivel(str(e)) from e
+
+
 _modelos: Dict[str, Any] = {}
 _trava = threading.Lock()
 
@@ -126,6 +135,8 @@ def _modelo(chave: str, carregar: Callable[[], Any]) -> Any:
         if chave not in _modelos:
             try:
                 _modelos[chave] = carregar()
+            except DetectorIndisponivel:
+                raise
             except ImportError as e:
                 raise DetectorIndisponivel(f"pacote ausente para {chave}: {e.name}") from e
             except Exception as e:
@@ -152,7 +163,10 @@ def _caixa(x1: float, y1: float, x2: float, y2: float, w: int, h: int) -> List[i
 PASTA_ULTRALYTICS = Path(os.getenv("CAPIAU_ULTRALYTICS_DIR") or Path.home() / ".cache" / "capiau" / "ultralytics")
 
 
-def _carregar_yolo_world():
+def _carregar_yolo_world(permitir_download: bool = False):
+    """Carrega o YOLO-World. Só baixa pesos com ``permitir_download`` (botão em Modelos locais)."""
+    if not permitir_download:
+        _exigir("yolo_world")
     os.environ.setdefault("YOLO_CONFIG_DIR", str(PASTA_ULTRALYTICS))  # antes do 1o import da ultralytics
     pesos = PASTA_ULTRALYTICS / "weights"
     pesos.mkdir(parents=True, exist_ok=True)
@@ -184,7 +198,9 @@ def _owlv2(img_path: Path, classes_en: List[str], volta: Dict[str, str], min_con
 
     def carregar():
         from transformers import Owlv2ForObjectDetection, Owlv2Processor
-        return Owlv2Processor.from_pretrained(MODELO_OWLV2), Owlv2ForObjectDetection.from_pretrained(MODELO_OWLV2).eval()
+        _exigir("owlv2")
+        return (Owlv2Processor.from_pretrained(MODELO_OWLV2, local_files_only=True),
+                Owlv2ForObjectDetection.from_pretrained(MODELO_OWLV2, local_files_only=True).eval())
     proc, modelo = _modelo(MOTOR_OWLV2, carregar)
     img = _abrir_imagem(img_path)
     w, h = img.size
@@ -208,8 +224,9 @@ def _grounding_dino(img_path: Path, classes_en: List[str], volta: Dict[str, str]
 
     def carregar():
         from transformers import AutoModelForZeroShotObjectDetection, AutoProcessor
-        return (AutoProcessor.from_pretrained(MODELO_GROUNDING_DINO),
-                AutoModelForZeroShotObjectDetection.from_pretrained(MODELO_GROUNDING_DINO).eval())
+        _exigir("grounding_dino")
+        return (AutoProcessor.from_pretrained(MODELO_GROUNDING_DINO, local_files_only=True),
+                AutoModelForZeroShotObjectDetection.from_pretrained(MODELO_GROUNDING_DINO, local_files_only=True).eval())
     proc, modelo = _modelo(MOTOR_GROUNDING_DINO, carregar)
     img = _abrir_imagem(img_path)
     w, h = img.size
@@ -232,8 +249,9 @@ def _florence_2(img_path: Path, classes_en: List[str], volta: Dict[str, str], mi
 
     def carregar():
         from transformers import AutoProcessor, Florence2ForConditionalGeneration
-        return (AutoProcessor.from_pretrained(MODELO_FLORENCE_2),
-                Florence2ForConditionalGeneration.from_pretrained(MODELO_FLORENCE_2).eval())
+        _exigir("florence_2")
+        return (AutoProcessor.from_pretrained(MODELO_FLORENCE_2, local_files_only=True),
+                Florence2ForConditionalGeneration.from_pretrained(MODELO_FLORENCE_2, local_files_only=True).eval())
     proc, modelo = _modelo(MOTOR_FLORENCE_2, carregar)
     img = _abrir_imagem(img_path)
     w, h = img.size

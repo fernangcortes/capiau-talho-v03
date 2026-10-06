@@ -173,6 +173,11 @@ class System1LayaEngine:
         cls = System1LayaEngine
         with cls._trava:
             if cls._router_compartilhado is None:
+                from src.services.modelos_locais import ModeloNaoBaixado, exigir
+                try:
+                    exigir("laya_multilingual")  # nada baixa sozinho
+                except ModeloNaoBaixado as e:
+                    raise System1Indisponivel(str(e)) from e
                 try:
                     from laya import Router
                 except ImportError as e:

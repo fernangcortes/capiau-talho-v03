@@ -257,8 +257,10 @@ def _carregar_whisper():
                 from faster_whisper import WhisperModel
             except ImportError as e:
                 raise ErroASR("pacote 'faster-whisper' não instalado (uv pip install faster-whisper)") from e
+            _exigir_modelo("whisper_turbo")
             threads = max(1, (os.cpu_count() or 2) // 2)
-            _whisper_modelo = WhisperModel(WHISPER_MODELO, device="cpu", compute_type="int8", cpu_threads=threads)
+            _whisper_modelo = WhisperModel(WHISPER_MODELO, device="cpu", compute_type="int8", cpu_threads=threads,
+                                           local_files_only=True)
         return _whisper_modelo
 
 
@@ -318,8 +320,22 @@ NEMO_TIMEOUT_S = 1800
 
 def python_venv_nemo() -> Path:
     """Intérprete do ambiente separado (transformers >= 5.18). CAPIAU_VENV_NEMO troca o caminho."""
-    base = Path(os.getenv("CAPIAU_VENV_NEMO") or (RAIZ / ".venv-nemo"))
-    return base / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
+    from src.services.modelos_locais import python_venv_nemo as caminho
+    return caminho()
+
+
+def _exigir_modelo(modelo_id: str) -> None:
+    """Modelo fora da máquina vira ErroASR com tamanho e onde baixar (nada baixa sozinho)."""
+    from src.services.modelos_locais import ModeloNaoBaixado, exigir
+    try:
+        exigir(modelo_id)
+    except ModeloNaoBaixado as e:
+        raise ErroASR(str(e)) from e
+
+
+# Tarefa do worker -> modelo do catálogo que ela usa
+MODELO_DA_TAREFA = {"diarizar": "nemotron_diarization", "pyannote": "pyannote_community1",
+                    "canary": "canary_1b_v2", "sensevoice": "sensevoice_small"}
 
 
 def _rodar_worker_nemo(tarefa: str, audio: Path, *extra: str) -> Dict[str, Any]:
@@ -329,7 +345,9 @@ def _rodar_worker_nemo(tarefa: str, audio: Path, *extra: str) -> Dict[str, Any]:
 
     py = python_venv_nemo()
     if not py.exists():
-        raise ErroASR(f"Ambiente .venv-nemo não encontrado em {py.parent.parent} (ver docs: ambiente separado do NeMo)")
+        raise ErroASR(f"Ambiente .venv-nemo não encontrado em {py.parent.parent} (ver requirements-nemo.txt)")
+    if tarefa in MODELO_DA_TAREFA:
+        _exigir_modelo(MODELO_DA_TAREFA[tarefa])
     with tempfile.TemporaryDirectory(prefix="capiau_nemo_") as tmp:
         wav, saida = Path(tmp) / "audio.wav", Path(tmp) / "saida.json"
         kw = {"creationflags": subprocess.CREATE_NO_WINDOW} if os.name == "nt" else {}
@@ -338,8 +356,10 @@ def _rodar_worker_nemo(tarefa: str, audio: Path, *extra: str) -> Dict[str, Any]:
         if conv.returncode != 0:
             raise ErroASR(f"ffmpeg não converteu o áudio para o {tarefa}: {conv.stderr.decode(errors='replace')[:200]}")
         try:
+            # HF_HUB_OFFLINE: o worker nunca baixa nada; o download é pelo botão em Modelos locais
+            ambiente = {**os.environ, "HF_HUB_OFFLINE": "1"}
             r = subprocess.run([str(py), str(WORKER_NEMO), tarefa, str(wav), str(saida), *extra],
-                               capture_output=True, timeout=NEMO_TIMEOUT_S, **kw)
+                               capture_output=True, timeout=NEMO_TIMEOUT_S, env=ambiente, **kw)
         except subprocess.TimeoutExpired as e:
             raise ErroASR(f"{tarefa} no .venv-nemo passou de {NEMO_TIMEOUT_S} s") from e
         if r.returncode != 0 or not saida.exists():
