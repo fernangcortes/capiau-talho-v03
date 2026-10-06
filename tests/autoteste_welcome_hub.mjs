@@ -133,8 +133,14 @@ function createMockEnvironment() {
     const updatedSettings = [];
     const externalIngests = [];
     const externalFilesIngests = [];
+    const objetivos = [];
 
     const mockApi = {
+        async updateProjectObjetivo(projectId, objetivo) {
+            if (mockApi.failObjetivo) throw new Error("HTTP 500 simulado");
+            objetivos.push({ projectId, objetivo });
+            return { ok: true };
+        },
         async createProject(name, description) {
             const newId = 100 + createdProjects.length + 1;
             const record = { project_id: newId, id: newId, name, description };
@@ -231,6 +237,7 @@ function createMockEnvironment() {
         updatedSettings,
         externalIngests,
         externalFilesIngests,
+        objetivos,
         storageMap,
         sessionMap
     };
@@ -283,6 +290,10 @@ console.log("\n--- 3. Fluxo Principal da FSM e Onboarding Conversacional ---");
     // Pular ingestão por enquanto
     const skipRes = await hub.handleUserInput("pular ingestão por enquanto");
     assert.equal(skipRes, true);
+    // Antes de criar, a conversa pergunta o objetivo (uma vez); aqui o usuário pula
+    assert.equal(hub.awaitingObjetivo, true, "Deve perguntar o objetivo antes de criar");
+    assert.equal(env.createdProjects.length, 0, "Não cria o projeto enquanto espera o objetivo");
+    await hub.handleChipClick({ label: "Pular por agora", action: "skip_objetivo" });
     assert.equal(hub.state, WELCOME_HUB_STATES.READY_TO_TRANSITION, "Criação concluída deve levar a READY_TO_TRANSITION");
 
     // Verifica que o projeto foi criado no banco
@@ -397,6 +408,7 @@ console.log("\n--- 5. Resolução Inteligente de Perfis e Ações dos Chips ---"
     await hub.handleUserInput("Projeto Teste");
     await hub.handleUserInput("cinema");
     await hub.handleUserInput("pular");
+    await hub.handleUserInput("pular"); // pula também a pergunta do objetivo
 
     assert.equal(hub.state, WELCOME_HUB_STATES.READY_TO_TRANSITION);
     await hub.handleChipClick({ action: "transition_nle" });
@@ -574,6 +586,125 @@ console.log("\n--- 7. Chat Inteligente: Perguntas do Usuário, Explicações e C
     assert.equal(hubLocal.state, WELCOME_HUB_STATES.AWAITING_NAME);
 
     console.log("✔ 7 passou: Inteligência conversacional, tratamento de dúvidas, painel seguro e privacidade de chaves API.");
+}
+
+// ---------------------------------------------------------------------------
+// 9. Objetivo do projeto: pergunta antes de criar, grava depois, nunca bloqueia
+// ---------------------------------------------------------------------------
+console.log("\n--- 8. Objetivo do Projeto ---");
+{
+    async function ateAMidia(env) {
+        const hub = new WelcomeHub({
+            state: env.mockState,
+            api: env.mockApi,
+            document: env.mockDocument,
+            window: env.mockWindow
+        });
+        hub.startOnboarding();
+        await hub.handleUserInput("Festa do Divino");
+        await hub.handleUserInput("entrevista_agil");
+        assert.equal(hub.state, WELCOME_HUB_STATES.AWAITING_MEDIA);
+        return hub;
+    }
+    const ultimaAssistente = (hub) => [...hub.conversationHistory].reverse().find(m => m.role === "assistant").content;
+
+    // 8a. A pergunta aparece, com sugestões e opção de pular; nada é criado ainda
+    {
+        const env = createMockEnvironment();
+        const hub = await ateAMidia(env);
+        await hub.handleChipClick({ action: "skip_media" });
+        assert.equal(hub.awaitingObjetivo, true);
+        assert(ultimaAssistente(hub).includes("o que você vai produzir com este material?"), "Deve perguntar o objetivo");
+        const labels = hub.activeChips.map(c => c.label);
+        assert.deepEqual(labels, ["Making of de um longa", "Documentário", "Cobertura de evento", "Pular por agora"]);
+        assert.equal(env.createdProjects.length, 0);
+        assert.equal(env.objetivos.length, 0);
+
+        // 8b. Responder (texto livre) grava o objetivo com o id do projeto criado
+        const frase = "Documentário sobre a Festa do Divino em Pirenópolis";
+        await hub.handleUserInput(frase);
+        assert.equal(hub.state, WELCOME_HUB_STATES.READY_TO_TRANSITION);
+        assert.equal(env.createdProjects.length, 1);
+        assert.equal(env.objetivos.length, 1);
+        assert.deepEqual(env.objetivos[0], { projectId: env.createdProjects[0].project_id, objetivo: frase });
+        assert(ultimaAssistente(hub).includes(frase), "Resumo final mostra o objetivo");
+    }
+
+    // 8c. Clicar numa sugestão também grava
+    {
+        const env = createMockEnvironment();
+        const hub = await ateAMidia(env);
+        await hub.handleChipClick({ action: "skip_media" });
+        await hub.handleChipClick({ label: "Making of de um longa", value: "Making of de um longa" });
+        assert.equal(env.objetivos.length, 1);
+        assert.equal(env.objetivos[0].objetivo, "Making of de um longa");
+        assert.equal(env.objetivos[0].projectId, hub.createdProjectId);
+    }
+
+    // 8d. Pular (chip ou texto) cria o projeto e NÃO chama a API do objetivo
+    {
+        const env = createMockEnvironment();
+        const hub = await ateAMidia(env);
+        await hub.handleChipClick({ action: "skip_media" });
+        await hub.handleChipClick({ label: "Pular por agora", action: "skip_objetivo" });
+        assert.equal(env.createdProjects.length, 1);
+        assert.equal(env.objetivos.length, 0, "Pular não grava objetivo");
+        assert.equal(hub.state, WELCOME_HUB_STATES.READY_TO_TRANSITION);
+
+        const env2 = createMockEnvironment();
+        const hub2 = await ateAMidia(env2);
+        await hub2.handleChipClick({ action: "skip_media" });
+        await hub2.handleUserInput("pular");
+        assert.equal(env2.createdProjects.length, 1);
+        assert.equal(env2.objetivos.length, 0);
+    }
+
+    // 8e. Erro na API do objetivo não impede a criação
+    {
+        const env = createMockEnvironment();
+        env.mockApi.failObjetivo = true;
+        const hub = await ateAMidia(env);
+        await hub.handleChipClick({ action: "skip_media" });
+        const avisos = [];
+        const warnOriginal = console.warn;
+        console.warn = (...a) => avisos.push(a);
+        try {
+            await hub.handleUserInput("Vídeo institucional do CriaLab");
+        } finally {
+            console.warn = warnOriginal;
+        }
+        assert.equal(env.createdProjects.length, 1, "Projeto criado mesmo com erro no objetivo");
+        assert.equal(hub.state, WELCOME_HUB_STATES.READY_TO_TRANSITION);
+        assert.equal(env.objetivos.length, 0);
+        assert(avisos.length >= 1, "Falha registrada no console");
+        assert(ultimaAssistente(hub).includes("não consegui gravar"), "Resumo avisa que o objetivo não foi gravado");
+    }
+
+    // 8f. Perguntou uma vez, não pergunta de novo (objetivo já dado ou pergunta já feita)
+    {
+        const env = createMockEnvironment();
+        const hub = await ateAMidia(env);
+        hub.objetivo = "Curta de ficção X, material bruto das diárias";
+        await hub.handleChipClick({ action: "skip_media" });
+        assert.equal(hub.awaitingObjetivo, false, "Objetivo já conhecido: não pergunta");
+        assert.equal(env.objetivos.length, 1);
+        assert.equal(env.objetivos[0].objetivo, "Curta de ficção X, material bruto das diárias");
+    }
+
+    // 8g. Ao soltar mídia no estado AWAITING_MEDIA a pergunta também vem antes de criar
+    {
+        const env = createMockEnvironment();
+        const hub = await ateAMidia(env);
+        hub.pendingFolder = "D:\\midia\\cartao01";
+        await hub.handleChipClick({ action: "create_now" });
+        assert.equal(hub.awaitingObjetivo, true);
+        assert.equal(env.createdProjects.length, 0);
+        await hub.handleUserInput("Cobertura do festival Y 2026");
+        assert.equal(env.externalIngests.length, 1);
+        assert.equal(env.objetivos[0].projectId, env.externalIngests[0].projectId);
+    }
+
+    console.log("✔ 8 passou: pergunta do objetivo, gravação, pulo e tolerância a falha.");
 }
 
 console.log("\n=======================================================");

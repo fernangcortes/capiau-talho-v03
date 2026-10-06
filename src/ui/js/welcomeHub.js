@@ -256,6 +256,9 @@ export class WelcomeHub {
         this.pendingFiles = [];
         this.pendingFolder = null;
         this.createdProjectId = null;
+        this.objetivo = "";
+        this.objetivoResolvido = false; // já perguntou (respondido ou pulado): não pergunta de novo
+        this.awaitingObjetivo = false;
         this.conversationHistory = [];
         this.activeChips = [];
         this.isProcessing = false;
@@ -540,6 +543,9 @@ export class WelcomeHub {
         this.pendingFiles = [];
         this.pendingFolder = null;
         this.createdProjectId = null;
+        this.objetivo = "";
+        this.objetivoResolvido = false;
+        this.awaitingObjetivo = false;
         this.conversationHistory = [];
         this.activeChips = [];
         this.isProcessing = false;
@@ -755,6 +761,11 @@ export class WelcomeHub {
             }
         }
 
+        // 1b. Resposta à pergunta do objetivo: não vai para o chat do backend nem para a FSM
+        if (this.awaitingObjetivo) {
+            return this.handleObjetivoAnswer(text);
+        }
+
         // 2. Integração com a API OnboardingChat (Backend inteligente com conhecimento do Talho).
         // Com streaming o texto aparece enquanto o modelo escreve; sem ele (mocks), chega inteiro.
         const canStream = typeof this.api?.onboardingChatStream === "function";
@@ -825,7 +836,7 @@ export class WelcomeHub {
 
                     if (chatRes.ready_to_create || chatRes.step === "ready") {
                         this.finishStreaming();
-                        await this.createProjectAndFinalize();
+                        await this.requestCreation();
                     } else if (this.projectName && !this.selectedProfile) {
                         this.state = WelcomeHub.STATES.AWAITING_PROFILE;
                     } else if (this.projectName && this.selectedProfile) {
@@ -975,14 +986,14 @@ export class WelcomeHub {
 
                 if (isSkip) {
                     this.appendMessage({ role: "user", content: "Pular ingestão inicial por enquanto." });
-                    await this.createProjectAndFinalize();
+                    await this.requestCreation();
                     return true;
                 }
 
                 const hasMedia = Boolean(this.pendingFolder || (this.pendingFiles && this.pendingFiles.length > 0));
                 if (hasMedia) {
                     this.appendMessage({ role: "user", content: text });
-                    await this.createProjectAndFinalize();
+                    await this.requestCreation();
                     return true;
                 }
 
@@ -1032,6 +1043,45 @@ export class WelcomeHub {
         return null;
     }
 
+    /**
+     * Porta de entrada da criação: antes de criar, pergunta o objetivo do projeto uma única vez.
+     * Se o objetivo já veio (conversa) ou a pergunta já foi feita, cria direto.
+     */
+    async requestCreation() {
+        if (this.isProcessing) return;
+        if (this.objetivoResolvido || this.objetivo) {
+            await this.createProjectAndFinalize();
+            return;
+        }
+        this.awaitingObjetivo = true;
+        this.appendMessage({
+            role: "assistant",
+            content: "Última pergunta: **o que você vai produzir com este material?**\n\nUma frase basta. A triagem usa isso para decidir o que importa em cada cena. Dá para pular."
+        });
+        this.setChips([
+            { label: "Making of de um longa", value: "Making of de um longa" },
+            { label: "Documentário", value: "Documentário" },
+            { label: "Cobertura de evento", value: "Cobertura de evento" },
+            { label: "Pular por agora", action: "skip_objetivo" }
+        ]);
+    }
+
+    /** Recebe a resposta (ou o pulo) da pergunta do objetivo e segue para a criação */
+    async handleObjetivoAnswer(text) {
+        const pulou = /^(pular|pula|pule|depois|sem objetivo|n[aã]o sei|skip)\b/i.test(text);
+        this.awaitingObjetivo = false;
+        this.objetivoResolvido = true;
+        if (pulou) {
+            this.objetivo = "";
+            this.appendMessage({ role: "user", content: "Pular por agora." });
+        } else {
+            this.objetivo = text;
+            this.appendMessage({ role: "user", content: text });
+        }
+        await this.createProjectAndFinalize();
+        return true;
+    }
+
     /** Cria o projeto no banco SQLite, aplica os settings e agenda ingestão assíncrona */
     async createProjectAndFinalize() {
         if (this.isProcessing) return;
@@ -1060,6 +1110,18 @@ export class WelcomeHub {
                 }
             }
 
+            // 2b. Objetivo do projeto: falha aqui nunca impede a criação
+            let objetivoLinha = "";
+            if (this.objetivo && typeof this.api.updateProjectObjetivo === "function") {
+                try {
+                    await this.api.updateProjectObjetivo(this.createdProjectId, this.objetivo);
+                    objetivoLinha = `\n- Objetivo: ${this.objetivo}`;
+                } catch (objErr) {
+                    console.warn("[WelcomeHub] Não foi possível gravar o objetivo do projeto:", objErr);
+                    objetivoLinha = "\n- Objetivo: não consegui gravar agora. Dá para definir depois.";
+                }
+            }
+
             // 3. Disparo da Ingestão de Mídias via TASK_MANAGER
             let mediaSummaryText = "nenhuma ainda. Dá para importar no editor.";
             if (this.pendingFolder) {
@@ -1085,7 +1147,7 @@ export class WelcomeHub {
             this.state = WelcomeHub.STATES.READY_TO_TRANSITION;
             this.appendMessage({
                 role: "assistant",
-                content: `Projeto **${this.projectName}** criado.\n\n- Perfil: ${this.selectedProfile?.label || "Padrão"}\n- Mídias: ${mediaSummaryText}\n\nA análise continua enquanto você edita. A conversa vai junto para o editor.`
+                content: `Projeto **${this.projectName}** criado.\n\n- Perfil: ${this.selectedProfile?.label || "Padrão"}${objetivoLinha}\n- Mídias: ${mediaSummaryText}\n\nA análise continua enquanto você edita. A conversa vai junto para o editor.`
             });
 
             this.setChips([
@@ -1206,6 +1268,12 @@ export class WelcomeHub {
             return;
         }
 
+        if (chip.action === "skip_objetivo") {
+            if (!this.awaitingObjetivo) return;
+            await this.handleObjetivoAnswer("pular");
+            return;
+        }
+
         if (chip.action === "skip_nle") {
             this.hide();
             if (typeof sessionStorage !== "undefined") {
@@ -1229,7 +1297,7 @@ export class WelcomeHub {
         if (chip.action === "create_now") {
             if (this.state !== WelcomeHub.STATES.AWAITING_MEDIA) return;
             this.appendMessage({ role: "user", content: "Criar o projeto com estas mídias." });
-            await this.createProjectAndFinalize();
+            await this.requestCreation();
             return;
         }
 
@@ -1264,7 +1332,7 @@ export class WelcomeHub {
                 });
 
                 if (this.state === WelcomeHub.STATES.AWAITING_MEDIA) {
-                    await this.createProjectAndFinalize();
+                    await this.requestCreation();
                 }
             }
         } catch (err) {
@@ -1286,7 +1354,7 @@ export class WelcomeHub {
                 });
 
                 if (this.state === WelcomeHub.STATES.AWAITING_MEDIA) {
-                    await this.createProjectAndFinalize();
+                    await this.requestCreation();
                 }
             }
         } catch (err) {
@@ -1323,7 +1391,7 @@ export class WelcomeHub {
         });
 
         if (this.state === WelcomeHub.STATES.AWAITING_MEDIA) {
-            await this.createProjectAndFinalize();
+            await this.requestCreation();
         } else if (this.state === WelcomeHub.STATES.AWAITING_NAME && !this.projectName) {
             this.appendMessage({
                 role: "assistant",

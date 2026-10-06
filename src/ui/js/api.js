@@ -49,6 +49,15 @@ export class CapIAuAPI {
         });
     }
 
+    // Objetivo do projeto: uma frase que diz o que se produz com o material (a triagem usa para classificar)
+    static updateProjectObjetivo(projectId, objetivo) {
+        return this.request(`/api/project/${projectId}/objetivo`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ objetivo })
+        });
+    }
+
     static fetchDocuments(projectId) {
         return this.request(`/api/project/${projectId}/docs`);
     }
