@@ -17,7 +17,8 @@ from typing import Any, Callable, Dict, List, Optional
 
 MOTOR_ASSEMBLYAI = "assemblyai_universal_35"
 MOTOR_DEEPGRAM = "deepgram_nova_3"
-MOTOR_WHISPER = "whisper_turbo"
+MOTOR_WHISPER = "whisper"
+MOTOR_WHISPER_ANTIGO = "whisper_turbo"  # valor gravado antes de haver vários tamanhos
 MOTOR_CANARY = "nvidia_canary"
 MOTOR_SENSEVOICE = "sensevoice"
 # SenseVoice Small só foi treinado nestas línguas; em outra, cai na AssemblyAI e avisa.
@@ -72,6 +73,7 @@ class OpcoesASR:
     diarizar: bool = True
     max_falantes: Optional[int] = None
     detectar_entidades: bool = False
+    whisper_modelo: str = "large-v3-turbo"
 
 
 @dataclass
@@ -84,11 +86,18 @@ class ResultadoASR:
 
 
 def resolver_motores(escolha_transcricao: Optional[str], escolha_diarizacao: Optional[str],
-                     idioma: Optional[str] = None) -> PlanoASR:
+                     idioma: Optional[str] = None, whisper_modelo: Optional[str] = None) -> PlanoASR:
     """Traduz a escolha das Configurações no que realmente vai rodar."""
     avisos: List[str] = []
 
     transcricao = escolha_transcricao or MOTOR_ASSEMBLYAI
+    if transcricao == MOTOR_WHISPER_ANTIGO:
+        transcricao = MOTOR_WHISPER
+    if (transcricao == MOTOR_WHISPER and idioma and idioma != "en" and whisper_modelo
+            and whisper_modelo in WHISPER_SO_INGLES):
+        avisos.append(f"O Whisper '{whisper_modelo}' só transcreve inglês; idioma '{idioma}' vai pela "
+                      "AssemblyAI Universal-3.5. Escolha um Whisper multilíngue (sem .en nem distil).")
+        transcricao = MOTOR_ASSEMBLYAI
     if transcricao == MOTOR_SENSEVOICE and idioma and idioma not in IDIOMAS_SENSEVOICE:
         avisos.append(f"SenseVoice só transcreve {', '.join(IDIOMAS_SENSEVOICE)}; idioma '{idioma}' "
                       "vai pela AssemblyAI Universal-3.5.")
@@ -251,26 +260,31 @@ def transcrever_deepgram(audio: Path, plano: PlanoASR, opcoes: OpcoesASR, chave:
                         modelo_usado=modelo_deepgram(resposta), avisos=avisos)
 
 
-# -- Whisper Turbo (local, CPU) --------------------------------------------------------
+# -- Whisper local (CPU), vários tamanhos ------------------------------------------------
 
-WHISPER_MODELO = "large-v3-turbo"  # faster-whisper: mobiuslabsgmbh/faster-whisper-large-v3-turbo
-_whisper_modelo = None
+WHISPER_PADRAO = "large-v3-turbo"
+# Tamanhos do faster-whisper (nomes de faster_whisper.utils._MODELS). Os .en e os distil
+# foram treinados só em inglês.
+WHISPER_MODELOS = ("tiny", "base", "small", "medium", "large-v1", "large-v2", "large-v3", "large-v3-turbo",
+                   "tiny.en", "base.en", "small.en", "medium.en",
+                   "distil-small.en", "distil-medium.en", "distil-large-v2", "distil-large-v3", "distil-large-v3.5")
+WHISPER_SO_INGLES = tuple(m for m in WHISPER_MODELOS if m.endswith(".en") or m.startswith("distil-"))
+_whisper_modelos: Dict[str, Any] = {}
 _whisper_trava = threading.Lock()
 
 
-def _carregar_whisper():
-    global _whisper_modelo
+def _carregar_whisper(nome: str = WHISPER_PADRAO):
     with _whisper_trava:
-        if _whisper_modelo is None:
+        if nome not in _whisper_modelos:
             try:
                 from faster_whisper import WhisperModel
             except ImportError as e:
                 raise ErroASR("pacote 'faster-whisper' não instalado (uv pip install faster-whisper)") from e
-            _exigir_modelo("whisper_turbo")
+            _exigir_modelo(f"whisper_{nome}")
             threads = max(1, (os.cpu_count() or 2) // 2)
-            _whisper_modelo = WhisperModel(WHISPER_MODELO, device="cpu", compute_type="int8", cpu_threads=threads,
-                                           local_files_only=True)
-        return _whisper_modelo
+            _whisper_modelos[nome] = WhisperModel(nome, device="cpu", compute_type="int8", cpu_threads=threads,
+                                                  local_files_only=True)
+        return _whisper_modelos[nome]
 
 
 def palavras_whisper(segmentos) -> List[Dict[str, Any]]:
@@ -305,7 +319,8 @@ def audio_16k(audio: Path):
 
 def transcrever_whisper(audio: Path, plano: PlanoASR, opcoes: OpcoesASR, chave: Optional[str] = None,
                         modelo: Any = None) -> ResultadoASR:
-    modelo = modelo or _carregar_whisper()
+    nome = opcoes.whisper_modelo or WHISPER_PADRAO
+    modelo = modelo or _carregar_whisper(nome)
     amostras = audio_16k(audio)
     try:
         segmentos, info = modelo.transcribe(amostras, language=opcoes.idioma, word_timestamps=True,
@@ -316,7 +331,7 @@ def transcrever_whisper(audio: Path, plano: PlanoASR, opcoes: OpcoesASR, chave: 
     avisos = []
     if opcoes.detectar_entidades:
         avisos.append("Detecção de entidades faladas só existe na AssemblyAI; ficou de fora nesta transcrição.")
-    return ResultadoASR(palavras=palavras, motor=MOTOR_WHISPER, modelo_usado=f"faster-whisper {WHISPER_MODELO}",
+    return ResultadoASR(palavras=palavras, motor=MOTOR_WHISPER, modelo_usado=f"faster-whisper {nome}",
                         avisos=avisos)
 
 

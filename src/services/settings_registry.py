@@ -158,11 +158,11 @@ SETTINGS_REGISTRY: List[Dict[str, Any]] = [
     # -- Transcrição ----------------------------------------------------------
     {
         "key": "transcription.engine", "type": "enum", "default": "assemblyai_universal_35",
-        "enum": ["assemblyai_universal_35", "nvidia_canary", "whisper_turbo", "sensevoice", "deepgram_nova_3"],
+        "enum": ["assemblyai_universal_35", "nvidia_canary", "whisper", "sensevoice", "deepgram_nova_3"],
         "enum_labels": {
             "assemblyai_universal_35": "AssemblyAI Universal-3.5 Pro (nuvem)",
             "nvidia_canary": "NVIDIA Canary 1B v2 (local, CPU, lento; sem separar falantes por conta própria)",
-            "whisper_turbo": "Whisper Turbo (local, CPU; sem separar falantes por conta própria)",
+            "whisper": "Whisper local (CPU; tamanho em 'Modelo do Whisper'; não separa falantes)",
             "sensevoice": "SenseVoice Small (local; só inglês, chinês, japonês, coreano, cantonês)",
             "deepgram_nova_3": "Deepgram Nova-3 (nuvem)",
         },
@@ -191,6 +191,16 @@ SETTINGS_REGISTRY: List[Dict[str, Any]] = [
         "help": "Limite superior de vozes distintas a procurar.",
         "help_tech": "speaker_options.max_speakers_expected da AssemblyAI (teto, não contagem exata).",
         "category": "transcription", "level": "pro", "scope": "both", "requires_reprocess": True,
+    },
+    {
+        "key": "asr.whisper_model", "type": "enum", "default": "large-v3-turbo",
+        "enum": ["tiny", "base", "small", "medium", "large-v1", "large-v2", "large-v3", "large-v3-turbo",
+                 "tiny.en", "base.en", "small.en", "medium.en",
+                 "distil-small.en", "distil-medium.en", "distil-large-v2", "distil-large-v3", "distil-large-v3.5"],
+        "label": "Modelo do Whisper",
+        "help": "Tamanho do Whisper local: maior acerta mais e demora mais. Os terminados em .en e os distil só transcrevem inglês. Cada um é baixado em Modelos locais.",
+        "help_tech": "Nome do faster-whisper (faster_whisper.utils._MODELS); só vale com o motor Whisper local.",
+        "category": "transcription", "level": "simple", "scope": "both", "requires_reprocess": True,
     },
     {
         "key": "asr.language", "type": "enum", "default": "pt",

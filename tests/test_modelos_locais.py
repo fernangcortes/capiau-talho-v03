@@ -24,7 +24,7 @@ def test_todo_modelo_tem_tamanho_uso_e_configuracao():
     for m in ML.CATALOGO.values():
         assert m.tamanho_mb > 0 and m.uso and m.configuracao, m.id
         assert m.ambiente in ("principal", "nemo")
-        assert m.id == "yolo_world" or (m.repo and m.marcadores), m.id
+        assert m.id in ("yolo_world", "canary_1b_v2") or (m.repo and m.marcadores), m.id
 
 
 def test_baixado_procura_em_qualquer_revisao(cache_vazio):
@@ -36,22 +36,22 @@ def test_baixado_procura_em_qualquer_revisao(cache_vazio):
 
 def test_exigir_diz_tamanho_e_onde_baixar(cache_vazio):
     with pytest.raises(ML.ModeloNaoBaixado) as e:
-        ML.exigir("whisper_turbo")
+        ML.exigir("whisper_large-v3-turbo")
     assert "1,6 GB" in str(e.value) and "Modelos locais" in str(e.value)
 
 
 def test_pacote_ausente_vem_antes_do_download(monkeypatch, cache_vazio):
     monkeypatch.setattr(ML.importlib.util, "find_spec", lambda nome: None)
     with pytest.raises(ML.ModeloNaoBaixado, match="falta instalar faster_whisper"):
-        ML.exigir("whisper_turbo")
+        ML.exigir("whisper_large-v3-turbo")
     with pytest.raises(ML.ModeloNaoBaixado, match="instale antes"):
-        ML.baixar("whisper_turbo")
+        ML.baixar("whisper_large-v3-turbo")
 
 
 def test_motores_recusam_modelo_nao_baixado_sem_baixar(monkeypatch, cache_vazio, tmp_path):
     from src.transcription import motores
     from src.vision import detectores as D
-    monkeypatch.setattr(motores, "_whisper_modelo", None)
+    monkeypatch.setattr(motores, "_whisper_modelos", {})
     with pytest.raises(motores.ErroASR, match="não está baixado"):
         motores._carregar_whisper()
     monkeypatch.setattr(D, "_modelos", {})
@@ -77,7 +77,7 @@ def test_rota_lista_e_recusa_modelo_desconhecido(cache_vazio):
     r = c.get("/api/modelos")
     assert r.status_code == 200
     ids = {m["id"] for m in r.json()["modelos"]}
-    assert {"whisper_turbo", "laya_multilingual", "yolo_world"} <= ids
+    assert {"whisper_large-v3-turbo", "whisper_tiny", "laya_multilingual", "yolo_world"} <= ids
     assert c.post("/api/modelos/nao_existe/baixar").status_code == 404
 
 
@@ -93,3 +93,15 @@ def test_download_roda_em_segundo_plano_e_registra_falha(monkeypatch, cache_vazi
     assert t["status"] == "baixando"
     assert terminou.wait(5)
     assert estados[-1]["status"] == "falhou" and "aceite os termos" in estados[-1]["erro"]
+
+
+def test_canary_conta_como_baixado_pela_pasta_descompactada(monkeypatch, tmp_path):
+    pasta = tmp_path / "canary"
+    monkeypatch.setenv("CAPIAU_CANARY_DIR", str(pasta))
+    canary = ML.CATALOGO["canary_1b_v2"]
+    assert ML.baixado(canary) is False
+    pasta.mkdir()
+    (pasta / "model_config.yaml").write_text("x")
+    assert ML.baixado(canary) is False  # sem os pesos ainda
+    (pasta / "model_weights.ckpt").write_bytes(b"x")
+    assert ML.baixado(canary) is True  # o .nemo original pode não existir mais

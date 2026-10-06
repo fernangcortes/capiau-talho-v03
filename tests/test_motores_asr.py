@@ -223,7 +223,7 @@ class _WhisperFalso:
 def test_whisper_sem_diarizacao_propria_avisa_e_fica_sem_falante(monkeypatch, audio):
     from src.transcription import motores
     monkeypatch.setattr(motores, "audio_16k", lambda a: "AMOSTRAS")
-    plano = resolver_motores("whisper_turbo", "mesmo_motor")
+    plano = resolver_motores("whisper", "mesmo_motor")
     assert plano.diarizacao == SEM_DIARIZACAO
     assert any("não separa falantes" in a for a in plano.avisos)
 
@@ -234,13 +234,13 @@ def test_whisper_sem_diarizacao_propria_avisa_e_fica_sem_falante(monkeypatch, au
     assert kw["language"] == "pt" and kw["word_timestamps"] is True
     assert [p["word"] for p in r.palavras] == ["Oi,", "tudo"]
     assert {p["speaker_id"] for p in r.palavras} == {"Desconhecido"}
-    assert r.motor == "whisper_turbo"
+    assert r.motor == "whisper"
 
 
 # -- Nemotron 3 Diarization (diarizador separado) ----------------------------------------
 
 def test_nemotron_com_whisper_e_com_assemblyai():
-    plano = resolver_motores("whisper_turbo", "nemotron_3_diarization")
+    plano = resolver_motores("whisper", "nemotron_3_diarization")
     assert plano.diarizacao == "nemotron_3_diarization" and plano.avisos == []
     plano_aai = resolver_motores(MOTOR_ASSEMBLYAI, "nemotron_3_diarization")
     # A AssemblyAI não cobra a diarização dela quando o Nemotron vai separar os falantes
@@ -264,10 +264,10 @@ def test_atribuir_falantes_por_sobreposicao_e_folga():
 def test_transcrever_aplica_o_diarizador_separado(monkeypatch, audio):
     from src.transcription import motores
     monkeypatch.setattr(motores, "audio_16k", lambda a: "AMOSTRAS")
-    monkeypatch.setattr(motores, "_carregar_whisper", lambda: _WhisperFalso())
+    monkeypatch.setattr(motores, "_carregar_whisper", lambda nome="large-v3-turbo": _WhisperFalso())
     monkeypatch.setattr(motores, "diarizar_nemotron",
                         lambda a: ([{"inicio": 0.0, "fim": 1.0, "falante": 2}], "nvidia/Nemotron-3-Diarization"))
-    r = motores.transcrever(audio, resolver_motores("whisper_turbo", "nemotron_3_diarization"), OpcoesASR(), None)
+    r = motores.transcrever(audio, resolver_motores("whisper", "nemotron_3_diarization"), OpcoesASR(), None)
     assert {p["speaker_id"] for p in r.palavras} == {"Falante C"}
     assert r.modelo_usado.endswith("+ nvidia/Nemotron-3-Diarization")
 
@@ -322,12 +322,12 @@ def test_preco_por_hora_segue_o_motor_escolhido():
     # Nemotron separa os falantes: a AssemblyAI não cobra a diarização dela
     assert preco_hora_usd(resolver_motores(MOTOR_ASSEMBLYAI, "nemotron_3_diarization"), completo) == 0.29
     assert preco_hora_usd(resolver_motores(MOTOR_DEEPGRAM, "mesmo_motor"), completo) == 0.258
-    assert preco_hora_usd(resolver_motores("whisper_turbo", "nemotron_3_diarization"), completo) == 0.0
+    assert preco_hora_usd(resolver_motores("whisper", "nemotron_3_diarization"), completo) == 0.0
 
 
 def test_pyannote_e_diarizador_separado(monkeypatch):
     from src.transcription import motores
-    plano = resolver_motores("whisper_turbo", "pyannote_40")
+    plano = resolver_motores("whisper", "pyannote_40")
     assert plano.diarizacao == "pyannote_40" and plano.avisos == []
     chamados = []
     monkeypatch.setattr(motores, "_rodar_worker_nemo", lambda tarefa, a, *e: chamados.append(tarefa) or
@@ -355,3 +355,32 @@ def test_sensevoice_converte_a_saida_do_worker(monkeypatch, audio):
                              "speaker_id": "Desconhecido", "confidence": 1.0}
     with pytest.raises(ErroASR, match="não transcreve 'pt'"):
         motores.transcrever_sensevoice(audio, resolver_motores("sensevoice", "none", "en"), OpcoesASR(idioma="pt"))
+
+
+def test_whisper_valor_antigo_e_tamanhos():
+    from src.transcription.motores import WHISPER_MODELOS, WHISPER_SO_INGLES
+    assert resolver_motores("whisper_turbo", "none").transcricao == "whisper"  # gravado antes
+    assert set(WHISPER_SO_INGLES) == {m for m in WHISPER_MODELOS if m.endswith(".en") or m.startswith("distil-")}
+    plano = resolver_motores("whisper", "none", "pt", "distil-large-v3")
+    assert plano.transcricao == MOTOR_ASSEMBLYAI and "só transcreve inglês" in plano.avisos[0]
+    assert resolver_motores("whisper", "none", "en", "distil-large-v3").transcricao == "whisper"
+    assert resolver_motores("whisper", "none", "pt", "small").transcricao == "whisper"
+
+
+def test_todo_tamanho_do_whisper_esta_no_catalogo_e_nas_configuracoes():
+    from src.services.modelos_locais import CATALOGO
+    from src.transcription.motores import WHISPER_MODELOS
+    assert REGISTRY_BY_KEY["asr.whisper_model"]["enum"] == list(WHISPER_MODELOS)
+    for nome in WHISPER_MODELOS:
+        m = CATALOGO[f"whisper_{nome}"]
+        assert m.configuracao == (f"asr.whisper_model={nome}",)
+        assert (m.idiomas == ("en",)) == (nome.endswith(".en") or nome.startswith("distil-"))
+
+
+def test_whisper_usa_o_tamanho_escolhido(monkeypatch, audio):
+    from src.transcription import motores
+    pedidos = []
+    monkeypatch.setattr(motores, "audio_16k", lambda a: "AMOSTRAS")
+    monkeypatch.setattr(motores, "_carregar_whisper", lambda nome: pedidos.append(nome) or _WhisperFalso())
+    r = motores.transcrever_whisper(audio, resolver_motores("whisper", "none"), OpcoesASR(whisper_modelo="small"))
+    assert pedidos == ["small"] and r.modelo_usado == "faster-whisper small"

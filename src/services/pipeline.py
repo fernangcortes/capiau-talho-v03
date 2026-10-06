@@ -411,7 +411,8 @@ class PipelineService:
 
         # Configurações resolvidas do projeto (motor, chave, idioma, diarização, VAD)
         S = SettingsService.get_settings(project_id)
-        plano = resolver_motores(S.get("transcription.engine"), S.get("diarization.engine"), S.get("asr.language"))
+        plano = resolver_motores(S.get("transcription.engine"), S.get("diarization.engine"), S.get("asr.language"),
+                                 S.get("asr.whisper_model"))
         provedor = CHAVE_DO_MOTOR.get(plano.transcricao)
         api_key = S.api_key(provedor) if provedor else None
         if provedor and (not api_key or api_key.startswith("your_")):
@@ -452,6 +453,7 @@ class PipelineService:
                 diarizar=S.get("asr.speaker_labels"),
                 max_falantes=S.get("diarization.max_speakers"),
                 detectar_entidades=S.get("asr.entity_detection"),
+                whisper_modelo=S.get("asr.whisper_model"),
             )
             try:
                 resultado = transcrever(upload_path, plano, opcoes, api_key)

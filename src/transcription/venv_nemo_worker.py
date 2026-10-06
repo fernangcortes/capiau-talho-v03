@@ -25,7 +25,8 @@ NEMOTRON = "nvidia/Nemotron-3-Diarization"
 PYANNOTE = "pyannote/speaker-diarization-community-1"
 CANARY_REPO, CANARY_ARQUIVO = "nvidia/canary-1b-v2", "canary-1b-v2.nemo"
 # O NeMo descompacta o .nemo (6,4 GB) a cada carga: ~120 s. Descompactado uma
-# vez aqui, a carga cai para ~25 s. CAPIAU_CANARY_DIR troca o lugar.
+# vez, a carga cai para ~25 s, e o .nemo pode ser apagado (o download pelo
+# catálogo faz isso). CAPIAU_CANARY_DIR troca o lugar.
 CANARY_DIR = os.getenv("CAPIAU_CANARY_DIR") or os.path.expanduser("~/.cache/capiau/canary-1b-v2")
 
 
@@ -99,14 +100,16 @@ def canary(audio_path: str, idioma: str) -> dict:
     from nemo.core.connectors.save_restore_connector import SaveRestoreConnector
 
     t0 = time.perf_counter()
-    nemo = hf_hub_download(CANARY_REPO, CANARY_ARQUIVO)
     if not os.path.exists(os.path.join(CANARY_DIR, "model_config.yaml")):
+        nemo = hf_hub_download(CANARY_REPO, CANARY_ARQUIVO)
         os.makedirs(CANARY_DIR, exist_ok=True)
         with tarfile.open(nemo) as tf:
             tf.extractall(CANARY_DIR)
     conector = SaveRestoreConnector()
     conector.model_extracted_dir = CANARY_DIR
-    modelo = ASRModel.restore_from(nemo, map_location="cpu", save_restore_connector=conector)
+    # Com a pasta descompactada o NeMo usa só ela (modelPT.restore_from troca o caminho);
+    # o .nemo original não precisa existir.
+    modelo = ASRModel.restore_from(CANARY_DIR, map_location="cpu", save_restore_connector=conector)
     modelo.eval()
     carga = time.perf_counter() - t0
 

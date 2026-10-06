@@ -59,6 +59,7 @@ def main():
     ap.add_argument("--project", type=int, default=2)
     ap.add_argument("--n", type=int, default=5)
     ap.add_argument("--idioma", default="", help="sobrepõe asr.language (ex.: en para testar o SenseVoice)")
+    ap.add_argument("--whisper", default="", help="tamanho do Whisper (sobrepõe asr.whisper_model)")
     ap.add_argument("--motores", default="assemblyai_universal_35,deepgram_nova_3")
     ap.add_argument("--diarizacao", default="mesmo_motor",
                     help="mesmo_motor, nemotron_3_diarization ou none (vale para todos os motores)")
@@ -82,10 +83,11 @@ def main():
             continue
         print(f"\n#{vid} ({v['duration']:.0f} s)")
         opcoes = OpcoesASR(idioma=args.idioma or S.get("asr.language"), diarizar=True,
+                           whisper_modelo=args.whisper or S.get("asr.whisper_model"),
                            max_falantes=S.get("diarization.max_speakers"), detectar_entidades=False)
         referencia = None
         for motor in motores:
-            plano = resolver_motores(motor, args.diarizacao, opcoes.idioma)
+            plano = resolver_motores(motor, args.diarizacao, opcoes.idioma, opcoes.whisper_modelo)
             if plano.transcricao != motor or (args.diarizacao in ("nemotron_3_diarization",)
                                               and plano.diarizacao != args.diarizacao):
                 print(f"  {motor:<26} não ligado ainda")

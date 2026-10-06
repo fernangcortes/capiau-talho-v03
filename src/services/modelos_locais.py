@@ -43,6 +43,30 @@ class ModeloLocal:
     obs: str = ""
 
 
+# Whisper local (faster-whisper): nome, repositório, MB do model.bin (conferido no
+# Hugging Face em 05/10/2026), uso. Os .en e os distil só transcrevem inglês.
+WHISPERS = [
+    ("tiny", "Systran/faster-whisper-tiny", 76, "Transcrição local mínima; fraca em português"),
+    ("base", "Systran/faster-whisper-base", 145, "Transcrição local leve; fraca em português"),
+    ("small", "Systran/faster-whisper-small", 484, "Transcrição local leve; reserva sem internet"),
+    ("medium", "Systran/faster-whisper-medium", 1528, "Transcrição local média"),
+    ("large-v1", "Systran/faster-whisper-large-v1", 3087, "Transcrição local grande (versão antiga)"),
+    ("large-v2", "Systran/faster-whisper-large-v2", 3087, "Transcrição local grande (versão antiga)"),
+    ("large-v3", "Systran/faster-whisper-large-v3", 3087, "Transcrição local grande; mais lenta que a turbo"),
+    ("large-v3-turbo", "mobiuslabsgmbh/faster-whisper-large-v3-turbo", 1618,
+     "Transcrição local na CPU (~0,4x o tempo do áudio); padrão do Whisper"),
+    ("tiny.en", "Systran/faster-whisper-tiny.en", 76, "Só inglês"),
+    ("base.en", "Systran/faster-whisper-base.en", 145, "Só inglês"),
+    ("small.en", "Systran/faster-whisper-small.en", 484, "Só inglês"),
+    ("medium.en", "Systran/faster-whisper-medium.en", 1528, "Só inglês"),
+    ("distil-small.en", "Systran/faster-distil-whisper-small.en", 332, "Só inglês, rápido"),
+    ("distil-medium.en", "Systran/faster-distil-whisper-medium.en", 789, "Só inglês, rápido"),
+    ("distil-large-v2", "Systran/faster-distil-whisper-large-v2", 1513, "Só inglês, rápido"),
+    ("distil-large-v3", "Systran/faster-distil-whisper-large-v3", 1513, "Só inglês, rápido"),
+    ("distil-large-v3.5", "distil-whisper/distil-large-v3.5-ct2", 1513, "Só inglês, rápido"),
+]
+
+
 CATALOGO: Dict[str, ModeloLocal] = {m.id: m for m in [
     ModeloLocal(
         id="laya_multilingual", nome="Laya multilíngue",
@@ -53,12 +77,13 @@ CATALOGO: Dict[str, ModeloLocal] = {m.id: m for m in [
                  "multilingual/tokenizer/*", "multilingual/encoder/*"),
         marcadores=("multilingual/model.safetensors",),
         configuracao=("triage.system1_enabled=true",)),
-    ModeloLocal(
-        id="whisper_turbo", nome="Whisper large-v3-turbo",
-        uso="Transcrição local na CPU (~0,4x o tempo do áudio)",
-        tamanho_mb=1620, ambiente="principal", pacotes=("faster_whisper",),
-        repo="mobiuslabsgmbh/faster-whisper-large-v3-turbo", marcadores=("model.bin",),
-        configuracao=("transcription.engine=whisper_turbo",)),
+    *[ModeloLocal(
+        id=f"whisper_{nome}", nome=f"Whisper {nome}",
+        uso=uso, tamanho_mb=mb, ambiente="principal", pacotes=("faster_whisper",),
+        repo=repo, marcadores=("model.bin",),
+        configuracao=(f"asr.whisper_model={nome}",),
+        idiomas=("en",) if (nome.endswith(".en") or nome.startswith("distil-")) else None)
+      for nome, repo, mb, uso in WHISPERS],
     ModeloLocal(
         id="sensevoice_small", nome="SenseVoice Small",
         uso="Transcrição local rápida, só chinês, inglês, japonês, coreano e cantonês",
@@ -70,9 +95,9 @@ CATALOGO: Dict[str, ModeloLocal] = {m.id: m for m in [
         id="canary_1b_v2", nome="NVIDIA Canary 1B v2",
         uso="Transcrição local na CPU (~1,5x o tempo do áudio); pode repetir frases em áudio ruidoso",
         tamanho_mb=6360, ambiente="nemo", pacotes=("nemo",),
-        repo="nvidia/canary-1b-v2", padroes=("canary-1b-v2.nemo",), marcadores=("canary-1b-v2.nemo",),
+        repo="nvidia/canary-1b-v2", padroes=("canary-1b-v2.nemo",),
         configuracao=("transcription.engine=nvidia_canary",),
-        obs="Depois do download é descompactado (mais 6,4 GB) para carregar em ~25 s em vez de ~120 s."),
+        obs="Baixa 6,4 GB, descompacta (carga de ~25 s em vez de ~120 s) e apaga o arquivo original: fica 6 GB em disco."),
     ModeloLocal(
         id="nemotron_diarization", nome="NVIDIA Nemotron 3 Diarization",
         uso="Separar falantes local (até 8 vozes, fala sobreposta)",
@@ -159,6 +184,9 @@ def _pacotes_ok(m: ModeloLocal) -> Tuple[bool, List[str]]:
 
 
 def baixado(m: ModeloLocal) -> bool:
+    if m.id == "canary_1b_v2":  # só a pasta descompactada fica; o .nemo é apagado
+        pasta = pasta_canary()
+        return (pasta / "model_config.yaml").is_file() and (pasta / "model_weights.ckpt").is_file()
     if m.id == "yolo_world":
         pesos = pasta_ultralytics() / "weights"
         return (pesos / "yolov8s-worldv2.pt").is_file() and (pesos / "clip" / "ViT-B-32.pt").is_file()
@@ -213,19 +241,23 @@ def _baixar_hf(m: ModeloLocal) -> None:
         revisao = resolve_revision(m.repo, None)
         if revisao:
             kw["revision"] = revisao
-    snapshot_download(m.repo, **kw)
     if m.id == "canary_1b_v2":
-        _descompactar_canary(m)
+        _descompactar_canary(m)  # baixa o .nemo, descompacta e apaga o original
+        return
+    snapshot_download(m.repo, **kw)
 
 
 def _descompactar_canary(m: ModeloLocal) -> None:
+    """Descompacta o .nemo na pasta do Canary e apaga o original (6,4 GB a menos em disco)."""
     from huggingface_hub import hf_hub_download
     destino = pasta_canary()
-    if (destino / "model_config.yaml").exists():
-        return
-    destino.mkdir(parents=True, exist_ok=True)
-    with tarfile.open(hf_hub_download(m.repo, "canary-1b-v2.nemo")) as tf:
-        tf.extractall(destino)
+    nemo = Path(hf_hub_download(m.repo, "canary-1b-v2.nemo"))
+    if not (destino / "model_config.yaml").exists():
+        destino.mkdir(parents=True, exist_ok=True)
+        with tarfile.open(nemo) as tf:
+            tf.extractall(destino)
+    if (destino / "model_weights.ckpt").is_file():
+        nemo.unlink(missing_ok=True)
 
 
 def _baixar_yolo_world() -> None:

@@ -901,7 +901,8 @@ def launch_transcription_worker(
     # Prévia pelo motor que vai rodar de fato (Configurações), não por um preço fixo
     from src.transcription.motores import OpcoesASR, preco_hora_usd, resolver_motores
     S = SettingsService.get_settings(project_id)
-    plano = resolver_motores(S.get("transcription.engine"), S.get("diarization.engine"), S.get("asr.language"))
+    plano = resolver_motores(S.get("transcription.engine"), S.get("diarization.engine"), S.get("asr.language"),
+                             S.get("asr.whisper_model"))
     opcoes = OpcoesASR(diarizar=S.get("asr.speaker_labels"), detectar_entidades=S.get("asr.entity_detection"))
     horas = sum((r["duration"] or 0) for r in fila) / 3600
     custo = round(horas * preco_hora_usd(plano, opcoes), 2)
