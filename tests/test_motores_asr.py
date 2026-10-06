@@ -59,12 +59,12 @@ def test_diarizacao_de_outro_motor_de_nuvem_usa_a_do_motor_escolhido_e_avisa():
 
 
 def test_motor_sem_codigo_cai_na_assemblyai_e_avisa():
-    plano = resolver_motores("sensevoice", "pyannote_40")
+    plano = resolver_motores("sensevoice", "diarizador_que_nao_existe")
     assert plano.transcricao == MOTOR_ASSEMBLYAI
     assert plano.diarizacao == DIARIZACAO_PROPRIA
     assert len(plano.avisos) == 2
     assert "sensevoice" in plano.avisos[0]
-    assert "pyannote_40" in plano.avisos[1]
+    assert "diarizador_que_nao_existe" in plano.avisos[1]
 
 
 def test_valor_vazio_usa_assemblyai_sem_aviso():
@@ -323,3 +323,15 @@ def test_preco_por_hora_segue_o_motor_escolhido():
     assert preco_hora_usd(resolver_motores(MOTOR_ASSEMBLYAI, "nemotron_3_diarization"), completo) == 0.29
     assert preco_hora_usd(resolver_motores(MOTOR_DEEPGRAM, "mesmo_motor"), completo) == 0.258
     assert preco_hora_usd(resolver_motores("whisper_turbo", "nemotron_3_diarization"), completo) == 0.0
+
+
+def test_pyannote_e_diarizador_separado(monkeypatch):
+    from src.transcription import motores
+    plano = resolver_motores("whisper_turbo", "pyannote_40")
+    assert plano.diarizacao == "pyannote_40" and plano.avisos == []
+    chamados = []
+    monkeypatch.setattr(motores, "_rodar_worker_nemo", lambda tarefa, a, *e: chamados.append(tarefa) or
+                        {"modelo": "m", "segmentos": []})
+    motores.diarizar_separado("pyannote_40", Path("x.wav"))
+    motores.diarizar_separado("nemotron_3_diarization", Path("x.wav"))
+    assert chamados == ["pyannote", "diarizar"]

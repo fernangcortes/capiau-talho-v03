@@ -11,7 +11,9 @@
 #
 # Outro lugar: variável CAPIAU_VENV_NEMO apontando para a pasta do ambiente.
 # Montado em 05/10/2026 com torch 2.14.1+cpu, nemo-toolkit 3.0.0,
-# transformers 5.18.0, librosa 1.0.0.
+# transformers 5.18.0, librosa 1.0.0; pyannote.audio 4.0.7 (traz o torchcodec,
+# que no Windows quebra a leitura de áudio do transformers: o worker lê WAV com soundfile).
 nemo-toolkit[asr]>=3.0.0
 transformers>=5.18.0
 librosa>=0.10
+pyannote.audio>=4.0  # diarizador pyannote_40; o modelo exige aceitar os termos no Hugging Face

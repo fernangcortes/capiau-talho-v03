@@ -20,6 +20,7 @@ MOTOR_DEEPGRAM = "deepgram_nova_3"
 MOTOR_WHISPER = "whisper_turbo"
 MOTOR_CANARY = "nvidia_canary"
 DIARIZADOR_NEMOTRON = "nemotron_3_diarization"
+DIARIZADOR_PYANNOTE = "pyannote_40"
 SEM_DIARIZACAO = "none"
 DIARIZACAO_MESMO_MOTOR = "mesmo_motor"  # opção das Configurações: a do motor de transcrição
 DIARIZACAO_PROPRIA = "propria"  # no plano: a do próprio motor de transcrição
@@ -41,7 +42,7 @@ TIPOS_AUDIO = {".mp3": "audio/mpeg", ".wav": "audio/wav", ".m4a": "audio/mp4", "
 TRANSCRICAO_COM_DIARIZACAO = {MOTOR_ASSEMBLYAI: True, MOTOR_DEEPGRAM: True, MOTOR_WHISPER: False, MOTOR_CANARY: False}
 TRANSCRICAO_LIGADOS = set(TRANSCRICAO_COM_DIARIZACAO)
 # Diarizadores separados (rodam sobre o áudio, depois da transcrição).
-DIARIZADORES_SEPARADOS = {DIARIZADOR_NEMOTRON}
+DIARIZADORES_SEPARADOS = {DIARIZADOR_NEMOTRON, DIARIZADOR_PYANNOTE}
 # Valores antigos de diarization.engine que significam "a da própria transcrição X".
 DIARIZACAO_DE_TRANSCRICAO = {MOTOR_ASSEMBLYAI, MOTOR_DEEPGRAM}
 DIARIZACAO_LIGADOS = {DIARIZACAO_MESMO_MOTOR, SEM_DIARIZACAO} | DIARIZADORES_SEPARADOS
@@ -364,6 +365,18 @@ def transcrever_canary(audio: Path, plano: PlanoASR, opcoes: OpcoesASR, chave: O
     return ResultadoASR(palavras=palavras, motor=MOTOR_CANARY, modelo_usado=r.get("modelo"), avisos=avisos)
 
 
+def diarizar_pyannote(audio: Path):
+    """Segmentos do pyannote community-1 (repositório com aceite de termos no Hugging Face)."""
+    r = _rodar_worker_nemo("pyannote", audio)
+    return r["segmentos"], r.get("modelo") or "pyannote/speaker-diarization-community-1"
+
+
+def diarizar_separado(motor: str, audio: Path):
+    if motor == DIARIZADOR_PYANNOTE:
+        return diarizar_pyannote(audio)
+    return diarizar_nemotron(audio)
+
+
 def atribuir_falantes(palavras: List[Dict[str, Any]], segmentos: List[Dict[str, Any]],
                       folga_s: float = 0.5) -> List[Dict[str, Any]]:
     """Cada palavra recebe o falante com mais sobreposição no tempo.
@@ -456,7 +469,7 @@ def transcrever(audio: Path, plano: PlanoASR, opcoes: OpcoesASR, chave: Optional
     if loop:
         resultado.avisos.append(f"Possível alucinação do {resultado.motor}: '{loop}' repetido em sequência; confira o trecho.")
     if plano.diarizacao in DIARIZADORES_SEPARADOS and resultado.palavras:
-        segmentos, modelo = diarizar_nemotron(audio)
+        segmentos, modelo = diarizar_separado(plano.diarizacao, audio)
         resultado.palavras = atribuir_falantes(resultado.palavras, segmentos)
         resultado.modelo_usado = f"{resultado.modelo_usado or resultado.motor} + {modelo}"
     return resultado

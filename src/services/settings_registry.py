@@ -176,7 +176,7 @@ SETTINGS_REGISTRY: List[Dict[str, Any]] = [
         "enum_labels": {
             "mesmo_motor": "Do próprio motor de transcrição (AssemblyAI ou Deepgram)",
             "nemotron_3_diarization": "Nemotron 3 Diarization (local, CPU; até 8 falantes, fala sobreposta)",
-            "pyannote_40": "pyannote 4.0 (em teste; por ora usa a do motor de transcrição)",
+            "pyannote_40": "pyannote 4 community-1 (local, CPU)",
             "none": "Sem separar falantes",
         },
         "label": "Motor de Diarização de Vozes",

@@ -7,9 +7,11 @@ Este arquivo não importa nada de ``src``.
 
 Uso (o lado de cá está em src/transcription/motores.py):
     python venv_nemo_worker.py diarizar <audio.wav> <saida.json>
+    python venv_nemo_worker.py pyannote <audio.wav> <saida.json>
     python venv_nemo_worker.py canary <audio.wav> <saida.json> <idioma>
+O áudio chega sempre como WAV mono 16 kHz (convertido pelo lado de cá).
 Saídas:
-    diarizar: {"modelo", "segmentos": [{"inicio": s, "fim": s, "falante": n}, ...]}
+    diarizar, pyannote: {"modelo", "segmentos": [{"inicio": s, "fim": s, "falante": n}, ...]}
     canary:   {"modelo", "palavras": [{"word", "start", "end"}, ...]}
 """
 import json
@@ -19,16 +21,54 @@ import tarfile
 import time
 
 NEMOTRON = "nvidia/Nemotron-3-Diarization"
+PYANNOTE = "pyannote/speaker-diarization-community-1"
 CANARY_REPO, CANARY_ARQUIVO = "nvidia/canary-1b-v2", "canary-1b-v2.nemo"
 # O NeMo descompacta o .nemo (6,4 GB) a cada carga: ~120 s. Descompactado uma
 # vez aqui, a carga cai para ~25 s. CAPIAU_CANARY_DIR troca o lugar.
 CANARY_DIR = os.getenv("CAPIAU_CANARY_DIR") or os.path.expanduser("~/.cache/capiau/canary-1b-v2")
 
 
+def _ler_wav(audio_path: str, sr_esperado: int = 16000):
+    """Lê o WAV com soundfile. Não usa transformers.audio_utils.load_audio: com o
+    torchcodec instalado (vem com o pyannote) ele tenta o torchcodec, que no Windows
+    falha com 'Could not load libtorchcodec' -- medido em 05/10/2026."""
+    import soundfile as sf
+    dados, sr = sf.read(audio_path, dtype="float32", always_2d=False)
+    if sr != sr_esperado:
+        raise ValueError(f"WAV em {sr} Hz; esperado {sr_esperado} Hz")
+    if dados.ndim > 1:
+        dados = dados.mean(axis=1)
+    return dados
+
+
+def pyannote(audio_path: str) -> dict:
+    import torch
+    from pyannote.audio import Pipeline
+
+    t0 = time.perf_counter()
+    pipeline = Pipeline.from_pretrained(PYANNOTE)
+    carga = time.perf_counter() - t0
+
+    dados = _ler_wav(audio_path)
+    t0 = time.perf_counter()
+    saida = pipeline({"waveform": torch.from_numpy(dados).unsqueeze(0), "sample_rate": 16000})
+    anotacao = getattr(saida, "speaker_diarization", saida)
+    nomes = {}
+    segmentos = []
+    for trecho, _, falante in anotacao.itertracks(yield_label=True):
+        indice = nomes.setdefault(falante, len(nomes))  # SPEAKER_00 -> 0, na ordem em que aparecem
+        segmentos.append({"inicio": float(trecho.start), "fim": float(trecho.end), "falante": indice})
+    return {
+        "modelo": PYANNOTE,
+        "carga_s": round(carga, 2),
+        "inferencia_s": round(time.perf_counter() - t0, 2),
+        "segmentos": segmentos,
+    }
+
+
 def diarizar(audio_path: str) -> dict:
     import torch
     from transformers import AutoModelForAudioFrameClassification, AutoProcessor
-    from transformers.audio_utils import load_audio
 
     t0 = time.perf_counter()
     proc = AutoProcessor.from_pretrained(NEMOTRON)
@@ -37,7 +77,7 @@ def diarizar(audio_path: str) -> dict:
     carga = time.perf_counter() - t0
 
     sr = proc.feature_extractor.sampling_rate
-    audio = load_audio(audio_path, sampling_rate=sr)
+    audio = _ler_wav(audio_path, sr)
     t0 = time.perf_counter()
     inputs = proc(audio, sampling_rate=sr)
     with torch.inference_mode():
@@ -83,6 +123,8 @@ def canary(audio_path: str, idioma: str) -> dict:
 def main(argv):
     if len(argv) == 4 and argv[1] == "diarizar":
         resultado = diarizar(argv[2])
+    elif len(argv) == 4 and argv[1] == "pyannote":
+        resultado = pyannote(argv[2])
     elif len(argv) == 5 and argv[1] == "canary":
         resultado = canary(argv[2], argv[4])
     else:
