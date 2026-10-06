@@ -47,7 +47,7 @@ CATALOGO: Dict[str, ModeloLocal] = {m.id: m for m in [
     ModeloLocal(
         id="laya_multilingual", nome="Laya multilíngue",
         uso="Triagem local na CPU (Sistema 1), em modo sombra ou decidindo",
-        tamanho_mb=680, ambiente="principal", pacotes=("laya",),
+        tamanho_mb=650, ambiente="principal", pacotes=("laya",),
         repo="convaiinnovations/laya",
         padroes=("multilingual/rl_agent_config.json", "multilingual/model.safetensors",
                  "multilingual/tokenizer/*", "multilingual/encoder/*"),

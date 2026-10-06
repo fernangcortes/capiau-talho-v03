@@ -3,6 +3,7 @@
 // com escopo Global ou por Projeto e indicação da origem de cada valor.
 import { STATE } from "./state.js";
 import { CapIAuAPI } from "./api.js";
+import { ModelosLocais } from "./modelosLocais.js";
 
 const MODE_STORAGE_KEY = "capiau_ai_settings_mode";
 const DRAWER_WIDTH_KEY = "capiau_settings_drawer_w";
@@ -224,6 +225,8 @@ export class SettingsPanelManager {
         this.data.global = globalData;
         this.data.project = projectData;
         this.data.prompts = promptsData.prompts;
+        // Lista de modelos locais: falhar aqui não impede abrir as Configurações
+        try { await ModelosLocais.carregar(); } catch (e) { console.warn("[Settings] Modelos locais:", e); }
     }
 
     hasDirty() {
@@ -280,6 +283,7 @@ export class SettingsPanelManager {
             if (c.pro_only && this.mode === "simple") return false;
             if (c.id === "prompts" && this.mode !== "pro") return false;
             if (c.id === "prompts") return true; // Prompts tab handles its own visibility checks
+            if (c.id === "local_models") return true; // lista própria, fora do registry
             return this.visibleEntries(c.id).length > 0;
         });
     }
@@ -325,6 +329,11 @@ export class SettingsPanelManager {
         title.className = "settings-category-title";
         title.innerHTML = `<i class="fa-solid ${cat.icon}" style="color: var(--accent);"></i> ${cat.label}`;
         this.contentEl.appendChild(title);
+
+        if (categoryId === "local_models") {
+            ModelosLocais.render(this.contentEl);
+            return;
+        }
 
         const hint = document.createElement("p");
         hint.className = "settings-scope-hint";
@@ -505,6 +514,27 @@ export class SettingsPanelManager {
         help.className = "setting-help";
         help.textContent = entry.help;
         info.appendChild(help);
+
+        // Motor que depende de modelo local não baixado: avisa e leva até a lista (só com clique)
+        const valorAtual = isDirty ? dirtyMap.get(entry.key) : resolved.value;
+        const avisoModelo = ModelosLocais.aviso(entry.key, valorAtual);
+        if (avisoModelo) {
+            const note = document.createElement("div");
+            note.className = "setting-reprocess-note";
+            note.innerHTML = `<i class="fa-solid fa-download"></i> `;
+            note.appendChild(document.createTextNode(avisoModelo + " "));
+            const ir = document.createElement("a");
+            ir.href = "#";
+            ir.textContent = "Ver em Modelos locais";
+            ir.addEventListener("click", (ev) => {
+                ev.preventDefault();
+                this.activeCategory = "local_models";
+                this.renderNav(this.visibleCategories());
+                this.renderCategory("local_models");
+            });
+            note.appendChild(ir);
+            info.appendChild(note);
+        }
 
         if (entry.requires_reprocess) {
             const note = document.createElement("div");

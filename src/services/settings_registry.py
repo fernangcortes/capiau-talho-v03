@@ -27,6 +27,7 @@ CATEGORIES = [
     {"id": "faces",         "label": "Rostos",               "icon": "fa-user"},
     {"id": "hardware",      "label": "Hardware & GPU",       "icon": "fa-microchip"},
     {"id": "appearance",    "label": "Aparência",            "icon": "fa-palette"},
+    {"id": "local_models",  "label": "Modelos locais",       "icon": "fa-download"},
     {"id": "prompts",       "label": "Prompts",              "icon": "fa-terminal", "pro_only": True},
 ]
 
@@ -166,7 +167,7 @@ SETTINGS_REGISTRY: List[Dict[str, Any]] = [
             "deepgram_nova_3": "Deepgram Nova-3 (nuvem)",
         },
         "label": "Motor de Transcrição Primária",
-        "help": "Motor de reconhecimento de fala. Os marcados 'em teste' ainda não têm código: a transcrição sai pela AssemblyAI e a tela de Tarefas avisa.",
+        "help": "Motor de reconhecimento de fala. Os locais precisam do modelo baixado em Modelos locais; sem ele, a transcrição sai pela AssemblyAI e a tela de Tarefas avisa.",
         "help_tech": "Resolvido em src/transcription/motores.py (resolver_motores).",
         "category": "transcription", "level": "simple", "scope": "both", "requires_reprocess": True,
     },
@@ -180,7 +181,7 @@ SETTINGS_REGISTRY: List[Dict[str, Any]] = [
             "none": "Sem separar falantes",
         },
         "label": "Motor de Diarização de Vozes",
-        "help": "Separa e identifica quem está falando. Os marcados 'em teste' ainda não têm código: a separação sai pelo motor de transcrição e a tela de Tarefas avisa.",
+        "help": "Separa e identifica quem está falando. Nemotron e pyannote rodam no computador e precisam do modelo baixado em Modelos locais.",
         "help_tech": "Resolvido em src/transcription/motores.py; valores antigos (assemblyai_universal_35) contam como mesmo_motor.",
         "category": "transcription", "level": "simple", "scope": "both", "requires_reprocess": True,
     },
