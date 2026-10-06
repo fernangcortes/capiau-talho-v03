@@ -298,3 +298,73 @@ def test_analyze_video_all_nao_paga_asr_de_novo(monkeypatch, tem_fala, forcar, e
     monkeypatch.setattr(P, "analyze_video_vision", staticmethod(lambda *a, **k: True))
     P.analyze_video_all(9, forcar_asr=forcar)
     assert (chamadas == ["asr"]) is espera_asr
+
+
+# ---------------------------------------------------------------------------
+# Item 4: piso de esforço quando a triagem é incerta
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("categoria,conf,laya,esperado", [
+    ("cotidiano", 0.9, None, "triagem"),          # firme: economiza
+    ("cotidiano", 0.9, "cotidiano", "triagem"),   # Laya concorda
+    ("cotidiano", 0.4, None, "completo"),         # abaixo do limiar
+    ("cotidiano", None, None, "completo"),        # confiança vazia = incerta
+    ("cotidiano", 0.9, "obra", "completo"),       # Laya discorda
+    ("pessoal", 0.95, "arquivo", "completo"),
+    ("tecnico", 0.3, None, "completo"),           # reduzido também sobe
+    ("cotidiano", 1.0, "obra", "triagem"),        # correção humana manda
+    ("obra", 0.2, "pessoal", "completo"),         # piso nunca corta
+    (None, None, None, "completo"),
+])
+def test_piso_de_esforco(categoria, conf, laya, esperado):
+    from src.services.analysis_policy import get_profile
+    assert get_profile(categoria, None, confianca=conf, limiar=0.55, categoria_laya=laya).effort == esperado
+
+
+def test_get_profile_sem_confianca_mantem_comportamento_antigo():
+    from src.services.analysis_policy import get_profile
+    assert get_profile("cotidiano").effort == "triagem"
+    assert get_profile("cotidiano", '{"cotidiano": "completo"}').effort == "completo"
+
+
+def _laya(conn, video_id, categoria):
+    conn.execute("""INSERT INTO system1_decisao (project_id, media_kind, media_id, tarefa, motor, modo,
+                    estado_json, perguntas_json, categoria, confianca)
+                    VALUES (1, 'video', ?, 'triagem', 'laya-multilingual', 'sombra', '{}', '[]', ?, 0.6)""",
+                 (video_id, categoria))
+    conn.commit()
+
+
+@pytest.mark.parametrize("laya,quadros", [("cotidiano", 2), ("obra", 6)])
+def test_pipeline_aplica_o_piso_com_a_discordancia_da_laya(banco, monkeypatch, tmp_path, laya, quadros):
+    from pathlib import Path
+    banco.execute("UPDATE video SET category = 'cotidiano', category_confidence = 0.92, duration = 60 WHERE id = 7")
+    banco.commit()
+    _laya(banco, 7, laya)
+    capturados = []
+    P = _pipeline_falso(banco, monkeypatch, tmp_path, capturados)
+    _detector(monkeypatch, [])
+    assert P.analyze_video_vision(7, Path("C:/nao/existe/take.mp4"), 60.0) is True
+    assert len(capturados) == quadros
+
+
+def test_fila_de_revisao_inclui_discordancia_e_confianca_vazia(banco, monkeypatch):
+    from src.api.routes.media import triage_review_queue
+    monkeypatch.setattr(SettingsService, "get_settings", _settings())
+    banco.execute("UPDATE video SET category_confidence = 1.0 WHERE id = 7")
+    linhas = [  # id, categoria, confiança, laya
+        (20, "obra", 0.95, "obra"),      # firme e concorda: fora
+        (21, "obra", 0.95, "pessoal"),   # discorda: dentro
+        (22, "obra", None, None),        # vazia: dentro
+        (23, "obra", 0.30, None),        # baixa: dentro
+        (24, "obra", 1.0, "pessoal"),    # humana: fora
+    ]
+    for vid, cat, conf, laya in linhas:
+        banco.execute("""INSERT INTO video (id, project_id, filename, filepath, hash, category, category_confidence)
+                         VALUES (?, 1, 'v', 'v', ?, ?, ?)""", (vid, f"h{vid}", cat, conf))
+        if laya:
+            _laya(banco, vid, laya)
+    banco.commit()
+    fila = triage_review_queue(1, conn=banco)
+    assert sorted(v["id"] for v in fila["videos"]) == [21, 22, 23]
+    assert {v["id"]: v["categoria_laya"] for v in fila["videos"]}[21] == "pessoal"

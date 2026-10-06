@@ -135,6 +135,48 @@ def resolve_effort(category: Optional[str], overrides_raw: Any = None) -> str:
     return DEFAULT_EFFORT_BY_CATEGORY.get(cat, FALLBACK_EFFORT)
 
 
-def get_profile(category: Optional[str], overrides_raw: Any = None) -> EffortProfile:
-    """Perfil de esforço aplicável ao material desta categoria."""
-    return PROFILES[resolve_effort(category, overrides_raw)]
+# Ordem de custo: serve para saber se uma mudança de categoria pede MAIS análise
+EFFORT_RANK: Dict[str, int] = {EFFORT_TRIAGE: 0, EFFORT_REDUCED: 1, EFFORT_FULL: 2}
+
+# Correção humana grava confiança 1.0 (media.py): ela manda, mesmo contra a Laya
+CONFIANCA_HUMANA = 1.0
+
+_NAO_INFORMADA = object()
+
+
+def categoria_incerta(confianca: Any, limiar: Optional[float] = None,
+                      categoria: Optional[str] = None, categoria_laya: Optional[str] = None) -> bool:
+    """A categoria da triagem é firme o bastante para cortar esforço?
+
+    Incerta quando: não há confiança registrada; a confiança está abaixo do limiar
+    (`triage.min_confidence`); ou a Laya, que roda em sombra, discordou. A confiança
+    que o modelo declara sai ~0,9 para quase tudo, então a discordância entre dois
+    motores independentes é o sinal que de fato separa os casos duvidosos.
+    """
+    if confianca is None:
+        return True
+    try:
+        conf = float(confianca)
+    except (TypeError, ValueError):
+        return True
+    if conf >= CONFIANCA_HUMANA:
+        return False
+    if limiar is not None and conf < float(limiar):
+        return True
+    if categoria and categoria_laya:
+        return str(categoria_laya).strip().lower() != str(categoria).strip().lower()
+    return False
+
+
+def get_profile(category: Optional[str], overrides_raw: Any = None, *, confianca: Any = _NAO_INFORMADA,
+                limiar: Optional[float] = None, categoria_laya: Optional[str] = None) -> EffortProfile:
+    """Perfil de esforço aplicável ao material desta categoria.
+
+    Com `confianca` informada (pode ser None = vazia), categoria incerta usa o perfil
+    completo: o piso só sobe o esforço, nunca corta. Sem `confianca`, comportamento antigo.
+    """
+    effort = resolve_effort(category, overrides_raw)
+    if (category and confianca is not _NAO_INFORMADA
+            and categoria_incerta(confianca, limiar, category, categoria_laya)):
+        effort = EFFORT_FULL
+    return PROFILES[effort]

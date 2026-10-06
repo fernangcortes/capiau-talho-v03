@@ -161,15 +161,24 @@ def triage_review_queue(project_id: int, conn: sqlite3.Connection = Depends(get_
     min_conf = S.get("triage.min_confidence")
     cursor = conn.cursor()
 
+    # Mesma regra do piso de esforço (analysis_policy.categoria_incerta): confiança
+    # vazia, abaixo do limiar, ou Laya discordando de categoria não confirmada por humano.
+    from src.services.system1_service import MOTOR_LAYA
     cursor.execute(
-        """SELECT id, filename, title, category, category_confidence, video_type, duration, status
-           FROM video
-           WHERE project_id = ?
-             AND ((category IS NOT NULL AND category_confidence < ?)
-                  OR (category IS NULL AND video_type != 'interview'
-                      AND description IS NOT NULL AND description != ''))
-           ORDER BY category_confidence ASC""",
-        (project_id, min_conf)
+        """SELECT v.id, v.filename, v.title, v.category, v.category_confidence, v.video_type, v.duration,
+                  v.status, laya.categoria AS categoria_laya
+           FROM video v
+           LEFT JOIN system1_decisao laya ON laya.id = (
+               SELECT max(d.id) FROM system1_decisao d
+               WHERE d.media_kind = 'video' AND d.media_id = v.id AND d.motor = ? AND d.categoria IS NOT NULL)
+           WHERE v.project_id = ?
+             AND ((v.category IS NOT NULL AND (v.category_confidence IS NULL OR v.category_confidence < ?))
+                  OR (v.category IS NOT NULL AND v.category_confidence < 1.0
+                      AND laya.categoria IS NOT NULL AND lower(laya.categoria) != lower(v.category))
+                  OR (v.category IS NULL AND v.video_type != 'interview'
+                      AND v.description IS NOT NULL AND v.description != ''))
+           ORDER BY v.category_confidence ASC""",
+        (MOTOR_LAYA, project_id, min_conf)
     )
     videos = [dict(r) for r in cursor.fetchall()]
 

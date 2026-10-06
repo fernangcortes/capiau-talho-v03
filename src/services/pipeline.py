@@ -706,6 +706,21 @@ class PipelineService:
         return PipelineService._cap_keeping_coverage(kept, max_frames)
 
     @staticmethod
+    def _categoria_laya(video_id: int) -> Optional[str]:
+        """Última categoria que a Laya deu a este vídeo (sombra ou decide); None se nunca respondeu."""
+        try:
+            from src.services.system1_service import MOTOR_LAYA
+            with get_db() as conn:
+                row = conn.execute(
+                    "SELECT categoria FROM system1_decisao WHERE media_kind = 'video' AND media_id = ? "
+                    "AND motor = ? AND categoria IS NOT NULL ORDER BY id DESC LIMIT 1",
+                    (video_id, MOTOR_LAYA)).fetchone()
+            return row["categoria"] if row else None
+        except Exception as e:
+            print(f"[Vision] Falha ao ler a decisão da Laya do vídeo {video_id}: {e}")
+            return None
+
+    @staticmethod
     def _tem_transcricao(video_id: int) -> bool:
         with get_db() as conn:
             return conn.execute("SELECT 1 FROM transcript WHERE video_id = ? LIMIT 1", (video_id,)).fetchone() is not None
@@ -789,10 +804,18 @@ class PipelineService:
 
         # Perfil de esforço (E2.C1): a categoria da triagem decide quanta análise cara
         # este material merece. Sem categoria, o perfil é o completo (comportamento antigo).
-        profile = get_profile(category, S.get("analysis.effort_overrides"))
+        # Piso: categoria incerta (confiança vazia, abaixo do limiar ou Laya discordando)
+        # não corta esforço -- erro de triagem não pode virar análise pobre.
+        with get_db() as conn:
+            row = conn.execute("SELECT category_confidence FROM video WHERE id = ?", (video_id,)).fetchone()
+        confianca = row["category_confidence"] if row else None
+        categoria_laya = PipelineService._categoria_laya(video_id)
+        profile = get_profile(category, S.get("analysis.effort_overrides"), confianca=confianca,
+                              limiar=S.get("triage.min_confidence"), categoria_laya=categoria_laya)
         if profile.max_keyframes is not None:
             max_frames = min(max_frames, profile.max_keyframes)
         print(f"[Vision] Video {video_id}: categoria='{category or 'sem categoria'}' "
+              f"(conf {confianca if confianca is not None else 'vazia'}, Laya '{categoria_laya or '-'}') "
               f"-> esforco '{profile.effort}' ({profile.label})")
 
         # Cada job de frame carrega a janela real do trecho (para o payload do Qdrant)
