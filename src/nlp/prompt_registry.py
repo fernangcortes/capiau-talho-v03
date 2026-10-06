@@ -11,21 +11,62 @@ from src.db.connection import get_db
 
 # ── Catálogo de Prompts Padrão do Sistema ────────────────────────────────────
 
-# Taxonomia fixa de triagem (Eixo A — natureza do material, universal)
+# Taxonomia de triagem, eixo 1: o que o material é (docs/REVISAO_CATEGORIAS.md, proposta B).
+# Descreve o que está diante da câmera, não o valor editorial. "Interessa ao projeto?" é o
+# eixo 2, uma marca à parte (fora_do_projeto), e não categoria.
 TRIAGE_CATEGORIES: Dict[str, str] = {
-    "obra": "material da própria obra: takes de cena, stills de cena, material que pode ir ao corte final",
-    "processo": "registro do fazer: making of, bastidores de gravação, montagem de set, equipe trabalhando",
-    "depoimento": "entrevistas e falas dirigidas à câmera",
-    "cotidiano": "conversas informais, vida da equipe, registros sociais no entorno do trabalho",
-    "evento": "lançamentos, festivais, coletivas de imprensa, celebrações",
-    "tecnico": "testes de câmera/luz/som, calibração, claquetes vazias, enquadramentos de teste",
-    "arquivo": "material recebido de terceiros, banco de imagens, material histórico",
-    "pessoal": "sem relação com o projeto (registros pessoais que vieram junto no cartão)",
-    "documento": "papéis, telas, roteiros ou documentos filmados/fotografados",
+    "cena": "a encenação ou o assunto filmado como obra: take, plano de cobertura, still de cena",
+    "bastidor": "a equipe e o fazer: montagem, ensaio, direção, equipe trabalhando ao redor da cena",
+    "depoimento": "alguém falando para a câmera ou para um entrevistador, como foco do plano",
+    "convivio": "vida da equipe fora do trabalho em cena: refeição, deslocamento, conversa solta",
+    "evento": "lançamento, festival, coletiva de imprensa, celebração",
+    "teste": "plano feito para testar ou calibrar equipamento (câmera, luz, som), sem cena nem trabalho de equipe em foco",
+    "documento": "papel, tela ou roteiro filmado para ser lido",
+    "terceiros": "material que não foi gravado pela produção: recebido, banco de imagens, histórico",
 }
 
+# Chaves da taxonomia anterior (até 06/10/2026). 'pessoal' não tem par: virou a marca
+# fora_do_projeto. Serve à migração dos dados e a quem ainda manda o nome antigo.
+CATEGORIAS_ANTIGAS: Dict[str, str] = {
+    "obra": "cena",
+    "processo": "bastidor",
+    "cotidiano": "convivio",
+    "tecnico": "teste",
+    "arquivo": "terceiros",
+}
+
+# Regras de desempate, em ordem (seção 5 do documento). Entram no prompt da triagem.
+TRIAGE_RULES: List[str] = [
+    "Não foi gravado pela produção: 'terceiros'.",
+    "Alguém fala para a câmera ou para um entrevistador durante a maior parte do tempo: "
+    "'depoimento', mesmo no set.",
+    "O plano registra a encenação em si (atores em cena, claquete de take, câmera na posição da "
+    "cena): 'cena'. Se registra a equipe AO REDOR da encenação: 'bastidor'.",
+    "O objetivo do plano é testar equipamento e não há cena nem equipe trabalhando em foco: 'teste'. "
+    "Teste de luz com a equipe montando: 'bastidor'.",
+    "O que importa é ler o que está escrito: 'documento'. Roteiro na mão de alguém em ação: 'bastidor'.",
+    "Equipe fora do trabalho em cena: 'convivio'. Conversa sobre a cena durante o almoço: 'convivio' "
+    "(o assunto vai para o título, não para a categoria).",
+    "Material misto: a categoria do que ocupa MAIS tempo; as outras vão em categorias_secundarias.",
+]
+
+
+def normalizar_categoria(valor: Any) -> Optional[str]:
+    """Chave canônica da taxonomia, aceitando caixa, acento e os nomes antigos.
+    Fora da taxonomia (inclusive 'pessoal') devolve None."""
+    if valor is None:
+        return None
+    import unicodedata
+    chave = unicodedata.normalize("NFKD", str(valor)).encode("ascii", "ignore").decode().strip().lower()
+    chave = CATEGORIAS_ANTIGAS.get(chave, chave)
+    return chave if chave in TRIAGE_CATEGORIES else None
+
+
 def _triage_categories_block() -> str:
-    return "\n".join([f'- "{k}": {v}' for k, v in TRIAGE_CATEGORIES.items()])
+    linhas = [f'- "{k}": {v}' for k, v in TRIAGE_CATEGORIES.items()]
+    linhas.append("\nREGRAS DE DESEMPATE (em ordem; a primeira que se aplica vence):")
+    linhas += [f"{i}. {r}" for i, r in enumerate(TRIAGE_RULES, start=1)]
+    return "\n".join(linhas)
 
 
 PROMPT_REGISTRY: Dict[str, Dict[str, Any]] = {
@@ -94,19 +135,22 @@ Responda estritamente em Português e em formato JSON puro:
             "context_block": "Contexto disponível: nome do arquivo, pasta, trecho de transcrição, entidades do projeto."
         },
         "default": """Você é um assistente de catalogação de material audiovisual bruto de um projeto.
-Você verá um ou mais quadros extraídos de um MESMO arquivo (em ordem cronológica) e um contexto opcional.
-Sua tarefa é classificar O QUE este material é em relação à produção — observe com neutralidade, sem presumir nada.
+Você verá quadros de um MESMO vídeo (em ordem cronológica) e um contexto opcional.
+Sua tarefa é classificar O QUE este material mostra — observe com neutralidade, sem presumir nada.
 
-CATEGORIAS POSSÍVEIS (escolha exatamente UMA, a que melhor descreve o arquivo como um todo):
+CATEGORIAS POSSÍVEIS (escolha exatamente UMA principal, a que ocupa mais tempo no vídeo):
 {categories_block}
 {context_block}
 Responda estritamente em Português e em JSON puro (sem markdown):
 {
-  "categoria": "uma das chaves acima, ex: 'cotidiano'",
+  "categoria": "uma das chaves acima, ex: 'convivio'",
+  "categorias_secundarias": ["outras chaves que também aparecem por um trecho relevante; [] se não houver"],
+  "fora_do_projeto": false,
   "confianca": 0.85,
-  "titulo": "título curto e específico de 3 a 6 palavras que diferencie este arquivo dos demais (ex: 'Almoço da equipe na varanda')",
+  "titulo": "título curto e específico de 3 a 6 palavras que diferencie este vídeo dos demais (ex: 'Almoço da equipe na varanda')",
   "justificativa": "uma frase curta explicando a escolha"
-}"""
+}
+"fora_do_projeto" é true só quando o material não tem relação com o projeto (registro pessoal que veio junto no cartão, por exemplo)."""
     },
     "triage_batch_title": {
         "label": "Triagem: Títulos em Lote",

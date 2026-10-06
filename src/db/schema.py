@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS project (
     name TEXT NOT NULL,
     description TEXT,
     drive_link TEXT,
+    objetivo TEXT, -- o que o projeto produz (ex.: 'making of do longa MONSTRO'); contexto da triagem
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -51,6 +52,8 @@ CREATE TABLE IF NOT EXISTS video (
     summary TEXT,
     tags TEXT, -- JSON array de tags gerais
     esforco_analisado TEXT,       -- perfil de esforço da última análise de visão (completo|reduzido|triagem)
+    categorias_secundarias TEXT,  -- JSON: outras categorias com trecho relevante; não vazio = vídeo misto
+    fora_do_projeto INTEGER DEFAULT 0, -- eixo 2 da triagem: material sem relação com o projeto
     analise_desatualizada TEXT,   -- motivo quando a categoria mudou e pede mais esforço; NULL = em dia
 
     -- Status no pipeline
@@ -627,6 +630,34 @@ def migrate_storage_schema(conn: sqlite3.Connection) -> None:
     conn.commit()
 
 
+def migrar_taxonomia_categorias(conn: sqlite3.Connection) -> None:
+    """Chaves antigas de categoria -> novas (docs/REVISAO_CATEGORIAS.md, proposta B).
+
+    Idempotente: só toca linhas que ainda têm o nome antigo. 'pessoal' deixa de ser
+    categoria: no vídeo vira a marca fora_do_projeto (categoria vazia, para a triagem
+    dizer o que é); na foto a categoria só fica vazia. As decisões da Laya
+    (system1_decisao) também são traduzidas, para a comparação com a triagem valer.
+    """
+    from src.nlp.prompt_registry import CATEGORIAS_ANTIGAS
+    cur = conn.cursor()
+    total = 0
+    for antiga, nova in CATEGORIAS_ANTIGAS.items():
+        for sql in ("UPDATE video SET category = ? WHERE category = ?",
+                    "UPDATE photo SET category = ? WHERE category = ?",
+                    "UPDATE triage_feedback SET right_category = ? WHERE right_category = ?",
+                    "UPDATE triage_feedback SET wrong_category = ? WHERE wrong_category = ?",
+                    "UPDATE system1_decisao SET categoria = ? WHERE categoria = ?"):
+            cur.execute(sql, (nova, antiga))
+            total += cur.rowcount
+    cur.execute("UPDATE video SET fora_do_projeto = 1, category = NULL, category_confidence = NULL "
+                "WHERE category = 'pessoal'")
+    total += cur.rowcount
+    cur.execute("UPDATE photo SET category = NULL, category_confidence = NULL WHERE category = 'pessoal'")
+    total += cur.rowcount
+    if total:
+        print(f"[MIGRATION] Taxonomia de categorias: {total} valores traduzidos para as chaves novas.")
+
+
 def init_db(db_path: Path = None):
     """Inicializa o banco de dados SQLite com as tabelas do schema e realiza migracoes dinamicas."""
     if db_path is None:
@@ -649,6 +680,9 @@ def init_db(db_path: Path = None):
         if "drive_link" not in project_cols:
             cursor.execute("ALTER TABLE project ADD COLUMN drive_link TEXT")
             print("[MIGRATION] Coluna 'drive_link' adicionada a tabela project.")
+        if "objetivo" not in project_cols:
+            cursor.execute("ALTER TABLE project ADD COLUMN objetivo TEXT")
+            print("[MIGRATION] Coluna 'objetivo' adicionada a tabela project.")
             
         # Migracao: tabela face (nova estrutura versionada)
         cursor.execute("PRAGMA table_info(face)")
@@ -719,6 +753,14 @@ def init_db(db_path: Path = None):
         if "analise_desatualizada" not in video_cols:
             cursor.execute("ALTER TABLE video ADD COLUMN analise_desatualizada TEXT")
             print("[MIGRATION] Coluna 'analise_desatualizada' adicionada a tabela video.")
+        # Triagem em dois eixos (docs/REVISAO_CATEGORIAS.md): misto e fora do projeto
+        if "categorias_secundarias" not in video_cols:
+            cursor.execute("ALTER TABLE video ADD COLUMN categorias_secundarias TEXT")
+            print("[MIGRATION] Coluna 'categorias_secundarias' adicionada a tabela video.")
+        if "fora_do_projeto" not in video_cols:
+            cursor.execute("ALTER TABLE video ADD COLUMN fora_do_projeto INTEGER DEFAULT 0")
+            print("[MIGRATION] Coluna 'fora_do_projeto' adicionada a tabela video.")
+        migrar_taxonomia_categorias(conn)
         # Origem da decupagem CORRENTE ('ia' | 'humano' | 'importado'). Serve para
         # que video_metadata_history registre corretamente quem escreveu a versao
         # que esta sendo arquivada.

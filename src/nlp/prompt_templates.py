@@ -4,19 +4,18 @@ Delegam a resolução dos templates para o PromptRegistry para suportar
 prompts editáveis pelo painel de configurações.
 """
 from typing import Optional
-from src.nlp.prompt_registry import get_prompt, PROMPT_REGISTRY, TRIAGE_CATEGORIES, _triage_categories_block
+from src.nlp.prompt_registry import get_prompt, PROMPT_REGISTRY, TRIAGE_CATEGORIES, _triage_categories_block, normalizar_categoria
 
 # Rótulos amigáveis das categorias de triagem (para injetar em prompts e UI)
 CATEGORY_LABELS = {
-    "obra": "Obra (cena/take)",
-    "processo": "Making of / Processo",
+    "cena": "Cena",
+    "bastidor": "Bastidor",
     "depoimento": "Depoimento",
-    "cotidiano": "Cotidiano da equipe",
+    "convivio": "Convívio",
     "evento": "Evento",
-    "tecnico": "Material técnico",
-    "arquivo": "Arquivo / Terceiros",
-    "pessoal": "Pessoal / Sem relação",
+    "teste": "Teste",
     "documento": "Documento",
+    "terceiros": "Terceiros",
 }
 
 # Mantido para retrocompatibilidade com chamadores legados
@@ -27,6 +26,21 @@ TIMELINE_PERSONAS = {
     "sound_designer": PROMPT_REGISTRY["persona.sound_designer"]["default"],
     "colorista": PROMPT_REGISTRY["persona.colorista"]["default"],
 }
+
+
+def objetivo_do_projeto(project_id: Optional[int]) -> str:
+    """O que o projeto está produzindo (ex.: 'making of do longa MONSTRO'). A mesma cena
+    vale diferente num filme e no making of dele; a triagem precisa saber qual é o caso.
+    Vazio quando não definido ou em falha (a triagem segue sem)."""
+    if not project_id:
+        return ""
+    try:
+        from src.db.connection import get_db
+        with get_db() as conn:
+            row = conn.execute("SELECT objetivo FROM project WHERE id = ?", (project_id,)).fetchone()
+        return (row[0] or "").strip() if row else ""
+    except Exception:
+        return ""
 
 
 def _triage_feedback_block(project_id: Optional[int]) -> str:
@@ -181,6 +195,9 @@ def _script_context_block(project_id: Optional[int]) -> str:
 def get_triage_prompt(filename: str = "", folder_hint: str = "", transcript_snippet: str = "", known_entities: list = None, project_id: Optional[int] = None) -> str:
     """Gera o prompt de triagem (categoria Eixo A + título) com o contexto barato disponível."""
     context_lines = []
+    objetivo = objetivo_do_projeto(project_id)
+    if objetivo:
+        context_lines.append(f"- Objetivo do projeto: {objetivo}")
     if filename:
         context_lines.append(f"- Nome do arquivo: {filename}")
     if folder_hint:
@@ -323,7 +340,8 @@ def get_theme_naming_prompt(clusters_block: str, existing_themes: list = None, p
 
 
 def _summary_category_block(category: Optional[str]) -> str:
-    if category and category in TRIAGE_CATEGORIES:
+    category = normalizar_categoria(category)
+    if category:
         label = CATEGORY_LABELS.get(category, category)
         return f"CLASSIFICAÇÃO DO ARQUIVO: '{label}' ({TRIAGE_CATEGORIES[category]}).\n"
     return ""

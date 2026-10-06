@@ -35,7 +35,7 @@ from src.services.ingest import IngestService
 from src.services.pipeline import PipelineService
 from src.services.burst_service import group_photo_bursts, replicate_to_members
 from src.services.settings_service import SettingsService
-from src.nlp.prompt_registry import TRIAGE_CATEGORIES
+from src.nlp.prompt_registry import TRIAGE_CATEGORIES, normalizar_categoria
 from src.services.vision_batch import run_vision_batch
 from src.search.semantic import SemanticSearch
 
@@ -166,7 +166,7 @@ def triage_review_queue(project_id: int, conn: sqlite3.Connection = Depends(get_
     from src.services.system1_service import MOTOR_LAYA
     cursor.execute(
         """SELECT v.id, v.filename, v.title, v.category, v.category_confidence, v.video_type, v.duration,
-                  v.status, laya.categoria AS categoria_laya
+                  v.status, laya.categoria AS categoria_laya, v.categorias_secundarias, v.fora_do_projeto
            FROM video v
            LEFT JOIN system1_decisao laya ON laya.id = (
                SELECT max(d.id) FROM system1_decisao d
@@ -175,6 +175,8 @@ def triage_review_queue(project_id: int, conn: sqlite3.Connection = Depends(get_
              AND ((v.category IS NOT NULL AND (v.category_confidence IS NULL OR v.category_confidence < ?))
                   OR (v.category IS NOT NULL AND v.category_confidence < 1.0
                       AND laya.categoria IS NOT NULL AND lower(laya.categoria) != lower(v.category))
+                  OR (v.category IS NOT NULL AND v.category_confidence < 1.0
+                      AND v.categorias_secundarias IS NOT NULL AND v.categorias_secundarias NOT IN ('', '[]'))
                   OR (v.category IS NULL AND v.video_type != 'interview'
                       AND v.description IS NOT NULL AND v.description != ''))
            ORDER BY v.category_confidence ASC""",
@@ -205,9 +207,9 @@ def triage_review_queue(project_id: int, conn: sqlite3.Connection = Depends(get_
 def update_video_category(video_id: int, payload: CategoryUpdate, conn: sqlite3.Connection = Depends(get_db_conn)):
     """Correção humana de categoria: persiste com confiança 1.0, registra o
     feedback (few-shot do E2.C3) e re-deriva video_type quando aplicável."""
-    category = payload.category.strip().lower()
-    if category not in TRIAGE_CATEGORIES:
-        raise HTTPException(400, f"Categoria inválida '{category}'. Válidas: {', '.join(sorted(TRIAGE_CATEGORIES))}")
+    category = normalizar_categoria(payload.category)
+    if not category:
+        raise HTTPException(400, f"Categoria inválida '{payload.category}'. Válidas: {', '.join(sorted(TRIAGE_CATEGORIES))}")
 
     cursor = conn.cursor()
     cursor.execute("SELECT project_id, category, category_confidence, video_type, status, esforco_analisado "
@@ -275,9 +277,9 @@ def _analise_desatualizada(cursor, video_id: int, row, nova_categoria: str) -> O
 def update_photo_category(photo_id: int, payload: CategoryUpdate, conn: sqlite3.Connection = Depends(get_db_conn)):
     """Correção humana de categoria da foto. Fotos de rajada compartilham a mesma
     cena por construção (CLIP > limiar), então a correção propaga ao grupo inteiro."""
-    category = payload.category.strip().lower()
-    if category not in TRIAGE_CATEGORIES:
-        raise HTTPException(400, f"Categoria inválida '{category}'. Válidas: {', '.join(sorted(TRIAGE_CATEGORIES))}")
+    category = normalizar_categoria(payload.category)
+    if not category:
+        raise HTTPException(400, f"Categoria inválida '{payload.category}'. Válidas: {', '.join(sorted(TRIAGE_CATEGORIES))}")
 
     cursor = conn.cursor()
     cursor.execute("SELECT project_id, category, burst_group_id FROM photo WHERE id = ?", (photo_id,))

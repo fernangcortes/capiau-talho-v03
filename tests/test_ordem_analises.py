@@ -27,7 +27,7 @@ def banco(monkeypatch):
     conn.execute("ALTER TABLE video ADD COLUMN metadata_origem TEXT DEFAULT 'ia'")  # idem, só por migração
     conn.execute("INSERT INTO project (id, name) VALUES (1, 'teste')")
     conn.execute("""INSERT INTO video (id, project_id, filename, filepath, hash, duration, category, video_type, status)
-                    VALUES (7, 1, 'take.mp4', 'C:/nao/existe/take.mp4', 'h7', 20.0, 'obra', 'broll', 'analyzed')""")
+                    VALUES (7, 1, 'take.mp4', 'C:/nao/existe/take.mp4', 'h7', 20.0, 'cena', 'broll', 'analyzed')""")
     conn.commit()
 
     @contextlib.contextmanager
@@ -222,7 +222,7 @@ def _ordem_falsa(monkeypatch, P, ordem, asr_ok=True, grava_fala=True, banco=None
     monkeypatch.setattr(P, "transcribe_video", staticmethod(asr))
     monkeypatch.setattr(P, "triage_system1", staticmethod(lambda *a, **k: ordem.append("laya")))
     monkeypatch.setattr(P, "triage_video", staticmethod(
-        lambda *a, **k: (ordem.append("triagem"), {"categoria": "obra", "confianca": 0.9})[1]))
+        lambda *a, **k: (ordem.append("triagem"), {"categoria": "cena", "confianca": 0.9})[1]))
 
 
 def test_sem_transcricao_e_com_audio_transcreve_antes_da_laya_e_da_triagem(banco, monkeypatch, tmp_path):
@@ -306,15 +306,15 @@ def test_analyze_video_all_nao_paga_asr_de_novo(monkeypatch, tem_fala, forcar, e
 # ---------------------------------------------------------------------------
 
 @pytest.mark.parametrize("categoria,conf,laya,esperado", [
-    ("cotidiano", 0.9, None, "triagem"),          # firme: economiza
-    ("cotidiano", 0.9, "cotidiano", "triagem"),   # Laya concorda
-    ("cotidiano", 0.4, None, "completo"),         # abaixo do limiar
-    ("cotidiano", None, None, "completo"),        # confiança vazia = incerta
-    ("cotidiano", 0.9, "obra", "completo"),       # Laya discorda
-    ("pessoal", 0.95, "arquivo", "completo"),
-    ("tecnico", 0.3, None, "completo"),           # reduzido também sobe
-    ("cotidiano", 1.0, "obra", "triagem"),        # correção humana manda
-    ("obra", 0.2, "pessoal", "completo"),         # piso nunca corta
+    ("convivio", 0.9, None, "triagem"),          # firme: economiza
+    ("convivio", 0.9, "convivio", "triagem"),   # Laya concorda
+    ("convivio", 0.4, None, "completo"),         # abaixo do limiar
+    ("convivio", None, None, "completo"),        # confiança vazia = incerta
+    ("convivio", 0.9, "cena", "completo"),       # Laya discorda
+    ("convivio", 0.95, "terceiros", "completo"),
+    ("teste", 0.3, None, "completo"),           # reduzido também sobe
+    ("convivio", 1.0, "cena", "triagem"),        # correção humana manda
+    ("cena", 0.2, "convivio", "completo"),         # piso nunca corta
     (None, None, None, "completo"),
 ])
 def test_piso_de_esforco(categoria, conf, laya, esperado):
@@ -324,8 +324,8 @@ def test_piso_de_esforco(categoria, conf, laya, esperado):
 
 def test_get_profile_sem_confianca_mantem_comportamento_antigo():
     from src.services.analysis_policy import get_profile
-    assert get_profile("cotidiano").effort == "triagem"
-    assert get_profile("cotidiano", '{"cotidiano": "completo"}').effort == "completo"
+    assert get_profile("convivio").effort == "triagem"
+    assert get_profile("convivio", '{"convivio": "completo"}').effort == "completo"
 
 
 def _laya(conn, video_id, categoria):
@@ -336,10 +336,10 @@ def _laya(conn, video_id, categoria):
     conn.commit()
 
 
-@pytest.mark.parametrize("laya,quadros", [("cotidiano", 2), ("obra", 6)])
+@pytest.mark.parametrize("laya,quadros", [("convivio", 2), ("cena", 6)])
 def test_pipeline_aplica_o_piso_com_a_discordancia_da_laya(banco, monkeypatch, tmp_path, laya, quadros):
     from pathlib import Path
-    banco.execute("UPDATE video SET category = 'cotidiano', category_confidence = 0.92, duration = 60 WHERE id = 7")
+    banco.execute("UPDATE video SET category = 'convivio', category_confidence = 0.92, duration = 60 WHERE id = 7")
     banco.commit()
     _laya(banco, 7, laya)
     capturados = []
@@ -354,11 +354,11 @@ def test_fila_de_revisao_inclui_discordancia_e_confianca_vazia(banco, monkeypatc
     monkeypatch.setattr(SettingsService, "get_settings", _settings())
     banco.execute("UPDATE video SET category_confidence = 1.0 WHERE id = 7")
     linhas = [  # id, categoria, confiança, laya
-        (20, "obra", 0.95, "obra"),      # firme e concorda: fora
-        (21, "obra", 0.95, "pessoal"),   # discorda: dentro
-        (22, "obra", None, None),        # vazia: dentro
-        (23, "obra", 0.30, None),        # baixa: dentro
-        (24, "obra", 1.0, "pessoal"),    # humana: fora
+        (20, "cena", 0.95, "cena"),      # firme e concorda: fora
+        (21, "cena", 0.95, "convivio"),   # discorda: dentro
+        (22, "cena", None, None),        # vazia: dentro
+        (23, "cena", 0.30, None),        # baixa: dentro
+        (24, "cena", 1.0, "convivio"),    # humana: fora
     ]
     for vid, cat, conf, laya in linhas:
         banco.execute("""INSERT INTO video (id, project_id, filename, filepath, hash, category, category_confidence)
@@ -368,7 +368,7 @@ def test_fila_de_revisao_inclui_discordancia_e_confianca_vazia(banco, monkeypatc
     banco.commit()
     fila = triage_review_queue(1, conn=banco)
     assert sorted(v["id"] for v in fila["videos"]) == [21, 22, 23]
-    assert {v["id"]: v["categoria_laya"] for v in fila["videos"]}[21] == "pessoal"
+    assert {v["id"]: v["categoria_laya"] for v in fila["videos"]}[21] == "convivio"
 
 
 # ---------------------------------------------------------------------------
@@ -394,39 +394,39 @@ def _marca(banco):
 
 
 def test_subir_esforco_marca_e_oferece_reanalise_sem_rodar_nada(banco, monkeypatch):
-    banco.execute("UPDATE video SET category = 'cotidiano', category_confidence = 0.9, "
+    banco.execute("UPDATE video SET category = 'convivio', category_confidence = 0.9, "
                   "esforco_analisado = 'triagem', description = 'almoço' WHERE id = 7")
     banco.commit()
-    r = _corrigir(banco, monkeypatch, "obra")
+    r = _corrigir(banco, monkeypatch, "cena")
     assert "triagem" in r["analise_desatualizada"] and "completo" in r["analise_desatualizada"]
     assert r["reanalise"] == {"metodo": "POST", "rota": "/api/video/7/analyze-vision"}
     assert _marca(banco) == r["analise_desatualizada"]
     assert banco.execute("SELECT status, description FROM video WHERE id = 7").fetchone()[:] == ("analyzed", "almoço")
 
     # Voltar à categoria antiga desfaz a marca
-    r = _corrigir(banco, monkeypatch, "cotidiano")
+    r = _corrigir(banco, monkeypatch, "convivio")
     assert r["analise_desatualizada"] is None and "reanalise" not in r and _marca(banco) is None
 
 
 def test_descer_esforco_nao_marca_nem_apaga(banco, monkeypatch):
     banco.execute("UPDATE video SET esforco_analisado = 'completo', description = 'take 3' WHERE id = 7")
     banco.commit()
-    r = _corrigir(banco, monkeypatch, "cotidiano")
+    r = _corrigir(banco, monkeypatch, "convivio")
     assert r["analise_desatualizada"] is None and _marca(banco) is None
     assert banco.execute("SELECT description FROM video WHERE id = 7").fetchone()[0] == "take 3"
 
 
 def test_analise_antiga_sem_esforco_registrado_usa_o_perfil_da_categoria_anterior(banco, monkeypatch):
-    banco.execute("UPDATE video SET category = 'cotidiano', category_confidence = 0.9, esforco_analisado = NULL WHERE id = 7")
+    banco.execute("UPDATE video SET category = 'convivio', category_confidence = 0.9, esforco_analisado = NULL WHERE id = 7")
     banco.commit()
-    assert _corrigir(banco, monkeypatch, "processo")["analise_desatualizada"]
+    assert _corrigir(banco, monkeypatch, "bastidor")["analise_desatualizada"]
 
 
 def test_video_que_nunca_passou_pela_visao_nao_fica_desatualizado(banco, monkeypatch):
-    banco.execute("UPDATE video SET category = 'cotidiano', category_confidence = 0.9, "
+    banco.execute("UPDATE video SET category = 'convivio', category_confidence = 0.9, "
                   "esforco_analisado = NULL, status = 'transcribed' WHERE id = 7")
     banco.commit()
-    assert _corrigir(banco, monkeypatch, "obra")["analise_desatualizada"] is None
+    assert _corrigir(banco, monkeypatch, "cena")["analise_desatualizada"] is None
 
 
 def test_analise_de_visao_registra_esforco_e_limpa_a_marca(banco, monkeypatch, tmp_path):
@@ -489,7 +489,7 @@ def test_resumo_mescla_fala_imagem_e_categoria(banco, monkeypatch):
     assert PipelineService.generate_video_summary(7, "interview", 1) is True
     p = prompts[0]
     assert "madrugada" in p and "refletor sendo içado" in p, "fala e imagem no mesmo resumo"
-    assert "CLASSIFICAÇÃO DO ARQUIVO" in p and "obra" in p.lower()
+    assert "CLASSIFICAÇÃO DO ARQUIVO" in p and "cena" in p.lower()
     assert banco.execute("SELECT title FROM video WHERE id = 7").fetchone()[0] == "Ensaio no galpão"
 
 

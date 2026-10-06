@@ -25,7 +25,7 @@ from typing import Any, Dict, Optional
 
 from pydantic import BaseModel, Field
 
-from src.nlp.prompt_registry import TRIAGE_CATEGORIES
+from src.nlp.prompt_registry import TRIAGE_CATEGORIES, TRIAGE_RULES, normalizar_categoria
 
 MOTOR_LAYA = "laya-multilingual"
 MOTOR_JEV = "jev-latest"
@@ -79,8 +79,9 @@ def perguntas_triagem() -> Dict[str, Any]:
     return {
         "categoria": {
             "type": "choice",
-            "instructions": ("Que tipo de material é este arquivo, dentro do acervo de uma produção "
-                             "audiovisual (filme, making of, documentário)?"),
+            "instructions": ("O que este material mostra, dentro do acervo de uma produção audiovisual "
+                             "(filme, making of, documentário)? Em caso de dúvida: "
+                             + " ".join(TRIAGE_RULES)),
             "criteria": dict(TRIAGE_CATEGORIES),
         }
     }
@@ -93,10 +94,13 @@ def estado_triagem(media_state: Dict[str, Any]) -> str:
     áudio e o começo da fala (quando já existe transcrição).
     """
     linhas = []
+    objetivo = (media_state.get("objetivo") or "").strip()
+    if objetivo:
+        linhas.append(f"objetivo do projeto: {objetivo}")
     nome = media_state.get("filename") or ""
     pasta = media_state.get("folder") or ""
     if nome:
-        linhas.append(f"arquivo: {nome}")
+        linhas.append(f"nome: {nome}")
     if pasta:
         linhas.append(f"pasta: {pasta}")
     duracao = media_state.get("duration_s")
@@ -137,9 +141,9 @@ def estado_corte(trechos: list, justificativa: str) -> str:
 def _decisao_de_resposta(resposta: Dict[str, Any], motor: str, latencia_ms: float,
                          limiar: float) -> TriageDecision:
     ans = (resposta.get("answers") or {}).get("categoria") or {}
-    categoria = ans.get("choice")
+    categoria = normalizar_categoria(ans.get("choice"))
     if categoria not in TRIAGE_CATEGORIES:
-        raise System1Indisponivel(f"{motor} devolveu categoria fora da lista: {categoria!r}")
+        raise System1Indisponivel(f"{motor} devolveu categoria fora da lista: {ans.get('choice')!r}")
     confianca = float(ans.get("confidence") or 0.0)
     return TriageDecision(
         category=categoria,

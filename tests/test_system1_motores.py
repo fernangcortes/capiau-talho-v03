@@ -119,14 +119,14 @@ def _config(**extra):
 def test_comparacao_registra_laya_e_jev_lado_a_lado(banco_memoria, monkeypatch):
     monkeypatch.setattr(SettingsService, "get_settings", _config())
     jev = System1JevClient(api_key=CHAVE, http=HttpFalso(RespostaFalsa(200, resposta_jev("depoimento", 0.97))))
-    svc = System1Service(laya=laya_falsa(padrao=("processo", 0.55)), jev=jev)
+    svc = System1Service(laya=laya_falsa(padrao=("bastidor", 0.55)), jev=jev)
 
     dec = svc.evaluate_triage({"filename": "entrevista.mp4"}, project_id=None, media_id=42)
-    assert dec.model == MOTOR_LAYA and dec.category == "processo"
+    assert dec.model == MOTOR_LAYA and dec.category == "bastidor"
 
     linhas = {r["motor"]: dict(r) for r in banco_memoria.execute("SELECT * FROM system1_decisao")}
     assert set(linhas) == {MOTOR_LAYA, MOTOR_JEV}
-    assert linhas[MOTOR_LAYA]["categoria"] == "processo" and linhas[MOTOR_LAYA]["confianca"] == 0.55
+    assert linhas[MOTOR_LAYA]["categoria"] == "bastidor" and linhas[MOTOR_LAYA]["confianca"] == 0.55
     assert linhas[MOTOR_JEV]["categoria"] == "depoimento"
     assert all(l["modo"] == "sombra" and l["media_id"] == 42 and l["erro"] is None for l in linhas.values())
     assert linhas[MOTOR_LAYA]["estado_json"] == linhas[MOTOR_JEV]["estado_json"]
@@ -135,10 +135,10 @@ def test_comparacao_registra_laya_e_jev_lado_a_lado(banco_memoria, monkeypatch):
 def test_jev_falhando_fica_registrado_com_o_motivo(banco_memoria, monkeypatch):
     monkeypatch.setattr(SettingsService, "get_settings", _config())
     jev = System1JevClient(api_key=CHAVE, http=HttpFalso(RespostaFalsa(503, "fora")))
-    svc = System1Service(laya=laya_falsa(padrao=("obra", 0.9)), jev=jev)
+    svc = System1Service(laya=laya_falsa(padrao=("cena", 0.9)), jev=jev)
 
     dec = svc.evaluate_triage({"filename": "take.mp4"}, media_id=7)
-    assert dec.category == "obra"
+    assert dec.category == "cena"
     linha = dict(banco_memoria.execute("SELECT * FROM system1_decisao WHERE motor = ?", (MOTOR_JEV,)).fetchone())
     assert linha["categoria"] is None and "HTTP 503" in linha["erro"]
 

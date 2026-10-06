@@ -9,6 +9,9 @@ class ProjectCreate(BaseModel):
 class ProjectDriveLinkUpdate(BaseModel):
     drive_link: str
 
+class ProjectObjetivoUpdate(BaseModel):
+    objetivo: str  # o que o projeto produz (ex.: 'making of do longa MONSTRO'); contexto da triagem
+
 class ProjectExportOptions(BaseModel):
     include_metadata: bool = True
     include_proxies: bool = False

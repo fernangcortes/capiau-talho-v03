@@ -249,12 +249,12 @@ class TestTier1FeatureCoverage:
     def test_f07_system1_dual_cognitive_engine_triage(self):
         """Sistema 1: a Laya decide com a confiança dela e escala para a visão abaixo de 0.88."""
         svc = System1Service(escalation_threshold=0.88, laya=laya_falsa({
-            "som_direto": ("tecnico", 0.96),
+            "som_direto": ("teste", 0.96),
             "entrevista": ("depoimento", 0.93),
-        }, padrao=("processo", 0.61)))
+        }, padrao=("bastidor", 0.61)))
 
         res_audio = svc.evaluate_triage({"filename": "som_direto.wav", "has_audio": True, "duration_s": 60.0})
-        assert res_audio.category == "tecnico" and res_audio.escalate_to_system2 is False
+        assert res_audio.category == "teste" and res_audio.escalate_to_system2 is False
 
         res_dep = svc.evaluate_triage({"filename": "entrevista_01.mp4", "duration_s": 240.0})
         assert res_dep.category == "depoimento" and res_dep.escalate_to_system2 is False
@@ -585,10 +585,10 @@ class TestTier2BoundaryAndCornerCases:
         engine = System1LayaEngine(escalation_threshold=0.88)
         
         # Simulação direta de decisão com threshold
-        d_exact = TriageDecision(category="processo", confidence=0.88000, escalate_to_system2=(0.88000 < 0.88), inference_time_ms=20.0, model="teste")
+        d_exact = TriageDecision(category="bastidor", confidence=0.88000, escalate_to_system2=(0.88000 < 0.88), inference_time_ms=20.0, model="teste")
         assert d_exact.escalate_to_system2 is False  # 0.88000 NÃO escalona
 
-        d_sub = TriageDecision(category="processo", confidence=0.87999, escalate_to_system2=(0.87999 < 0.88), inference_time_ms=20.0, model="teste")
+        d_sub = TriageDecision(category="bastidor", confidence=0.87999, escalate_to_system2=(0.87999 < 0.88), inference_time_ms=20.0, model="teste")
         assert d_sub.escalate_to_system2 is True   # 0.87999 DEVE escalonar
 
     def test_boundary_overlapping_speakers_concurrency_max8(self, db_conn):
@@ -668,19 +668,19 @@ class TestTier3CrossFeatureCombinations:
             SettingsRepository.upsert_global(conn, "llm.text_model", "deepseek/deepseek-v4-flash")
         SettingsService.invalidate()
 
-        svc = System1Service(laya=laya_falsa(padrao=("tecnico", 0.95)))
+        svc = System1Service(laya=laya_falsa(padrao=("teste", 0.95)))
         decision = svc.evaluate_triage({"filename": "som.wav", "has_audio": True})
         assert decision.escalate_to_system2 is False
-        assert decision.category == "tecnico"
+        assert decision.category == "teste"
 
     def test_cross_c02_dnd_ingest_triage_to_canonical_bbox(self, db_conn):
         """C02: Ingestão de clipe -> Triagem Sistema 1 -> Detecção espacial gravada em detected_object."""
         proj_id, vid_id, _ = seed_test_project_and_media(db_conn)
-        svc = System1Service(laya=laya_falsa({"cena_01_take_02": ("obra", 0.93)}))
+        svc = System1Service(laya=laya_falsa({"cena_01_take_02": ("cena", 0.93)}))
 
         # 1. Triagem Eixo A
-        triage = svc.evaluate_triage({"filename": "cena_01_take_02.mp4", "folder": "obra", "has_video": True})
-        assert triage.category == "obra"
+        triage = svc.evaluate_triage({"filename": "cena_01_take_02.mp4", "folder": "cena", "has_video": True})
+        assert triage.category == "cena"
 
         # 2. Atualizar vídeo no banco
         cursor = db_conn.cursor()
@@ -697,7 +697,7 @@ class TestTier3CrossFeatureCombinations:
 
         cursor.execute("SELECT v.category, o.label, o.bounding_box FROM video v JOIN detected_object o ON v.id = o.video_id WHERE v.id = ?;", (vid_id,))
         row = cursor.fetchone()
-        assert row["category"] == "obra"
+        assert row["category"] == "cena"
         assert row["label"] == "claquete"
         assert json.loads(row["bounding_box"]) == [300, 250, 800, 650]
 
@@ -858,8 +858,8 @@ class TestTier4RealWorldApplicationScenarios:
         # 3. Ingestão de lote de 3 arquivos
         takes = [
             ("entrevista_paje.mp4", 300.0, 0.85, "depoimento"),
-            ("danca_ritual.mp4", 40.0, 0.05, "processo"),
-            ("cantos_gravador.wav", 120.0, 0.90, "tecnico"),
+            ("danca_ritual.mp4", 40.0, 0.05, "bastidor"),
+            ("cantos_gravador.wav", 120.0, 0.90, "teste"),
         ]
         svc = System1Service(laya=laya_falsa({f: (cat, 0.92) for f, _, _, cat in takes}))
         inserted_ids = []

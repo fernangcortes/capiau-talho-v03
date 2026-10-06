@@ -89,7 +89,7 @@ class TestSystem1StressAndEscalation:
         borderline_below = [0.0, 0.50, 0.72, 0.80, 0.879, 0.87999, 0.8799999]
         for conf in borderline_below:
             decision = TriageDecision(
-                category="processo",
+                category="bastidor",
                 confidence=conf,
                 escalate_to_system2=(conf < threshold),
                 inference_time_ms=18.5,
@@ -102,7 +102,7 @@ class TestSystem1StressAndEscalation:
         borderline_above = [0.880, 0.8800001, 0.881, 0.890, 0.92, 0.95, 1.0]
         for conf in borderline_above:
             decision = TriageDecision(
-                category="processo",
+                category="bastidor",
                 confidence=conf,
                 escalate_to_system2=(conf < threshold),
                 inference_time_ms=18.5,
@@ -115,10 +115,10 @@ class TestSystem1StressAndEscalation:
         """O mesmo 0.72 da Laya escala num limiar estrito e passa num tolerante."""
         ambiguous = {"filename": "clip_sem_padrao.mp4", "duration_s": 70.0, "folder": "outros"}
 
-        dec_strict = laya_falsa(padrao=("processo", 0.72), escalation_threshold=0.95).evaluate_media_triage(ambiguous)
+        dec_strict = laya_falsa(padrao=("bastidor", 0.72), escalation_threshold=0.95).evaluate_media_triage(ambiguous)
         assert dec_strict.confidence == 0.72 and dec_strict.escalate_to_system2 is True
 
-        dec_lenient = laya_falsa(padrao=("processo", 0.72), escalation_threshold=0.70).evaluate_media_triage(ambiguous)
+        dec_lenient = laya_falsa(padrao=("bastidor", 0.72), escalation_threshold=0.70).evaluate_media_triage(ambiguous)
         assert dec_lenient.confidence == 0.72 and dec_lenient.escalate_to_system2 is False
 
     def test_system1_service_settings_override(self, monkeypatch):
@@ -126,7 +126,7 @@ class TestSystem1StressAndEscalation:
         base = {"triage.system1_mode": "sombra", "triage.system1_compare_jev": False}
         monkeypatch.setattr(SettingsService, "get_settings", lambda project_id=None: ResolvedSettings({
             **base, "triage.system1_enabled": True, "triage.escalation_threshold": 0.65}))
-        service = System1Service(laya=laya_falsa(padrao=("processo", 0.72)))
+        service = System1Service(laya=laya_falsa(padrao=("bastidor", 0.72)))
         ambiguous = {"filename": "clip_ambiguo.mp4", "duration_s": 70.0, "folder": "outros"}
         dec = service.evaluate_triage(ambiguous, project_id=123)
         assert dec.confidence == 0.72

@@ -157,7 +157,7 @@ class TestBurstReplication(unittest.TestCase):
                           category = ?, category_confidence = ?, title = ?, status = 'analyzed'
                    WHERE id = ?""",
                 ("Equipe montando o trilho no pátio.", "bruto da visão", '["trilho", "equipe"]',
-                 "processo", 0.91, "Montagem do trilho", ids[0]),
+                 "bastidor", 0.91, "Montagem do trilho", ids[0]),
             )
             conn.commit()
 
@@ -187,7 +187,7 @@ class TestBurstReplication(unittest.TestCase):
         for i, pid in enumerate(ids[1:], start=2):
             member = rows[pid]
             self.assertEqual(member["burst_group_id"], ids[0])
-            self.assertEqual(member["category"], "processo")
+            self.assertEqual(member["category"], "bastidor")
             self.assertEqual(member["title"], "Montagem do trilho")
             self.assertEqual(member["status"], "analyzed")
             self.assertIn("Equipe montando o trilho", member["description"])

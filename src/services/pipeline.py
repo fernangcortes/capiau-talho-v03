@@ -26,7 +26,7 @@ from src.nlp.prompt_templates import (
     get_video_summary_prompt,
     get_theme_clustering_prompt
 )
-from src.nlp.prompt_registry import TRIAGE_CATEGORIES
+from src.nlp.prompt_registry import TRIAGE_CATEGORIES, normalizar_categoria
 from src.services.analysis_policy import get_profile
 
 # Tags de categoria são proibidas como tag de busca: se quase tudo é "making of",
@@ -190,14 +190,16 @@ class PipelineService:
             )
             result = PipelineService.call_openrouter_vision_multi(base64_images, prompt, project_id=project_id)
 
-            category = str(result.get("categoria", "")).strip().lower()
-            if category not in TRIAGE_CATEGORIES:
+            category = normalizar_categoria(result.get("categoria"))
+            if not category:
                 return {}
             try:
                 confidence = float(result.get("confianca", 0.0))
             except Exception:
                 confidence = 0.0
             title = str(result.get("titulo", "")).strip()
+            secundarias = PipelineService._categorias_secundarias(result.get("categorias_secundarias"), category)
+            fora = result.get("fora_do_projeto") in (True, "true", "sim", 1)
 
             S = SettingsService.get_settings(project_id)
             min_conf = S.get("triage.min_confidence")
@@ -205,8 +207,9 @@ class PipelineService:
             with get_db() as conn:
                 cursor = conn.cursor()
                 cursor.execute(
-                    "UPDATE video SET category = ?, category_confidence = ?, title = COALESCE(NULLIF(?, ''), title) WHERE id = ?",
-                    (category, confidence, title, video_id)
+                    "UPDATE video SET category = ?, category_confidence = ?, title = COALESCE(NULLIF(?, ''), title), "
+                    "categorias_secundarias = ?, fora_do_projeto = ? WHERE id = ?",
+                    (category, confidence, title, json.dumps(secundarias), int(fora), video_id)
                 )
                 # Deriva video_type por conteúdo: 'depoimento' → interview, resto → broll.
                 # Só sobrescreve tipo já definido (por nome de arquivo) com confiança alta.
@@ -220,8 +223,10 @@ class PipelineService:
                     cursor.execute("UPDATE video SET video_type = ? WHERE id = ?", (derived_type, video_id))
                 conn.commit()
 
-            print(f"[Triage] Vídeo {video_id}: categoria='{category}' (conf {confidence:.2f}) título='{title}'")
-            return {"categoria": category, "confianca": confidence, "titulo": title}
+            print(f"[Triage] Vídeo {video_id}: categoria='{category}' (conf {confidence:.2f}) "
+                  f"secundarias={secundarias} fora_do_projeto={fora} título='{title}'")
+            return {"categoria": category, "confianca": confidence, "titulo": title,
+                    "categorias_secundarias": secundarias, "fora_do_projeto": fora}
         except Exception as e:
             print(f"[Triage] Falha na triagem do vídeo {video_id}: {e}")
             return {}
@@ -277,6 +282,18 @@ class PipelineService:
         return len(r.deteccoes)
 
     @staticmethod
+    def _categorias_secundarias(valor: Any, principal: Optional[str]) -> List[str]:
+        """Lista limpa de categorias secundárias (vídeo misto): canônicas, sem repetir a principal."""
+        if isinstance(valor, str):
+            valor = [valor]
+        saida: List[str] = []
+        for item in valor or []:
+            chave = normalizar_categoria(item)
+            if chave and chave != principal and chave not in saida:
+                saida.append(chave)
+        return saida
+
+    @staticmethod
     def triage_system1(video_id: int, filepath: Path, duration: float, project_id: int) -> Optional[str]:
         """Triagem local (Laya) antes da visão. Devolve a categoria SÓ no modo 'decide' com confiança
         acima do limiar; em sombra, desligada ou indisponível devolve None e a visão decide.
@@ -291,7 +308,9 @@ class PipelineService:
                     dialogues = NarrativeRepository.get_transcript_dialogues(conn, video_id)
                 except Exception:
                     dialogues = []
+            from src.nlp.prompt_templates import objetivo_do_projeto
             media_state = {
+                "objetivo": objetivo_do_projeto(project_id),
                 "filename": filepath.name,
                 "folder": filepath.parent.name,
                 "duration_s": duration,
@@ -841,11 +860,18 @@ class PipelineService:
         # Piso: categoria incerta (confiança vazia, abaixo do limiar ou Laya discordando)
         # não corta esforço -- erro de triagem não pode virar análise pobre.
         with get_db() as conn:
-            row = conn.execute("SELECT category_confidence FROM video WHERE id = ?", (video_id,)).fetchone()
+            row = conn.execute("SELECT category_confidence, categorias_secundarias, fora_do_projeto "
+                               "FROM video WHERE id = ?", (video_id,)).fetchone()
         confianca = row["category_confidence"] if row else None
+        try:
+            secundarias = json.loads(row["categorias_secundarias"] or "[]") if row else []
+        except (TypeError, ValueError):
+            secundarias = []
+        fora = bool(row["fora_do_projeto"]) if row else False
         categoria_laya = PipelineService._categoria_laya(video_id)
         profile = get_profile(category, S.get("analysis.effort_overrides"), confianca=confianca,
-                              limiar=S.get("triage.min_confidence"), categoria_laya=categoria_laya)
+                              limiar=S.get("triage.min_confidence"), categoria_laya=categoria_laya,
+                              secundarias=secundarias, fora_do_projeto=fora)
         if profile.max_keyframes is not None:
             max_frames = min(max_frames, profile.max_keyframes)
         print(f"[Vision] Video {video_id}: categoria='{category or 'sem categoria'}' "
@@ -1186,9 +1212,7 @@ class PipelineService:
             tags = PipelineService.clean_tags(analysis.get("tags", []))
 
             # Triagem embutida na mesma chamada: categoria + título
-            category = str(analysis.get("categoria", "") or "").strip().lower()
-            if category not in TRIAGE_CATEGORIES:
-                category = None
+            category = normalizar_categoria(analysis.get("categoria"))
             try:
                 cat_conf = float(analysis.get("confianca", 0.0))
             except Exception:

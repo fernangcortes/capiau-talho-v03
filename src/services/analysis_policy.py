@@ -54,18 +54,29 @@ PROFILES: Dict[str, EffortProfile] = {
 
 # ── Mapa categoria -> esforço ────────────────────────────────────────────────
 
+# Números provisórios (os mesmos da taxonomia anterior, com as chaves novas): a calibração
+# por categoria está em docs/REVISAO_CATEGORIAS.md, seção 12.
 DEFAULT_EFFORT_BY_CATEGORY: Dict[str, str] = {
-    "obra": EFFORT_FULL,
-    "processo": EFFORT_FULL,
+    "cena": EFFORT_FULL,
+    "bastidor": EFFORT_FULL,
     "depoimento": EFFORT_FULL,
     "evento": EFFORT_FULL,
-    "tecnico": EFFORT_REDUCED,
-    "arquivo": EFFORT_REDUCED,
+    "teste": EFFORT_REDUCED,
+    "terceiros": EFFORT_REDUCED,
     # Documento filmado é conteúdo estático: 1 frame por plano basta para ler a página.
     "documento": EFFORT_REDUCED,
-    "cotidiano": EFFORT_TRIAGE,
-    "pessoal": EFFORT_TRIAGE,
+    "convivio": EFFORT_TRIAGE,
 }
+
+# Marca do eixo 2: material sem relação com o projeto recebe só o mínimo para existir na busca
+EFFORT_FORA_DO_PROJETO = EFFORT_TRIAGE
+
+
+def _chave(categoria: Any) -> str:
+    """Chave canônica (aceita nome antigo, caixa e acento); desconhecida volta como veio."""
+    from src.nlp.prompt_registry import normalizar_categoria
+    bruta = str(categoria).strip().lower()
+    return normalizar_categoria(bruta) or bruta
 
 # Categoria ausente (triagem falhou, vídeo antigo) ou desconhecida: nunca economizar
 # às cegas — o default é o comportamento de antes do E2.C1.
@@ -90,7 +101,7 @@ def parse_overrides(raw: Any) -> Dict[str, str]:
 
     clean: Dict[str, str] = {}
     for cat, effort in data.items():
-        cat_key = str(cat).strip().lower()
+        cat_key = _chave(cat)
         effort_key = str(effort).strip().lower()
         if effort_key not in EFFORT_LEVELS:
             print(f"[AnalysisPolicy] esforco '{effort}' desconhecido para '{cat}'; ignorado")
@@ -113,12 +124,12 @@ def validate_overrides(raw: str) -> Tuple[bool, str]:
     except (ValueError, TypeError) as e:
         return False, f"JSON invalido: {e}"
     if not isinstance(data, dict):
-        return False, 'Use um objeto JSON, ex: {"cotidiano": "completo"}'
+        return False, 'Use um objeto JSON, ex: {"convivio": "completo"}'
 
     known = set(DEFAULT_EFFORT_BY_CATEGORY)
     for cat, effort in data.items():
-        if str(cat).strip().lower() not in known:
-            return False, f"Categoria desconhecida: '{cat}' (use uma das 9 da triagem)"
+        if _chave(cat) not in known:
+            return False, f"Categoria desconhecida: '{cat}' (use uma de: {', '.join(sorted(known))})"
         if str(effort).strip().lower() not in EFFORT_LEVELS:
             return False, f"Esforco invalido para '{cat}': use {' | '.join(EFFORT_LEVELS)}"
     return True, ""
@@ -128,7 +139,7 @@ def resolve_effort(category: Optional[str], overrides_raw: Any = None) -> str:
     """Categoria -> nível de esforço, com os overrides do usuário por cima."""
     if not category:
         return FALLBACK_EFFORT
-    cat = str(category).strip().lower()
+    cat = _chave(category)
     overrides = parse_overrides(overrides_raw)
     if cat in overrides:
         return overrides[cat]
@@ -164,19 +175,28 @@ def categoria_incerta(confianca: Any, limiar: Optional[float] = None,
     if limiar is not None and conf < float(limiar):
         return True
     if categoria and categoria_laya:
-        return str(categoria_laya).strip().lower() != str(categoria).strip().lower()
+        return _chave(categoria_laya) != _chave(categoria)
     return False
 
 
 def get_profile(category: Optional[str], overrides_raw: Any = None, *, confianca: Any = _NAO_INFORMADA,
-                limiar: Optional[float] = None, categoria_laya: Optional[str] = None) -> EffortProfile:
+                limiar: Optional[float] = None, categoria_laya: Optional[str] = None,
+                secundarias: Optional[list] = None, fora_do_projeto: bool = False) -> EffortProfile:
     """Perfil de esforço aplicável ao material desta categoria.
 
     Com `confianca` informada (pode ser None = vazia), categoria incerta usa o perfil
     completo: o piso só sobe o esforço, nunca corta. Sem `confianca`, comportamento antigo.
+    Vídeo misto (`secundarias`) recebe o perfil mais caro entre as categorias que tem.
+    Fora do projeto, com triagem firme, recebe o mínimo.
     """
-    effort = resolve_effort(category, overrides_raw)
     if (category and confianca is not _NAO_INFORMADA
             and categoria_incerta(confianca, limiar, category, categoria_laya)):
-        effort = EFFORT_FULL
+        return PROFILES[EFFORT_FULL]
+    if fora_do_projeto:
+        return PROFILES[EFFORT_FORA_DO_PROJETO]
+    effort = resolve_effort(category, overrides_raw)
+    for sec in secundarias or []:
+        outro = resolve_effort(sec, overrides_raw)
+        if EFFORT_RANK[outro] > EFFORT_RANK[effort]:
+            effort = outro
     return PROFILES[effort]

@@ -44,13 +44,13 @@ class TestTriageFewShot(unittest.TestCase):
         return vid
 
     def test_corrections_appear_in_both_prompts(self):
-        self._fix_video("conversa_cozinha.mp4", "cotidiano", "processo", "discutem o plano de filmagem")
+        self._fix_video("conversa_cozinha.mp4", "convivio", "bastidor", "discutem o plano de filmagem")
 
         prompt = get_triage_prompt(filename="novo.mp4", project_id=self.proj)
         self.assertIn("CORREÇÕES RECENTES DO USUÁRIO", prompt)
         self.assertIn("conversa_cozinha", prompt)
-        self.assertIn("'cotidiano'", prompt)
-        self.assertIn("'processo'", prompt)
+        self.assertIn("'convivio'", prompt)
+        self.assertIn("'bastidor'", prompt)
         self.assertIn("discutem o plano de filmagem", prompt)
 
         photo_prompt = get_photo_vision_prompt(project_id=self.proj)
@@ -70,7 +70,7 @@ class TestTriageFewShot(unittest.TestCase):
 
     def test_limit_respected_most_recent_first(self):
         for i in range(8):
-            self._fix_video(f"serie_{i}.mp4", "cotidiano", "processo")
+            self._fix_video(f"serie_{i}.mp4", "convivio", "bastidor")
         prompt = get_triage_prompt(project_id=self.proj)
         # default = 6 exemplos: os 2 mais antigos da serie ficam de fora
         self.assertIn("serie_7", prompt)

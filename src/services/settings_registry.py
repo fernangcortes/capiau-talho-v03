@@ -415,7 +415,7 @@ SETTINGS_REGISTRY: List[Dict[str, Any]] = [
     {
         "key": "analysis.effort_overrides", "type": "string", "default": "", "json_map": "effort_overrides",
         "label": "Análise: esforço por categoria (JSON)",
-        "help": 'Quanto de análise cara cada tipo de material recebe. Vazio = padrão: obra/processo/depoimento/evento recebem análise completa; tecnico/arquivo/documento recebem 1 frame por plano; cotidiano/pessoal recebem só 2 frames. Para mudar, escreva um JSON como {"cotidiano": "completo", "arquivo": "triagem"}. Esforços válidos: completo | reduzido | triagem.',
+        "help": 'Quanto de análise cara cada tipo de material recebe. Vazio = padrão: cena/bastidor/depoimento/evento recebem análise completa; teste/terceiros/documento recebem 1 frame por plano; convivio recebe só 2 frames (e material marcado como fora do projeto também). Categoria incerta sempre recebe a completa. Para mudar, escreva um JSON como {"convivio": "completo", "terceiros": "triagem"}. Esforços válidos: completo | reduzido | triagem.',
         "help_tech": "Override do DEFAULT_EFFORT_BY_CATEGORY em analysis_policy.py; get_profile() controla beats, piso de cobertura e teto de keyframes em analyze_video_vision.",
         "category": "vision", "level": "pro", "scope": "both", "requires_reprocess": True,
     },

@@ -68,12 +68,12 @@ class TestTriageReview(unittest.TestCase):
     def test_review_queue_thresholds_and_interviews(self):
         # Confianca baixa -> entra na fila
         v_low = add_video(1, "low_conf.mp4", "/x/low_conf.mp4", "h_low", "broll", 30.0)
-        _set_video(v_low, category="processo", category_confidence=0.4,
+        _set_video(v_low, category="bastidor", category_confidence=0.4,
                    description="Equipe montando o set")
 
         # Confianca alta -> fora da fila
         v_high = add_video(1, "high_conf.mp4", "/x/high_conf.mp4", "h_high", "broll", 30.0)
-        _set_video(v_high, category="obra", category_confidence=0.95,
+        _set_video(v_high, category="cena", category_confidence=0.95,
                    description="Take da cena 12")
 
         # Analisado sem categoria (triagem falhou) -> entra na fila
@@ -100,10 +100,10 @@ class TestTriageReview(unittest.TestCase):
 
     def test_review_queue_photos(self):
         p_low = add_photo(1, "p_low.jpg", "/x/p_low.jpg", "ph_low", description="Foto do set")
-        _set_photo(p_low, category="cotidiano", category_confidence=0.3)
+        _set_photo(p_low, category="convivio", category_confidence=0.3)
 
         p_high = add_photo(1, "p_high.jpg", "/x/p_high.jpg", "ph_high", description="Foto da cena")
-        _set_photo(p_high, category="obra", category_confidence=0.9)
+        _set_photo(p_high, category="cena", category_confidence=0.9)
 
         resp = self.client.get("/api/project/1/triage/review")
         self.assertEqual(resp.status_code, 200)
@@ -115,7 +115,7 @@ class TestTriageReview(unittest.TestCase):
 
     def test_patch_video_category_persists_and_derives_type(self):
         vid = add_video(1, "corrigir.mp4", "/x/corrigir.mp4", "h_fix", "broll", 30.0)
-        _set_video(vid, category="cotidiano", category_confidence=0.5,
+        _set_video(vid, category="convivio", category_confidence=0.5,
                    description="Na verdade e uma fala dirigida a camera")
 
         resp = self.client.patch(f"/api/video/{vid}/category",
@@ -124,7 +124,7 @@ class TestTriageReview(unittest.TestCase):
         body = resp.json()
         self.assertEqual(body["category"], "depoimento")
         self.assertEqual(body["video_type"], "interview")
-        self.assertEqual(body["previous_category"], "cotidiano")
+        self.assertEqual(body["previous_category"], "convivio")
 
         row = _get_row("video", vid)
         self.assertEqual(row["category"], "depoimento")
@@ -140,15 +140,15 @@ class TestTriageReview(unittest.TestCase):
         finally:
             conn.close()
         self.assertIsNotNone(fb)
-        self.assertEqual(fb["wrong_category"], "cotidiano")
+        self.assertEqual(fb["wrong_category"], "convivio")
         self.assertEqual(fb["right_category"], "depoimento")
         self.assertEqual(fb["note"], "e entrevista")
 
     def test_patch_video_same_category_confirms_without_feedback(self):
         vid = add_video(1, "confirmar.mp4", "/x/confirmar.mp4", "h_conf", "broll", 30.0)
-        _set_video(vid, category="processo", category_confidence=0.5, description="Set sendo montado")
+        _set_video(vid, category="bastidor", category_confidence=0.5, description="Set sendo montado")
 
-        resp = self.client.patch(f"/api/video/{vid}/category", json={"category": "processo"})
+        resp = self.client.patch(f"/api/video/{vid}/category", json={"category": "bastidor"})
         self.assertEqual(resp.status_code, 200)
 
         row = _get_row("video", vid)
@@ -168,7 +168,7 @@ class TestTriageReview(unittest.TestCase):
         resp = self.client.patch(f"/api/video/{vid}/category", json={"category": "making_of"})
         self.assertEqual(resp.status_code, 400)
 
-        resp = self.client.patch("/api/video/999999/category", json={"category": "obra"})
+        resp = self.client.patch("/api/video/999999/category", json={"category": "cena"})
         self.assertEqual(resp.status_code, 404)
 
     # ── PATCH foto + rajada ─────────────────────────────────────────────────
@@ -179,50 +179,50 @@ class TestTriageReview(unittest.TestCase):
         m3 = add_photo(1, "burst3.jpg", "/x/burst3.jpg", "b3", description="Rajada frame 3")
         solo = add_photo(1, "solo.jpg", "/x/solo.jpg", "s1", description="Foto avulsa")
         for pid in (leader, m2, m3):
-            _set_photo(pid, category="cotidiano", category_confidence=0.6, burst_group_id=leader)
-        _set_photo(solo, category="cotidiano", category_confidence=0.6)
+            _set_photo(pid, category="convivio", category_confidence=0.6, burst_group_id=leader)
+        _set_photo(solo, category="convivio", category_confidence=0.6)
 
         # Corrigir um MEMBRO deve propagar ao grupo inteiro (mesma cena por construcao)
-        resp = self.client.patch(f"/api/photo/{m2}/category", json={"category": "processo"})
+        resp = self.client.patch(f"/api/photo/{m2}/category", json={"category": "bastidor"})
         self.assertEqual(resp.status_code, 200)
         body = resp.json()
         self.assertEqual(body["updated_count"], 3)
 
         for pid in (leader, m2, m3):
             row = _get_row("photo", pid)
-            self.assertEqual(row["category"], "processo")
+            self.assertEqual(row["category"], "bastidor")
             self.assertEqual(row["category_confidence"], 1.0)
         # Foto fora do grupo nao muda
-        self.assertEqual(_get_row("photo", solo)["category"], "cotidiano")
+        self.assertEqual(_get_row("photo", solo)["category"], "convivio")
 
     def test_patch_photo_solo_updates_one(self):
         pid = add_photo(1, "uma.jpg", "/x/uma.jpg", "u1", description="Foto")
-        _set_photo(pid, category="pessoal", category_confidence=0.5)
+        _set_photo(pid, category="convivio", category_confidence=0.5)
 
-        resp = self.client.patch(f"/api/photo/{pid}/category", json={"category": "obra"})
+        resp = self.client.patch(f"/api/photo/{pid}/category", json={"category": "cena"})
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp.json()["updated_count"], 1)
         row = _get_row("photo", pid)
-        self.assertEqual(row["category"], "obra")
+        self.assertEqual(row["category"], "cena")
 
     def test_patch_photo_invalid_category_and_missing_photo(self):
         pid = add_photo(1, "inv.jpg", "/x/inv.jpg", "i1", description="Foto")
         resp = self.client.patch(f"/api/photo/{pid}/category", json={"category": "bastidores"})
         self.assertEqual(resp.status_code, 400)
 
-        resp = self.client.patch("/api/photo/999999/category", json={"category": "obra"})
+        resp = self.client.patch("/api/photo/999999/category", json={"category": "cena"})
         self.assertEqual(resp.status_code, 404)
 
     # ── Fila reflete correcao ───────────────────────────────────────────────
 
     def test_corrected_media_leaves_review_queue(self):
         vid = add_video(1, "sai_da_fila.mp4", "/x/sai.mp4", "h_out", "broll", 30.0)
-        _set_video(vid, category="tecnico", category_confidence=0.2, description="Teste de camera")
+        _set_video(vid, category="teste", category_confidence=0.2, description="Teste de camera")
 
         ids = {v["id"] for v in self.client.get("/api/project/1/triage/review").json()["videos"]}
         self.assertIn(vid, ids)
 
-        self.client.patch(f"/api/video/{vid}/category", json={"category": "tecnico"})
+        self.client.patch(f"/api/video/{vid}/category", json={"category": "teste"})
 
         ids = {v["id"] for v in self.client.get("/api/project/1/triage/review").json()["videos"]}
         self.assertNotIn(vid, ids)

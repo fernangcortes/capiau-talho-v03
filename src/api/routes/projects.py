@@ -17,6 +17,7 @@ from src.api.dependencies import get_db_conn
 from src.api.schemas import (
     ProjectCreate,
     ProjectDriveLinkUpdate,
+    ProjectObjetivoUpdate,
     ProjectExportOptions,
     OnboardingChatPayload,
     OnboardingApiKeyPayload,
@@ -52,6 +53,17 @@ def remove_project(project_id: int, conn: sqlite3.Connection = Depends(get_db_co
         return {"status": "success", "message": f"Projeto {project_id} deletado com sucesso."}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.put("/api/project/{project_id}/objetivo")
+def update_objetivo(project_id: int, payload: ProjectObjetivoUpdate, conn: sqlite3.Connection = Depends(get_db_conn)):
+    """Objetivo do projeto (ex.: 'making of do longa MONSTRO'). A triagem e a Laya leem
+    isto: a mesma cena vale diferente num filme e no making of dele."""
+    objetivo = payload.objetivo.strip()
+    cur = conn.execute("UPDATE project SET objetivo = ? WHERE id = ?", (objetivo or None, project_id))
+    if cur.rowcount == 0:
+        raise HTTPException(status_code=404, detail="Projeto não encontrado.")
+    conn.commit()
+    return {"status": "success", "id": project_id, "objetivo": objetivo}
 
 @router.put("/api/project/{project_id}/drive-link")
 def update_drive_link(project_id: int, payload: ProjectDriveLinkUpdate, conn: sqlite3.Connection = Depends(get_db_conn)):

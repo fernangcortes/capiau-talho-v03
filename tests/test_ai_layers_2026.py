@@ -66,11 +66,11 @@ class TestSystem1CognitiveArchitecture:
 
     def test_laya_triage_devolve_decisao_com_latencia_medida(self):
         """A decisão vem da resposta do motor e a latência é a medida (nada fixo)."""
-        service = System1Service(escalation_threshold=0.88, laya=laya_falsa({"take_04": ("obra", 0.93)}))
+        service = System1Service(escalation_threshold=0.88, laya=laya_falsa({"take_04": ("cena", 0.93)}))
         decision = service.evaluate_triage({"filename": "take_04_cena_02.mov", "duration_s": 35.0,
                                             "folder": "material_bruto/takes"})
         assert isinstance(decision, TriageDecision)
-        assert decision.category == "obra"
+        assert decision.category == "cena"
         assert decision.model == "laya-multilingual"
         assert decision.inference_time_ms is not None and decision.inference_time_ms < 1000
         estado = service.laya._router.chamadas[0][0]
@@ -80,7 +80,7 @@ class TestSystem1CognitiveArchitecture:
         """Escala para a visão quando a confiança informada pela Laya fica abaixo do limiar."""
         service = System1Service(escalation_threshold=0.88, laya=laya_falsa({
             "entrevista_diretora": ("depoimento", 0.95),
-            "clip_indefinido": ("processo", 0.72),
+            "clip_indefinido": ("bastidor", 0.72),
         }))
         clara = service.evaluate_triage({"filename": "entrevista_diretora.mp4", "duration_s": 450.0})
         assert clara.category == "depoimento" and clara.escalate_to_system2 is False

@@ -25,11 +25,11 @@ class TestEffortMap(unittest.TestCase):
         self.assertEqual(set(DEFAULT_EFFORT_BY_CATEGORY), set(TRIAGE_CATEGORIES))
 
     def test_plan_categories(self):
-        for cat in ("obra", "processo", "depoimento", "evento"):
+        for cat in ("cena", "bastidor", "depoimento", "evento"):
             self.assertEqual(resolve_effort(cat), EFFORT_FULL)
-        for cat in ("tecnico", "arquivo"):
+        for cat in ("teste", "terceiros"):
             self.assertEqual(resolve_effort(cat), EFFORT_REDUCED)
-        for cat in ("cotidiano", "pessoal"):
+        for cat in ("convivio", "convivio"):
             self.assertEqual(resolve_effort(cat), EFFORT_TRIAGE)
 
     def test_unknown_or_missing_category_is_full(self):
@@ -44,36 +44,36 @@ class TestEffortMap(unittest.TestCase):
 
 class TestOverrides(unittest.TestCase):
     def test_override_wins_over_default(self):
-        self.assertEqual(resolve_effort("cotidiano", '{"cotidiano": "completo"}'), EFFORT_FULL)
-        self.assertEqual(resolve_effort("obra", '{"obra": "triagem"}'), EFFORT_TRIAGE)
+        self.assertEqual(resolve_effort("convivio", '{"convivio": "completo"}'), EFFORT_FULL)
+        self.assertEqual(resolve_effort("cena", '{"cena": "triagem"}'), EFFORT_TRIAGE)
 
     def test_override_of_other_category_does_not_leak(self):
-        self.assertEqual(resolve_effort("obra", '{"cotidiano": "completo"}'), EFFORT_FULL)
+        self.assertEqual(resolve_effort("cena", '{"convivio": "completo"}'), EFFORT_FULL)
 
     def test_invalid_json_falls_back_to_defaults(self):
         """Setting corrompido não pode derrubar a análise — só volta ao mapa padrão."""
         self.assertEqual(parse_overrides("isto nao e json"), {})
-        self.assertEqual(resolve_effort("cotidiano", "isto nao e json"), EFFORT_TRIAGE)
+        self.assertEqual(resolve_effort("convivio", "isto nao e json"), EFFORT_TRIAGE)
         self.assertEqual(parse_overrides('["lista"]'), {})
         self.assertEqual(parse_overrides(""), {})
         self.assertEqual(parse_overrides(None), {})
 
     def test_unknown_effort_is_ignored(self):
-        self.assertEqual(parse_overrides('{"cotidiano": "turbo"}'), {})
+        self.assertEqual(parse_overrides('{"convivio": "turbo"}'), {})
 
     def test_validate_overrides_rejects_bad_input(self):
         self.assertTrue(validate_overrides("")[0])
-        self.assertTrue(validate_overrides('{"cotidiano": "completo"}')[0])
+        self.assertTrue(validate_overrides('{"convivio": "completo"}')[0])
         self.assertFalse(validate_overrides("{nao json}")[0])
         self.assertFalse(validate_overrides('["lista"]')[0])
         self.assertFalse(validate_overrides('{"xpto": "completo"}')[0])
-        self.assertFalse(validate_overrides('{"cotidiano": "turbo"}')[0])
+        self.assertFalse(validate_overrides('{"convivio": "turbo"}')[0])
 
     def test_setting_is_validated_on_write(self):
         from src.services.settings_registry import validate_value
-        ok, _ = validate_value("analysis.effort_overrides", '{"cotidiano": "completo"}')
+        ok, _ = validate_value("analysis.effort_overrides", '{"convivio": "completo"}')
         self.assertTrue(ok)
-        ok, msg = validate_value("analysis.effort_overrides", '{"cotidiano": "turbo"}')
+        ok, msg = validate_value("analysis.effort_overrides", '{"convivio": "turbo"}')
         self.assertFalse(ok, "esforço inválido deve ser rejeitado na escrita, não ignorado depois")
 
 
@@ -100,21 +100,21 @@ class TestProfileEffectOnKeyframes(unittest.TestCase):
         )
 
     def test_full_effort_keeps_coverage(self):
-        self.assertGreaterEqual(len(self._plan("obra")), 30)
+        self.assertGreaterEqual(len(self._plan("cena")), 30)
 
     def test_reduced_effort_is_one_keyframe_per_shot(self):
-        self.assertEqual(len(self._plan("tecnico")), len(self.SEGMENTS))
+        self.assertEqual(len(self._plan("teste")), len(self.SEGMENTS))
 
     def test_triage_effort_caps_at_two_keyframes(self):
         """Aceite E2.C1: cotidiano consome <= 3 chamadas de visão (1 triagem + 2 keyframes)."""
-        jobs = self._plan("cotidiano")
+        jobs = self._plan("convivio")
         self.assertEqual(len(jobs), 2)
         self.assertLessEqual(1 + len(jobs), 3)
 
     def test_triage_effort_caps_even_on_fragmented_video(self):
-        """Vídeo com 60 cortes classificado 'pessoal' continua em 2 keyframes."""
+        """Vídeo com 60 cortes classificado 'convivio' continua em 2 keyframes."""
         segs = [{"start": float(t), "end": float(t + 5)} for t in range(0, 300, 5)]
-        profile = get_profile("pessoal")
+        profile = get_profile("convivio")
         jobs = PipelineService._plan_keyframes(
             segs, 300.0, 10.0, 2.0, min(38, profile.max_keyframes),
             coverage_floor=profile.coverage_floor,
@@ -123,14 +123,14 @@ class TestProfileEffectOnKeyframes(unittest.TestCase):
 
     def test_reduced_keyframes_keep_real_windows(self):
         """Mesmo no esforço reduzido a janela do keyframe é a do segmento (E2.A6)."""
-        jobs = self._plan("arquivo")
+        jobs = self._plan("terceiros")
         self.assertAlmostEqual(jobs[0]["start"], 0.0, delta=0.01)
         self.assertAlmostEqual(jobs[0]["end"], 100.0, delta=0.01)
 
     def test_full_effort_matches_legacy_default(self):
         """Paridade: perfil completo == chamada sem o parâmetro novo (comportamento antigo)."""
         legacy = PipelineService._plan_keyframes(self.SEGMENTS, self.DURATION, self.INTERVAL, 2.0, 38)
-        self.assertEqual([j["timestamp"] for j in legacy], [j["timestamp"] for j in self._plan("obra")])
+        self.assertEqual([j["timestamp"] for j in legacy], [j["timestamp"] for j in self._plan("cena")])
 
 
 class TestFallbackRespectsProfile(unittest.TestCase):
@@ -151,13 +151,13 @@ class TestFallbackRespectsProfile(unittest.TestCase):
         return jobs
 
     def test_fallback_capped_for_triage_effort(self):
-        jobs = self._fallback(300.0, 10.0, get_profile("cotidiano"))
+        jobs = self._fallback(300.0, 10.0, get_profile("convivio"))
         self.assertEqual(len(jobs), 2)
         self.assertEqual(jobs[0]["timestamp"], 0.0, "mantém a ponta inicial")
         self.assertEqual(jobs[-1]["timestamp"], 290.0, "mantém a ponta final")
 
     def test_fallback_untouched_for_full_effort(self):
-        self.assertEqual(len(self._fallback(300.0, 10.0, get_profile("obra"))), 30)
+        self.assertEqual(len(self._fallback(300.0, 10.0, get_profile("cena"))), 30)
 
     def test_subsample_uniform_keeps_ends_and_spreads(self):
         jobs = [{"timestamp": float(t)} for t in range(100)]
