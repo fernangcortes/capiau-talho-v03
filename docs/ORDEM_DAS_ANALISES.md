@@ -1,6 +1,10 @@
 # Ordem das análises na ingestão e reanálise
 
-Levantamento lendo o código (sem rodar). Referências `arquivo:linha` em `src/`.
+Levantamento lendo o código (sem rodar) em 05/10/2026. Referências `arquivo:linha` em `src/`.
+
+> **Atualizado em 06/10/2026.** As seções 1 a 5 são o levantamento original (linhas de
+> 05/10, podem ter andado). O que foi corrigido e implementado está na **seção 6**; o que
+> ficou de fora, na **seção 7**.
 
 ## 1. Ordem real hoje
 
@@ -71,3 +75,78 @@ Dentro de `analyze_video_vision` (`pipeline.py:702`): Laya (722) -> triagem por 
 6. `media.py:195`: após corrigir categoria, marcar `analise_desatualizada` (novo campo) se o perfil mudou.
 7. `pipeline.py:1281`: não deixar resumo "broll" sobrescrever o de "interview" quando há transcrição (ou mesclar).
 8. Checagem B (novo): `src/services/checagem_set.py` (novo) + rota em `media.py` + ferramenta no chat de onboarding. Teste: não roda fora de `obra`; não lê `descricao`.
+
+## 6. O que mudou em 06/10/2026
+
+Um commit por item, todos com teste em `tests/test_ordem_analises.py` (banco SQLite em memória,
+IA, ffmpeg e detector falsos).
+
+### Ordem nova
+
+| Caminho | Ordem |
+|---|---|
+| `analyze_video_all` | ASR **só se não houver transcrição** (`forcar_asr=True` retranscreve) -> visão (`finalizar=False`) -> rosto de 1 frame -> **resumo e temas uma vez** |
+| Visão (lote, reanálise, `analyze_video_all`) | **ASR se tem áudio e não tem transcrição** -> Laya (sombra) -> triagem por visão -> perfil **com piso** -> por keyframe: rostos -> objetos -> pessoas confirmadas -> visão -> CLIP -> fim: Qdrant, **keyframes no SQLite**, resumo mesclado, enriquecimento, temas |
+| ASR avulso | inalterado; o resumo agora inclui a imagem já gravada |
+
+### Bugs corrigidos
+
+1. **Rosto nomeado sumia na reanálise** (`face_engine.py`, `_substituir_faces_automaticas`).
+   Antes: `DELETE` de todas as faces do instante e regravação com `name = NULL`; o `ON DELETE
+   CASCADE` levava as confirmações de `face_recognition`. Agora só sai face automática (sem nome
+   ou com nome provisório "Pessoa Desconhecida…", e sem reconhecimento humano). Nome real,
+   descarte ("Não Relevante", "Não é Rosto") e confirmação ficam. Detecção nova que cai na caixa
+   de uma face curada (IoU >= 0,5, janela de 0,5 s) não é regravada: a antiga segue com id, nome
+   e confirmações, e o nome chega a `detected_people` do prompt de visão. Vale também para fotos.
+   - Medição antes da correção (banco real, só leitura): 1.300 faces de vídeo com nome real, 909
+     confirmadas. Comparando com os 4 backups de `data/`, **nenhum nome tinha sido perdido**: os
+     34 "sumidos" desde 08/07 são renomeações suas (mesmo id de face, nome trocado).
+2. **Camada de rosto de `analyze_video_all` nunca rodava.** Eram dois erros, não um:
+   `CONFIG.FRAMES_DIR` não existe (AttributeError) e `extract_frame` recebia (vídeo, saída, tempo).
+3. **Colateral:** `proxy_path` só existia dentro do bloco de segmentação; com
+   `vision.use_segments` desligado, o `extract_frame` dos keyframes dava NameError.
+
+### Itens 3 a 6
+
+3. **Transcrição antes da triagem** (`_transcrever_antes_da_triagem`). Decisão: transcrever
+   antes. O VAD local de `transcribe_video` descarta b-roll mudo sem custo; falha do ASR não para
+   a visão e fica no log da tarefa como `triagem_sem_transcricao`. A Laya continua em sombra,
+   agora depois da fala (item 7).
+4. **Piso de esforço** (`analysis_policy.categoria_incerta`, `get_profile(..., confianca=,
+   limiar=, categoria_laya=)`). Incerta = confiança vazia, abaixo de `triage.min_confidence` ou a
+   **Laya discordando**. Correção humana (1,0) manda. O piso só sobe esforço. A discordância
+   entrou porque a confiança declarada pelo modelo não discrimina: 21 dos 22 vídeos triados estão
+   com >= 0,8. A fila de revisão (`/api/project/{id}/triage/review`) usa a mesma regra e devolve
+   `categoria_laya`.
+5. **Análise desatualizada** (`media.py`, `_analise_desatualizada`). Colunas novas em `video`:
+   `esforco_analisado` (gravada pela visão) e `analise_desatualizada` (motivo, ou NULL). A
+   correção humana só **marca e oferece** (`reanalise: {metodo, rota}` na resposta) quando o
+   esforço sobe; descer não marca nem apaga; voltar à categoria anterior desfaz; vídeo que nunca
+   passou pela visão não é marcado. A reanálise limpa a marca. Interface: fica para a sessão de UI.
+6. **Resumo único e temas uma vez.** `generate_video_summary` junta fala + imagem + categoria
+   (prompt novo `video_summary`; só fala ou só imagem usa os de antes, agora com categoria).
+   Tabela nova **`video_keyframe`**: a descrição de cada keyframe passa a existir no SQLite (antes
+   só no Qdrant). Análises antigas caem no Qdrant como reserva. Temas: uma vez no fim de
+   `analyze_video_all`; fluxos avulsos seguem com os seus.
+
+## 7. Achados que ficaram de fora (para decidir)
+
+- **Qdrant `capiau_images` corrompido** ("database disk image is malformed"): derruba a busca
+  inteira, inclusive a de texto (íntegra, 7.319 pontos). Só 81 vetores, 80 legíveis. Conserto
+  proposto: renomear o arquivo e recriar com os 80, com o servidor parado.
+- **Plano EmbeddingGemma 2** (branch `ccr-760500b3-ihwuzl`, item 1.4): supõe ler as descrições
+  do SQLite. Até hoje elas só existiam no Qdrant; `video_keyframe` resolve isso **para as análises
+  novas**. Para as antigas, ou se exporta do Qdrant para `video_keyframe` (sem custo de API), ou
+  a reanálise completa preenche.
+- `get_video_vision_frames` (Qdrant) lê no máximo **100 pontos** por vídeo (`limit=100`, sem
+  paginar): a exportação de `sync.py` e a reserva do resumo cortam vídeos longos.
+- `face.embedding` (onde o `face_engine` grava) não está no `SCHEMA_SQL` nem em migração: só
+  existe em bancos antigos. Num banco novo (`init_db`) a detecção de rosto falha em silêncio.
+  `video.metadata_origem` existe só por migração (testes com `SCHEMA_SQL` precisam acrescentar).
+- O vídeo 555 tem categoria `Trilha`, fora da taxonomia: algum caminho grava sem validar.
+- `vision.frame_interval` global está em **4 s**: a reanálise completa (18,7 h) dá ~16 mil
+  keyframes no esforço completo.
+- Lote de visão continua pulando `interview` (`vision_batch.py`).
+- Módulos legados (`transcription/asr_engine.py`, `vision/multimodal_engine.py`,
+  `nlp/summary_engine.py`) têm o próprio resumo e não seguem esta ordem.
+- Checagem B (item 8 da seção 5): não implementada.
