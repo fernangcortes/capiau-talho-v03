@@ -411,7 +411,7 @@ class PipelineService:
 
         # Configurações resolvidas do projeto (motor, chave, idioma, diarização, VAD)
         S = SettingsService.get_settings(project_id)
-        plano = resolver_motores(S.get("transcription.engine"), S.get("diarization.engine"))
+        plano = resolver_motores(S.get("transcription.engine"), S.get("diarization.engine"), S.get("asr.language"))
         provedor = CHAVE_DO_MOTOR.get(plano.transcricao)
         api_key = S.api_key(provedor) if provedor else None
         if provedor and (not api_key or api_key.startswith("your_")):

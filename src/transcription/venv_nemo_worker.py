@@ -9,10 +9,11 @@ Uso (o lado de cá está em src/transcription/motores.py):
     python venv_nemo_worker.py diarizar <audio.wav> <saida.json>
     python venv_nemo_worker.py pyannote <audio.wav> <saida.json>
     python venv_nemo_worker.py canary <audio.wav> <saida.json> <idioma>
+    python venv_nemo_worker.py sensevoice <audio.wav> <saida.json> <idioma>
 O áudio chega sempre como WAV mono 16 kHz (convertido pelo lado de cá).
 Saídas:
     diarizar, pyannote: {"modelo", "segmentos": [{"inicio": s, "fim": s, "falante": n}, ...]}
-    canary:   {"modelo", "palavras": [{"word", "start", "end"}, ...]}
+    canary, sensevoice: {"modelo", "palavras": [{"word", "start", "end"}, ...]}
 """
 import json
 import os
@@ -120,6 +121,34 @@ def canary(audio_path: str, idioma: str) -> dict:
     }
 
 
+SENSEVOICE = "FunAudioLLM/SenseVoiceSmall"
+SENSEVOICE_JANELA_S = 25  # o modelo foi feito para trechos de até 30 s; o VAD do FunASR baixaria outro modelo
+
+
+def sensevoice(audio_path: str, idioma: str) -> dict:
+    from funasr import AutoModel
+
+    t0 = time.perf_counter()
+    modelo = AutoModel(model=SENSEVOICE, hub="hf", device="cpu", disable_update=True)
+    carga = time.perf_counter() - t0
+
+    dados = _ler_wav(audio_path)
+    janela = SENSEVOICE_JANELA_S * 16000
+    palavras = []
+    t0 = time.perf_counter()
+    for inicio in range(0, len(dados), janela):
+        trecho = dados[inicio:inicio + janela]
+        if len(trecho) < 1600:  # menos de 0,1 s
+            continue
+        res = modelo.generate(input=trecho, cache={}, language=idioma, use_itn=True, output_timestamp=True)
+        desloc = inicio / 16000
+        for r in res or []:
+            for palavra, (ms_ini, ms_fim) in zip(r.get("words") or [], r.get("timestamp") or []):
+                palavras.append({"word": palavra, "start": desloc + ms_ini / 1000, "end": desloc + ms_fim / 1000})
+    return {"modelo": SENSEVOICE, "carga_s": round(carga, 2),
+            "inferencia_s": round(time.perf_counter() - t0, 2), "palavras": palavras}
+
+
 def main(argv):
     if len(argv) == 4 and argv[1] == "diarizar":
         resultado = diarizar(argv[2])
@@ -127,6 +156,8 @@ def main(argv):
         resultado = pyannote(argv[2])
     elif len(argv) == 5 and argv[1] == "canary":
         resultado = canary(argv[2], argv[4])
+    elif len(argv) == 5 and argv[1] == "sensevoice":
+        resultado = sensevoice(argv[2], argv[4])
     else:
         print(__doc__, file=sys.stderr)
         return 2

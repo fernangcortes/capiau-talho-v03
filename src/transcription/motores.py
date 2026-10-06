@@ -19,6 +19,9 @@ MOTOR_ASSEMBLYAI = "assemblyai_universal_35"
 MOTOR_DEEPGRAM = "deepgram_nova_3"
 MOTOR_WHISPER = "whisper_turbo"
 MOTOR_CANARY = "nvidia_canary"
+MOTOR_SENSEVOICE = "sensevoice"
+# SenseVoice Small só foi treinado nestas línguas; em outra, cai na AssemblyAI e avisa.
+IDIOMAS_SENSEVOICE = ("zh", "en", "ja", "ko", "yue")
 DIARIZADOR_NEMOTRON = "nemotron_3_diarization"
 DIARIZADOR_PYANNOTE = "pyannote_40"
 SEM_DIARIZACAO = "none"
@@ -39,7 +42,8 @@ TIPOS_AUDIO = {".mp3": "audio/mpeg", ".wav": "audio/wav", ".m4a": "audio/mp4", "
 
 # Motores de transcrição com código hoje, e se trazem diarização junto.
 # Um motor novo só entra aqui junto com o código dele e o teste.
-TRANSCRICAO_COM_DIARIZACAO = {MOTOR_ASSEMBLYAI: True, MOTOR_DEEPGRAM: True, MOTOR_WHISPER: False, MOTOR_CANARY: False}
+TRANSCRICAO_COM_DIARIZACAO = {MOTOR_ASSEMBLYAI: True, MOTOR_DEEPGRAM: True, MOTOR_WHISPER: False, MOTOR_CANARY: False,
+                              MOTOR_SENSEVOICE: False}
 TRANSCRICAO_LIGADOS = set(TRANSCRICAO_COM_DIARIZACAO)
 # Diarizadores separados (rodam sobre o áudio, depois da transcrição).
 DIARIZADORES_SEPARADOS = {DIARIZADOR_NEMOTRON, DIARIZADOR_PYANNOTE}
@@ -79,11 +83,16 @@ class ResultadoASR:
     avisos: List[str] = field(default_factory=list)
 
 
-def resolver_motores(escolha_transcricao: Optional[str], escolha_diarizacao: Optional[str]) -> PlanoASR:
+def resolver_motores(escolha_transcricao: Optional[str], escolha_diarizacao: Optional[str],
+                     idioma: Optional[str] = None) -> PlanoASR:
     """Traduz a escolha das Configurações no que realmente vai rodar."""
     avisos: List[str] = []
 
     transcricao = escolha_transcricao or MOTOR_ASSEMBLYAI
+    if transcricao == MOTOR_SENSEVOICE and idioma and idioma not in IDIOMAS_SENSEVOICE:
+        avisos.append(f"SenseVoice só transcreve {', '.join(IDIOMAS_SENSEVOICE)}; idioma '{idioma}' "
+                      "vai pela AssemblyAI Universal-3.5.")
+        transcricao = MOTOR_ASSEMBLYAI
     if transcricao not in TRANSCRICAO_LIGADOS:
         avisos.append(f"Motor de transcrição '{transcricao}' ainda não está ligado; usando AssemblyAI Universal-3.5.")
         transcricao = MOTOR_ASSEMBLYAI
@@ -397,6 +406,19 @@ def diarizar_separado(motor: str, audio: Path):
     return diarizar_nemotron(audio)
 
 
+def transcrever_sensevoice(audio: Path, plano: PlanoASR, opcoes: OpcoesASR, chave: Optional[str] = None) -> ResultadoASR:
+    """SenseVoice Small pelo FunASR no .venv-nemo (CPU), em janelas de 25 s. Sem diarização própria."""
+    if opcoes.idioma not in IDIOMAS_SENSEVOICE:
+        raise ErroASR(f"SenseVoice não transcreve '{opcoes.idioma}' (só {', '.join(IDIOMAS_SENSEVOICE)})")
+    r = _rodar_worker_nemo("sensevoice", audio, opcoes.idioma)
+    palavras = [{"word": w["word"], "start_time": w["start"], "end_time": w["end"],
+                 "speaker_id": "Desconhecido", "confidence": 1.0} for w in r["palavras"]]
+    avisos = ["O SenseVoice não informa confiança por palavra; gravada como 1.0."]
+    if opcoes.detectar_entidades:
+        avisos.append("Detecção de entidades faladas só existe na AssemblyAI; ficou de fora nesta transcrição.")
+    return ResultadoASR(palavras=palavras, motor=MOTOR_SENSEVOICE, modelo_usado=r.get("modelo"), avisos=avisos)
+
+
 def atribuir_falantes(palavras: List[Dict[str, Any]], segmentos: List[Dict[str, Any]],
                       folga_s: float = 0.5) -> List[Dict[str, Any]]:
     """Cada palavra recebe o falante com mais sobreposição no tempo.
@@ -475,6 +497,7 @@ MOTORES: Dict[str, Callable[..., ResultadoASR]] = {
     MOTOR_DEEPGRAM: transcrever_deepgram,
     MOTOR_WHISPER: transcrever_whisper,
     MOTOR_CANARY: transcrever_canary,
+    MOTOR_SENSEVOICE: transcrever_sensevoice,
 }
 
 

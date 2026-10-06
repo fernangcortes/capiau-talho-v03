@@ -59,11 +59,11 @@ def test_diarizacao_de_outro_motor_de_nuvem_usa_a_do_motor_escolhido_e_avisa():
 
 
 def test_motor_sem_codigo_cai_na_assemblyai_e_avisa():
-    plano = resolver_motores("sensevoice", "diarizador_que_nao_existe")
+    plano = resolver_motores("motor_que_nao_existe", "diarizador_que_nao_existe")
     assert plano.transcricao == MOTOR_ASSEMBLYAI
     assert plano.diarizacao == DIARIZACAO_PROPRIA
     assert len(plano.avisos) == 2
-    assert "sensevoice" in plano.avisos[0]
+    assert "motor_que_nao_existe" in plano.avisos[0]
     assert "diarizador_que_nao_existe" in plano.avisos[1]
 
 
@@ -335,3 +335,23 @@ def test_pyannote_e_diarizador_separado(monkeypatch):
     motores.diarizar_separado("pyannote_40", Path("x.wav"))
     motores.diarizar_separado("nemotron_3_diarization", Path("x.wav"))
     assert chamados == ["pyannote", "diarizar"]
+
+
+def test_sensevoice_so_nas_linguas_dele():
+    assert resolver_motores("sensevoice", "none", "en").transcricao == "sensevoice"
+    plano = resolver_motores("sensevoice", "none", "pt")
+    assert plano.transcricao == MOTOR_ASSEMBLYAI
+    assert any("SenseVoice só transcreve" in a for a in plano.avisos)
+
+
+def test_sensevoice_converte_a_saida_do_worker(monkeypatch, audio):
+    from src.transcription import motores
+    pedidos = []
+    monkeypatch.setattr(motores, "_rodar_worker_nemo", lambda tarefa, a, *extra: pedidos.append((tarefa, extra)) or {
+        "modelo": "FunAudioLLM/SenseVoiceSmall", "palavras": [{"word": "hello", "start": 25.1, "end": 25.4}]})
+    r = motores.transcrever_sensevoice(audio, resolver_motores("sensevoice", "none", "en"), OpcoesASR(idioma="en"))
+    assert pedidos == [("sensevoice", ("en",))]
+    assert r.palavras[0] == {"word": "hello", "start_time": 25.1, "end_time": 25.4,
+                             "speaker_id": "Desconhecido", "confidence": 1.0}
+    with pytest.raises(ErroASR, match="não transcreve 'pt'"):
+        motores.transcrever_sensevoice(audio, resolver_motores("sensevoice", "none", "en"), OpcoesASR(idioma="pt"))

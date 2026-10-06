@@ -17,3 +17,5 @@ nemo-toolkit[asr]>=3.0.0
 transformers>=5.18.0
 librosa>=0.10
 pyannote.audio>=4.0  # diarizador pyannote_40; o modelo exige aceitar os termos no Hugging Face
+funasr>=1.4  # SenseVoice Small (só zh/en/ja/ko/yue)
+# Os modelos não baixam sozinhos: Configurações > Modelos locais.

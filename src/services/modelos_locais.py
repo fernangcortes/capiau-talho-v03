@@ -76,17 +76,18 @@ CATALOGO: Dict[str, ModeloLocal] = {m.id: m for m in [
     ModeloLocal(
         id="nemotron_diarization", nome="NVIDIA Nemotron 3 Diarization",
         uso="Separar falantes local (até 8 vozes, fala sobreposta)",
-        tamanho_mb=100, ambiente="nemo", pacotes=("transformers",),
-        repo="nvidia/Nemotron-3-Diarization", marcadores=("config.json",),
+        tamanho_mb=400, ambiente="nemo", pacotes=("transformers",),
+        repo="nvidia/Nemotron-3-Diarization",
+        padroes=("config.json", "processor_config.json", "model.safetensors"),  # sem o .nemo e o .gguf
+        marcadores=("model.safetensors",),
         configuracao=("diarization.engine=nemotron_3_diarization",)),
     ModeloLocal(
         id="pyannote_community1", nome="pyannote community-1",
         uso="Separar falantes local",
-        tamanho_mb=35, ambiente="nemo", pacotes=("pyannote",),
+        tamanho_mb=32, ambiente="nemo", pacotes=("pyannote",),
         repo="pyannote/speaker-diarization-community-1", marcadores=("config.yaml",),
         termos_url="https://huggingface.co/pyannote/speaker-diarization-community-1",
-        configuracao=("diarization.engine=pyannote_40",),
-        obs="O tamanho não foi conferido arquivo a arquivo."),
+        configuracao=("diarization.engine=pyannote_40",)),
     ModeloLocal(
         id="yolo_world", nome="YOLO-World v2 (s) + CLIP ViT-B/32",
         uso="Detector de objetos local rápido (~0,5 s por quadro)",
