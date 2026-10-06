@@ -218,6 +218,7 @@ def segment_video(
     motion_enabled: bool = True,
     embed_fn: Optional[Callable[[np.ndarray], np.ndarray]] = None,
     detect_beats_enabled: bool = True,
+    shots: Optional[List[Dict[str, float]]] = None,
 ) -> List[Dict[str, Any]]:
     """Orquestra shots + beats + movimento e devolve a lista final de segmentos.
 
@@ -225,8 +226,11 @@ def segment_video(
     Shots que geraram beats são substituídos pelos beats (granularidade final).
     `detect_beats_enabled=False` (perfis de esforço reduzido, E2.C1) para na
     granularidade de shot — também poupa o decode da amostragem de beats.
+    `shots` já detectados (a triagem detecta antes, para escolher os quadros dela)
+    evitam decodificar o vídeo de novo.
     """
-    shots = detect_shots(video_path, threshold=detect_threshold)
+    if shots is None:
+        shots = detect_shots(video_path, threshold=detect_threshold)
     if not shots:
         shots = [{"start": 0.0, "end": max(duration, 0.0)}]  # plano-sequência: 1 shot único
 

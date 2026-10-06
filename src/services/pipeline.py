@@ -140,9 +140,38 @@ class PipelineService:
         messages = [{"role": "user", "content": content}]
         return PipelineService._call_vision_api(messages, project_id, "Triage", timeout_floor=40)
 
+    # Quadros da triagem: um por plano, os planos mais longos primeiro
+    TRIAGEM_MAX_QUADROS = 6
+    TRIAGEM_MIN_QUADROS = 4
+
     @staticmethod
-    def triage_video(video_id: int, filepath: Path, duration: float, project_id: int) -> Dict[str, Any]:
-        """Triagem do vídeo: 3-4 frames espalhados + contexto barato → categoria (Eixo A), título e confiança.
+    def _instantes_da_triagem(duration: float, shots: Optional[List[Dict[str, float]]] = None) -> List[float]:
+        """Onde olhar na triagem. Com os planos detectados: o meio de cada plano, dos mais
+        longos para os mais curtos, até TRIAGEM_MAX_QUADROS; posições fixas completam até
+        TRIAGEM_MIN_QUADROS (plano-sequência também muda por dentro). Sem planos: as
+        posições fixas de antes. Antes eram sempre as fixas, que podiam cair todas no
+        mesmo plano e perder o que muda no vídeo."""
+        fim = max(duration - 0.5, 0.0)
+        fixos = [0.1, 0.35, 0.6, 0.85] if duration >= 20 else [0.2, 0.7]
+        fixos = [max(0.0, min(duration * f, fim)) for f in fixos]
+        if not shots:
+            return fixos
+        longos = sorted(shots, key=lambda sh: sh["end"] - sh["start"], reverse=True)
+        instantes = [max(0.0, min((sh["start"] + sh["end"]) / 2, fim))
+                     for sh in longos[:PipelineService.TRIAGEM_MAX_QUADROS]]
+        minimo = min(PipelineService.TRIAGEM_MIN_QUADROS, len(fixos) + len(instantes))
+        for t in fixos:
+            if len(instantes) >= minimo:
+                break
+            if all(abs(t - u) >= 2.0 for u in instantes):
+                instantes.append(t)
+        return sorted(instantes)
+
+    @staticmethod
+    def triage_video(video_id: int, filepath: Path, duration: float, project_id: int,
+                     shots: Optional[List[Dict[str, float]]] = None) -> Dict[str, Any]:
+        """Triagem do vídeo: um quadro por plano (ou posições fixas) + contexto barato →
+        categoria, secundárias, fora do projeto, título e confiança.
 
         Persiste category/category_confidence/title e deriva video_type quando o
         atual é 'unknown' (ou quando a triagem discorda com confiança alta).
@@ -150,15 +179,13 @@ class PipelineService:
         """
         import base64
 
-        # Frames espalhados pela duração (mínimo 1 para clipes muito curtos)
-        fractions = [0.1, 0.35, 0.6, 0.85] if duration >= 20 else [0.2, 0.7]
+        instantes = PipelineService._instantes_da_triagem(duration, shots)
         triage_dir = CONFIG.CACHE_DIR / f"triage_{video_id}"
         triage_dir.mkdir(exist_ok=True)
 
         base64_images = []
         try:
-            for idx, frac in enumerate(fractions):
-                ts = max(0.0, min(duration * frac, max(duration - 0.5, 0.0)))
+            for idx, ts in enumerate(instantes):
                 frame_path = triage_dir / f"triage_{idx}.jpg"
                 if extract_frame(filepath, ts, frame_path):
                     with open(frame_path, "rb") as f:
@@ -280,6 +307,20 @@ class PipelineService:
                      int(r.latencia_ms)))
             conn.commit()
         return len(r.deteccoes)
+
+    @staticmethod
+    def _detectar_planos(project_id: int, source: Path) -> Optional[List[Dict[str, float]]]:
+        """Cortes de plano (local, sem API). None em falha: a triagem volta às posições fixas
+        e a segmentação detecta de novo."""
+        try:
+            if not SettingsService.get_settings(project_id).get("vision.use_segments"):
+                return None
+            from src.vision.segmentation import detect_shots
+            threshold = SettingsService.get_settings(project_id).get("segment.detect_threshold")
+            return detect_shots(source, threshold=threshold) or None
+        except Exception as e:
+            print(f"[Triage] Falha ao detectar planos ({e}); triagem com posições fixas.")
+            return None
 
     @staticmethod
     def _categorias_secundarias(valor: Any, principal: Optional[str]) -> List[str]:
@@ -828,11 +869,17 @@ class PipelineService:
         # Fala primeiro: a Laya (sombra) e a triagem por visão leem a transcrição
         PipelineService._transcrever_antes_da_triagem(video_id, frame_source)
 
+        # Planos antes da triagem: ela olha um quadro de cada; a segmentação reaproveita
+        proxy_path = CONFIG.PROXIES_DIR / f"proxy_vid_{video_id}.mp4"
+        shots = None
+        if not category:
+            shots = PipelineService._detectar_planos(project_id, proxy_path if proxy_path.exists() else frame_source)
+
         # Triagem antes da varredura: categoria (Eixo A) + título curto + video_type por conteúdo
         if not category:
             category = PipelineService.triage_system1(video_id, filepath, duration, project_id)
         if not category:
-            triage = PipelineService.triage_video(video_id, frame_source, duration, project_id)
+            triage = PipelineService.triage_video(video_id, frame_source, duration, project_id, shots=shots)
             category = triage.get("categoria") or None
 
         # Reanálise limpa: remove vetores antigos deste vídeo (texto + imagem) para
@@ -881,9 +928,8 @@ class PipelineService:
         # Cada job de frame carrega a janela real do trecho (para o payload do Qdrant)
         frame_jobs: List[Dict[str, Any]] = []
         seg_log = ""
-        # Fora do bloco de segmentação: o extract_frame dos keyframes usa o proxy como
-        # fallback e, com vision.use_segments desligado, o nome não existia (NameError).
-        proxy_path = CONFIG.PROXIES_DIR / f"proxy_vid_{video_id}.mp4"
+        # proxy_path fica definido antes da triagem: o extract_frame dos keyframes usa o
+        # proxy como fallback mesmo com vision.use_segments desligado.
         if S.get("vision.use_segments"):
             try:
                 from src.vision.segmentation import segment_video
@@ -909,6 +955,7 @@ class PipelineService:
                     motion_enabled=S.get("segment.motion_enabled"),
                     embed_fn=embed_fn,
                     detect_beats_enabled=profile.detect_beats,
+                    shots=shots,
                 )
                 if segments:
                     with get_db() as conn:

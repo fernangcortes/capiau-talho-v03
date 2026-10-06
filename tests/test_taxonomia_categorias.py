@@ -196,3 +196,66 @@ def test_fila_de_revisao_inclui_video_misto(banco, monkeypatch):  # noqa: F811
                      categorias_secundarias) VALUES (31, 1, 'v', 'v', 'h31', 'convivio', 0.9, '[]')""")
     banco.commit()
     assert [v["id"] for v in triage_review_queue(1, conn=banco)["videos"]] == [30]
+
+
+# ---------------------------------------------------------------------------
+# Triagem com um quadro por plano
+# ---------------------------------------------------------------------------
+
+def test_sem_planos_a_triagem_usa_as_posicoes_fixas():
+    from src.services.pipeline import PipelineService as P
+    assert P._instantes_da_triagem(100.0) == [10.0, 35.0, 60.0, 85.0]
+    assert P._instantes_da_triagem(10.0) == [2.0, 7.0]
+
+
+def test_com_muitos_planos_olha_o_meio_dos_seis_mais_longos_em_ordem():
+    from src.services.pipeline import PipelineService as P
+    duracoes = [5, 30, 2, 20, 8, 1, 25, 3, 12, 4]  # 10 planos
+    shots, t = [], 0.0
+    for d in duracoes:
+        shots.append({"start": t, "end": t + d})
+        t += d
+    instantes = P._instantes_da_triagem(t, shots)
+    longos = sorted(shots, key=lambda s: s["end"] - s["start"], reverse=True)[:6]
+    assert instantes == sorted((s["start"] + s["end"]) / 2 for s in longos)
+
+
+def test_plano_sequencia_completa_com_posicoes_fixas_sem_repetir_o_meio():
+    from src.services.pipeline import PipelineService as P
+    instantes = P._instantes_da_triagem(100.0, [{"start": 0.0, "end": 100.0}])
+    assert 50.0 in instantes and len(instantes) == 4
+    assert all(abs(a - b) >= 2.0 for i, a in enumerate(instantes) for b in instantes[i + 1:])
+
+
+def test_planos_sao_detectados_uma_vez_e_servem_a_triagem_e_a_segmentacao(banco, monkeypatch, tmp_path):  # noqa: F811
+    from pathlib import Path
+    from src.services import pipeline as mod
+    from tests.test_ordem_analises import _detector, _pipeline_falso
+    banco.execute("UPDATE video SET category = NULL WHERE id = 7"); banco.commit()
+    P = _pipeline_falso(banco, monkeypatch, tmp_path, [])
+    _detector(monkeypatch, [])
+    monkeypatch.setattr(SettingsService, "get_settings", _settings(**{
+        "vision.use_segments": True, "clip.enabled": False, "vision.frame_interval": 10,
+        "object.detector_engine": "none"}))
+    planos = [{"start": 0.0, "end": 8.0}, {"start": 8.0, "end": 20.0}]
+    chamadas = {"detect": 0, "segment_shots": None, "triagem_shots": None}
+
+    def detect(path, threshold=27.0):
+        chamadas["detect"] += 1
+        return planos
+
+    def segment(path, duration, shots=None, **kw):
+        chamadas["segment_shots"] = shots
+        return [{"start": s["start"], "end": s["end"], "kind": "shot", "reason": "", "motion_label": ""} for s in shots]
+
+    def triagem(vid, fp, d, pid, shots=None):
+        chamadas["triagem_shots"] = shots
+        return {"categoria": "cena", "confianca": 0.9}
+
+    monkeypatch.setattr("src.vision.segmentation.detect_shots", detect)
+    monkeypatch.setattr("src.vision.segmentation.segment_video", segment)
+    monkeypatch.setattr(P, "triage_system1", staticmethod(lambda *a, **k: None))
+    monkeypatch.setattr(P, "triage_video", staticmethod(triagem))
+    assert P.analyze_video_vision(7, Path("C:/nao/existe/take.mp4"), 20.0) is True
+    assert chamadas["detect"] == 1, "um decode só para achar os planos"
+    assert chamadas["triagem_shots"] == planos and chamadas["segment_shots"] == planos
