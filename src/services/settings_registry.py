@@ -731,10 +731,10 @@ SETTINGS_REGISTRY: List[Dict[str, Any]] = [
         "category": "themes_search", "level": "simple", "scope": "both", "requires_reprocess": True,
     },
     {
-        "key": "burst.similarity_threshold", "type": "float", "default": 0.97, "min": 0.80, "max": 0.999, "step": 0.005,
+        "key": "burst.similarity_threshold", "type": "float", "default": 0.90, "min": 0.80, "max": 0.999, "step": 0.005,
         "label": "Rajadas: similaridade mínima",
         "help": "Quão parecidas duas fotos precisam ser para entrarem na mesma rajada. Menor = agrupa mais (e arrisca juntar fotos diferentes); maior = só quadros praticamente idênticos.",
-        "help_tech": "Cosseno mínimo entre embeddings CLIP da foto e da líder do grupo corrente.",
+        "help_tech": "Cosseno mínimo entre embeddings CLIP da foto e da líder do grupo corrente. Padrão 0,90 medido em 06/10/2026 nas 1.424 fotos de MONSTRO (docs/REVISAO_CATEGORIAS.md, seção 10): 0,97 juntava 6%; 0,90 junta 28% em sequências da mesma cena; 0,85 já juntava páginas diferentes de um documento.",
         "category": "themes_search", "level": "pro", "scope": "both", "requires_reprocess": True,
     },
     {
