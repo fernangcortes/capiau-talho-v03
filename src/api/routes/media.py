@@ -166,7 +166,8 @@ def triage_review_queue(project_id: int, conn: sqlite3.Connection = Depends(get_
     from src.services.system1_service import MOTOR_LAYA
     cursor.execute(
         """SELECT v.id, v.filename, v.title, v.category, v.category_confidence, v.video_type, v.duration,
-                  v.status, laya.categoria AS categoria_laya, v.categorias_secundarias, v.fora_do_projeto
+                  v.status, laya.categoria AS categoria_laya, v.categorias_secundarias, v.fora_do_projeto,
+                  v.categoria_resumo
            FROM video v
            LEFT JOIN system1_decisao laya ON laya.id = (
                SELECT max(d.id) FROM system1_decisao d
@@ -177,6 +178,8 @@ def triage_review_queue(project_id: int, conn: sqlite3.Connection = Depends(get_
                       AND laya.categoria IS NOT NULL AND lower(laya.categoria) != lower(v.category))
                   OR (v.category IS NOT NULL AND v.category_confidence < 1.0
                       AND v.categorias_secundarias IS NOT NULL AND v.categorias_secundarias NOT IN ('', '[]'))
+                  OR (v.category IS NOT NULL AND (v.category_confidence IS NULL OR v.category_confidence < 1.0)
+                      AND v.categoria_resumo IS NOT NULL AND v.categoria_resumo != v.category)
                   OR (v.category IS NULL AND v.video_type != 'interview'
                       AND v.description IS NOT NULL AND v.description != ''))
            ORDER BY v.category_confidence ASC""",

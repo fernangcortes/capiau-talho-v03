@@ -489,7 +489,8 @@ def test_resumo_mescla_fala_imagem_e_categoria(banco, monkeypatch):
     assert PipelineService.generate_video_summary(7, "interview", 1) is True
     p = prompts[0]
     assert "madrugada" in p and "refletor sendo içado" in p, "fala e imagem no mesmo resumo"
-    assert "CLASSIFICAÇÃO DO ARQUIVO" in p and "cena" in p.lower()
+    # Com imagem, o resumo julga a categoria em vez de recebê-la (docs/REVISAO_CATEGORIAS.md, seção 11)
+    assert "CLASSIFIQUE TAMBÉM O VÍDEO" in p and "CLASSIFICAÇÃO DO ARQUIVO" not in p
     assert banco.execute("SELECT title FROM video WHERE id = 7").fetchone()[0] == "Ensaio no galpão"
 
 

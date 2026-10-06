@@ -259,3 +259,115 @@ def test_planos_sao_detectados_uma_vez_e_servem_a_triagem_e_a_segmentacao(banco,
     assert P.analyze_video_vision(7, Path("C:/nao/existe/take.mp4"), 20.0) is True
     assert chamadas["detect"] == 1, "um decode só para achar os planos"
     assert chamadas["triagem_shots"] == planos and chamadas["segment_shots"] == planos
+
+
+# ---------------------------------------------------------------------------
+# Categoria fora do prompt da visão; o resumo com imagem confere
+# ---------------------------------------------------------------------------
+
+def test_prompt_da_visao_nao_recebe_mais_a_categoria():
+    from src.nlp.prompt_templates import get_vision_prompt
+    assert get_vision_prompt([], [], category="cena") == get_vision_prompt([], [])
+    assert "CLASSIFICAÇÃO" not in get_vision_prompt([], [], category="cena")
+
+
+def _resumo(banco, monkeypatch, resposta, com_quadros=True):  # noqa: F811
+    from src.services import pipeline as mod
+    from src.services.pipeline import PipelineService
+
+    class R:
+        status_code = 200
+
+        def json(self):
+            return {"choices": [{"message": {"content": json.dumps(resposta)}}]}
+
+    prompts = []
+    monkeypatch.setattr(SettingsService, "get_settings", _settings(**{"api.openrouter_key": "sk-teste"}))
+    monkeypatch.setattr(mod.requests, "post", lambda url, headers=None, json=None, timeout=None:
+                        (prompts.append(json["messages"][0]["content"]), R())[1])
+    monkeypatch.setattr("src.services.pipeline.SemanticSearch.get_instance",
+                        staticmethod(lambda: (_ for _ in ()).throw(RuntimeError("sem Qdrant"))))
+    banco.execute("INSERT INTO transcript (video_id, word, start_time, end_time, speaker_id) VALUES (7, 'oi', 0, 1, 'A')")
+    banco.commit()
+    quadros = [{"timestamp": 1.0, "description": "atores em cena com claquete", "tags": []}] if com_quadros else []
+    assert PipelineService.generate_video_summary(7, None, 1, quadros) is True
+    return prompts[0], dict(banco.execute(
+        "SELECT category, category_confidence, categorias_secundarias, categoria_resumo, analise_desatualizada "
+        "FROM video WHERE id = 7").fetchone())
+
+
+BASE = {"titulo": "t", "description": "d", "summary": "s", "tags": []}
+
+
+def test_resumo_concorda_e_junta_secundarias(banco, monkeypatch):  # noqa: F811
+    banco.execute("UPDATE video SET category = 'cena', category_confidence = 0.9, categorias_secundarias = '[]', "
+                  "esforco_analisado = 'completo' WHERE id = 7")
+    prompt, v = _resumo(banco, monkeypatch, {**BASE, "categoria": "cena", "categorias_secundarias": ["bastidor"]})
+    assert "CLASSIFIQUE TAMBÉM O VÍDEO" in prompt and "'cena'" in prompt
+    assert v["category"] == "cena" and json.loads(v["categorias_secundarias"]) == ["bastidor"]
+    assert v["categoria_resumo"] == "cena" and v["analise_desatualizada"] is None
+
+
+def test_resumo_discorda_marca_desatualizada_quando_pede_mais_esforco(banco, monkeypatch):  # noqa: F811
+    banco.execute("UPDATE video SET category = 'convivio', category_confidence = 0.9, esforco_analisado = 'triagem' "
+                  "WHERE id = 7")
+    _, v = _resumo(banco, monkeypatch, {**BASE, "categoria": "cena"})
+    assert v["category"] == "convivio", "a triagem não é trocada sozinha"
+    assert v["categoria_resumo"] == "cena"
+    assert "convivio" in v["analise_desatualizada"] and "completo" in v["analise_desatualizada"]
+
+
+def test_resumo_discorda_sem_pedir_mais_esforco_so_registra(banco, monkeypatch):  # noqa: F811
+    banco.execute("UPDATE video SET category = 'cena', category_confidence = 0.9, esforco_analisado = 'completo' "
+                  "WHERE id = 7")
+    _, v = _resumo(banco, monkeypatch, {**BASE, "categoria": "convivio"})
+    assert v["categoria_resumo"] == "convivio" and v["analise_desatualizada"] is None
+
+
+def test_correcao_humana_nunca_e_trocada_nem_marcada(banco, monkeypatch):  # noqa: F811
+    banco.execute("UPDATE video SET category = 'convivio', category_confidence = 1.0, esforco_analisado = 'triagem' "
+                  "WHERE id = 7")
+    _, v = _resumo(banco, monkeypatch, {**BASE, "categoria": "cena"})
+    assert v["category"] == "convivio" and v["analise_desatualizada"] is None
+
+
+def test_video_sem_categoria_fica_com_a_do_resumo_como_incerta(banco, monkeypatch):  # noqa: F811
+    banco.execute("UPDATE video SET category = NULL, category_confidence = NULL WHERE id = 7")
+    _, v = _resumo(banco, monkeypatch, {**BASE, "categoria": "bastidor", "categorias_secundarias": ["cena"]})
+    assert v["category"] == "bastidor" and v["category_confidence"] is None
+    assert json.loads(v["categorias_secundarias"]) == ["cena"]
+
+
+def test_resumo_so_de_fala_nao_julga_categoria(banco, monkeypatch):  # noqa: F811
+    prompt, v = _resumo(banco, monkeypatch, {**BASE, "categoria": "teste"}, com_quadros=False)
+    assert "CLASSIFIQUE" not in prompt
+    assert v["categoria_resumo"] is None and v["category"] == "cena"
+
+
+def test_marca_do_resumo_sobrevive_ao_fim_da_analise(banco, monkeypatch, tmp_path):  # noqa: F811
+    from pathlib import Path
+    from tests.test_ordem_analises import _detector, _pipeline_falso
+    P = _pipeline_falso(banco, monkeypatch, tmp_path, [])
+    _detector(monkeypatch, [])
+
+    def resumo_que_marca(video_id, *a, **k):
+        banco.execute("UPDATE video SET analise_desatualizada = 'resumo discorda' WHERE id = ?", (video_id,))
+        return True
+
+    monkeypatch.setattr(P, "generate_video_summary", staticmethod(resumo_que_marca))
+    assert P.analyze_video_vision(7, Path("C:/nao/existe/take.mp4"), 20.0) is True
+    row = banco.execute("SELECT esforco_analisado, analise_desatualizada FROM video WHERE id = 7").fetchone()
+    assert tuple(row) == ("completo", "resumo discorda")
+
+
+def test_fila_de_revisao_inclui_divergencia_do_resumo(banco, monkeypatch):  # noqa: F811
+    from src.api.routes.media import triage_review_queue
+    monkeypatch.setattr(SettingsService, "get_settings", _settings())
+    banco.execute("UPDATE video SET category_confidence = 1.0, categoria_resumo = 'convivio' WHERE id = 7")  # humana: fora
+    banco.execute("""INSERT INTO video (id, project_id, filename, filepath, hash, category, category_confidence,
+                     categoria_resumo) VALUES (40, 1, 'v', 'v', 'h40', 'convivio', 0.9, 'cena')""")
+    banco.execute("""INSERT INTO video (id, project_id, filename, filepath, hash, category, category_confidence,
+                     categoria_resumo) VALUES (41, 1, 'v', 'v', 'h41', 'convivio', 0.9, 'convivio')""")
+    banco.commit()
+    fila = triage_review_queue(1, conn=banco)["videos"]
+    assert [v["id"] for v in fila] == [40] and fila[0]["categoria_resumo"] == "cena"

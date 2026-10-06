@@ -54,6 +54,7 @@ CREATE TABLE IF NOT EXISTS video (
     esforco_analisado TEXT,       -- perfil de esforço da última análise de visão (completo|reduzido|triagem)
     categorias_secundarias TEXT,  -- JSON: outras categorias com trecho relevante; não vazio = vídeo misto
     fora_do_projeto INTEGER DEFAULT 0, -- eixo 2 da triagem: material sem relação com o projeto
+    categoria_resumo TEXT,        -- categoria que o resumo final (com imagem) julgou, sem ver a da triagem
     analise_desatualizada TEXT,   -- motivo quando a categoria mudou e pede mais esforço; NULL = em dia
 
     -- Status no pipeline
@@ -760,6 +761,9 @@ def init_db(db_path: Path = None):
         if "fora_do_projeto" not in video_cols:
             cursor.execute("ALTER TABLE video ADD COLUMN fora_do_projeto INTEGER DEFAULT 0")
             print("[MIGRATION] Coluna 'fora_do_projeto' adicionada a tabela video.")
+        if "categoria_resumo" not in video_cols:
+            cursor.execute("ALTER TABLE video ADD COLUMN categoria_resumo TEXT")
+            print("[MIGRATION] Coluna 'categoria_resumo' adicionada a tabela video.")
         migrar_taxonomia_categorias(conn)
         # Origem da decupagem CORRENTE ('ia' | 'humano' | 'importado'). Serve para
         # que video_metadata_history registre corretamente quem escreveu a versao

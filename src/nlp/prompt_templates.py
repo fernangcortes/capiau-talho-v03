@@ -227,14 +227,14 @@ def get_triage_prompt(filename: str = "", folder_hint: str = "", transcript_snip
 
 
 def get_vision_prompt(known_entities: list = None, detected_people: list = None, project_id: Optional[int] = None, category: Optional[str] = None) -> str:
-    """Gera o prompt de visão estruturado, injetando entidades conhecidas do projeto."""
+    """Gera o prompt de visão estruturado, injetando entidades conhecidas do projeto.
+
+    `category` é ignorada desde 06/10/2026: com a categoria no prompt ("descreva dentro
+    desse contexto") a descrição confirmava a triagem, inclusive quando ela errava. A
+    descrição fica independente e o resumo final confere a categoria com ela
+    (docs/REVISAO_CATEGORIAS.md, seção 11).
+    """
     context_block = ""
-    if category and category in TRIAGE_CATEGORIES:
-        label = CATEGORY_LABELS.get(category, category)
-        context_block += (
-            f"\nCLASSIFICAÇÃO DO ARQUIVO: este vídeo foi classificado como '{label}' "
-            f"({TRIAGE_CATEGORIES[category]}). Descreva o frame dentro desse contexto, sem repetir a categoria como descrição."
-        )
     if known_entities:
         objects = [e["name"] for e in known_entities if e.get("entity_type") in ("object", "location", "other")]
         if objects:
@@ -353,17 +353,34 @@ def get_interview_summary_prompt(formatted_transcript: str, project_id: Optional
                       category_block=_summary_category_block(category))
 
 
+def classificacao_block(project_id: Optional[int] = None) -> str:
+    """Pede ao resumo com imagem que julgue a categoria. Ele NÃO recebe a categoria da
+    triagem, para não confirmar por viés; o pipeline compara as duas depois."""
+    linhas = ["CLASSIFIQUE TAMBÉM O VÍDEO, com base no que se vê e se ouve abaixo."]
+    objetivo = objetivo_do_projeto(project_id)
+    if objetivo:
+        linhas.append(f"Objetivo do projeto: {objetivo}")
+    linhas.append("Categorias:")
+    linhas.append(_triage_categories_block())
+    linhas.append('Inclua no MESMO objeto JSON: "categoria" (uma das chaves acima, a que ocupa mais tempo), '
+                  '"categorias_secundarias" (lista; [] se não houver) e "fora_do_projeto" (true só se não '
+                  'tiver relação com o projeto).')
+    return "\n".join(linhas) + "\n"
+
+
 def get_broll_summary_prompt(formatted_visuals: str, project_id: Optional[int] = None, category: Optional[str] = None) -> str:
-    """Gera o prompt para sumarização de vídeos a partir de descrições de frames."""
+    """Gera o prompt para sumarização de vídeos a partir de descrições de frames.
+    `category` é ignorada: este resumo julga a categoria (classificacao_block)."""
     return get_prompt("broll_summary", project_id=project_id, formatted_visuals=formatted_visuals,
-                      category_block=_summary_category_block(category))
+                      classificacao_block=classificacao_block(project_id))
 
 
 def get_video_summary_prompt(formatted_transcript: str, formatted_visuals: str, project_id: Optional[int] = None,
                              category: Optional[str] = None) -> str:
-    """Resumo único de vídeo com fala e imagem: um não sobrescreve mais o outro."""
+    """Resumo único de vídeo com fala e imagem: um não sobrescreve mais o outro.
+    `category` é ignorada: este resumo julga a categoria (classificacao_block)."""
     return get_prompt("video_summary", project_id=project_id, formatted_transcript=formatted_transcript,
-                      formatted_visuals=formatted_visuals, category_block=_summary_category_block(category))
+                      formatted_visuals=formatted_visuals, classificacao_block=classificacao_block(project_id))
 
 
 def get_theme_clustering_prompt(formatted_transcript: str, project_id: Optional[int] = None) -> str:

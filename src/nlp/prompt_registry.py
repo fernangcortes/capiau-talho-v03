@@ -352,12 +352,12 @@ Responda estritamente em Português e em formato JSON com a seguinte estrutura (
         "category": "vision",
         "variables": {
             "formatted_visuals": "Sequência cronológica de descrições visuais dos frames do clipe.",
-            "category_block": "Categoria de triagem do vídeo (quando conhecida)."
+            "classificacao_block": "Pedido de classificação (objetivo do projeto, categorias e regras); o resumo julga a categoria sem receber a da triagem."
         },
         "default": """Você é um editor sênior de cinema e vídeo.
 Analise a sequência cronológica de ações visuais descritas abaixo, capturadas em frames de um mesmo vídeo, e gere metadados editoriais úteis.
 Descreva o que o vídeo realmente mostra — NÃO presuma que é making of ou bastidores.
-{category_block}
+{classificacao_block}
 SEQUÊNCIA DE AÇÕES VISUAIS:
 {formatted_visuals}
 
@@ -375,12 +375,12 @@ Responda estritamente em Português e em formato JSON com a seguinte estrutura (
         "variables": {
             "formatted_transcript": "Transcrição com marcações de tempo e falantes.",
             "formatted_visuals": "Sequência cronológica de descrições visuais dos frames do clipe.",
-            "category_block": "Categoria de triagem do vídeo (quando conhecida)."
+            "classificacao_block": "Pedido de classificação (objetivo do projeto, categorias e regras); o resumo julga a categoria sem receber a da triagem."
         },
         "default": """Você é um editor sênior de cinema e documentário.
 Este vídeo tem fala e imagem. Abaixo estão a transcrição do que se fala e a descrição do que se vê em quadros do MESMO vídeo, ambas com marcação de tempo. Cruze as duas para gerar metadados editoriais úteis para a montagem.
 Descreva o que o vídeo realmente é — NÃO presuma que é making of, bastidores ou entrevista formal. Quando fala e imagem divergirem, diga o que cada uma mostra em vez de escolher uma.
-{category_block}
+{classificacao_block}
 TRANSCRIÇÃO (o que se fala):
 {formatted_transcript}
 

@@ -323,6 +323,53 @@ class PipelineService:
             return None
 
     @staticmethod
+    def _conferir_categoria(conn, video_id: int, project_id: int, data: Dict[str, Any]) -> None:
+        """Compara a categoria que o resumo final julgou (com todas as descrições e a fala,
+        sem ver a da triagem) com a da triagem. Nada roda sozinho:
+        - vídeo sem categoria: fica com a do resumo, sem confiança (conta como incerta);
+        - concorda: junta as secundárias;
+        - discorda: guarda em categoria_resumo (fila de revisão) e, se a do resumo pede
+          mais esforço do que a análise teve, marca a análise como desatualizada.
+        Correção humana (confiança 1.0) nunca é trocada.
+        """
+        from src.services.analysis_policy import EFFORT_RANK
+        cat = normalizar_categoria(data.get("categoria"))
+        if not cat:
+            return
+        secundarias = PipelineService._categorias_secundarias(data.get("categorias_secundarias"), cat)
+        fora = data.get("fora_do_projeto") in (True, "true", "sim", 1)
+        row = conn.execute("SELECT category, category_confidence, categorias_secundarias, esforco_analisado "
+                           "FROM video WHERE id = ?", (video_id,)).fetchone()
+        if not row:
+            return
+        conn.execute("UPDATE video SET categoria_resumo = ? WHERE id = ?", (cat, video_id))
+        atual = normalizar_categoria(row["category"])
+        if not atual:
+            conn.execute("UPDATE video SET category = ?, category_confidence = NULL, categorias_secundarias = ?, "
+                         "fora_do_projeto = ? WHERE id = ?", (cat, json.dumps(secundarias), int(fora), video_id))
+            print(f"[Summary] Vídeo {video_id}: sem categoria; o resumo diz '{cat}'.")
+            return
+        if cat == atual:
+            try:
+                antigas = json.loads(row["categorias_secundarias"] or "[]")
+            except (TypeError, ValueError):
+                antigas = []
+            juntas = antigas + [c for c in secundarias if c not in antigas]
+            if juntas != antigas:
+                conn.execute("UPDATE video SET categorias_secundarias = ? WHERE id = ?", (json.dumps(juntas), video_id))
+            return
+        print(f"[Summary] Vídeo {video_id}: triagem disse '{atual}', o resumo diz '{cat}' (fila de revisão).")
+        if row["category_confidence"] is not None and float(row["category_confidence"]) >= 1.0:
+            return
+        S = SettingsService.get_settings(project_id)
+        pede = get_profile(cat, S.get("analysis.effort_overrides"), secundarias=secundarias).effort
+        teve = row["esforco_analisado"]
+        if teve and EFFORT_RANK[pede] > EFFORT_RANK.get(teve, 2):
+            conn.execute("UPDATE video SET analise_desatualizada = ? WHERE id = ?",
+                         (f"triagem '{atual}', resumo '{cat}': analisado com esforço '{teve}', "
+                          f"a do resumo pede '{pede}'", video_id))
+
+    @staticmethod
     def _categorias_secundarias(valor: Any, principal: Optional[str]) -> List[str]:
         """Lista limpa de categorias secundárias (vídeo misto): canônicas, sem repetir a principal."""
         if isinstance(valor, str):
@@ -1063,7 +1110,8 @@ class PipelineService:
                 with open(frame_path, "rb") as img_file:
                     base64_img = base64.b64encode(img_file.read()).decode('utf-8')
 
-                vision_prompt = get_vision_prompt(known_entities, detected_people, project_id=project_id, category=category)
+                # Sem a categoria: a descrição fica independente e o resumo final confere a triagem
+                vision_prompt = get_vision_prompt(known_entities, detected_people, project_id=project_id)
                 analysis = PipelineService.call_openrouter_vision(base64_img, "jpg", prompt=vision_prompt, project_id=project_id)
                 if not analysis:
                     # Chamada falhou -- pula este keyframe em vez de indexar uma
@@ -1149,6 +1197,13 @@ class PipelineService:
                 except Exception as qdrant_err:
                     print(f"[Vision] Falha na indexação vetorial Qdrant do vídeo {video_id}: {qdrant_err}")
 
+                # Esforço desta análise registrado ANTES do resumo: a conferência da categoria
+                # no resumo compara com ele e pode marcar a análise como desatualizada.
+                with get_db() as conn:
+                    conn.execute("UPDATE video SET esforco_analisado = ?, analise_desatualizada = NULL WHERE id = ?",
+                                 (profile.effort, video_id))
+                    conn.commit()
+
                 try:
                     PipelineService._gravar_keyframes(project_id, video_id, descriptions_indexed)
                 except Exception as kf_err:
@@ -1178,10 +1233,6 @@ class PipelineService:
             with get_db() as conn:
                 warn_msg = f"Aviso: {failed_frames} de {total_jobs} quadros falharam na análise visual." if failed_frames > 0 else None
                 MediaRepository.update_video_status(conn, video_id, 'analyzed', error_message=warn_msg)
-                # Registra o esforço desta análise; a reanálise resolve o aviso de desatualizada
-                conn.execute("UPDATE video SET esforco_analisado = ?, analise_desatualizada = NULL WHERE id = ?",
-                             (profile.effort, video_id))
-                conn.commit()
             TASK_MANAGER.update_progress(str(video_id), 100.0, "finished", task_type="vision")
             return True
         except Exception as e:
@@ -1556,6 +1607,8 @@ class PipelineService:
                         print(f"[Nomes] Video {video_id}: {resumir_trocas(trocas)}")
 
                     MediaRepository.update_video_metadata(conn, video_id, desc, summary, tags, title=title)
+                    if quadros:  # só o resumo que viu a imagem julga a categoria
+                        PipelineService._conferir_categoria(conn, video_id, project_id, data)
 
                     for tag in tags:
                         NarrativeRepository.add_relation(
