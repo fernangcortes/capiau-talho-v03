@@ -716,16 +716,17 @@ export function cleanTitle(text) {
     return clean;
 }
 
+// Taxonomia de triagem (docs/REVISAO_CATEGORIAS.md): mesmas chaves de
+// TRIAGE_CATEGORIES no backend. "Fora do projeto" é uma marca à parte, não categoria.
 export const CATEGORY_LABELS = {
-    obra: "Obra",
-    processo: "Making of",
+    cena: "Cena",
+    bastidor: "Bastidor",
     depoimento: "Depoimento",
-    cotidiano: "Cotidiano",
+    convivio: "Convívio",
     evento: "Evento",
-    tecnico: "Técnico",
-    arquivo: "Arquivo",
-    pessoal: "Pessoal",
-    documento: "Documento"
+    teste: "Teste",
+    documento: "Documento",
+    terceiros: "Terceiros"
 };
 
 export function getFriendlyTitle(v) {
@@ -7835,7 +7836,7 @@ export class LibraryManager {
             options = [
                 { value: "tipo", label: "Tipo (fala/bastidores/video/foto)" },
                 { value: "status", label: "Status (pendente/asr/visao/erro)" },
-                { value: "cat", label: "Categoria (obra/processo...)" },
+                { value: "cat", label: "Categoria (cena/bastidor...)" },
                 { value: "pasta", label: "Pasta / Bin" },
                 { value: "data", label: "Data / Diária" },
                 { value: "duracao", label: "Duração (segundos)" },
