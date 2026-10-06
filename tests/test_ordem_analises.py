@@ -154,3 +154,50 @@ def test_nome_confirmado_chega_ao_prompt_de_visao_na_reanalise(banco, monkeypatc
     assert [p["name"] for p in por_quadro[1]] == ["Thiago Moyses"], \
         "o nome confirmado no quadro 10s precisa chegar a detected_people"
     assert banco.execute("SELECT count(*) FROM face WHERE video_id = 7 AND name = 'Thiago Moyses'").fetchone()[0] == 1
+
+
+# ---------------------------------------------------------------------------
+# Bug 2: analyze_video_all chamava extract_frame com argumentos trocados
+# ---------------------------------------------------------------------------
+
+def test_analyze_video_all_extrai_frame_do_rosto_na_ordem_certa(monkeypatch, tmp_path):
+    from pathlib import Path
+    from src.services import pipeline as mod
+    P = mod.PipelineService
+
+    @contextlib.contextmanager
+    def db():
+        conn = sqlite3.connect(":memory:")
+        conn.row_factory = sqlite3.Row
+        conn.executescript(SCHEMA_SQL)
+        conn.execute("INSERT INTO project (id, name) VALUES (1, 'p')")
+        conn.execute("""INSERT INTO video (id, project_id, filename, filepath, hash, duration)
+                        VALUES (9, 1, 'a.mp4', 'C:/v/a.mp4', 'h', 8.0)""")
+        yield conn
+
+    class TarefasFalsas:
+        def update_progress(self, *a, **k): pass
+        def add_log(self, *a, **k): pass
+
+    chamadas, rostos = [], []
+
+    def frame_falso(video_path, timestamp, output_path, proxy_fallback_path=None):
+        chamadas.append((video_path, timestamp, output_path))
+        assert isinstance(timestamp, float) and isinstance(output_path, Path)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_bytes(b"jpg")
+        return True
+
+    monkeypatch.setattr(mod, "get_db", db)
+    monkeypatch.setattr(mod, "TASK_MANAGER", TarefasFalsas())
+    monkeypatch.setattr(mod.CONFIG, "CACHE_DIR", tmp_path)
+    monkeypatch.setattr(mod, "extract_frame", frame_falso)
+    monkeypatch.setattr(mod, "process_video_frame_faces", lambda *a: rostos.append((*a, a[3].exists())))
+    monkeypatch.setattr(P, "transcribe_video", staticmethod(lambda *a, **k: True))
+    monkeypatch.setattr(P, "analyze_video_vision", staticmethod(lambda *a, **k: True))
+
+    P.analyze_video_all(9)
+    quadro = tmp_path / "rosto_vid_9" / "frame_1000.jpg"
+    assert chamadas == [(Path("C:/v/a.mp4"), 1.0, quadro)]
+    assert rostos == [(1, 9, 1.0, quadro, True)], "o rosto desse fluxo agora roda, com o quadro no disco"
+    assert not quadro.exists(), "o quadro temporário é apagado depois"

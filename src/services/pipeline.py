@@ -1685,14 +1685,16 @@ Responda em formato JSON puro:
                 label=f"Detecção Facial (Vídeo #{video_id})",
                 log_message="[VISION] Executando Camada 6: Detecção de Rostos..."
             )
-            frame_dir = CONFIG.FRAMES_DIR / f"vid_{video_id}"
-            frame_dir.mkdir(parents=True, exist_ok=True)
+            # CONFIG.FRAMES_DIR não existe (AttributeError) e os argumentos do
+            # extract_frame vinham trocados: esta camada nunca rodava.
+            frame_dir = CONFIG.CACHE_DIR / f"rosto_vid_{video_id}"
             sample_ts = min(1.0, duration / 2.0) if duration > 0 else 0.0
             sample_frame = frame_dir / f"frame_{int(sample_ts*1000)}.jpg"
-            if not sample_frame.exists():
-                extract_frame(filepath, sample_frame, sample_ts)
-            if sample_frame.exists():
-                process_video_frame_faces(project_id, video_id, sample_ts, sample_frame)
+            try:
+                if extract_frame(filepath, sample_ts, sample_frame):
+                    process_video_frame_faces(project_id, video_id, sample_ts, sample_frame)
+            finally:
+                sample_frame.unlink(missing_ok=True)
         except Exception as e:
             print(f"[AnalyzeAllVideo] Detecção facial erro: {e}")
             TASK_MANAGER.add_log(task_key, f"[WARN] Detecção facial erro: {e}", "WARN")
