@@ -285,12 +285,13 @@ REGRAS:
         "label": "Sumário de Depoimentos",
         "category": "vision",
         "variables": {
-            "formatted_transcript": "Transcrição do depoimento com marcações de tempo e falantes."
+            "formatted_transcript": "Transcrição do depoimento com marcações de tempo e falantes.",
+            "category_block": "Categoria de triagem do vídeo (quando conhecida)."
         },
         "default": """Você é um editor sênior de documentários de cinema.
 Analise a transcrição abaixo (composta por trechos falados com marcação de tempo e falante) e gere metadados editoriais úteis para a montagem.
 Atenção: nem toda fala é uma entrevista formal — pode ser uma conversa informal, uma reunião ou uma instrução de trabalho. Descreva o que a transcrição realmente é.
-
+{category_block}
 TRANSCRIÇÃO DO VÍDEO:
 {formatted_transcript}
 
@@ -322,6 +323,32 @@ Responda estritamente em Português e em formato JSON com a seguinte estrutura (
   "description": "Uma frase concisa descrevendo o conteúdo visual e a ação geral ocorrendo neste vídeo",
   "summary": "Um resumo do desenrolar da ação ou cenário apresentado neste clipe, descrevendo sua utilidade e valor editorial/estético para a edição",
   "tags": ["3 a 6 tags específicas sobre a AÇÃO, o LOCAL e o CONTEXTO; PROIBIDO tags genéricas como 'making of', 'bastidores', 'set de filmagem', 'b-roll', 'vídeo'"]
+}"""
+    },
+    "video_summary": {
+        "label": "Sumário de Vídeo (fala + imagem)",
+        "category": "vision",
+        "variables": {
+            "formatted_transcript": "Transcrição com marcações de tempo e falantes.",
+            "formatted_visuals": "Sequência cronológica de descrições visuais dos frames do clipe.",
+            "category_block": "Categoria de triagem do vídeo (quando conhecida)."
+        },
+        "default": """Você é um editor sênior de cinema e documentário.
+Este vídeo tem fala e imagem. Abaixo estão a transcrição do que se fala e a descrição do que se vê em quadros do MESMO vídeo, ambas com marcação de tempo. Cruze as duas para gerar metadados editoriais úteis para a montagem.
+Descreva o que o vídeo realmente é — NÃO presuma que é making of, bastidores ou entrevista formal. Quando fala e imagem divergirem, diga o que cada uma mostra em vez de escolher uma.
+{category_block}
+TRANSCRIÇÃO (o que se fala):
+{formatted_transcript}
+
+QUADROS (o que se vê):
+{formatted_visuals}
+
+Responda estritamente em Português e em formato JSON com a seguinte estrutura (não inclua marcações markdown adicionais de código como ```json, responda apenas o JSON puro):
+{
+  "titulo": "Título executivo curto e cinematográfico de 3 a 6 palavras sobre quem aparece/fala e o assunto ou ação central. PROIBIDO iniciar com 'Entrevista sobre', 'Vídeo de', 'Este clipe mostra', 'Registro de', etc.",
+  "description": "Uma frase concisa dizendo o que se vê e o que se fala neste vídeo",
+  "summary": "Um resumo em tópicos (bullet points) com as principais ideias faladas e o que acontece em cena, adequado para entender o conteúdo sem assistir todo o clipe",
+  "tags": ["3 a 6 tags específicas sobre ASSUNTOS, AÇÃO e LOCAL; PROIBIDO tags genéricas como 'entrevista', 'making of', 'bastidores', 'depoimento', 'set de filmagem', 'vídeo'"]
 }"""
     },
     "theme_clustering": {

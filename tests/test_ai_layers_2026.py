@@ -306,21 +306,21 @@ class TestFacialBiometrics512:
 # ── Testes 4: Governança de Prompts & Personas Editoriais ─────────────────────
 
 class TestPromptGovernanceAndPersonas:
-    def test_catalog_has_all_19_prompts(self):
-        """Verifica a integridade absoluta dos 19 prompts oficiais do PROMPT_REGISTRY."""
+    def test_catalog_has_all_20_prompts(self):
+        """Verifica a integridade absoluta dos 20 prompts oficiais do PROMPT_REGISTRY."""
         expected_prompts = {
             "vision", "photo_vision", "triage", "triage_batch_title", "enrichment_rewrite",
-            "interview_summary", "broll_summary", "theme_naming", "theme_clustering",
+            "interview_summary", "broll_summary", "video_summary", "theme_naming", "theme_clustering",
             "script_format_detect", "script_extract", "timeline_suggestion",
             "persona.montadora", "persona.diretora", "persona.sound_designer", "persona.colorista",
             "agent_system", "chatbot_system", "rag_categorize"
         }
         actual_prompts = set(PROMPT_REGISTRY.keys())
         assert actual_prompts == expected_prompts, f"Diferença no catálogo de prompts: {actual_prompts ^ expected_prompts}"
-        assert len(PROMPT_REGISTRY) == 19
+        assert len(PROMPT_REGISTRY) == 20
 
     def test_all_prompts_pass_template_validation(self):
-        """Valida que todos os 19 prompts possuem seus placeholders obrigatórios presentes."""
+        """Valida que todos os 20 prompts possuem seus placeholders obrigatórios presentes."""
         for prompt_id, entry in PROMPT_REGISTRY.items():
             valid, err = validate_template(prompt_id, entry["default"])
             assert valid is True, f"Falha de validação no prompt '{prompt_id}': {err}"

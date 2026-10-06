@@ -263,6 +263,25 @@ CREATE TABLE IF NOT EXISTS media_segment (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Descricao da visao por keyframe. Antes so existia no Qdrant (unica copia de um
+-- dado pago); aqui alimenta o resumo mesclado fala+imagem e a reindexacao sem API
+-- (ex.: docs/PLANO_EMBEDDINGGEMMA2.md, 1.4). Saida da IA: a reanalise substitui.
+CREATE TABLE IF NOT EXISTS video_keyframe (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER NOT NULL REFERENCES project(id) ON DELETE CASCADE,
+    video_id INTEGER NOT NULL REFERENCES video(id) ON DELETE CASCADE,
+    timestamp REAL NOT NULL,
+    start_time REAL,
+    end_time REAL,
+    segment_id INTEGER,
+    descricao TEXT,
+    tags TEXT,      -- JSON array
+    pessoas TEXT,   -- JSON array
+    objetos TEXT,   -- JSON array
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_video_keyframe_video ON video_keyframe(video_id, timestamp);
+
 -- Correcoes humanas de triagem (E2.C2): registro do erro -> acerto.
 -- O E2.C3 consome as ultimas correcoes como few-shot no prompt de triagem.
 CREATE TABLE IF NOT EXISTS triage_feedback (

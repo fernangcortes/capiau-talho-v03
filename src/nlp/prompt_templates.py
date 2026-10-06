@@ -322,18 +322,30 @@ def get_theme_naming_prompt(clusters_block: str, existing_themes: list = None, p
     )
 
 
-def get_interview_summary_prompt(formatted_transcript: str, project_id: Optional[int] = None) -> str:
+def _summary_category_block(category: Optional[str]) -> str:
+    if category and category in TRIAGE_CATEGORIES:
+        label = CATEGORY_LABELS.get(category, category)
+        return f"CLASSIFICAÇÃO DO ARQUIVO: '{label}' ({TRIAGE_CATEGORIES[category]}).\n"
+    return ""
+
+
+def get_interview_summary_prompt(formatted_transcript: str, project_id: Optional[int] = None, category: Optional[str] = None) -> str:
     """Gera o prompt para sumarização de entrevistas de depoimentos."""
-    return get_prompt("interview_summary", project_id=project_id, formatted_transcript=formatted_transcript)
+    return get_prompt("interview_summary", project_id=project_id, formatted_transcript=formatted_transcript,
+                      category_block=_summary_category_block(category))
 
 
 def get_broll_summary_prompt(formatted_visuals: str, project_id: Optional[int] = None, category: Optional[str] = None) -> str:
     """Gera o prompt para sumarização de vídeos a partir de descrições de frames."""
-    category_block = ""
-    if category and category in TRIAGE_CATEGORIES:
-        label = CATEGORY_LABELS.get(category, category)
-        category_block = f"CLASSIFICAÇÃO DO ARQUIVO: '{label}' ({TRIAGE_CATEGORIES[category]}).\n"
-    return get_prompt("broll_summary", project_id=project_id, formatted_visuals=formatted_visuals, category_block=category_block)
+    return get_prompt("broll_summary", project_id=project_id, formatted_visuals=formatted_visuals,
+                      category_block=_summary_category_block(category))
+
+
+def get_video_summary_prompt(formatted_transcript: str, formatted_visuals: str, project_id: Optional[int] = None,
+                             category: Optional[str] = None) -> str:
+    """Resumo único de vídeo com fala e imagem: um não sobrescreve mais o outro."""
+    return get_prompt("video_summary", project_id=project_id, formatted_transcript=formatted_transcript,
+                      formatted_visuals=formatted_visuals, category_block=_summary_category_block(category))
 
 
 def get_theme_clustering_prompt(formatted_transcript: str, project_id: Optional[int] = None) -> str:

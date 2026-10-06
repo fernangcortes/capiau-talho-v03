@@ -24,6 +24,7 @@ def banco(monkeypatch):
     conn.executescript(SCHEMA_SQL)
     # Coluna legada que o face_engine ainda usa (o banco real tem; o SCHEMA_SQL não)
     conn.execute("ALTER TABLE face ADD COLUMN embedding TEXT")
+    conn.execute("ALTER TABLE video ADD COLUMN metadata_origem TEXT DEFAULT 'ia'")  # idem, só por migração
     conn.execute("INSERT INTO project (id, name) VALUES (1, 'teste')")
     conn.execute("""INSERT INTO video (id, project_id, filename, filepath, hash, duration, category, video_type, status)
                     VALUES (7, 1, 'take.mp4', 'C:/nao/existe/take.mp4', 'h7', 20.0, 'obra', 'broll', 'analyzed')""")
@@ -437,3 +438,124 @@ def test_analise_de_visao_registra_esforco_e_limpa_a_marca(banco, monkeypatch, t
     assert P.analyze_video_vision(7, Path("C:/nao/existe/take.mp4"), 20.0) is True
     assert banco.execute("SELECT esforco_analisado, analise_desatualizada FROM video WHERE id = 7").fetchone()[:] \
         == ("completo", None)
+
+
+# ---------------------------------------------------------------------------
+# Item 6: um resumo só (fala + imagem + categoria), temas uma vez
+# ---------------------------------------------------------------------------
+
+class _RespostaLLM:
+    status_code = 200
+
+    def json(self):
+        return {"choices": [{"message": {"content": json.dumps(
+            {"titulo": "Ensaio no galpão", "description": "d", "summary": "s", "tags": ["ensaio"]})}}]}
+
+
+def _llm_falso(monkeypatch):
+    from src.services import pipeline as mod
+    prompts = []
+    monkeypatch.setattr(SettingsService, "get_settings", _settings(**{"api.openrouter_key": "sk-teste"}))
+    monkeypatch.setattr(mod.requests, "post",
+                        lambda url, headers=None, json=None, timeout=None: (prompts.append(json["messages"][0]["content"]), _RespostaLLM())[1])
+    return prompts
+
+
+def _fala(banco, video_id=7, texto="a gente montou a luz de madrugada"):
+    for i, w in enumerate(texto.split()):
+        banco.execute("INSERT INTO transcript (video_id, word, start_time, end_time, speaker_id) VALUES (?, ?, ?, ?, 'A')",
+                      (video_id, w, float(i), float(i) + 0.5))
+    banco.commit()
+
+
+def test_visao_guarda_a_descricao_de_cada_keyframe_no_sqlite(banco, monkeypatch, tmp_path):
+    from pathlib import Path
+    P = _pipeline_falso(banco, monkeypatch, tmp_path, [])
+    _detector(monkeypatch, [])
+    assert P.analyze_video_vision(7, Path("C:/nao/existe/take.mp4"), 20.0) is True
+    linhas = banco.execute("SELECT timestamp, descricao FROM video_keyframe WHERE video_id = 7 ORDER BY timestamp").fetchall()
+    assert [tuple(l) for l in linhas] == [(0.0, "set de filmagem"), (10.0, "set de filmagem")]
+    # Reanálise substitui, não duplica
+    P.analyze_video_vision(7, Path("C:/nao/existe/take.mp4"), 20.0)
+    assert banco.execute("SELECT count(*) FROM video_keyframe WHERE video_id = 7").fetchone()[0] == 2
+
+
+def test_resumo_mescla_fala_imagem_e_categoria(banco, monkeypatch):
+    from src.services.pipeline import PipelineService
+    _fala(banco)
+    PipelineService._gravar_keyframes(1, 7, [{"timestamp": 3.0, "description": "refletor sendo içado", "tags": ["luz"]}])
+    prompts = _llm_falso(monkeypatch)
+    # O fluxo de ASR pede 'interview', mas a imagem já gravada entra junto
+    assert PipelineService.generate_video_summary(7, "interview", 1) is True
+    p = prompts[0]
+    assert "madrugada" in p and "refletor sendo içado" in p, "fala e imagem no mesmo resumo"
+    assert "CLASSIFICAÇÃO DO ARQUIVO" in p and "obra" in p.lower()
+    assert banco.execute("SELECT title FROM video WHERE id = 7").fetchone()[0] == "Ensaio no galpão"
+
+
+def test_resumo_so_de_fala_recebe_a_categoria(banco, monkeypatch):
+    from src.services.pipeline import PipelineService
+    monkeypatch.setattr("src.services.pipeline.SemanticSearch.get_instance",
+                        staticmethod(lambda: (_ for _ in ()).throw(RuntimeError("sem Qdrant"))))
+    _fala(banco)
+    prompts = _llm_falso(monkeypatch)
+    assert PipelineService.generate_video_summary(7, "interview", 1) is True
+    assert "CLASSIFICAÇÃO DO ARQUIVO" in prompts[0] and "QUADROS" not in prompts[0]
+
+
+def test_resumo_usa_o_qdrant_para_analises_antigas_sem_keyframes_no_sqlite(banco, monkeypatch):
+    from src.services.pipeline import PipelineService
+
+    class BuscaFalsa:
+        def get_video_vision_frames(self, project_id, video_id):
+            return [{"timestamp": 1.0, "description": "claquete batendo", "tags": []}]
+
+    monkeypatch.setattr("src.services.pipeline.SemanticSearch.get_instance", staticmethod(lambda: BuscaFalsa()))
+    _fala(banco)
+    prompts = _llm_falso(monkeypatch)
+    PipelineService.generate_video_summary(7, "interview", 1)
+    assert "claquete batendo" in prompts[0] and "madrugada" in prompts[0]
+
+
+def test_visao_com_finalizar_false_nao_resume_nem_atribui_temas(banco, monkeypatch, tmp_path):
+    from pathlib import Path
+    P = _pipeline_falso(banco, monkeypatch, tmp_path, [])
+    _detector(monkeypatch, [])
+    chamadas = []
+    monkeypatch.setattr(P, "generate_video_summary", staticmethod(lambda *a, **k: chamadas.append("resumo")))
+    monkeypatch.setattr("src.nlp.theme_engine.assign_media_to_themes", lambda *a, **k: chamadas.append("temas"))
+    P.analyze_video_vision(7, Path("C:/nao/existe/take.mp4"), 20.0, finalizar=False)
+    assert chamadas == []
+    P.analyze_video_vision(7, Path("C:/nao/existe/take.mp4"), 20.0)
+    assert chamadas == ["resumo", "temas"]
+
+
+def test_analyze_video_all_resume_e_atribui_temas_uma_vez_no_fim(monkeypatch):
+    from src.services import pipeline as mod
+    P = mod.PipelineService
+
+    class TarefasFalsas:
+        def update_progress(self, *a, **k): pass
+        def add_log(self, *a, **k): pass
+
+    @contextlib.contextmanager
+    def db():
+        conn = sqlite3.connect(":memory:")
+        conn.row_factory = sqlite3.Row
+        conn.executescript(SCHEMA_SQL)
+        conn.execute("INSERT INTO project (id, name) VALUES (1, 'p')")
+        conn.execute("INSERT INTO video (id, project_id, filename, filepath, hash, duration) VALUES (9, 1, 'a', 'a.mp4', 'h', 0)")
+        yield conn
+
+    ordem = []
+    monkeypatch.setattr(mod, "get_db", db)
+    monkeypatch.setattr(mod, "TASK_MANAGER", TarefasFalsas())
+    monkeypatch.setattr(mod, "extract_frame", lambda *a, **k: False)
+    monkeypatch.setattr(P, "_tem_transcricao", staticmethod(lambda vid: False))
+    monkeypatch.setattr(P, "transcribe_video", staticmethod(lambda vid, fp, finalizar=True: ordem.append(("asr", finalizar))))
+    monkeypatch.setattr(P, "analyze_video_vision",
+                        staticmethod(lambda vid, fp, d, finalizar=True: ordem.append(("visao", finalizar))))
+    monkeypatch.setattr(P, "generate_video_summary", staticmethod(lambda *a, **k: ordem.append("resumo")))
+    monkeypatch.setattr("src.nlp.theme_engine.assign_media_to_themes", lambda *a, **k: ordem.append("temas"))
+    P.analyze_video_all(9)
+    assert ordem == [("asr", False), ("visao", False), "resumo", "temas"]

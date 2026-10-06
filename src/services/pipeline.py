@@ -23,6 +23,7 @@ from src.nlp.prompt_templates import (
     get_triage_prompt,
     get_interview_summary_prompt,
     get_broll_summary_prompt,
+    get_video_summary_prompt,
     get_theme_clustering_prompt
 )
 from src.nlp.prompt_registry import TRIAGE_CATEGORIES
@@ -706,6 +707,37 @@ class PipelineService:
         return PipelineService._cap_keeping_coverage(kept, max_frames)
 
     @staticmethod
+    def _gravar_keyframes(project_id: int, video_id: int, descricoes: List[Dict[str, Any]]) -> None:
+        """Guarda a descrição de cada keyframe no SQLite (antes só existia no Qdrant).
+        É saída da IA: a reanálise substitui o conjunto inteiro do vídeo."""
+        with get_db() as conn:
+            conn.execute("DELETE FROM video_keyframe WHERE video_id = ?", (video_id,))
+            conn.executemany(
+                "INSERT INTO video_keyframe (project_id, video_id, timestamp, start_time, end_time, segment_id, "
+                "descricao, tags, pessoas, objetos) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                [(project_id, video_id, d["timestamp"], d.get("start_time"), d.get("end_time"), d.get("segment_id"),
+                  d.get("description", ""), json.dumps(d.get("tags") or [], ensure_ascii=False),
+                  json.dumps(d.get("people") or [], ensure_ascii=False),
+                  json.dumps(d.get("objects") or [], ensure_ascii=False)) for d in descricoes])
+            conn.commit()
+
+    @staticmethod
+    def _descricoes_keyframes(project_id: int, video_id: int) -> List[Dict[str, Any]]:
+        """Descrições dos keyframes do vídeo: SQLite; análises anteriores a video_keyframe
+        ainda só estão no Qdrant, que serve de reserva."""
+        with get_db() as conn:
+            rows = conn.execute("SELECT timestamp, descricao, tags FROM video_keyframe WHERE video_id = ? "
+                                "ORDER BY timestamp", (video_id,)).fetchall()
+        if rows:
+            return [{"timestamp": r["timestamp"], "description": r["descricao"] or "",
+                     "tags": json.loads(r["tags"] or "[]")} for r in rows]
+        try:
+            return SemanticSearch.get_instance().get_video_vision_frames(project_id, video_id) or []
+        except Exception as e:
+            print(f"[Summary] Sem descrições de keyframes do vídeo {video_id} no Qdrant: {e}")
+            return []
+
+    @staticmethod
     def _categoria_laya(video_id: int) -> Optional[str]:
         """Última categoria que a Laya deu a este vídeo (sombra ou decide); None se nunca respondeu."""
         try:
@@ -753,11 +785,13 @@ class PipelineService:
             TASK_MANAGER.add_log(task_key, "[ASR] Nenhuma fala detectada: triagem sem transcrição.")
 
     @staticmethod
-    def analyze_video_vision(video_id: int, filepath: Path, duration: float, beat_embedder: Optional[str] = None) -> bool:
+    def analyze_video_vision(video_id: int, filepath: Path, duration: float, beat_embedder: Optional[str] = None,
+                             finalizar: bool = True) -> bool:
         """Decupa frames-chave do vídeo B-roll enviando para LLM multimodal e Qdrant.
 
         `beat_embedder` ('hsv'|'clip') permite forçar o método de deriva dos beats
         nesta execução (reanálise sob demanda); None usa o setting do projeto.
+        `finalizar=False` pula resumo e temas (analyze_video_all roda os dois no fim).
         """
         with get_db() as conn:
             video = MediaRepository.get_video(conn, video_id)
@@ -973,6 +1007,7 @@ class PipelineService:
                     "timestamp": timestamp,
                     "start_time": job["start"],
                     "end_time": job["end"],
+                    "segment_id": job.get("segment_id"),
                     "description": analysis.get("descricao", ""),
                     "tags": frame_tags,
                     "people": analysis.get("pessoas", []) or [],
@@ -1042,9 +1077,15 @@ class PipelineService:
                     print(f"[Vision] Falha na indexação vetorial Qdrant do vídeo {video_id}: {qdrant_err}")
 
                 try:
-                    PipelineService.generate_video_summary(video_id, "broll", project_id, descriptions_indexed)
-                except Exception as sum_err:
-                    print(f"[Vision] Falha ao resumir B-roll: {sum_err}")
+                    PipelineService._gravar_keyframes(project_id, video_id, descriptions_indexed)
+                except Exception as kf_err:
+                    print(f"[Vision] Falha ao gravar descrições dos keyframes do vídeo {video_id}: {kf_err}")
+
+                if finalizar:
+                    try:
+                        PipelineService.generate_video_summary(video_id, "broll", project_id, descriptions_indexed)
+                    except Exception as sum_err:
+                        print(f"[Vision] Falha ao resumir B-roll: {sum_err}")
 
                 # Enriquecimento pós-análise: aplica nomes confirmados anteriormente
                 try:
@@ -1054,11 +1095,12 @@ class PipelineService:
                     print(f"[Vision] Falha no enriquecimento pós-análise: {enrich_err}")
 
                 # Atribuição incremental de temas existentes ao novo material
-                try:
-                    from src.nlp.theme_engine import assign_media_to_themes
-                    assign_media_to_themes(project_id, video_id=video_id)
-                except Exception as theme_err:
-                    print(f"[Vision] Falha na atribuição incremental de temas: {theme_err}")
+                if finalizar:
+                    try:
+                        from src.nlp.theme_engine import assign_media_to_themes
+                        assign_media_to_themes(project_id, video_id=video_id)
+                    except Exception as theme_err:
+                        print(f"[Vision] Falha na atribuição incremental de temas: {theme_err}")
 
             with get_db() as conn:
                 warn_msg = f"Aviso: {failed_frames} de {total_jobs} quadros falharam na análise visual." if failed_frames > 0 else None
@@ -1349,8 +1391,14 @@ class PipelineService:
             return {"themes": []}
 
     @staticmethod
-    def generate_video_summary(video_id: int, video_type: str, project_id: int, visual_descriptions: Optional[List[Dict[str, Any]]] = None) -> bool:
-        """Gera descrição, sumário em marcadores e tags por IA para o vídeo."""
+    def generate_video_summary(video_id: int, video_type: Optional[str], project_id: int, visual_descriptions: Optional[List[Dict[str, Any]]] = None) -> bool:
+        """Gera descrição, sumário em marcadores e tags por IA para o vídeo.
+
+        Um resumo só, com tudo o que existir: fala (transcrição), imagem (descrições
+        dos keyframes, passadas ou lidas de video_keyframe) e categoria. Antes o de
+        fala e o de imagem gravavam no mesmo campo e vencia o último a rodar.
+        `video_type` ficou só por compatibilidade: não decide mais a fonte.
+        """
         S = SettingsService.get_settings(project_id)
         api_key = S.api_key("openrouter")
         if not api_key or api_key == "your_openrouter_api_key_here":
@@ -1367,22 +1415,26 @@ class PipelineService:
             if row:
                 category = row["category"]
 
-        if video_type == "interview":
-            with get_db() as conn:
-                dialogues = NarrativeRepository.get_transcript_dialogues(conn, video_id)
+        with get_db() as conn:
+            dialogues = NarrativeRepository.get_transcript_dialogues(conn, video_id)
+        if visual_descriptions is None:
+            visual_descriptions = PipelineService._descricoes_keyframes(project_id, video_id)
 
-            if not dialogues:
-                return False
+        fala = ""
+        for block in dialogues or []:
+            fala += f"[{block['speaker_id']} | {block['start_time']:.1f}s - {block['end_time']:.1f}s]: \"{block['text']}\"\n\n"
+        quadros = ""
+        for frame in visual_descriptions or []:
+            if not frame.get("description"):
+                continue
+            quadros += f"[Tempo: {frame['timestamp']:.1f}s]: {frame['description']} (Tags visuais: {', '.join(frame.get('tags') or [])})\n"
 
-            formatted = ""
-            for block in dialogues:
-                formatted += f"[{block['speaker_id']} | {block['start_time']:.1f}s - {block['end_time']:.1f}s]: \"{block['text']}\"\n\n"
-            prompt = get_interview_summary_prompt(formatted[:max_chars])
-        elif video_type == "broll" and visual_descriptions:
-            formatted = ""
-            for frame in visual_descriptions:
-                formatted += f"[Tempo: {frame['timestamp']:.1f}s]: {frame['description']} (Tags visuais: {', '.join(frame['tags'])})\n"
-            prompt = get_broll_summary_prompt(formatted[:max_chars], project_id=project_id, category=category)
+        if fala and quadros:
+            prompt = get_video_summary_prompt(fala[:max_chars], quadros[:max_chars], project_id=project_id, category=category)
+        elif fala:
+            prompt = get_interview_summary_prompt(fala[:max_chars], project_id=project_id, category=category)
+        elif quadros:
+            prompt = get_broll_summary_prompt(quadros[:max_chars], project_id=project_id, category=category)
         else:
             return False
             
@@ -1730,7 +1782,7 @@ Responda em formato JSON puro:
             )
             # Transcrição existente não se paga de novo (a visão também confere antes da triagem)
             if forcar_asr or not PipelineService._tem_transcricao(video_id):
-                PipelineService.transcribe_video(video_id, filepath)
+                PipelineService.transcribe_video(video_id, filepath, finalizar=False)
             else:
                 TASK_MANAGER.add_log(task_key, "[ASR] Transcrição já existe: mantida.")
         except Exception as e:
@@ -1744,10 +1796,21 @@ Responda em formato JSON puro:
                 label=f"Visão Multimodal (Vídeo #{video_id})",
                 log_message="[LLM] Executando Camada 5 & 7: Visão Multimodal e Indexação Qdrant..."
             )
-            PipelineService.analyze_video_vision(video_id, filepath, duration)
+            PipelineService.analyze_video_vision(video_id, filepath, duration, finalizar=False)
         except Exception as e:
             print(f"[AnalyzeAllVideo] Visão Multimodal falhou: {e}")
             TASK_MANAGER.add_log(task_key, f"[WARN] Visão falhou: {e}", "WARN")
+
+        # Resumo e temas uma vez só, com fala e imagem já gravadas
+        try:
+            PipelineService.generate_video_summary(video_id, None, project_id)
+        except Exception as e:
+            TASK_MANAGER.add_log(task_key, f"[WARN] Resumo falhou: {e}", "WARN")
+        try:
+            from src.nlp.theme_engine import assign_media_to_themes
+            assign_media_to_themes(project_id, video_id=video_id)
+        except Exception as e:
+            TASK_MANAGER.add_log(task_key, f"[WARN] Temas falharam: {e}", "WARN")
 
         # Camada 6: Detecção Facial em Frame Principal
         try:
