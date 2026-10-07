@@ -25,6 +25,18 @@ TRIAGE_CATEGORIES: Dict[str, str] = {
     "terceiros": "material que não foi gravado pela produção: recebido, banco de imagens, histórico",
 }
 
+# Categorias do material de áudio (video.natureza = 'audio'; docs/PLANO_AUDIO_CATEGORIAS.md).
+# Mesmo campo video.category; 'depoimento' é a mesma chave do vídeo, de propósito: a busca
+# acha entrevista em vídeo e em áudio juntas.
+AUDIO_CATEGORIES: Dict[str, str] = {
+    "depoimento": "entrevista gravada só em áudio",
+    "locucao": "narração, voz limpa de um falante",
+    "trilha": "música",
+    "efeito": "som pontual: porta, passo, impacto",
+    "ambiente": "som do lugar com eventos (rua, set)",
+    "room_tone": "silêncio do lugar, constante",
+}
+
 # Chaves da taxonomia anterior (até 06/10/2026). 'pessoal' não tem par: virou a marca
 # fora_do_projeto. Serve à migração dos dados e a quem ainda manda o nome antigo.
 CATEGORIAS_ANTIGAS: Dict[str, str] = {
@@ -51,13 +63,17 @@ TRIAGE_RULES: List[str] = [
 ]
 
 
-def normalizar_categoria(valor: Any) -> Optional[str]:
+def normalizar_categoria(valor: Any, natureza: Optional[str] = None) -> Optional[str]:
     """Chave canônica da taxonomia, aceitando caixa, acento e os nomes antigos.
-    Fora da taxonomia (inclusive 'pessoal') devolve None."""
+    Fora da taxonomia (inclusive 'pessoal') devolve None. Com natureza 'audio' a
+    taxonomia é a de áudio (AUDIO_CATEGORIES); 'room tone' vira 'room_tone'."""
     if valor is None:
         return None
     import unicodedata
     chave = unicodedata.normalize("NFKD", str(valor)).encode("ascii", "ignore").decode().strip().lower()
+    if natureza == "audio":
+        chave = chave.replace(" ", "_").replace("-", "_")
+        return chave if chave in AUDIO_CATEGORIES else None
     chave = CATEGORIAS_ANTIGAS.get(chave, chave)
     return chave if chave in TRIAGE_CATEGORIES else None
 

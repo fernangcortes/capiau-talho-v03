@@ -303,6 +303,13 @@ SETTINGS_REGISTRY: List[Dict[str, Any]] = [
 
     # -- Visão & Resumos ------------------------------------------------------
     {
+        "key": "audio.classificar_tipo", "type": "bool", "default": True,
+        "label": "Classificar o tipo de som do material de áudio",
+        "help": "Arquivo só de som (ou vídeo de imagem parada) ganha uma categoria de áudio: trilha, depoimento, locução, efeito, ambiente ou room tone. Local, na CPU, sem gastar crédito. Precisa do modelo PANNs Cnn10 (25 MB) em Modelos locais. Trilha, efeito, ambiente e room tone não vão para a transcrição.",
+        "help_tech": "audio_classificador.classificar em PipelineService._analisar_material_audio; decisão em system1_decisao (tarefa 'tipo_de_som').",
+        "category": "audio", "level": "simple", "scope": "both", "requires_reprocess": True,
+    },
+    {
         "key": "triage.system1_enabled", "type": "bool", "default": True,
         "label": "Triagem Local (Sistema 1 - Laya)",
         "help": "Roda a Laya na CPU (~0,2 s por mídia, sem gastar crédito) antes da triagem por visão. No primeiro uso baixa ~680 MB.",

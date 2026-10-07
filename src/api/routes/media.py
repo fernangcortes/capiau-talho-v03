@@ -35,7 +35,7 @@ from src.services.ingest import IngestService
 from src.services.pipeline import PipelineService
 from src.services.burst_service import group_photo_bursts, replicate_to_members
 from src.services.settings_service import SettingsService
-from src.nlp.prompt_registry import TRIAGE_CATEGORIES, normalizar_categoria
+from src.nlp.prompt_registry import AUDIO_CATEGORIES, TRIAGE_CATEGORIES, normalizar_categoria
 from src.services.vision_batch import run_vision_batch
 from src.search.semantic import SemanticSearch
 
@@ -167,7 +167,7 @@ def triage_review_queue(project_id: int, conn: sqlite3.Connection = Depends(get_
     cursor.execute(
         """SELECT v.id, v.filename, v.title, v.category, v.category_confidence, v.video_type, v.duration,
                   v.status, laya.categoria AS categoria_laya, v.categorias_secundarias, v.fora_do_projeto,
-                  v.categoria_resumo
+                  v.categoria_resumo, v.natureza
            FROM video v
            LEFT JOIN system1_decisao laya ON laya.id = (
                SELECT max(d.id) FROM system1_decisao d
@@ -210,24 +210,28 @@ def triage_review_queue(project_id: int, conn: sqlite3.Connection = Depends(get_
 def update_video_category(video_id: int, payload: CategoryUpdate, conn: sqlite3.Connection = Depends(get_db_conn)):
     """Correção humana de categoria: persiste com confiança 1.0, registra o
     feedback (few-shot do E2.C3) e re-deriva video_type quando aplicável."""
-    category = normalizar_categoria(payload.category)
-    if not category:
-        raise HTTPException(400, f"Categoria inválida '{payload.category}'. Válidas: {', '.join(sorted(TRIAGE_CATEGORIES))}")
-
     cursor = conn.cursor()
-    cursor.execute("SELECT project_id, category, category_confidence, video_type, status, esforco_analisado "
+    cursor.execute("SELECT project_id, category, category_confidence, video_type, status, esforco_analisado, natureza "
                    "FROM video WHERE id = ?", (video_id,))
     row = cursor.fetchone()
     if not row:
         raise HTTPException(404, "Vídeo não encontrado")
 
+    # Material de áudio tem a taxonomia própria (docs/PLANO_AUDIO_CATEGORIAS.md)
+    audio = row["natureza"] == "audio"
+    category = normalizar_categoria(payload.category, row["natureza"])
+    if not category:
+        validas = AUDIO_CATEGORIES if audio else TRIAGE_CATEGORIES
+        raise HTTPException(400, f"Categoria inválida '{payload.category}'. Válidas: {', '.join(sorted(validas))}")
+
     old_category = row["category"]
     if old_category != category:
         _record_triage_feedback(cursor, row["project_id"], "video", video_id, old_category, category, payload.note)
 
-    # 'depoimento' é fala dirigida à câmera -> interview; o resto -> broll.
-    derived_type = "interview" if category == "depoimento" else "broll"
-    desatualizada = _analise_desatualizada(cursor, video_id, row, category)
+    # 'depoimento' (e a locução, no áudio) é fala dirigida -> interview; o resto -> broll.
+    derived_type = "interview" if category in ("depoimento", "locucao") else "broll"
+    # Áudio não passa pela visão: não há esforço de análise para desatualizar
+    desatualizada = None if audio else _analise_desatualizada(cursor, video_id, row, category)
     cursor.execute(
         "UPDATE video SET category = ?, category_confidence = 1.0, video_type = ?, analise_desatualizada = ? "
         "WHERE id = ?",

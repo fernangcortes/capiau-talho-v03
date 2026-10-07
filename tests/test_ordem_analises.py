@@ -567,10 +567,13 @@ def test_analyze_video_all_resume_e_atribui_temas_uma_vez_no_fim(monkeypatch):
 # Camada 1 do áudio (docs/PLANO_AUDIO_CATEGORIAS.md): áudio não passa pela visão
 # ---------------------------------------------------------------------------
 
-def _visao_proibida(monkeypatch, P, chamadas):
-    """Qualquer passo de imagem anota a chamada: o teste confere que nenhum rodou."""
+def _visao_proibida(monkeypatch, P, chamadas, tipo_de_som=None):
+    """Qualquer passo de imagem anota a chamada: o teste confere que nenhum rodou.
+    O classificador de som devolve `tipo_de_som` sem gravar nada (None = sem modelo)."""
     def anota(nome, retorno=None):
         return staticmethod(lambda *a, **k: chamadas.append(nome) or retorno)
+    monkeypatch.setattr(P, "classificar_audio",
+                        staticmethod(lambda *a, **k: chamadas.append(("tipo_de_som", tipo_de_som)) or tipo_de_som))
     monkeypatch.setattr(P, "triage_system1", anota("laya"))
     monkeypatch.setattr(P, "triage_video", anota("triagem", {}))
     monkeypatch.setattr(P, "_detectar_planos", anota("planos"))
@@ -591,11 +594,12 @@ def test_material_de_audio_nao_passa_pela_visao_e_vai_ao_asr(banco, monkeypatch,
     monkeypatch.setattr(P, "generate_video_summary", staticmethod(lambda *a, **k: chamadas.append("resumo")))
 
     assert P.analyze_video_vision(7, Path("C:/nao/existe/take.wav"), 20.0) is True
-    assert chamadas == [("asr", False), "resumo"], "marca 'audio' gravada não é sondada de novo"
+    assert chamadas == [("tipo_de_som", None), ("asr", False), "resumo"], \
+        "marca 'audio' gravada não é sondada de novo; sem modelo, o ASR decide pelo VAD"
     row = banco.execute("SELECT status, esforco_analisado, category FROM video WHERE id = 7").fetchone()
     assert row["status"] == "analyzed"
     assert row["esforco_analisado"] is None, "não houve análise de visão"
-    assert row["category"] is None, "a camada 2 (tipo de som) ainda não existe"
+    assert row["category"] is None, "sem modelo, sem categoria"
     assert banco.execute("SELECT count(*) FROM video_keyframe WHERE video_id = 7").fetchone()[0] == 0
 
 
@@ -610,7 +614,7 @@ def test_analise_descobre_imagem_parada_e_grava_a_natureza(banco, monkeypatch, t
     monkeypatch.setattr(P, "transcribe_video", staticmethod(lambda *a, **k: chamadas.append("asr")))
 
     assert P.analyze_video_vision(7, Path("C:/nao/existe/take.mp4"), 20.0, finalizar=False) is True
-    assert chamadas == [], "com transcrição gravada, nem ASR"
+    assert chamadas == [("tipo_de_som", None)], "'cena' não vale para áudio; com transcrição gravada, nem ASR"
     assert banco.execute("SELECT natureza FROM video WHERE id = 7").fetchone()[0] == "audio"
     assert any("material de áudio" in m for m in P.logs)
 
@@ -624,7 +628,7 @@ def test_asr_falhando_no_material_de_audio_nao_cai_na_visao(banco, monkeypatch, 
     _visao_proibida(monkeypatch, P, chamadas)
     monkeypatch.setattr(P, "transcribe_video", staticmethod(lambda *a, **k: False))
     assert P.analyze_video_vision(7, Path("C:/nao/existe/take.wav"), 20.0) is False
-    assert chamadas == []
+    assert chamadas == [("tipo_de_som", None)]
 
 
 def test_analyze_video_all_nao_procura_rosto_em_material_de_audio(banco, monkeypatch, tmp_path):
@@ -654,3 +658,113 @@ def test_migracao_marca_audio_pela_extensao_e_e_idempotente():
     nat = {r["filename"]: r["natureza"] for r in conn.execute("SELECT filename, natureza FROM video")}
     assert nat == {"ENTREVISTA ARTE.WAV": "audio", "trilha.mp3": "audio", "take.MTS": "video",
                    "voz.m4a": "audio", "parada.mp4": "video"}, "imagem parada só a análise descobre"
+
+# ---------------------------------------------------------------------------
+# Camada 2 do áudio: tipo de som decide o que vai ao ASR
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("tipo, vai_ao_asr", [
+    ("trilha", False), ("efeito", False), ("ambiente", False), ("room_tone", False),
+    ("depoimento", True), ("locucao", True), (None, True),
+])
+def test_tipo_de_som_decide_o_asr(banco, monkeypatch, tmp_path, tipo, vai_ao_asr):
+    from pathlib import Path
+    banco.execute("UPDATE video SET natureza = 'audio', category = NULL WHERE id = 7")
+    banco.commit()
+    P = _pipeline_falso(banco, monkeypatch, tmp_path, [])
+    chamadas = []
+    _visao_proibida(monkeypatch, P, chamadas, tipo_de_som=tipo)
+    monkeypatch.setattr(P, "transcribe_video", staticmethod(lambda *a, **k: chamadas.append("asr") or True))
+    assert P.analyze_video_vision(7, Path("C:/nao/existe/x.wav"), 20.0, finalizar=False) is True
+    assert ("asr" in chamadas) is vai_ao_asr
+    assert chamadas[0] == ("tipo_de_som", tipo)
+
+
+def test_categoria_antiga_de_audio_e_normalizada_sem_reclassificar(banco, monkeypatch, tmp_path):
+    from pathlib import Path
+    banco.execute("UPDATE video SET natureza = 'audio', category = 'Trilha' WHERE id = 7")  # o caso do 555
+    banco.commit()
+    P = _pipeline_falso(banco, monkeypatch, tmp_path, [])
+    chamadas = []
+    _visao_proibida(monkeypatch, P, chamadas, tipo_de_som="depoimento")
+    monkeypatch.setattr(P, "transcribe_video", staticmethod(lambda *a, **k: chamadas.append("asr") or True))
+    P.analyze_video_vision(7, Path("C:/nao/existe/x.mp4"), 20.0, finalizar=False)
+    assert chamadas == [], "já tinha categoria de áudio: nem classificador nem Whisper"
+    assert banco.execute("SELECT category FROM video WHERE id = 7").fetchone()[0] == "trilha"
+
+
+def test_correcao_humana_vale_mesmo_com_categoria_de_imagem(banco, monkeypatch, tmp_path):
+    from pathlib import Path
+    banco.execute("UPDATE video SET natureza = 'audio', category = 'cena', category_confidence = 1.0 WHERE id = 7")
+    banco.commit()
+    P = _pipeline_falso(banco, monkeypatch, tmp_path, [])
+    chamadas = []
+    _visao_proibida(monkeypatch, P, chamadas, tipo_de_som="trilha")
+    monkeypatch.setattr(P, "_tem_transcricao", staticmethod(lambda vid: True))
+    P.analyze_video_vision(7, Path("C:/nao/existe/x.mp4"), 20.0, finalizar=False)
+    assert chamadas == []
+    assert banco.execute("SELECT category FROM video WHERE id = 7").fetchone()[0] == "cena"
+
+
+def test_classificar_audio_grava_categoria_tipo_e_a_decisao(banco, monkeypatch, tmp_path):
+    from pathlib import Path
+    from src.media import audio_classificador as AC
+    P = _pipeline_falso(banco, monkeypatch, tmp_path, [])
+    banco.execute("UPDATE video SET natureza = 'audio', category = NULL, video_type = 'unknown' WHERE id = 7")
+    banco.commit()
+
+    class Motor:
+        nome = "motor-falso"
+
+    sinais = {"frac_fala": 0.9, "latencia_ms": 12}
+    monkeypatch.setattr(AC, "carregar_motor", lambda: Motor())
+    monkeypatch.setattr(AC, "classificar", lambda c, d, m: AC.Resultado("depoimento", 0.9, "fala", dict(sinais)))
+    assert P.classificar_audio(7, Path("x.wav"), 1, 20.0) == "depoimento"
+    v = banco.execute("SELECT category, category_confidence, video_type FROM video WHERE id = 7").fetchone()
+    assert tuple(v) == ("depoimento", 0.9, "interview")
+    d = banco.execute("SELECT tarefa, motor, modo, categoria, confianca, latencia_ms, estado_json "
+                      "FROM system1_decisao WHERE media_id = 7").fetchone()
+    assert tuple(d)[:6] == ("tipo_de_som", "motor-falso", "decide", "depoimento", 0.9, 12)
+    assert json.loads(d["estado_json"])["frac_fala"] == 0.9
+    assert P._categoria_laya(7) is None, "a decisão do som não se passa pela Laya"
+
+
+def test_sem_modelo_ou_desligado_o_audio_segue_sem_categoria(banco, monkeypatch, tmp_path):
+    from pathlib import Path
+    from src.media import audio_classificador as AC
+    from src.services.modelos_locais import ModeloNaoBaixado
+    P = _pipeline_falso(banco, monkeypatch, tmp_path, [])
+
+    def sem_modelo():
+        raise ModeloNaoBaixado("PANNs Cnn10 (AudioSet) não está baixado (25 MB)")
+
+    monkeypatch.setattr(AC, "carregar_motor", sem_modelo)
+    assert P.classificar_audio(7, Path("x.wav"), 1, 20.0) is None
+    assert any("não está baixado" in m for m in P.logs)
+    monkeypatch.setattr(SettingsService, "get_settings", _settings(**{"audio.classificar_tipo": False}))
+    monkeypatch.setattr(AC, "carregar_motor", lambda: pytest.fail("desligado não carrega o modelo"))
+    assert P.classificar_audio(7, Path("x.wav"), 1, 20.0) is None
+
+
+def test_analyze_video_all_nao_transcreve_audio_antes_do_tipo_de_som(banco, monkeypatch, tmp_path):
+    from src.services import pipeline as mod
+    P = _pipeline_falso(banco, monkeypatch, tmp_path, [])
+    monkeypatch.setattr(mod, "detectar_natureza", lambda caminho: "audio")
+    monkeypatch.setattr(P, "_tem_transcricao", staticmethod(lambda vid: False))
+    ordem = []
+    monkeypatch.setattr(P, "transcribe_video", staticmethod(lambda *a, **k: ordem.append("asr_antes")))
+    monkeypatch.setattr(P, "analyze_video_vision", staticmethod(lambda *a, **k: ordem.append("visao")))
+    P.analyze_video_all(7)
+    assert ordem == ["visao"], "o ASR do áudio roda dentro da visão, depois da classificação"
+    assert banco.execute("SELECT natureza FROM video WHERE id = 7").fetchone()[0] == "audio"
+
+def test_correcao_humana_de_audio_usa_a_taxonomia_de_audio(banco, monkeypatch):
+    from fastapi import HTTPException
+    banco.execute("UPDATE video SET natureza = 'audio', category = 'depoimento', status = 'analyzed' WHERE id = 7")
+    banco.commit()
+    r = _corrigir(banco, monkeypatch, "Room tone")
+    assert (r["category"], r["video_type"], r["analise_desatualizada"]) == ("room_tone", "broll", None)
+    assert _corrigir(banco, monkeypatch, "locução")["video_type"] == "interview"
+    with pytest.raises(HTTPException) as e:
+        _corrigir(banco, monkeypatch, "cena")
+    assert "trilha" in e.value.detail, "a mensagem lista as categorias de áudio"

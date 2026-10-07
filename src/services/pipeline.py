@@ -908,15 +908,78 @@ class PipelineService:
         return natureza
 
     @staticmethod
-    def _analisar_material_audio(video_id: int, source: Path, project_id: int, finalizar: bool) -> bool:
-        """Material de áudio (docs/PLANO_AUDIO_CATEGORIAS.md, camada 1): sem triagem por
-        visão, sem quadros, sem CLIP. Só a fala, pelo ASR de sempre (o VAD local de
-        transcribe_video descarta o que não tem voz). A classificação do tipo de som
-        (camada 2) ainda não existe: a categoria fica como está."""
+    def classificar_audio(video_id: int, source: Path, project_id: int, duration: float) -> Optional[str]:
+        """Camada 2 do áudio: tipo de som, local (PANNs Cnn10 + nível, duração e nome).
+        Grava categoria e confiança; a decisão e os sinais ficam em system1_decisao
+        (tarefa 'tipo_de_som') para a calibração. Sem o modelo, desligado ou em falha:
+        None, e o material segue sem categoria (o VAD do ASR decide se tem fala)."""
+        task_key = str(video_id)
+        if not SettingsService.get_settings(project_id).get("audio.classificar_tipo"):
+            return None
+        from src.media import audio_classificador
+        from src.services.modelos_locais import ModeloNaoBaixado
+        try:
+            motor = audio_classificador.carregar_motor()
+            r = audio_classificador.classificar(source, duration, motor)
+        except ModeloNaoBaixado as e:
+            TASK_MANAGER.add_log(task_key, f"[Áudio] {e}. Material segue sem categoria de áudio.", "WARN")
+            return None
+        except Exception as e:
+            print(f"[Áudio] Falha ao classificar o tipo de som do vídeo {video_id}: {e}")
+            TASK_MANAGER.add_log(task_key, f"[WARN] Tipo de som não classificado: {e}", "WARN")
+            return None
+        tipo = "interview" if r.categoria in ("depoimento", "locucao") else "broll"
+        with get_db() as conn:
+            conn.execute("UPDATE video SET category = ?, category_confidence = ?, "
+                         "video_type = CASE WHEN video_type = 'unknown' THEN ? ELSE video_type END WHERE id = ?",
+                         (r.categoria, r.confianca, tipo, video_id))
+            conn.execute(
+                "INSERT INTO system1_decisao (project_id, media_kind, media_id, tarefa, motor, modo, estado_json, "
+                "perguntas_json, resposta_json, categoria, confianca, latencia_ms) "
+                "VALUES (?, 'video', ?, 'tipo_de_som', ?, 'decide', ?, '[]', ?, ?, ?, ?)",
+                (project_id, video_id, motor.nome, json.dumps(r.sinais, ensure_ascii=False),
+                 json.dumps({"motivo": r.motivo}, ensure_ascii=False), r.categoria, r.confianca,
+                 r.sinais.get("latencia_ms")))
+            conn.commit()
+        TASK_MANAGER.add_log(task_key, f"[Áudio] Tipo de som: {r.categoria} ({r.confianca:.2f}): {r.motivo}.")
+        return r.categoria
+
+    @staticmethod
+    def _categoria_do_audio(video_id: int, source: Path, project_id: int, duration: float) -> Optional[str]:
+        """Categoria de áudio que vale: a gravada, se já for de áudio (o 'Trilha' antigo
+        vira 'trilha'); a correção humana (1,0), mesmo de imagem; senão o classificador."""
+        with get_db() as conn:
+            row = conn.execute("SELECT category, category_confidence FROM video WHERE id = ?", (video_id,)).fetchone()
+        atual = row["category"] if row else None
+        categoria = normalizar_categoria(atual, NATUREZA_AUDIO)
+        if categoria:
+            if categoria != atual:
+                with get_db() as conn:
+                    conn.execute("UPDATE video SET category = ? WHERE id = ?", (categoria, video_id))
+                    conn.commit()
+            return categoria
+        if atual and row["category_confidence"] is not None and row["category_confidence"] >= 1.0:
+            TASK_MANAGER.add_log(str(video_id), f"[Áudio] Categoria '{atual}' foi dada à mão: mantida.")
+            return atual
+        if atual:
+            TASK_MANAGER.add_log(str(video_id), f"[Áudio] '{atual}' não é categoria de áudio: classificando o som.")
+        return PipelineService.classificar_audio(video_id, source, project_id, duration)
+
+    @staticmethod
+    def _analisar_material_audio(video_id: int, source: Path, project_id: int, finalizar: bool,
+                                 duration: float = 0.0) -> bool:
+        """Material de áudio (docs/PLANO_AUDIO_CATEGORIAS.md): sem triagem por visão,
+        sem quadros, sem CLIP. Camada 2: tipo de som. Camada 3: só o que é fala vai ao
+        ASR (o VAD local de transcribe_video ainda filtra quem chegar sem categoria);
+        Whisper em música gera lixo."""
+        from src.media.audio_classificador import CATEGORIAS_SEM_FALA
         task_key = str(video_id)
         TASK_MANAGER.add_log(task_key, "[Natureza] Material de áudio: sem triagem por visão, quadros e CLIP.")
+        categoria = PipelineService._categoria_do_audio(video_id, source, project_id, duration)
         ok = True
-        if not PipelineService._tem_transcricao(video_id):
+        if categoria in CATEGORIAS_SEM_FALA:
+            TASK_MANAGER.add_log(task_key, f"[ASR] '{categoria}' não é fala: sem transcrição.")
+        elif not PipelineService._tem_transcricao(video_id):
             try:
                 ok = PipelineService.transcribe_video(video_id, source, finalizar=False)
             except Exception as e:
@@ -966,7 +1029,7 @@ class PipelineService:
 
         # Áudio (sem imagem ou imagem parada) sai daqui: nada de visão para quem não tem o que ver
         if PipelineService._conferir_natureza(video_id, frame_source, video.get('natureza')) == NATUREZA_AUDIO:
-            return PipelineService._analisar_material_audio(video_id, frame_source, project_id, finalizar)
+            return PipelineService._analisar_material_audio(video_id, frame_source, project_id, finalizar, duration)
 
         # Fala primeiro: a Laya (sombra) e a triagem por visão leem a transcrição
         PipelineService._transcrever_antes_da_triagem(video_id, frame_source)
@@ -1959,8 +2022,12 @@ Responda em formato JSON puro:
                 label=f"Transcrição ASR (Vídeo #{video_id})",
                 log_message="[ASR] Executando Camada 4: Transcrição ASR e diarização..."
             )
+            # Material de áudio: o ASR fica para depois da classificação do som (dentro da
+            # visão, que desvia para _analisar_material_audio): trilha não vai ao Whisper
+            if PipelineService._conferir_natureza(video_id, filepath, video.get("natureza")) == NATUREZA_AUDIO:
+                TASK_MANAGER.add_log(task_key, "[ASR] Material de áudio: transcrição depois do tipo de som.")
             # Transcrição existente não se paga de novo (a visão também confere antes da triagem)
-            if forcar_asr or not PipelineService._tem_transcricao(video_id):
+            elif forcar_asr or not PipelineService._tem_transcricao(video_id):
                 PipelineService.transcribe_video(video_id, filepath, finalizar=False)
             else:
                 TASK_MANAGER.add_log(task_key, "[ASR] Transcrição já existe: mantida.")

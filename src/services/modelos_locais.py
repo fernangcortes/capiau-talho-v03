@@ -114,6 +114,12 @@ CATALOGO: Dict[str, ModeloLocal] = {m.id: m for m in [
         termos_url="https://huggingface.co/pyannote/speaker-diarization-community-1",
         configuracao=("diarization.engine=pyannote_40",)),
     ModeloLocal(
+        id="panns_cnn10", nome="PANNs Cnn10 (AudioSet)",
+        uso="Tipo de som do material de áudio: trilha, fala, efeito, ambiente, room tone (~2 s por arquivo)",
+        tamanho_mb=25, ambiente="principal", pacotes=("torch", "safetensors"),
+        repo="nicofarr/panns_Cnn10", padroes=("config.json", "model.safetensors"),
+        marcadores=("model.safetensors",), configuracao=("audio.classificar_tipo=true",)),
+    ModeloLocal(
         id="yolo_world", nome="YOLO-World v2 (s) + CLIP ViT-B/32",
         uso="Detector de objetos local rápido (~0,5 s por quadro)",
         tamanho_mb=380, ambiente="principal", pacotes=("ultralytics", "clip"),
