@@ -250,8 +250,14 @@ algo como 0,93 a 0,95; o número sai da medição, não de chute.
   - **0,93 × 0,97**: todos os pares são praticamente a mesma foto. Seguro.
   - **0,90 × 0,93**: mesma cena, mas às vezes entra uma pessoa nova no quadro. Perde detalhe.
   - **0,85 × 0,90**: junta páginas diferentes de um documento e grupos que mudaram de gente.
-- Recomendação: **0,93**. O fotógrafo de MONSTRO quase não dispara rajada, então a economia é
-  modesta (18%); o ganho maior nas fotos virá de não reanalisá-las sem motivo.
+- Recomendação inicial: 0,93.
+
+**Decisão final (06/10/2026): limiar 0,80 e teto de 10 fotos por grupo** (commit `406346c`).
+O Fernando conferiu as folhas de 0,88 a 0,80 e os grupos de fronteira são de fato a mesma
+sequência (não eram documentos nem lugares diferentes, ao contrário da minha leitura). Com 0,80
+são 736 chamadas de visão (48% de economia). O teto 10 faz uma sequência longa receber uma análise
+a mais a cada 10 fotos. As fotos do grupo herdam só a descrição: mantêm o próprio vetor CLIP e os
+rostos (detectados na ingestão para todas).
 
 ## 11. Quando a visão entra na decisão da categoria (proposta, em aberto)
 
@@ -309,12 +315,18 @@ milhares). A estimativa exata sai quando a amostra for escolhida.
 | `6e6bf74` | Triagem com um quadro por plano (6 planos mais longos), planos detectados uma vez e reaproveitados na segmentação |
 | `3f14817` | Categoria fora do prompt da visão; o resumo com imagem julga a categoria (`video.categoria_resumo`), divergência vai para a fila e pode marcar a análise como desatualizada |
 
+| `4266533`, `406346c` | Rajadas de fotos: limiar 0,80 e teto 10 por grupo (seção 10) |
+| `f900939` | Rótulos da biblioteca na taxonomia nova (o modal de metadados pré-selecionava "Obra") |
+| `3c26af0` | Welcome Hub pergunta o objetivo do projeto antes de criar |
+
+Feito fora do código: `project.objetivo` do projeto 2 = "Making of do longa O Monstro que Reside
+Dentro da Casa Acima da Colina". Backup antes das migrações: `data/capiau.db.antes-reanalise-20261006`.
+
 Ainda não feito:
 
-- **Rótulos da biblioteca** (`library.js`, sessão de interface): continuam com os nomes antigos. O
-  backend aceita os dois, então nada quebra, mas a tela mostra "Obra", "Making of" etc.
-- **Objetivo do projeto 2** está vazio: definir o texto (ex.: "making of do longa MONSTRO").
-- **Números por categoria**: provisórios, os de antes. Calibrar (seção 12).
-- **Limiar das fotos**: o padrão continua 0,97; a medição recomenda 0,93 (seção 10).
+- **Números por categoria**: provisórios, os de antes. Calibrar com `scripts/visao_calibrar.py`
+  (seção 12) depois da rodada de triagem.
 - **Rodada só de triagem** (seção 8, passo 3): não há rota nem script ainda.
-- Vídeo 555 com categoria `Trilha`, fora das duas taxonomias: a migração não toca.
+- **Áudio**: plano em `docs/PLANO_AUDIO_CATEGORIAS.md` (categorias aprovadas, calibração pendente).
+  O vídeo 555 (`Trilha`) vira `trilha` quando a camada de áudio existir.
+- Campo de objetivo nas configurações do projeto (hoje só o Welcome Hub pergunta, na criação).
