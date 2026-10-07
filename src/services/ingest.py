@@ -12,6 +12,7 @@ from src.core.tasks import TASK_MANAGER
 from src.core.exceptions import IngestError
 from src.media.ffmpeg import get_media_metadata, generate_video_proxy, extract_thumbnail_frame
 from src.media.image_processing import generate_photo_proxy
+from src.media.natureza import NATUREZA_AUDIO, detectar_natureza
 from src.vision.face_engine import process_photo_faces
 
 SUPPORTED_VIDEO = {'.mp4', '.mov', '.mxf', '.mts', '.mkv', '.avi'}
@@ -145,6 +146,8 @@ class IngestService:
                     recorded_at=recorded_at
                 )
                 _registrar_cor_video(conn, media_id, filename, meta)
+                if ext in SUPPORTED_AUDIO:
+                    conn.execute("UPDATE video SET natureza = ? WHERE id = ?", (NATUREZA_AUDIO, media_id))
             else:
                 media_type = "photo"
                 recorded_at = None
@@ -265,6 +268,19 @@ class IngestService:
         }
 
     @staticmethod
+    def _registrar_natureza(video_id: int, original_path: Path) -> None:
+        """Sem faixa de imagem ou imagem parada = material de áudio (fora da visão).
+        Roda em segundo plano porque lê quadros; a análise confere de novo.
+        Falha nunca derruba a ingestão."""
+        try:
+            if detectar_natureza(original_path) == NATUREZA_AUDIO:
+                with get_db() as conn:
+                    conn.execute("UPDATE video SET natureza = ? WHERE id = ?", (NATUREZA_AUDIO, video_id))
+                print(f"[Natureza] Vídeo {video_id} ({original_path.name}) é material de áudio.")
+        except Exception as e:
+            print(f"[Natureza] Falha ao detectar a natureza de {original_path.name} (ingestão segue): {e}")
+
+    @staticmethod
     def _generate_video_proxy_task(video_id: int, original_path: Path, duration: float) -> None:
         """Tarefa executada em ThreadPool para processar o proxy de vídeo pelo FFmpeg."""
         proxy_path = CONFIG.PROXIES_DIR / f"proxy_vid_{video_id}.mp4"
@@ -276,6 +292,8 @@ class IngestService:
             
         def on_prog(percent: float) -> None:
             TASK_MANAGER.update_progress(str(video_id), percent, "running")
+
+        IngestService._registrar_natureza(video_id, original_path)
 
         try:
             # Garante limpeza de qualquer arquivo temporário prévio

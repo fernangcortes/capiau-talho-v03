@@ -40,6 +40,7 @@ GENERIC_TAG_BLOCKLIST = {
 from src.db.repositories.entities import EntityRepository
 from src.nlp.json_parser import extract_json_from_markdown
 from src.media.ffmpeg import extract_audio_mono, extract_frame, has_audio_stream
+from src.media.natureza import NATUREZA_AUDIO, detectar_natureza
 from src.search.semantic import SemanticSearch
 from src.vision.face_engine import process_video_frame_faces, process_photo_faces
 from src.core.tasks import TASK_MANAGER
@@ -892,6 +893,56 @@ class PipelineService:
             TASK_MANAGER.add_log(task_key, "[ASR] Nenhuma fala detectada: triagem sem transcrição.")
 
     @staticmethod
+    def _conferir_natureza(video_id: int, source: Path, atual: Optional[str]) -> str:
+        """A ingestão marca pela extensão e pela sondagem em segundo plano; a análise
+        confere de novo (material antigo, como o 555, entrou antes da coluna existir).
+        Só promove para áudio: nunca desfaz uma marca 'audio' já gravada."""
+        if atual == NATUREZA_AUDIO:
+            return NATUREZA_AUDIO
+        natureza = detectar_natureza(source)
+        if natureza == NATUREZA_AUDIO:
+            with get_db() as conn:
+                conn.execute("UPDATE video SET natureza = ? WHERE id = ?", (NATUREZA_AUDIO, video_id))
+                conn.commit()
+            TASK_MANAGER.add_log(str(video_id), "[Natureza] Sem imagem ou imagem parada: material de áudio.")
+        return natureza
+
+    @staticmethod
+    def _analisar_material_audio(video_id: int, source: Path, project_id: int, finalizar: bool) -> bool:
+        """Material de áudio (docs/PLANO_AUDIO_CATEGORIAS.md, camada 1): sem triagem por
+        visão, sem quadros, sem CLIP. Só a fala, pelo ASR de sempre (o VAD local de
+        transcribe_video descarta o que não tem voz). A classificação do tipo de som
+        (camada 2) ainda não existe: a categoria fica como está."""
+        task_key = str(video_id)
+        TASK_MANAGER.add_log(task_key, "[Natureza] Material de áudio: sem triagem por visão, quadros e CLIP.")
+        ok = True
+        if not PipelineService._tem_transcricao(video_id):
+            try:
+                ok = PipelineService.transcribe_video(video_id, source, finalizar=False)
+            except Exception as e:
+                ok = False
+                print(f"[Vision] ASR do material de áudio {video_id} falhou: {e}")
+        if not ok:
+            # transcribe_video já gravou o erro no status
+            TASK_MANAGER.update_progress(task_key, 0.0, "failed", task_type="vision")
+            return False
+        if finalizar:
+            try:
+                PipelineService.generate_video_summary(video_id, None, project_id)
+            except Exception as e:
+                print(f"[Vision] Falha ao resumir o material de áudio {video_id}: {e}")
+            try:
+                from src.nlp.theme_engine import assign_media_to_themes
+                assign_media_to_themes(project_id, video_id=video_id)
+            except Exception as e:
+                print(f"[Vision] Falha na atribuição de temas do material de áudio {video_id}: {e}")
+        with get_db() as conn:
+            MediaRepository.update_video_status(conn, video_id, 'analyzed')
+            conn.commit()
+        TASK_MANAGER.update_progress(task_key, 100.0, "finished", task_type="vision")
+        return True
+
+    @staticmethod
     def analyze_video_vision(video_id: int, filepath: Path, duration: float, beat_embedder: Optional[str] = None,
                              finalizar: bool = True) -> bool:
         """Decupa frames-chave do vídeo B-roll enviando para LLM multimodal e Qdrant.
@@ -912,6 +963,10 @@ class PipelineService:
         # Fonte dos keyframes de análise: original em resolução plena por padrão;
         # cai para o proxy 720p só se o original estiver ilegível (offline, movido…)
         frame_source = PipelineService._resolve_analysis_source(video_id, filepath, duration)
+
+        # Áudio (sem imagem ou imagem parada) sai daqui: nada de visão para quem não tem o que ver
+        if PipelineService._conferir_natureza(video_id, frame_source, video.get('natureza')) == NATUREZA_AUDIO:
+            return PipelineService._analisar_material_audio(video_id, frame_source, project_id, finalizar)
 
         # Fala primeiro: a Laya (sombra) e a triagem por visão leem a transcrição
         PipelineService._transcrever_antes_da_triagem(video_id, frame_source)
@@ -1936,7 +1991,23 @@ Responda em formato JSON puro:
         except Exception as e:
             TASK_MANAGER.add_log(task_key, f"[WARN] Temas falharam: {e}", "WARN")
 
-        # Camada 6: Detecção Facial em Frame Principal
+        # Camada 6: Detecção Facial em Frame Principal (a visão acima já gravou a natureza)
+        with get_db() as conn:
+            row = conn.execute("SELECT natureza FROM video WHERE id = ?", (video_id,)).fetchone()
+        if row and row["natureza"] == NATUREZA_AUDIO:
+            TASK_MANAGER.add_log(task_key, "[VISION] Material de áudio: sem detecção de rostos.")
+        else:
+            PipelineService._rosto_do_quadro_principal(task_key, project_id, video_id, filepath, duration)
+
+        TASK_MANAGER.update_progress(
+            task_key, 100.0, "finished", task_type="pipeline",
+            label=f"Análise Completa Finalizada (#{video_id})",
+            log_message="[FINISHED] Todas as camadas de IA foram processadas com sucesso."
+        )
+        return {"status": "success", "message": "Pipeline completo executado."}
+
+    @staticmethod
+    def _rosto_do_quadro_principal(task_key: str, project_id: int, video_id: int, filepath: Path, duration: float) -> None:
         try:
             TASK_MANAGER.update_progress(
                 task_key, 85.0, "running", task_type="pipeline",
@@ -1956,13 +2027,6 @@ Responda em formato JSON puro:
         except Exception as e:
             print(f"[AnalyzeAllVideo] Detecção facial erro: {e}")
             TASK_MANAGER.add_log(task_key, f"[WARN] Detecção facial erro: {e}", "WARN")
-
-        TASK_MANAGER.update_progress(
-            task_key, 100.0, "finished", task_type="pipeline",
-            label=f"Análise Completa Finalizada (#{video_id})",
-            log_message="[FINISHED] Todas as camadas de IA foram processadas com sucesso."
-        )
-        return {"status": "success", "message": "Pipeline completo executado."}
 
     @staticmethod
     def analyze_photo_all(photo_id: int) -> Dict[str, Any]:

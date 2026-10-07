@@ -134,6 +134,7 @@ def _pipeline_falso(banco, monkeypatch, tmp_path, capturados):
     monkeypatch.setattr(mod, "extract_frame", frame_falso)
     monkeypatch.setattr(mod, "get_vision_prompt", prompt_falso)
     monkeypatch.setattr(P, "_resolve_analysis_source", staticmethod(lambda vid, fp, d: fp))
+    monkeypatch.setattr(mod, "detectar_natureza", lambda caminho: "video")
     monkeypatch.setattr(P, "call_openrouter_vision",
                         staticmethod(lambda *a, **k: {"descricao": "set de filmagem", "tags": []}))
     monkeypatch.setattr(P, "generate_video_summary", staticmethod(lambda *a, **k: True))
@@ -560,3 +561,96 @@ def test_analyze_video_all_resume_e_atribui_temas_uma_vez_no_fim(monkeypatch):
     monkeypatch.setattr("src.nlp.theme_engine.assign_media_to_themes", lambda *a, **k: ordem.append("temas"))
     P.analyze_video_all(9)
     assert ordem == [("asr", False), ("visao", False), "resumo", "temas"]
+
+
+# ---------------------------------------------------------------------------
+# Camada 1 do áudio (docs/PLANO_AUDIO_CATEGORIAS.md): áudio não passa pela visão
+# ---------------------------------------------------------------------------
+
+def _visao_proibida(monkeypatch, P, chamadas):
+    """Qualquer passo de imagem anota a chamada: o teste confere que nenhum rodou."""
+    def anota(nome, retorno=None):
+        return staticmethod(lambda *a, **k: chamadas.append(nome) or retorno)
+    monkeypatch.setattr(P, "triage_system1", anota("laya"))
+    monkeypatch.setattr(P, "triage_video", anota("triagem", {}))
+    monkeypatch.setattr(P, "_detectar_planos", anota("planos"))
+    monkeypatch.setattr(P, "call_openrouter_vision", anota("visao", {"descricao": "x", "tags": []}))
+
+
+def test_material_de_audio_nao_passa_pela_visao_e_vai_ao_asr(banco, monkeypatch, tmp_path):
+    from pathlib import Path
+    from src.services import pipeline as mod
+    banco.execute("UPDATE video SET natureza = 'audio', category = NULL WHERE id = 7")
+    banco.commit()
+    P = _pipeline_falso(banco, monkeypatch, tmp_path, [])
+    chamadas = []
+    _visao_proibida(monkeypatch, P, chamadas)
+    monkeypatch.setattr(mod, "detectar_natureza", lambda caminho: chamadas.append("sondagem") or "video")
+    monkeypatch.setattr(P, "transcribe_video",
+                        staticmethod(lambda vid, fp, finalizar=True: chamadas.append(("asr", finalizar)) or True))
+    monkeypatch.setattr(P, "generate_video_summary", staticmethod(lambda *a, **k: chamadas.append("resumo")))
+
+    assert P.analyze_video_vision(7, Path("C:/nao/existe/take.wav"), 20.0) is True
+    assert chamadas == [("asr", False), "resumo"], "marca 'audio' gravada não é sondada de novo"
+    row = banco.execute("SELECT status, esforco_analisado, category FROM video WHERE id = 7").fetchone()
+    assert row["status"] == "analyzed"
+    assert row["esforco_analisado"] is None, "não houve análise de visão"
+    assert row["category"] is None, "a camada 2 (tipo de som) ainda não existe"
+    assert banco.execute("SELECT count(*) FROM video_keyframe WHERE video_id = 7").fetchone()[0] == 0
+
+
+def test_analise_descobre_imagem_parada_e_grava_a_natureza(banco, monkeypatch, tmp_path):
+    from pathlib import Path
+    from src.services import pipeline as mod
+    P = _pipeline_falso(banco, monkeypatch, tmp_path, [])
+    chamadas = []
+    _visao_proibida(monkeypatch, P, chamadas)
+    monkeypatch.setattr(mod, "detectar_natureza", lambda caminho: "audio")
+    monkeypatch.setattr(P, "_tem_transcricao", staticmethod(lambda vid: True))
+    monkeypatch.setattr(P, "transcribe_video", staticmethod(lambda *a, **k: chamadas.append("asr")))
+
+    assert P.analyze_video_vision(7, Path("C:/nao/existe/take.mp4"), 20.0, finalizar=False) is True
+    assert chamadas == [], "com transcrição gravada, nem ASR"
+    assert banco.execute("SELECT natureza FROM video WHERE id = 7").fetchone()[0] == "audio"
+    assert any("material de áudio" in m for m in P.logs)
+
+
+def test_asr_falhando_no_material_de_audio_nao_cai_na_visao(banco, monkeypatch, tmp_path):
+    from pathlib import Path
+    banco.execute("UPDATE video SET natureza = 'audio' WHERE id = 7")
+    banco.commit()
+    P = _pipeline_falso(banco, monkeypatch, tmp_path, [])
+    chamadas = []
+    _visao_proibida(monkeypatch, P, chamadas)
+    monkeypatch.setattr(P, "transcribe_video", staticmethod(lambda *a, **k: False))
+    assert P.analyze_video_vision(7, Path("C:/nao/existe/take.wav"), 20.0) is False
+    assert chamadas == []
+
+
+def test_analyze_video_all_nao_procura_rosto_em_material_de_audio(banco, monkeypatch, tmp_path):
+    from src.services import pipeline as mod
+    P = _pipeline_falso(banco, monkeypatch, tmp_path, [])
+    banco.execute("UPDATE video SET natureza = 'audio' WHERE id = 7")
+    banco.commit()
+    quadros = []
+    monkeypatch.setattr(mod, "extract_frame", lambda *a, **k: quadros.append(a) or False)
+    monkeypatch.setattr(P, "_tem_transcricao", staticmethod(lambda vid: True))
+    monkeypatch.setattr(P, "analyze_video_vision", staticmethod(lambda *a, **k: True))
+    assert P.analyze_video_all(7)["status"] == "success"
+    assert quadros == []
+
+
+def test_migracao_marca_audio_pela_extensao_e_e_idempotente():
+    from src.db.schema import migrar_natureza
+    conn = sqlite3.connect(":memory:")
+    conn.row_factory = sqlite3.Row
+    conn.executescript(SCHEMA_SQL)
+    conn.execute("ALTER TABLE video DROP COLUMN natureza")  # banco de antes da coluna
+    conn.execute("INSERT INTO project (id, name) VALUES (1, 'p')")
+    for i, nome in enumerate(["ENTREVISTA ARTE.WAV", "trilha.mp3", "take.MTS", "voz.m4a", "parada.mp4"]):
+        conn.execute("INSERT INTO video (project_id, filename, filepath, hash) VALUES (1, ?, ?, ?)", (nome, nome, f"h{i}"))
+    migrar_natureza(conn)
+    migrar_natureza(conn)
+    nat = {r["filename"]: r["natureza"] for r in conn.execute("SELECT filename, natureza FROM video")}
+    assert nat == {"ENTREVISTA ARTE.WAV": "audio", "trilha.mp3": "audio", "take.MTS": "video",
+                   "voz.m4a": "audio", "parada.mp4": "video"}, "imagem parada só a análise descobre"
