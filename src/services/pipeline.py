@@ -235,14 +235,28 @@ class PipelineService:
             )
             result = PipelineService.call_openrouter_vision_multi(base64_images, prompt, project_id=project_id)
 
+            distribuicao = PipelineService._distribuicao_da_triagem(result.get("distribuicao"))
             category = normalizar_categoria(result.get("categoria"))
+            if not category and distribuicao:
+                category = max(distribuicao, key=distribuicao.get)
             if not category:
                 return {}
-            try:
-                confidence = float(result.get("confianca", 0.0))
-            except Exception:
-                confidence = 0.0
-            title = str(result.get("titulo", "")).strip()
+            if distribuicao:
+                # A confiança é a probabilidade da categoria escolhida; a margem para a
+                # segunda colocada é o sinal de dúvida (o número solto não discriminava)
+                confidence = distribuicao.get(category, 0.0)
+                ordenadas = sorted(distribuicao.values(), reverse=True)
+                margem = round(ordenadas[0] - (ordenadas[1] if len(ordenadas) > 1 else 0.0), 3)
+            else:
+                try:
+                    confidence = float(result.get("confianca", 0.0))
+                except Exception:
+                    confidence = 0.0
+                margem = None
+            title = PipelineService._nomes_canonicos(str(result.get("titulo", "")).strip(), project_id)
+            detalhe = json.dumps({"distribuicao": distribuicao, "margem": margem,
+                                  "justificativa": str(result.get("justificativa") or "").strip() or None},
+                                 ensure_ascii=False)
             secundarias = PipelineService._categorias_secundarias(result.get("categorias_secundarias"), category)
             fora = result.get("fora_do_projeto") in (True, "true", "sim", 1)
 
@@ -253,8 +267,8 @@ class PipelineService:
                 cursor = conn.cursor()
                 cursor.execute(
                     "UPDATE video SET category = ?, category_confidence = ?, title = COALESCE(NULLIF(?, ''), title), "
-                    "categorias_secundarias = ?, fora_do_projeto = ? WHERE id = ?",
-                    (category, confidence, title, json.dumps(secundarias), int(fora), video_id)
+                    "categorias_secundarias = ?, fora_do_projeto = ?, triagem_detalhe = ? WHERE id = ?",
+                    (category, confidence, title, json.dumps(secundarias), int(fora), detalhe, video_id)
                 )
                 # Deriva video_type por conteúdo: 'depoimento' → interview, resto → broll.
                 # Só sobrescreve tipo já definido (por nome de arquivo) com confiança alta.
@@ -271,7 +285,8 @@ class PipelineService:
             print(f"[Triage] Vídeo {video_id}: categoria='{category}' (conf {confidence:.2f}) "
                   f"secundarias={secundarias} fora_do_projeto={fora} título='{title}'")
             return {"categoria": category, "confianca": confidence, "titulo": title,
-                    "categorias_secundarias": secundarias, "fora_do_projeto": fora}
+                    "categorias_secundarias": secundarias, "fora_do_projeto": fora,
+                    "distribuicao": distribuicao, "margem": margem}
         except Exception as e:
             print(f"[Triage] Falha na triagem do vídeo {video_id}: {e}")
             return {}
@@ -386,6 +401,44 @@ class PipelineService:
             conn.execute("UPDATE video SET analise_desatualizada = ? WHERE id = ?",
                          (f"triagem '{atual}', resumo '{cat}': analisado com esforço '{teve}', "
                           f"a do resumo pede '{pede}'", video_id))
+
+    @staticmethod
+    def _distribuicao_da_triagem(valor: Any) -> Optional[Dict[str, float]]:
+        """Distribuição pelas categorias que a triagem devolveu, limpa: chaves canônicas,
+        sem negativo, somando 1. None quando não veio ou não serve (cai na confiança solta)."""
+        if not isinstance(valor, dict):
+            return None
+        dist: Dict[str, float] = {}
+        for chave, p in valor.items():
+            cat = normalizar_categoria(chave)
+            try:
+                p = float(p)
+            except (TypeError, ValueError):
+                continue
+            if cat and p > 0:
+                dist[cat] = dist.get(cat, 0.0) + p
+        total = sum(dist.values())
+        if total <= 0:
+            return None
+        return {k: round(v / total, 4) for k, v in sorted(dist.items(), key=lambda kv: -kv[1])}
+
+    @staticmethod
+    def _nomes_canonicos(texto: str, project_id: int) -> str:
+        """Grafia dos nomes pelo cadastro (aliases + semelhança, src/nlp/name_fixer.py).
+        Falha nunca derruba a triagem: o texto volta como veio."""
+        if not texto:
+            return texto
+        try:
+            from src.nlp.name_fixer import carregar_regras, corrigir_texto, nomes_do_cadastro, resumir_trocas
+            with get_db() as conn:
+                novo, trocas = corrigir_texto(texto, "title", carregar_regras(project_id, conn),
+                                              nomes_do_cadastro(project_id, conn))
+            if trocas:
+                print(f"[Nomes] {resumir_trocas(trocas)}")
+            return novo
+        except Exception as e:
+            print(f"[Nomes] Correção de nomes falhou ({e}); texto mantido.")
+            return texto
 
     @staticmethod
     def _categorias_secundarias(valor: Any, principal: Optional[str]) -> List[str]:
@@ -1769,7 +1822,7 @@ class PipelineService:
                 title = str(data.get("titulo", "") or "").strip()
                 tags = PipelineService.clean_tags(data.get("tags", []))
 
-                from src.nlp.name_fixer import carregar_regras, corrigir_decupagem, resumir_trocas
+                from src.nlp.name_fixer import carregar_regras, corrigir_decupagem, nomes_do_cadastro, resumir_trocas
 
                 with get_db() as conn:
                     # Corrige nome proprio ANTES de gravar: o ASR erra ("Baiar" por
@@ -1778,7 +1831,7 @@ class PipelineService:
                     # aliases de entity/person; ver src/nlp/name_fixer.py.
                     regras = carregar_regras(project_id, conn)
                     title, desc, summary, tags, trocas = corrigir_decupagem(
-                        title, desc, summary, tags, regras
+                        title, desc, summary, tags, regras, nomes=nomes_do_cadastro(project_id, conn)
                     )
                     if trocas:
                         print(f"[Nomes] Video {video_id}: {resumir_trocas(trocas)}")

@@ -167,6 +167,25 @@ def carregar_regras(project_id: int, conn: Optional[sqlite3.Connection] = None) 
     return regras
 
 
+def nomes_do_cadastro(project_id: int, conn: Optional[sqlite3.Connection] = None) -> List[str]:
+    """Nomes de pessoa confirmados do projeto (person + entity), para a correção por
+    semelhança (src/nlp/nomes.py). Personagem de ficção fica de fora (get_known_names)."""
+    if conn is None:
+        from src.db.connection import get_db
+        with get_db() as propria:
+            return nomes_do_cadastro(project_id, propria)
+    try:
+        from src.db.repositories.entities import EntityRepository
+        return [n["name"] for n in EntityRepository.get_known_names(conn, project_id) if n["entity_type"] == "person"]
+    except sqlite3.Error:
+        # banco sem as colunas de curadoria de entity (só por migração): fica a tabela person
+        try:
+            return [r[0] for r in conn.execute("SELECT DISTINCT name FROM person WHERE project_id = ? "
+                                               "AND name IS NOT NULL AND name != ''", (project_id,))]
+        except sqlite3.Error:
+            return []
+
+
 def _regras_padrao() -> Dict[str, str]:
     """Mapa usado quando o chamador não passa nada — sem tocar no banco."""
     return {**SEMENTE, **REGRAS_GERAIS}
@@ -180,8 +199,12 @@ def corrigir_texto(
     texto: Any,
     campo: str = "texto",
     regras: Optional[Dict[str, str]] = None,
+    nomes: Optional[Sequence[str]] = None,
 ) -> Tuple[Any, List[Troca]]:
     """Corrige um texto. Devolve (texto_corrigido, trocas).
+
+    Primeiro as regras de alias (exatas); depois, com `nomes`, a grafia por semelhança
+    com o cadastro ("Thiago Moisés" -> "Thiago Moyses"), que pega o que não tem alias.
 
     Valor não-string volta intacto: a IA às vezes devolve None ou número.
     """
@@ -203,18 +226,23 @@ def corrigir_texto(
         saida = re.sub(padrao, certo, saida, flags=re.IGNORECASE)
         for achado in achados:
             trocas.append((campo, achado, certo))
+    if nomes:
+        from src.nlp.nomes import corrigir_nomes_com_trocas
+        saida, feitas = corrigir_nomes_com_trocas(saida, nomes)
+        trocas.extend((campo, achou, certo) for achou, certo in feitas)
     return saida, trocas
 
 
-def corrigir_tags(tags: Any, regras: Optional[Dict[str, str]] = None) -> Tuple[Any, List[Troca]]:
+def corrigir_tags(tags: Any, regras: Optional[Dict[str, str]] = None,
+                  nomes: Optional[Sequence[str]] = None) -> Tuple[Any, List[Troca]]:
     """Corrige uma lista de tags. Preserva o tipo do que entrou."""
     if not isinstance(tags, (list, tuple)):
-        return corrigir_texto(tags, "tags", regras)
+        return corrigir_texto(tags, "tags", regras, nomes)
 
     saida: List[Any] = []
     trocas: List[Troca] = []
     for tag in tags:
-        nova, t = corrigir_texto(tag, "tags", regras)
+        nova, t = corrigir_texto(tag, "tags", regras, nomes)
         saida.append(nova)
         trocas.extend(t)
     return saida, trocas
@@ -226,6 +254,7 @@ def corrigir_decupagem(
     summary: Any = None,
     tags: Any = None,
     regras: Optional[Dict[str, str]] = None,
+    nomes: Optional[Sequence[str]] = None,
 ) -> Tuple[Any, Any, Any, Any, List[Troca]]:
     """Corrige os quatro campos da decupagem de uma vez.
 
@@ -235,10 +264,10 @@ def corrigir_decupagem(
     if regras is None:
         regras = _regras_padrao()
 
-    novo_title, t1 = corrigir_texto(title, "title", regras)
-    nova_desc, t2 = corrigir_texto(description, "description", regras)
-    novo_summary, t3 = corrigir_texto(summary, "summary", regras)
-    novas_tags, t4 = corrigir_tags(tags, regras)
+    novo_title, t1 = corrigir_texto(title, "title", regras, nomes)
+    nova_desc, t2 = corrigir_texto(description, "description", regras, nomes)
+    novo_summary, t3 = corrigir_texto(summary, "summary", regras, nomes)
+    novas_tags, t4 = corrigir_tags(tags, regras, nomes)
     return novo_title, nova_desc, novo_summary, novas_tags, t1 + t2 + t3 + t4
 
 

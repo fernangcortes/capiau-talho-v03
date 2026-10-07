@@ -57,6 +57,7 @@ CREATE TABLE IF NOT EXISTS video (
     categoria_resumo TEXT,        -- categoria que o resumo final (com imagem) julgou, sem ver a da triagem
     analise_desatualizada TEXT,   -- motivo quando a categoria mudou e pede mais esforço; NULL = em dia
     natureza TEXT DEFAULT 'video', -- 'video' | 'audio' (sem imagem ou imagem parada): áudio não passa pela visão
+    triagem_detalhe TEXT,         -- JSON da última triagem por visão: distribuicao, margem, justificativa, modelo
 
     -- Status no pipeline
     status TEXT CHECK(status IN ('pending', 'ingested', 'transcribing', 'transcribed', 'analyzing', 'analyzed', 'error')) DEFAULT 'pending',
@@ -779,6 +780,9 @@ def init_db(db_path: Path = None):
         if "fora_do_projeto" not in video_cols:
             cursor.execute("ALTER TABLE video ADD COLUMN fora_do_projeto INTEGER DEFAULT 0")
             print("[MIGRATION] Coluna 'fora_do_projeto' adicionada a tabela video.")
+        if "triagem_detalhe" not in video_cols:
+            cursor.execute("ALTER TABLE video ADD COLUMN triagem_detalhe TEXT")
+            print("[MIGRATION] Coluna 'triagem_detalhe' adicionada a tabela video.")
         if "categoria_resumo" not in video_cols:
             cursor.execute("ALTER TABLE video ADD COLUMN categoria_resumo TEXT")
             print("[MIGRATION] Coluna 'categoria_resumo' adicionada a tabela video.")

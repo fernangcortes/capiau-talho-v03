@@ -159,13 +159,14 @@ CATEGORIAS POSSÍVEIS (escolha exatamente UMA principal, a que ocupa mais tempo 
 {context_block}
 Responda estritamente em Português e em JSON puro (sem markdown):
 {
-  "categoria": "uma das chaves acima, ex: 'convivio'",
+  "distribuicao": {"cena": 0.0, "bastidor": 0.0, "depoimento": 0.0, "convivio": 0.0, "evento": 0.0, "teste": 0.0, "documento": 0.0, "terceiros": 0.0},
+  "categoria": "a chave com a maior probabilidade em distribuicao",
   "categorias_secundarias": ["outras chaves que também aparecem por um trecho relevante; [] se não houver"],
   "fora_do_projeto": false,
-  "confianca": 0.85,
   "titulo": "título curto e específico de 3 a 6 palavras que diferencie este vídeo dos demais (ex: 'Almoço da equipe na varanda')",
   "justificativa": "uma frase curta explicando a escolha"
 }
+"distribuicao" é a probabilidade de cada categoria ser a principal, somando 1. Seja honesto: se os quadros deixam dúvida entre duas categorias, divida a probabilidade entre elas; reserve valores perto de 1 para quando não há dúvida.
 "fora_do_projeto" é true só quando o material não tem relação com o projeto (registro pessoal que veio junto no cartão, por exemplo)."""
     },
     "triage_batch_title": {
