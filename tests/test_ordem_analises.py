@@ -768,3 +768,88 @@ def test_correcao_humana_de_audio_usa_a_taxonomia_de_audio(banco, monkeypatch):
     with pytest.raises(HTTPException) as e:
         _corrigir(banco, monkeypatch, "cena")
     assert "trilha" in e.value.detail, "a mensagem lista as categorias de áudio"
+
+# ---------------------------------------------------------------------------
+# Rodada só de triagem (scripts/triagem_rodada.py)
+# ---------------------------------------------------------------------------
+
+def test_triar_video_faz_so_a_triagem_e_devolve_o_status(banco, monkeypatch, tmp_path):
+    banco.execute("UPDATE video SET category = NULL, status = 'transcribed' WHERE id = 7")
+    banco.commit()
+    P = _pipeline_falso(banco, monkeypatch, tmp_path, [])
+    ordem = []
+    monkeypatch.setattr(P, "_transcrever_antes_da_triagem", staticmethod(lambda vid, src: ordem.append("asr")))
+    monkeypatch.setattr(P, "_detectar_planos", staticmethod(lambda pid, src: ordem.append("planos") or [{"start": 0, "end": 20}]))
+    monkeypatch.setattr(P, "triage_system1", staticmethod(lambda *a: ordem.append("laya")))
+
+    def triagem(vid, src, dur, pid, shots=None):
+        ordem.append(("triagem", shots))
+        banco.execute("UPDATE video SET category = 'bastidor', status = 'analyzing' WHERE id = 7")
+        return {"categoria": "bastidor", "confianca": 0.8}
+
+    monkeypatch.setattr(P, "triage_video", staticmethod(triagem))
+    monkeypatch.setattr(P, "call_openrouter_vision", staticmethod(lambda *a, **k: pytest.fail("sem análise de quadros")))
+    r = P.triar_video(7)
+    assert ordem == ["asr", "planos", "laya", ("triagem", [{"start": 0, "end": 20}])]
+    assert (r["resultado"], r["categoria"], r["confianca"]) == ("triado", "bastidor", 0.8)
+    v = banco.execute("SELECT category, status FROM video WHERE id = 7").fetchone()
+    assert tuple(v) == ("bastidor", "transcribed"), "categoria fica; status volta ao de antes"
+
+
+def test_triar_video_manda_audio_para_o_tipo_de_som(banco, monkeypatch, tmp_path):
+    from src.services import pipeline as mod
+    banco.execute("UPDATE video SET category = NULL WHERE id = 7")
+    banco.commit()
+    P = _pipeline_falso(banco, monkeypatch, tmp_path, [])
+    chamadas = []
+    _visao_proibida(monkeypatch, P, chamadas, tipo_de_som="trilha")
+    monkeypatch.setattr(mod, "detectar_natureza", lambda caminho: "audio")
+    r = P.triar_video(7)
+    assert (r["resultado"], r["categoria"]) == ("audio", "trilha")
+    assert chamadas == [("tipo_de_som", "trilha")]
+
+
+def test_chamada_de_visao_avisa_o_gasto_real(monkeypatch):
+    from src.services import pipeline as mod
+
+    class Resposta:
+        status_code = 200
+        def json(self):
+            return {"choices": [{"message": {"content": '{"categoria": "cena"}'}}],
+                    "usage": {"prompt_tokens": 9000, "completion_tokens": 300, "cost": 0.0035}}
+
+    enviados, vistos = [], []
+    monkeypatch.setattr(SettingsService, "get_settings", _settings(**{"api.openrouter_key": "sk-teste"}))
+    monkeypatch.setattr(mod.SettingsService, "get_settings",
+                        lambda pid=None: type("S", (), {"get": lambda s, k: _settings()(pid).get(k),
+                                                        "api_key": lambda s, p: "sk-teste"})())
+    monkeypatch.setattr(mod.requests, "post", lambda url, headers, json, timeout: enviados.append(json) or Resposta())
+    monkeypatch.setattr(mod, "OBSERVADORES_DE_USO", [vistos.append])
+    assert mod.PipelineService._call_vision_api([], 1, "Triage") == {"categoria": "cena"}
+    assert enviados[0]["usage"] == {"include": True}
+    assert vistos == [{"etapa": "Triage", "modelo": enviados[0]["model"],
+                       "uso": {"prompt_tokens": 9000, "completion_tokens": 300, "cost": 0.0035}}]
+
+
+def test_piloto_espalha_pela_duracao(monkeypatch, tmp_path):
+    import importlib.util
+    from pathlib import Path
+    spec = importlib.util.spec_from_file_location("triagem_rodada", Path(__file__).parents[1] / "scripts/triagem_rodada.py")
+    rodada = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(rodada)
+    db = tmp_path / "t.db"
+    conn = sqlite3.connect(db)
+    conn.executescript(SCHEMA_SQL)
+    conn.execute("INSERT INTO project (id, name) VALUES (2, 'p')")
+    for i in range(1, 101):
+        conn.execute("INSERT INTO video (id, project_id, filename, filepath, hash, duration, category) "
+                     "VALUES (?, 2, ?, ?, ?, ?, ?)", (i, f"{i}.mov", f"{i}.mov", f"h{i}", float(i), None if i % 10 else "cena"))
+    conn.commit()
+    conn.close()
+    monkeypatch.setattr(rodada.CONFIG, "DB_PATH", db)
+    todos = rodada.selecionar(2)
+    assert len(todos) == 90, "só os sem categoria"
+    piloto = rodada.selecionar(2, limite=5)
+    duracoes = [v["duration"] for v in piloto]
+    assert duracoes[0] == 1.0 and duracoes[-1] == 99.0, "do mais curto ao mais longo"
+    assert duracoes == sorted(set(duracoes)) and len(duracoes) == 5

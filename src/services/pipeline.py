@@ -47,6 +47,21 @@ from src.core.tasks import TASK_MANAGER
 from src.services.settings_service import SettingsService
 from src.transcription.motores import CHAVE_DO_MOTOR, ErroASR, OpcoesASR, resolver_motores, transcrever
 
+# Quem quer saber o gasto real das chamadas de visão (ex.: scripts/triagem_rodada.py)
+# registra aqui uma função; ela recebe {etapa, modelo, uso} a cada resposta da API,
+# com o 'usage' da OpenRouter (tokens e 'cost' em US$). Falha do observador não
+# atrapalha a chamada.
+OBSERVADORES_DE_USO: List[Any] = []
+
+
+def _avisar_uso(etapa: str, modelo: str, uso: Optional[Dict[str, Any]]) -> None:
+    for observador in list(OBSERVADORES_DE_USO):
+        try:
+            observador({"etapa": etapa, "modelo": modelo, "uso": uso or {}})
+        except Exception as e:
+            print(f"[Uso] Observador falhou: {e}")
+
+
 class PipelineService:
     @staticmethod
     def clean_tags(tags: List[str]) -> List[str]:
@@ -89,6 +104,7 @@ class PipelineService:
             "messages": messages,
             "temperature": S.get("vision.temperature"),
             "max_tokens": S.get("vision.max_tokens"),
+            "usage": {"include": True},  # OpenRouter devolve tokens e custo em US$
         }
         timeout = max(S.get("vision.timeout"), timeout_floor)
 
@@ -100,6 +116,7 @@ class PipelineService:
                     print(f"[{log_prefix}] Falha na API de visão (modelo {model}, status {response.status_code}): {response.text[:300]}")
                     return None
                 res_json = response.json()
+                _avisar_uso(log_prefix, model, res_json.get("usage"))
                 if "choices" not in res_json or not res_json["choices"]:
                     # status 200 com corpo de erro (ex.: "Upstream idle timeout
                     # exceeded") acontece de verdade com modelos ':free' sob carga.
@@ -1004,6 +1021,48 @@ class PipelineService:
             conn.commit()
         TASK_MANAGER.update_progress(task_key, 100.0, "finished", task_type="vision")
         return True
+
+    @staticmethod
+    def triar_video(video_id: int) -> Dict[str, Any]:
+        """Só a triagem (docs/REVISAO_CATEGORIAS.md, seção 8, passo 3), sem a análise de
+        quadros: natureza -> (áudio: tipo de som) -> ASR se faltar fala -> planos -> Laya
+        (sombra) -> triagem por visão. Mesma ordem do começo de analyze_video_vision.
+        O status do vídeo volta ao que era (o ASR mexe nele), para o lote de visão não
+        tomar o vídeo como análise interrompida. Devolve o que aconteceu."""
+        with get_db() as conn:
+            video = MediaRepository.get_video(conn, video_id)
+        if not video:
+            return {"video_id": video_id, "resultado": "nao_encontrado"}
+        project_id = video["project_id"]
+        filepath = Path(video["filepath"])
+        duration = float(video.get("duration") or 0.0)
+        status_antes, erro_antes = video.get("status"), video.get("error_message")
+        tinha_fala = PipelineService._tem_transcricao(video_id)
+        saida: Dict[str, Any] = {"video_id": video_id, "duracao": duration}
+        try:
+            fonte = PipelineService._resolve_analysis_source(video_id, filepath, duration)
+            if PipelineService._conferir_natureza(video_id, fonte, video.get("natureza")) == NATUREZA_AUDIO:
+                saida.update(resultado="audio",
+                             categoria=PipelineService._categoria_do_audio(video_id, fonte, project_id, duration))
+                return saida
+            PipelineService._transcrever_antes_da_triagem(video_id, fonte)
+            saida["transcreveu"] = not tinha_fala and PipelineService._tem_transcricao(video_id)
+            proxy = CONFIG.PROXIES_DIR / f"proxy_vid_{video_id}.mp4"
+            shots = PipelineService._detectar_planos(project_id, proxy if proxy.exists() else fonte)
+            saida["laya"] = PipelineService.triage_system1(video_id, filepath, duration, project_id)
+            if saida["laya"]:
+                # Laya no modo 'decide' já gravou a categoria: a visão não é chamada
+                saida.update(resultado="laya", categoria=saida["laya"])
+                return saida
+            triagem = PipelineService.triage_video(video_id, fonte, duration, project_id, shots=shots)
+            saida.update(resultado="triado" if triagem else "falhou", **triagem)
+            saida["laya"] = PipelineService._categoria_laya(video_id)
+            return saida
+        finally:
+            with get_db() as conn:
+                conn.execute("UPDATE video SET status = ?, error_message = ? WHERE id = ?",
+                             (status_antes, erro_antes, video_id))
+                conn.commit()
 
     @staticmethod
     def analyze_video_vision(video_id: int, filepath: Path, duration: float, beat_embedder: Optional[str] = None,
