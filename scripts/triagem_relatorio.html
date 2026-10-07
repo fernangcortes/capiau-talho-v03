@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Revisão da triagem</title>
+<style>
+:root {
+  --bg: #f6f5f2; --card: #ffffff; --ink: #1d1d1b; --muted: #6b6a66; --line: #e3e1dc; --soft: #efede8;
+  --accent: #2f5bd3; --ok: #1f8a4c; --bad: #c2412d; --warn: #b7791f;
+  --c-cena: #7b4fd6; --c-bastidor: #2f7fd3; --c-depoimento: #d3532f; --c-convivio: #2fa37a;
+  --c-evento: #c9a227; --c-teste: #7d8a99; --c-documento: #8a5a2b; --c-terceiros: #c2418f;
+  --sombra: 0 1px 2px rgba(0,0,0,.05), 0 2px 8px rgba(0,0,0,.04);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #151514; --card: #1e1e1c; --ink: #ecebe7; --muted: #a09e98; --line: #33322f; --soft: #262624;
+    --accent: #7b9cff; --ok: #4cc283; --bad: #ef7a63; --warn: #e3b04b;
+    --sombra: 0 1px 2px rgba(0,0,0,.4);
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #151514; --card: #1e1e1c; --ink: #ecebe7; --muted: #a09e98; --line: #33322f; --soft: #262624;
+  --accent: #7b9cff; --ok: #4cc283; --bad: #ef7a63; --warn: #e3b04b; --sombra: 0 1px 2px rgba(0,0,0,.4);
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+main { max-width: 1180px; margin: 0 auto; padding: 24px 16px 80px; }
+h1 { font-size: 26px; margin: 0 0 4px; letter-spacing: -.01em; }
+h2 { font-size: 18px; margin: 32px 0 12px; }
+.sub { color: var(--muted); margin: 0 0 20px; }
+.grade { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+.stat { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; box-shadow: var(--sombra); }
+.stat b { display: block; font-size: 22px; font-variant-numeric: tabular-nums; }
+.stat span { color: var(--muted); font-size: 13px; }
+details.guia { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 4px 16px; margin-top: 16px; }
+details.guia > summary { cursor: pointer; font-weight: 600; padding: 10px 0; }
+.guia ol { padding-left: 20px; } .guia li { margin: 4px 0; }
+.cats { display: grid; grid-template-columns: max-content 1fr; gap: 6px 14px; margin: 8px 0 14px; }
+.nota { background: var(--soft); border-radius: 8px; padding: 10px 12px; margin: 10px 0; font-size: 14px; }
+.graficos { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
+.painel { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; box-shadow: var(--sombra); }
+.painel h3 { margin: 0 0 10px; font-size: 15px; }
+.barra-linha { display: grid; grid-template-columns: 96px 1fr 28px; align-items: center; gap: 8px; margin: 5px 0; font-size: 13px; }
+.trilho { background: var(--soft); border-radius: 4px; height: 14px; overflow: hidden; display: flex; }
+.trilho i { display: block; height: 100%; }
+.num { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
+.ferramentas { position: sticky; top: 0; z-index: 5; background: var(--bg); padding: 10px 0; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; border-bottom: 1px solid var(--line); margin-top: 24px; }
+.ferramentas input, .ferramentas select, button { font: inherit; font-size: 14px; color: var(--ink); background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; }
+.ferramentas input { flex: 1 1 180px; min-width: 0; }
+button { cursor: pointer; } button:hover { border-color: var(--accent); }
+button.primario { background: var(--accent); color: #fff; border-color: var(--accent); }
+.contagem { color: var(--muted); font-size: 13px; margin-left: auto; }
+.clipe { background: var(--card); border: 1px solid var(--line); border-radius: 12px; margin: 16px 0; box-shadow: var(--sombra); overflow: hidden; }
+.clipe.certo { border-left: 4px solid var(--ok); } .clipe.errado { border-left: 4px solid var(--bad); }
+.cab { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: baseline; padding: 12px 16px; border-bottom: 1px solid var(--line); }
+.cab .id { font-weight: 700; } .cab .arq { color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
+.corpo { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 18px; padding: 14px 16px; }
+@media (max-width: 820px) { .corpo { grid-template-columns: 1fr; } }
+video { width: 100%; aspect-ratio: 16 / 9; background: #000; border-radius: 8px; display: block; }
+.sem-video { aspect-ratio: 16/9; display: grid; place-items: center; background: var(--soft); border-radius: 8px; color: var(--muted); }
+.controles { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.controles button { padding: 3px 8px; font-size: 13px; }
+.pilula { display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px; border-radius: 999px; font-weight: 600; font-size: 13px; color: #fff; }
+.rotulo { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; margin: 12px 0 4px; }
+.rotulo:first-child { margin-top: 0; }
+.linha { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.conf { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); }
+.conf .trilho { width: 80px; height: 8px; }
+.chip { font-size: 12px; border: 1px solid var(--line); border-radius: 999px; padding: 1px 8px; color: var(--muted); }
+.acordo { font-weight: 600; font-size: 13px; } .acordo.sim { color: var(--ok); } .acordo.nao { color: var(--bad); }
+.dist { display: grid; grid-template-columns: 112px 1fr 38px; gap: 3px 8px; align-items: center; font-size: 12px; margin-top: 6px; }
+.dist .trilho { height: 9px; }
+.dist .marca { font-weight: 700; color: var(--ink); }
+.titulo-antes { text-decoration: line-through; color: var(--muted); }
+.falas { list-style: none; margin: 0; padding: 0; max-height: 210px; overflow: auto; border: 1px solid var(--line); border-radius: 8px; }
+.falas li { display: grid; grid-template-columns: 58px 1fr; gap: 8px; padding: 6px 8px; border-bottom: 1px solid var(--line); font-size: 14px; }
+.falas li:last-child { border-bottom: 0; }
+.falas button { padding: 1px 6px; font-size: 12px; font-variant-numeric: tabular-nums; align-self: start; }
+.vazio { color: var(--muted); font-style: italic; font-size: 14px; }
+details.desc summary { cursor: pointer; color: var(--muted); font-size: 13px; margin-top: 10px; }
+details.desc p { font-size: 14px; margin: 6px 0 0; }
+.rodape { display: flex; flex-wrap: wrap; gap: 6px 16px; padding: 10px 16px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.rodape code { overflow-wrap: anywhere; }
+.revisao { background: var(--soft); padding: 12px 16px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.revisao .v-certo.ativo { background: var(--ok); color: #fff; border-color: var(--ok); }
+.revisao .v-errado.ativo { background: var(--bad); color: #fff; border-color: var(--bad); }
+.revisao .detalhe { display: none; flex: 1 1 100%; gap: 8px; flex-wrap: wrap; align-items: center; }
+.revisao.mostrar .detalhe { display: flex; }
+.revisao textarea { font: inherit; font-size: 14px; flex: 1 1 260px; min-height: 36px; background: var(--card); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; }
+.revisao select { font: inherit; font-size: 14px; background: var(--card); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; }
+.tema { position: fixed; right: 12px; bottom: 12px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Revisão da triagem</h1>
+  <p class="sub" id="sub"></p>
+  <div class="grade" id="stats"></div>
+
+  <details class="guia" open>
+    <summary>Como ler este relatório</summary>
+    <ol>
+      <li><b>O que a triagem fez em cada clipe:</b> olhou até 6 quadros (um no meio de cada plano, dos mais longos primeiro), leu o começo da fala transcrita, o nome do arquivo e da pasta, o objetivo do projeto e a lista de nomes conhecidos, e escolheu <b>uma</b> categoria. Não houve análise de quadros completa: isto é só o "o que é este clipe".</li>
+      <li><b>Laya</b> roda local, de graça, em <b>modo sombra</b>: vota mas não decide. Está em teste e calibração; cada cartão mostra a distribuição de probabilidade dela pelas 8 categorias, para você ver se ela errou "perto" ou "longe".</li>
+      <li><b>Confiança</b> é o número que o próprio modelo declara. Até aqui ele quase sempre diz 0,85 a 0,95, então ela ainda não separa o fácil do difícil: não confie nela para escolher o que revisar.</li>
+      <li><b>Revise</b> marcando <b>Certo</b> ou <b>Errado</b> (e a categoria que deveria ser). Fica salvo neste navegador; no fim, <b>Baixar revisões</b> gera um JSON que o app aplica como correção humana.</li>
+      <li>As <b>falas</b> do cartão são as que a triagem leu: clique no horário para o vídeo pular até lá.</li>
+    </ol>
+    <div class="rotulo">As 8 categorias</div>
+    <div class="cats" id="cats"></div>
+    <div class="nota" id="nota-jev"></div>
+  </details>
+
+  <h2>Panorama</h2>
+  <div class="graficos">
+    <div class="painel"><h3>Categoria da triagem</h3><div id="g-triagem"></div></div>
+    <div class="painel"><h3>Triagem x Laya, por categoria da triagem</h3><div id="g-laya"></div>
+      <p class="sub" style="margin:8px 0 0;font-size:13px">Verde: a Laya votou igual. Vermelho: votou outra coisa.</p></div>
+  </div>
+
+  <div class="ferramentas">
+    <input id="busca" type="search" placeholder="Buscar em título, arquivo, fala…" aria-label="Buscar">
+    <select id="f-cat" aria-label="Categoria"><option value="">Todas as categorias</option></select>
+    <select id="f-laya" aria-label="Laya"><option value="">Laya: todos</option><option value="sim">Laya concorda</option><option value="nao">Laya discorda</option></select>
+    <select id="f-rev" aria-label="Revisão"><option value="">Revisão: todos</option><option value="pendente">Pendentes</option><option value="certo">Certos</option><option value="errado">Errados</option></select>
+    <select id="ordem" aria-label="Ordem"><option value="duracao">Ordem: duração</option><option value="id">Ordem: id</option><option value="custo">Ordem: custo</option></select>
+    <button id="baixar" class="primario">Baixar revisões</button>
+    <span class="contagem" id="contagem"></span>
+  </div>
+  <div id="lista"></div>
+</main>
+<button class="tema" id="tema" title="Alternar tema claro/escuro">◐</button>
+
+<script>
+const DADOS = /*__DADOS__*/null;
+const CATS = Object.keys(DADOS.categorias);
+const COR = c => `var(--c-${c}, var(--muted))`;
+const CHAVE = "triagem-revisao-" + DADOS.rodada.gerado_em;
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, m => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
+const tempo = s => { s = Math.max(0, Math.round(s || 0)); const h = Math.floor(s/3600), m = Math.floor(s%3600/60), x = s%60;
+  return (h ? h + ":" + String(m).padStart(2,"0") : m) + ":" + String(x).padStart(2,"0"); };
+const usd = v => { v = Number(v || 0); const casas = v === 0 ? 2 : v < 0.01 ? 5 : v < 1 ? 3 : 2;
+  return "US$ " + v.toLocaleString("pt-BR", { minimumFractionDigits: casas, maximumFractionDigits: casas }); };
+
+let revisoes = {};
+try { revisoes = JSON.parse(localStorage.getItem(CHAVE) || "{}") || {}; } catch (e) { revisoes = {}; }
+const salvar = () => { try { localStorage.setItem(CHAVE, JSON.stringify(revisoes)); } catch (e) {} atualizarContagem(); };
+try { const t = localStorage.getItem("triagem-tema"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
+$("#tema").onclick = () => {
+  const escuro = getComputedStyle(document.body).backgroundColor === "rgb(21, 21, 20)";
+  document.documentElement.dataset.theme = escuro ? "light" : "dark";
+  try { localStorage.setItem("triagem-tema", document.documentElement.dataset.theme); } catch (e) {}
+};
+
+const R = DADOS.rodada, S = R.resumo || {}, C = DADOS.clipes;
+const concorda = c => c.laya && c.laya.categoria && c.categoria ? c.laya.categoria === c.categoria : null;
+$("#sub").textContent = `Rodada de ${R.gerado_em.replace("T", " às ")} · projeto ${R.projeto} · ${C.length} clipes`
+  + (DADOS.backup ? ` · títulos antigos do backup ${DADOS.backup}` : "");
+
+const nLaya = C.filter(c => concorda(c) === true).length;
+const durTotal = C.reduce((a, c) => a + c.duracao, 0), segTotal = C.reduce((a, c) => a + (c.segundos || 0), 0);
+$("#stats").innerHTML = [
+  [C.length, "clipes triados"],
+  [usd(S.gasto_usd), "gasto real"],
+  [usd(S.visao_media_por_video_usd), "visão por clipe"],
+  [(S.tokens_entrada_medio || 0) + " / " + (S.tokens_saida_medio || 0), "tokens médios (entrada / saída)"],
+  [tempo(segTotal), `de processamento para ${tempo(durTotal)} de vídeo`],
+  [`${nLaya} de ${C.length}`, "Laya concorda"],
+  [S.restantes != null ? usd(S.projecao_restantes_usd) : "—", `projeção para os ${S.restantes ?? "?"} restantes`],
+].map(([b, s]) => `<div class="stat"><b>${esc(b)}</b><span>${esc(s)}</span></div>`).join("");
+
+$("#cats").innerHTML = CATS.map(c => `<span class="pilula" style="background:${COR(c)}">${c}</span><span>${esc(DADOS.categorias[c])}</span>`).join("");
+const comJev = C.filter(c => c.jev).length;
+$("#nota-jev").innerHTML = comJev
+  ? `<b>JEV:</b> ${comJev} destes clipes têm voto do JEV (TypeSafe), mostrado no cartão.`
+  : `<b>JEV:</b> nenhum destes clipes tem voto do JEV. A comparação com o JEV (TypeSafe, em nuvem, gasta crédito) está desligada nas Configurações (<code>triage.system1_compare_jev</code>); ele só rodou em 30/09, pelo script de avaliação, em outros 23 vídeos.`;
+
+function barras(alvo, linhas, max) {
+  alvo.innerHTML = linhas.map(([rot, partes, total]) => `<div class="barra-linha"><span>${esc(rot)}</span>
+    <span class="trilho">${partes.map(([v, cor]) => `<i style="width:${(v / max * 100).toFixed(1)}%;background:${cor}"></i>`).join("")}</span>
+    <span class="num">${total}</span></div>`).join("");
+}
+const porCat = CATS.map(c => [c, C.filter(x => x.categoria === c)]).filter(([, xs]) => xs.length);
+const maxCat = Math.max(1, ...porCat.map(([, xs]) => xs.length));
+barras($("#g-triagem"), porCat.map(([c, xs]) => [c, [[xs.length, COR(c)]], xs.length]), maxCat);
+barras($("#g-laya"), porCat.map(([c, xs]) => {
+  const sim = xs.filter(x => concorda(x) === true).length;
+  return [c, [[sim, "var(--ok)"], [xs.length - sim, "var(--bad)"]], `${sim}/${xs.length}`];
+}), maxCat);
+
+const fCat = $("#f-cat");
+CATS.forEach(c => fCat.insertAdjacentHTML("beforeend", `<option value="${c}">${c}</option>`));
+
+function voto(nome, d, categoriaTriagem) {
+  if (!d) return `<div class="vazio">${nome}: sem voto registrado.</div>`;
+  if (!d.categoria) return `<div class="vazio">${nome}: ${esc(d.erro || "não respondeu")}.</div>`;
+  const ac = d.categoria === categoriaTriagem;
+  const dist = Object.entries(d.distribuicao || {}).sort((a, b) => b[1] - a[1]);
+  return `<div class="linha"><span class="pilula" style="background:${COR(d.categoria)}">${esc(d.categoria)}</span>
+      <span class="conf">${d.confianca != null ? (d.confianca * 100).toFixed(0) + "%" : ""}</span>
+      <span class="acordo ${ac ? "sim" : "nao"}">${ac ? "✓ concorda com a triagem" : "✗ discorda da triagem"}</span></div>
+    ${dist.length ? `<div class="dist">${dist.map(([k, v]) => `<span class="${k === categoriaTriagem ? "marca" : ""}">${esc(k)}${k === categoriaTriagem ? " ◂" : ""}</span>
+      <span class="trilho"><i style="width:${(v * 100).toFixed(1)}%;background:${COR(k)}"></i></span><span class="num">${(v * 100).toFixed(0)}%</span>`).join("")}</div>` : ""}`;
+}
+
+function cartao(c) {
+  const rv = revisoes[c.id] || {};
+  const falas = (c.fala_vista || []).length
+    ? `<ul class="falas">${c.fala_vista.map(f => `<li><button data-pular="${f.t}" title="Pular para este trecho">${tempo(f.t)}</button><span>${esc(f.texto)}</span></li>`).join("")}</ul>`
+    : `<div class="vazio">Sem fala transcrita: a triagem decidiu só pelos quadros e pelo nome.</div>`;
+  const conf = c.confianca != null ? `<span class="conf"><span class="trilho"><i style="width:${c.confianca * 100}%;background:${COR(c.categoria)}"></i></span>${(c.confianca * 100).toFixed(0)}%</span>` : "";
+  const opcoes = CATS.map(k => `<option value="${k}" ${rv.categoria_certa === k ? "selected" : ""}>${k}</option>`).join("");
+  return `<article class="clipe ${rv.veredito || ""}" data-id="${c.id}">
+    <div class="cab"><span class="id">#${c.id}</span><span>${tempo(c.duracao)}</span><span class="chip">${esc(c.tipo || "")}</span>
+      ${c.transcreveu_agora ? `<span class="chip">transcrito nesta rodada</span>` : ""}<span class="arq">${esc(c.arquivo)}</span></div>
+    <div class="corpo">
+      <div>
+        ${c.video ? `<video controls preload="none" ${c.capa ? `poster="${esc(c.capa)}"` : ""} src="${esc(c.video)}"></video>` : `<div class="sem-video">Proxy não encontrado</div>`}
+        <div class="controles">
+          <button data-vel="1">1×</button><button data-vel="2">2×</button><button data-vel="4">4×</button>
+          <button data-frac=".1">10%</button><button data-frac=".35">35%</button><button data-frac=".6">60%</button><button data-frac=".85">85%</button>
+        </div>
+        <div class="rotulo">O que a triagem leu da fala ${c.falantes ? `(${c.falantes} falante${c.falantes > 1 ? "s" : ""} no total)` : ""}</div>
+        ${falas}
+      </div>
+      <div>
+        <div class="rotulo">Triagem</div>
+        <div class="linha"><span class="pilula" style="background:${COR(c.categoria)}">${esc(c.categoria || "sem categoria")}</span>${conf}
+          ${(c.secundarias || []).map(s => `<span class="chip">também: ${esc(s)}</span>`).join("")}
+          ${c.fora_do_projeto ? `<span class="chip" style="color:var(--warn)">fora do projeto</span>` : ""}</div>
+        <div class="rotulo">Título</div>
+        ${c.titulo_antes && c.titulo_antes !== c.titulo ? `<div class="titulo-antes">${esc(c.titulo_antes)}</div>` : ""}
+        <div><b>${esc(c.titulo || "—")}</b></div>
+        <div class="rotulo">Laya (sombra)</div>
+        ${voto("Laya", c.laya, c.categoria)}
+        ${c.jev ? `<div class="rotulo">JEV</div>${voto("JEV", c.jev, c.categoria)}` : ""}
+        ${c.descricao_anterior ? `<details class="desc"><summary>Descrição da análise de quadros anterior</summary><p>${esc(c.descricao_anterior)}</p></details>` : ""}
+      </div>
+    </div>
+    <div class="rodape"><span>visão ${usd(c.custo_visao)} · ${c.tokens_entrada} + ${c.tokens_saida} tokens · ${c.chamadas} chamada${c.chamadas === 1 ? "" : "s"}</span>
+      ${c.custo_asr ? `<span>ASR ${usd(c.custo_asr)}</span>` : ""}<span>${c.segundos ?? "?"} s</span>
+      <code title="Arquivo original">${esc(c.caminho)}</code></div>
+    <div class="revisao ${rv.veredito === "errado" ? "mostrar" : ""}">
+      <b>Sua revisão:</b>
+      <button class="v-certo ${rv.veredito === "certo" ? "ativo" : ""}" data-veredito="certo">✓ Certo</button>
+      <button class="v-errado ${rv.veredito === "errado" ? "ativo" : ""}" data-veredito="errado">✗ Errado</button>
+      <div class="detalhe">
+        <label>Deveria ser <select data-campo="categoria_certa"><option value="">escolha…</option>${opcoes}</select></label>
+        <label><input type="checkbox" data-campo="fora_do_projeto" ${rv.fora_do_projeto ? "checked" : ""}> fora do projeto</label>
+        <textarea data-campo="nota" placeholder="Por quê? (opcional)">${esc(rv.nota || "")}</textarea>
+      </div>
+    </div>
+  </article>`;
+}
+
+function filtrados() {
+  const q = $("#busca").value.trim().toLowerCase(), cat = $("#f-cat").value, la = $("#f-laya").value, rev = $("#f-rev").value;
+  const ordem = $("#ordem").value;
+  return C.filter(c => {
+    if (cat && c.categoria !== cat) return false;
+    if (la && String(concorda(c) === true ? "sim" : "nao") !== la) return false;
+    const v = (revisoes[c.id] || {}).veredito;
+    if (rev === "pendente" && v) return false;
+    if (rev && rev !== "pendente" && v !== rev) return false;
+    if (q) {
+      const texto = [c.titulo, c.titulo_antes, c.arquivo, c.categoria, c.descricao_anterior, ...(c.fala_vista || []).map(f => f.texto)].join(" ").toLowerCase();
+      if (!texto.includes(q)) return false;
+    }
+    return true;
+  }).sort((a, b) => ordem === "id" ? a.id - b.id : ordem === "custo" ? b.custo_visao - a.custo_visao : a.duracao - b.duracao);
+}
+function desenhar() { const xs = filtrados(); $("#lista").innerHTML = xs.map(cartao).join("") || `<p class="vazio">Nada com esses filtros.</p>`; atualizarContagem(xs.length); }
+function atualizarContagem(mostrando) {
+  const feitos = Object.values(revisoes).filter(r => r.veredito).length;
+  const errados = Object.values(revisoes).filter(r => r.veredito === "errado").length;
+  const vis = mostrando ?? document.querySelectorAll(".clipe").length;
+  $("#contagem").textContent = `${vis} na tela · revisados ${feitos}/${C.length}` + (feitos ? ` · ${errados} errado${errados === 1 ? "" : "s"}` : "");
+}
+["#busca", "#f-cat", "#f-laya", "#f-rev", "#ordem"].forEach(s => $(s).addEventListener("input", desenhar));
+
+$("#lista").addEventListener("click", e => {
+  const art = e.target.closest(".clipe"); if (!art) return;
+  const video = art.querySelector("video"), id = Number(art.dataset.id), c = C.find(x => x.id === id);
+  const b = e.target.closest("button"); if (!b) return;
+  if (b.dataset.pular && video) { video.currentTime = Number(b.dataset.pular); video.play(); }
+  else if (b.dataset.vel && video) { video.playbackRate = Number(b.dataset.vel); }
+  else if (b.dataset.frac && video) { video.currentTime = c.duracao * Number(b.dataset.frac); video.play(); }
+  else if (b.dataset.veredito) {
+    const rv = revisoes[id] = revisoes[id] || {};
+    rv.veredito = rv.veredito === b.dataset.veredito ? undefined : b.dataset.veredito;
+    if (!rv.veredito) delete revisoes[id];
+    salvar();
+    art.classList.toggle("certo", rv.veredito === "certo"); art.classList.toggle("errado", rv.veredito === "errado");
+    art.querySelector(".v-certo").classList.toggle("ativo", rv.veredito === "certo");
+    art.querySelector(".v-errado").classList.toggle("ativo", rv.veredito === "errado");
+    art.querySelector(".revisao").classList.toggle("mostrar", rv.veredito === "errado");
+  }
+});
+$("#lista").addEventListener("input", e => {
+  const campo = e.target.dataset.campo; if (!campo) return;
+  const id = Number(e.target.closest(".clipe").dataset.id);
+  const rv = revisoes[id] = revisoes[id] || { veredito: "errado" };
+  rv[campo] = e.target.type === "checkbox" ? e.target.checked : e.target.value;
+  salvar();
+});
+// Um vídeo tocando de cada vez
+document.addEventListener("play", e => document.querySelectorAll("video").forEach(v => { if (v !== e.target) v.pause(); }), true);
+
+$("#baixar").onclick = () => {
+  const linhas = C.filter(c => revisoes[c.id] && revisoes[c.id].veredito).map(c => {
+    const rv = revisoes[c.id];
+    return { video_id: c.id, arquivo: c.arquivo, veredito: rv.veredito, categoria_triagem: c.categoria,
+             categoria_laya: c.laya && c.laya.categoria, categoria_certa: rv.veredito === "certo" ? c.categoria : (rv.categoria_certa || null),
+             fora_do_projeto: !!rv.fora_do_projeto, nota: rv.nota || "" };
+  });
+  const blob = new Blob([JSON.stringify({ rodada: R.gerado_em, projeto: R.projeto, revisoes: linhas }, null, 1)], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = `revisao_triagem_${R.gerado_em.slice(0, 16).replace(/[:T]/g, "-")}.json`;
+  document.body.appendChild(a); a.click(); a.remove();
+};
+desenhar();
+</script>
+</body>
+</html>
