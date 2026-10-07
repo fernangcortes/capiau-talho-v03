@@ -3,8 +3,12 @@
 - Laya (``pip install laya``, pesos convaiinnovations/laya, Apache-2.0): roda na
   CPU, checkpoint ``multilingual`` (~680 MB, baixado no primeiro uso para o
   cache do Hugging Face). ~200 ms por decisão depois de carregado.
-- Jev (TypeSafe, ``POST https://api.typesafe.ai/v1/systemone``): mesmo formato
-  de pergunta da Laya; chave em ``api.typesafe_key`` ou ``TYPESAFE_API_KEY``.
+- Jev (TypeSafe): mesmo formato de pergunta da Laya. Por padrão direto no TypeSafe
+  (``POST https://api.typesafe.ai/v1/systemone``, chave ``api.typesafe_key`` ou
+  ``TYPESAFE_API_KEY``, crédito do TypeSafe). Lá só existe ``jev-latest``: a versão que
+  respondeu de fato (ex.: ``jev-1.13.0``) fica gravada em cada decisão, para a calibração
+  perceber quando ela muda. ``triage.jev_via = openrouter`` usa a chave da OpenRouter e a
+  versão fixa ``typesafe/jev-1.13`` (custo em ``usage.cost``).
 
 Os dois recebem o MESMO estado e as MESMAS perguntas; cada decisão vai para a
 tabela ``system1_decisao`` para comparar entre si, com a triagem por visão e
@@ -21,17 +25,20 @@ import json
 import os
 import threading
 import time
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
 from src.nlp.prompt_registry import TRIAGE_CATEGORIES, TRIAGE_RULES, normalizar_categoria
 
 MOTOR_LAYA = "laya-multilingual"
-MOTOR_JEV = "jev-latest"
+MOTOR_JEV = "jev-latest"            # TypeSafe direto (decisões antigas no banco têm este nome)
+MOTOR_JEV_OPENROUTER = "jev-1.13"   # pela OpenRouter, versão fixa
 
 JEV_ENDPOINT_PADRAO = "https://api.typesafe.ai/v1/systemone"
 JEV_MODELO = "jev-latest"
+JEV_OPENROUTER_ENDPOINT = "https://openrouter.ai/api/alpha/decisions"
+JEV_OPENROUTER_MODELO = "typesafe/jev-1.13"
 JEV_TIMEOUT_S = 20.0
 
 # Trecho de fala mandado como contexto: o bastante para decidir, curto para o
@@ -52,6 +59,7 @@ class TriageDecision(BaseModel):
     model: str = Field(..., description="Motor que decidiu (ou tentou)")
     reason: str = Field(default="", description="Motivo da escalação ou da decisão")
     probabilities: Dict[str, float] = Field(default_factory=dict)
+    versao: Optional[str] = Field(None, description="Versão que o motor informou ter respondido")
 
 
 class SafetyAuditDecision(BaseModel):
@@ -111,6 +119,49 @@ def estado_triagem(media_state: Dict[str, Any]) -> str:
     fala = (media_state.get("speech") or "").strip()
     linhas.append(f"fala: {fala[:FALA_MAX_CHARS]}" if fala else "fala: (sem transcrição)")
     return "\n".join(linhas)
+
+
+def _evidencia_visual(evidencia: Dict[str, Any]) -> List[str]:
+    linhas = []
+    visto = (evidencia.get("justificativa") or "").strip()
+    titulo = (evidencia.get("titulo") or "").strip()
+    linhas.append(f"o que a triagem por visão viu nos quadros: {visto}" if visto
+                  else "o que a triagem por visão viu nos quadros: (sem descrição)")
+    if titulo:
+        linhas.append(f"título dado pela visão: {titulo}")
+    return linhas
+
+
+def estado_com_visao(media_state: Dict[str, Any], evidencia: Dict[str, Any]) -> str:
+    """O estado de sempre + o que a visão descreveu dos quadros. Sem a categoria da visão."""
+    return "\n".join([estado_triagem(media_state), *_evidencia_visual(evidencia)])
+
+
+def estado_verificacao(media_state: Dict[str, Any], evidencia: Dict[str, Any], categoria: str) -> str:
+    """Para conferir a categoria proposta: as evidências, a proposta e a taxonomia inteira
+    (para "aponta para outra categoria" ter com o que comparar)."""
+    taxonomia = "; ".join(f"{k}: {v}" for k, v in TRIAGE_CATEGORIES.items())
+    return "\n".join([estado_com_visao(media_state, evidencia),
+                      f"categoria proposta: {categoria} ({TRIAGE_CATEGORIES.get(categoria, '?')})",
+                      f"categorias possíveis: {taxonomia}",
+                      "regras de desempate: " + " ".join(TRIAGE_RULES)])
+
+
+PERGUNTAS_VERIFICACAO: Dict[str, Any] = {
+    "verificacao": {
+        "type": "choice",
+        "instructions": ("Compare a categoria proposta com as evidências do material (o que a visão viu nos "
+                         "quadros, a fala, o nome e a pasta). Qual opção descreve a proposta?"),
+        "criteria": {
+            "confirma": ("As evidências mostram o que a definição da categoria proposta pede, e nada nelas "
+                         "aponta para outra categoria pelas regras de desempate."),
+            "contradiz": ("Alguma evidência aponta para outra categoria da lista pelas regras de desempate, "
+                          "ou contradiz a definição da categoria proposta."),
+            "insuficiente": ("As evidências são poucas ou vagas demais para confirmar ou contradizer a "
+                             "categoria proposta."),
+        },
+    }
+}
 
 
 PERGUNTAS_CORTE: Dict[str, Any] = {
@@ -216,22 +267,48 @@ class System1JevClient:
     """Cliente do Jev (TypeSafe). A chave nunca vai para log nem para mensagem de erro."""
 
     def __init__(self, api_key: Optional[str] = None, endpoint: Optional[str] = None,
-                 escalation_threshold: float = System1LayaEngine.DEFAULT_THRESHOLD, http: Any = None):
+                 escalation_threshold: float = System1LayaEngine.DEFAULT_THRESHOLD, http: Any = None,
+                 via: Optional[str] = None):
         self._api_key = api_key
-        self.endpoint = endpoint or os.getenv("TYPESAFE_ENDPOINT") or JEV_ENDPOINT_PADRAO
+        self._endpoint = endpoint
+        self._via = via  # 'openrouter' | 'typesafe'; None = Configurações (triage.jev_via)
         self.escalation_threshold = escalation_threshold
         self._http = http  # injetável nos testes (precisa de .post)
+        self.ultimo_uso: Dict[str, Any] = {}  # 'usage' da última resposta (custo em US$ pela OpenRouter)
+
+    def via(self, project_id: Optional[int] = None) -> str:
+        if self._via:
+            return self._via
+        try:
+            from src.services.settings_service import SettingsService
+            return SettingsService.get_settings(project_id).get("triage.jev_via") or "typesafe"
+        except Exception:
+            return "typesafe"
+
+    @property
+    def motor(self) -> str:
+        return MOTOR_JEV if self.via() == "typesafe" else MOTOR_JEV_OPENROUTER
+
+    @property
+    def endpoint(self) -> str:
+        if self._endpoint:
+            return self._endpoint
+        if self.via() == "typesafe":
+            return os.getenv("TYPESAFE_ENDPOINT") or JEV_ENDPOINT_PADRAO
+        return JEV_OPENROUTER_ENDPOINT
 
     def _chave(self, project_id: Optional[int] = None) -> str:
         if self._api_key:
             return self._api_key
+        provedor, variavel = ("typesafe", "TYPESAFE_API_KEY") if self.via(project_id) == "typesafe" \
+            else ("openrouter", "OPENROUTER_API_KEY")
         try:
             from src.services.settings_service import SettingsService
-            chave = SettingsService.get_settings(project_id).api_key("typesafe")
+            chave = SettingsService.get_settings(project_id).api_key(provedor)
         except Exception:
-            chave = os.getenv("TYPESAFE_API_KEY", "")
-        if not chave:
-            raise System1Indisponivel("sem chave do TypeSafe (Configurações > api.typesafe_key ou TYPESAFE_API_KEY)")
+            chave = os.getenv(variavel, "")
+        if not chave or chave.startswith("your_"):
+            raise System1Indisponivel(f"sem chave da {provedor} (Configurações > api.{provedor}_key ou {variavel})")
         return chave
 
     def system_one(self, state: Any, questions: Dict[str, Any], project_id: Optional[int] = None) -> Dict[str, Any]:
@@ -239,7 +316,8 @@ class System1JevClient:
         http = self._http
         if http is None:
             import requests as http
-        corpo = {"state": state, "model": JEV_MODELO, "questions": questions}
+        modelo = JEV_MODELO if self.via(project_id) == "typesafe" else JEV_OPENROUTER_MODELO
+        corpo = {"state": state, "model": modelo, "questions": questions}
         try:
             r = http.post(self.endpoint, json=corpo, timeout=JEV_TIMEOUT_S,
                           headers={"Authorization": f"Bearer {chave}", "Content-Type": "application/json"})
@@ -249,18 +327,47 @@ class System1JevClient:
             detalhe = (getattr(r, "text", "") or "")[:200].replace(chave, "***")
             raise System1Indisponivel(f"Jev respondeu HTTP {r.status_code}: {detalhe}")
         try:
-            return r.json()
+            resposta = r.json()
         except Exception as e:
             raise System1Indisponivel("Jev devolveu resposta que não é JSON") from e
+        self.ultimo_uso = resposta.get("usage") or {}
+        return resposta
 
     def evaluate_media_triage(self, media_state: Dict[str, Any], project_id: Optional[int] = None) -> TriageDecision:
         t0 = time.perf_counter()
         resposta = self.system_one(estado_triagem(media_state), perguntas_triagem(), project_id)
-        decisao = _decisao_de_resposta(resposta, MOTOR_JEV, (time.perf_counter() - t0) * 1000.0,
+        decisao = _decisao_de_resposta(resposta, self.motor, (time.perf_counter() - t0) * 1000.0,
                                        self.escalation_threshold)
         if resposta.get("model"):
             decisao.reason += f" [{resposta['model']}]"
+            decisao.versao = resposta["model"]
         return decisao
+
+    def triagem_com_visao(self, media_state: Dict[str, Any], evidencia: Dict[str, Any],
+                          project_id: Optional[int] = None) -> TriageDecision:
+        """A mesma escolha de categoria, lendo também o que a triagem por visão viu nos quadros
+        (o Jev não vê imagem: a justificativa e o título da visão entram como texto)."""
+        t0 = time.perf_counter()
+        resposta = self.system_one(estado_com_visao(media_state, evidencia), perguntas_triagem(), project_id)
+        decisao = _decisao_de_resposta(resposta, self.motor, (time.perf_counter() - t0) * 1000.0,
+                                       self.escalation_threshold)
+        decisao.versao = resposta.get("model")
+        return decisao
+
+    def verificar_triagem(self, media_state: Dict[str, Any], evidencia: Dict[str, Any], categoria: str,
+                          project_id: Optional[int] = None) -> Dict[str, Any]:
+        """As evidências sustentam a categoria que a triagem por visão deu? (receita "cascata
+        verificada" do Jev: confirma, contradiz ou insuficiente, com probabilidades)."""
+        t0 = time.perf_counter()
+        resposta = self.system_one(estado_verificacao(media_state, evidencia, categoria),
+                                   PERGUNTAS_VERIFICACAO, project_id)
+        ans = (resposta.get("answers") or {}).get("verificacao") or {}
+        veredito = ans.get("choice")
+        if veredito not in PERGUNTAS_VERIFICACAO["verificacao"]["criteria"]:
+            raise System1Indisponivel(f"Jev devolveu veredito fora da lista: {veredito!r}")
+        return {"veredito": veredito, "confianca": float(ans.get("confidence") or 0.0),
+                "probabilidades": {k: float(v) for k, v in (ans.get("probabilities") or {}).items()},
+                "latencia_ms": round((time.perf_counter() - t0) * 1000.0, 1), "modelo": resposta.get("model")}
 
     def auditar_cortes(self, trechos: list, justificativa: str, project_id: Optional[int] = None) -> Dict[str, Any]:
         """Segunda opinião sobre trechos que sairão da timeline (probabilidades do Jev)."""
@@ -310,12 +417,12 @@ class System1JevClient:
 def registrar_decisao(conn, *, project_id: Optional[int], media_kind: str, media_id: int, motor: str,
                       modo: str, estado: str, perguntas: Dict[str, Any],
                       decisao: Optional[TriageDecision] = None, erro: Optional[str] = None,
-                      modelo_resposta: Optional[str] = None) -> None:
+                      modelo_resposta: Optional[str] = None, tarefa: str = "triagem") -> None:
     conn.execute(
         "INSERT INTO system1_decisao (project_id, media_kind, media_id, tarefa, motor, modo, modelo_resposta, "
         "estado_json, perguntas_json, resposta_json, categoria, confianca, latencia_ms, erro) "
-        "VALUES (?, ?, ?, 'triagem', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        (project_id, media_kind, media_id, motor, modo, modelo_resposta,
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (project_id, media_kind, media_id, tarefa, motor, modo, modelo_resposta,
          json.dumps(estado, ensure_ascii=False), json.dumps(perguntas, ensure_ascii=False),
          json.dumps(decisao.probabilities, ensure_ascii=False) if decisao else None,
          decisao.category if decisao else None,
@@ -383,8 +490,9 @@ class System1Service:
                                   decisao=None if erro_laya else decisao, erro=erro_laya)
                 if comparar_jev:
                     registrar_decisao(conn, project_id=project_id, media_kind=media_kind, media_id=media_id,
-                                      motor=MOTOR_JEV, modo=modo, estado=estado, perguntas=perguntas,
-                                      decisao=jev_decisao, erro=erro_jev)
+                                      motor=self.jev.motor, modo=modo, estado=estado, perguntas=perguntas,
+                                      decisao=jev_decisao, erro=erro_jev,
+                                      modelo_resposta=jev_decisao.versao if jev_decisao else None)
                 conn.commit()
         return decisao
 

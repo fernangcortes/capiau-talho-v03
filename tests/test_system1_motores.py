@@ -221,3 +221,67 @@ def test_segunda_opiniao_entra_no_resumo_e_so_sobe_o_risco(monkeypatch):
     audit = {"risk_level": "warning", "reason": "Base."}
     ChatAgentService.segunda_opiniao_jev(1, audit, [], "")
     assert "indisponível" in audit["reason"] and audit["risk_level"] == "warning"
+
+
+# ---------------------------------------------------------------------------
+# Jev: TypeSafe direto (padrão) ou OpenRouter; versão registrada; verificador
+# ---------------------------------------------------------------------------
+
+def test_jev_padrao_e_typesafe_e_a_versao_que_respondeu_fica_registrada(banco_memoria, monkeypatch):
+    monkeypatch.setattr(SettingsService, "get_settings", _config())
+    http = HttpFalso(RespostaFalsa(200, resposta_jev("depoimento", 0.97)))
+    svc = System1Service(laya=laya_falsa(), jev=System1JevClient(api_key=CHAVE, http=http))
+    svc.evaluate_triage({"filename": "entrevista.mp4"}, media_id=3)
+    assert http.pedidos[0]["url"] == JEV_ENDPOINT_PADRAO and http.pedidos[0]["json"]["model"] == "jev-latest"
+    linha = banco_memoria.execute("SELECT motor, modelo_resposta, tarefa FROM system1_decisao WHERE motor = ?",
+                                  (MOTOR_JEV,)).fetchone()
+    assert tuple(linha) == (MOTOR_JEV, "jev-1.13.0", "triagem")
+
+
+def test_jev_pela_openrouter_usa_versao_fixa_chave_da_openrouter_e_guarda_o_custo(monkeypatch):
+    from src.services.system1_service import JEV_OPENROUTER_ENDPOINT, MOTOR_JEV_OPENROUTER
+    monkeypatch.setattr(SettingsService, "get_settings", lambda project_id=None: ResolvedSettings(
+        {"triage.jev_via": "openrouter", "api.openrouter_key": "sk-or-teste", "api.typesafe_key": CHAVE}))
+    corpo = {**resposta_jev("cena", 0.9), "usage": {"input_tokens": 400, "output_tokens": 30, "cost": 0.0000168}}
+    http = HttpFalso(RespostaFalsa(200, corpo))
+    jev = System1JevClient(http=http)
+    dec = jev.evaluate_media_triage({"filename": "take.mp4"})
+    pedido = http.pedidos[0]
+    assert pedido["url"] == JEV_OPENROUTER_ENDPOINT == "https://openrouter.ai/api/alpha/decisions"
+    assert pedido["json"]["model"] == "typesafe/jev-1.13"
+    assert pedido["headers"]["Authorization"] == "Bearer sk-or-teste"
+    assert dec.model == MOTOR_JEV_OPENROUTER == jev.motor and jev.ultimo_uso["cost"] == 0.0000168
+
+
+def _verificacao(veredito="contradiz", confianca=0.8):
+    return {"model": "jev-1.13.0", "answers": {"verificacao": {
+        "type": "choice", "choice": veredito, "confidence": confianca,
+        "probabilities": {"confirma": 0.1, "contradiz": confianca, "insuficiente": 0.1}}}}
+
+
+def test_verificador_le_o_que_a_visao_viu_e_a_categoria_proposta():
+    from src.services.system1_service import PERGUNTAS_VERIFICACAO
+    http = HttpFalso(RespostaFalsa(200, _verificacao()))
+    jev = System1JevClient(api_key=CHAVE, http=http, via="typesafe")
+    r = jev.verificar_triagem({"filename": "MVI_3367.MOV", "speech": "fala qualquer"},
+                              {"justificativa": "paisagem com névoa e piscina", "titulo": "Paisagem"}, "terceiros")
+    estado = http.pedidos[0]["json"]["state"]
+    assert "paisagem com névoa e piscina" in estado and "categoria proposta: terceiros" in estado
+    assert "categorias possíveis:" in estado and "regras de desempate:" in estado
+    assert http.pedidos[0]["json"]["questions"] == PERGUNTAS_VERIFICACAO
+    assert (r["veredito"], r["confianca"], r["modelo"]) == ("contradiz", 0.8, "jev-1.13.0")
+
+
+def test_triagem_com_visao_nao_conta_a_categoria_da_visao():
+    http = HttpFalso(RespostaFalsa(200, resposta_jev("bastidor", 0.8)))
+    jev = System1JevClient(api_key=CHAVE, http=http, via="typesafe")
+    dec = jev.triagem_com_visao({"filename": "a.mov"}, {"justificativa": "equipe ajusta refletor"})
+    estado = http.pedidos[0]["json"]["state"]
+    assert "equipe ajusta refletor" in estado and "categoria proposta" not in estado
+    assert dec.category == "bastidor" and dec.versao == "jev-1.13.0"
+
+
+def test_verificador_com_veredito_fora_da_lista_fica_indisponivel():
+    jev = System1JevClient(api_key=CHAVE, http=HttpFalso(RespostaFalsa(200, _verificacao("talvez"))), via="typesafe")
+    with pytest.raises(System1Indisponivel, match="veredito fora da lista"):
+        jev.verificar_triagem({}, {}, "cena")

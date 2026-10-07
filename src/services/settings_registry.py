@@ -329,10 +329,18 @@ SETTINGS_REGISTRY: List[Dict[str, Any]] = [
         "category": "vision", "level": "pro", "scope": "both", "requires_reprocess": False,
     },
     {
+        "key": "triage.jev_via", "type": "enum", "default": "typesafe",
+        "enum": ["typesafe", "openrouter"],
+        "label": "Jev: por onde chamar",
+        "help": "TypeSafe (padrão) usa a chave e o crédito do TypeSafe, sempre na versão mais nova (a versão que respondeu fica registrada). OpenRouter usa a chave e o crédito da OpenRouter, na versão fixa jev-1.13, e informa o custo de cada chamada.",
+        "help_tech": "openrouter: POST https://openrouter.ai/api/alpha/decisions, typesafe/jev-1.13. typesafe: POST https://api.typesafe.ai/v1/systemone, jev-latest.",
+        "category": "vision", "level": "pro", "scope": "both", "requires_reprocess": False,
+    },
+    {
         "key": "triage.system1_compare_jev", "type": "bool", "default": False,
         "label": "Comparar com o Jev (TypeSafe)",
-        "help": "Manda a mesma pergunta ao Jev em nuvem e registra as duas respostas lado a lado. Gasta crédito do TypeSafe; precisa da chave.",
-        "help_tech": "POST https://api.typesafe.ai/v1/systemone, modelo jev-latest.",
+        "help": "Manda a mesma pergunta ao Jev em nuvem e registra as duas respostas lado a lado. Gasta crédito do TypeSafe (ou da OpenRouter, uns US$ 0,00003 por mídia, se escolhida em Jev: por onde chamar).",
+        "help_tech": "Ver triage.jev_via. Decisões em system1_decisao (motor jev-1.13 ou jev-latest).",
         "category": "vision", "level": "pro", "scope": "both", "requires_reprocess": False,
     },
     {

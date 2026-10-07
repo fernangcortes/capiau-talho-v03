@@ -86,7 +86,7 @@ def main():
                 print(f"  Jev indisponível: {e}")
             with get_db() as conn:
                 registrar_decisao(conn, project_id=args.project, media_kind="video", media_id=v["id"],
-                                  motor=MOTOR_JEV, modo="avaliacao", estado=estado_triagem(estado),
+                                  motor=svc.jev.motor, modo="avaliacao", estado=estado_triagem(estado),
                                   perguntas=perguntas_triagem(), decisao=jev,
                                   erro=None if jev else "indisponível")
                 conn.commit()

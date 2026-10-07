@@ -23,7 +23,8 @@ from src.db.repositories.narrative import NarrativeRepository  # noqa: E402
 from src.nlp.prompt_registry import AUDIO_CATEGORIES, TRIAGE_CATEGORIES  # noqa: E402
 
 PASTA = CONFIG.CACHE_DIR / "triagem_rodada"
-MOTOR_LAYA, MOTOR_JEV = "laya-multilingual", "jev-latest"
+MOTOR_LAYA = "laya-multilingual"
+MOTORES_JEV = ("jev-latest", "jev-1.13")  # TypeSafe direto e OpenRouter
 
 
 def _ro(caminho: Path) -> sqlite3.Connection:
@@ -50,12 +51,14 @@ def _relativo(arquivo: Path, base: Path) -> str:
         return arquivo.as_uri()
 
 
-def _ultima_decisao(conn, video_id: int, motor: str) -> Optional[Dict[str, Any]]:
+def _ultima_decisao(conn, video_id: int, motores, tarefa: str = "triagem") -> Optional[Dict[str, Any]]:
     # a última que respondeu; sem nenhuma, a última tentativa (para mostrar o erro)
-    r = conn.execute("SELECT categoria, confianca, resposta_json, erro, modo, created_at FROM system1_decisao "
-                     "WHERE media_kind = 'video' AND media_id = ? AND motor = ? "
+    motores = (motores,) if isinstance(motores, str) else tuple(motores)
+    r = conn.execute("SELECT categoria, confianca, resposta_json, erro, modo, created_at, motor, modelo_resposta "
+                     "FROM system1_decisao WHERE media_kind = 'video' AND media_id = ? AND tarefa = ? "
+                     f"AND motor IN ({','.join('?' * len(motores))}) "
                      "ORDER BY categoria IS NOT NULL DESC, id DESC LIMIT 1",
-                     (video_id, motor)).fetchone()
+                     (video_id, tarefa, *motores)).fetchone()
     if not r:
         return None
     try:
@@ -64,7 +67,8 @@ def _ultima_decisao(conn, video_id: int, motor: str) -> Optional[Dict[str, Any]]
         dist = {}
     dist = {k: float(v) for k, v in dist.items() if isinstance(v, (int, float))} if isinstance(dist, dict) else {}
     return {"categoria": r["categoria"], "confianca": r["confianca"], "distribuicao": dist,
-            "erro": r["erro"], "modo": r["modo"], "quando": r["created_at"]}
+            "erro": r["erro"], "modo": r["modo"], "quando": r["created_at"],
+            "motor": r["motor"], "versao": r["modelo_resposta"]}
 
 
 def _rodadas_anteriores(atual: Path) -> Dict[int, Dict[str, Any]]:
@@ -132,7 +136,9 @@ def coletar(rodada: Dict[str, Any], base: Path, anteriores: Optional[Dict[int, D
                 "falantes": len({d["speaker_id"] for d in dialogos}),
                 "transcreveu_agora": bool(r.get("transcreveu")),
                 "laya": _ultima_decisao(conn, vid, MOTOR_LAYA),
-                "jev": _ultima_decisao(conn, vid, MOTOR_JEV),
+                "jev": _ultima_decisao(conn, vid, MOTORES_JEV),
+                "jev_visao": _ultima_decisao(conn, vid, MOTORES_JEV, "triagem_com_visao"),
+                "jev_verificacao": _ultima_decisao(conn, vid, MOTORES_JEV, "verificacao_triagem"),
                 "custo_visao": r.get("custo_visao_usd", 0), "custo_asr": r.get("custo_asr_usd", 0),
                 "tokens_entrada": sum(int(u.get("prompt_tokens") or 0) for u in usos),
                 "tokens_saida": sum(int(u.get("completion_tokens") or 0) for u in usos),
@@ -147,20 +153,25 @@ def coletar(rodada: Dict[str, Any], base: Path, anteriores: Optional[Dict[int, D
             "backup": backup.name if backup else None, "clipes": clipes}
 
 
-def gerar(caminho_json: Path) -> Path:
+def gerar(caminho_json: Path, destino: Optional[Path] = None) -> Path:
     rodada = json.loads(caminho_json.read_text(encoding="utf-8"))
     if not rodada.get("executado"):
         raise SystemExit(f"{caminho_json.name} é um plano (dry-run): não há resultados para relatar.")
     dados = coletar(rodada, caminho_json.parent, _rodadas_anteriores(caminho_json))
     modelo = (Path(__file__).with_name("triagem_relatorio.html")).read_text(encoding="utf-8")
     bruto = json.dumps(dados, ensure_ascii=False).replace("</", "<\\/")
-    destino = caminho_json.with_suffix(".html")
+    destino = destino or caminho_json.with_suffix(".html")
     destino.write_text(modelo.replace("/*__DADOS__*/null", bruto), encoding="utf-8")
     return destino
 
 
 def main(argv=None) -> int:
-    argv = sys.argv[1:] if argv is None else argv
+    argv = list(sys.argv[1:] if argv is None else argv)
+    saida = None
+    if "--saida" in argv:  # gera noutro arquivo, sem sobrescrever o relatório que já existe
+        i = argv.index("--saida")
+        saida = Path(argv[i + 1])
+        del argv[i:i + 2]
     if argv:
         alvo = Path(argv[0])
     else:
@@ -168,7 +179,7 @@ def main(argv=None) -> int:
         if not executadas:
             raise SystemExit("Nenhuma rodada executada em " + str(PASTA))
         alvo = executadas[-1]
-    destino = gerar(alvo)
+    destino = gerar(alvo, saida)
     print(f"Relatório: {destino}")
     return 0
 

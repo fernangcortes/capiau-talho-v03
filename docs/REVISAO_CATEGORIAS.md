@@ -372,3 +372,18 @@ Ideias para depois (não agora):
   objetos, fala), comparar os sinais e sugerir alterações de categoria para revisão humana.
 - **Mais tempo e custo por clipe** (mais quadros, modelo maior) pode melhorar a triagem: medir
   depois, contra as revisões.
+
+### JEV como verificador (07/10/2026, à tarde)
+
+Receitas do Jev Lab da OpenRouter (openrouter.ai/labs/jev). Entraram:
+- `triage.jev_via`: **TypeSafe é o padrão** (o Fernando tem crédito lá); OpenRouter é opção
+  (`typesafe/jev-1.13`, versão fixa, chave e custo da OpenRouter). O TypeSafe direto só aceita
+  `jev-latest`: a versão que respondeu (hoje `jev-1.13.0`) fica em `system1_decisao.modelo_resposta`.
+- `scripts/jev_verificar.py`: por clipe, JEV direto, JEV lendo o que a visão viu
+  (`tarefa='triagem_com_visao'`) e **verificação** da categoria da triagem
+  (`tarefa='verificacao_triagem'`: confirma / contradiz / insuficiente). Só acrescenta linhas.
+
+No 2º piloto: JEV direto concorda em 10/20; com o texto da visão, 20/20 (eco: a justificativa já
+carrega a resposta, vale pouco como confirmação); **verificador contradiz em 5/20 (#54, #36, #233,
+#60, #204), e os 3 clipes que mudaram de categoria entre os dois pilotos estão entre eles.**
+A confiança do verificador varia de verdade (0,28 a 1,0). A conferir contra as revisões do Fernando.

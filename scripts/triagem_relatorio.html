@@ -10,6 +10,7 @@
   --accent: #2f5bd3; --ok: #1f8a4c; --bad: #c2412d; --warn: #b7791f;
   --c-cena: #7b4fd6; --c-bastidor: #2f7fd3; --c-depoimento: #d3532f; --c-convivio: #2fa37a;
   --c-evento: #c9a227; --c-teste: #7d8a99; --c-documento: #8a5a2b; --c-terceiros: #c2418f;
+  --c-confirma: var(--ok); --c-contradiz: var(--bad); --c-insuficiente: var(--warn);
   --sombra: 0 1px 2px rgba(0,0,0,.05), 0 2px 8px rgba(0,0,0,.04);
 }
 @media (prefers-color-scheme: dark) {
@@ -105,6 +106,7 @@ details.desc p { font-size: 14px; margin: 6px 0 0; }
       <li><b>Laya</b> roda local, de graça, em <b>modo sombra</b>: vota mas não decide. Está em teste e calibração; cada cartão mostra a distribuição de probabilidade dela pelas 8 categorias, para você ver se ela errou "perto" ou "longe".</li>
       <li><b>Distribuição e margem.</b> A triagem agora devolve a probabilidade de cada categoria (as barras do cartão). A <b>margem</b> é a distância entre a 1ª e a 2ª colocada: margem pequena = o modelo ficou em dúvida entre duas. Rodadas antigas só tinham um número de confiança, que quase sempre saía 0,85 a 0,95 e não separava o fácil do difícil.</li>
       <li><b>JEV</b> (TypeSafe, em nuvem) também vota em sombra, como a Laya, para calibrar os dois. Laya e JEV <b>não veem imagem</b>: só nome do arquivo, pasta, duração e fala.</li>
+      <li><b>Verificação do JEV</b> (receita "cascata verificada"): o JEV lê o que a visão descreveu dos quadros, a fala, o nome e a pasta, e diz se isso <b>confirma</b>, <b>contradiz</b> ou é <b>insuficiente</b> para a categoria que a triagem deu. "Contradiz" é o candidato natural a revisão. O cartão também mostra o JEV escolhendo a categoria com o texto da visão; esse quase sempre ecoa a triagem, porque o texto já carrega a resposta.</li>
       <li><b>Rodada anterior:</b> quando o mesmo clipe já foi triado antes, o cartão mostra o que saiu lá. Se a resposta muda entre rodadas, é sinal de caso difícil.</li>
       <li><b>Revise</b> marcando <b>Certo</b> ou <b>Errado</b> (e a categoria que deveria ser). Fica salvo neste navegador; no fim, <b>Baixar revisões</b> gera um JSON que o app aplica como correção humana.</li>
       <li>As <b>falas</b> do cartão são as que a triagem leu: clique no horário para o vídeo pular até lá.</li>
@@ -127,6 +129,7 @@ details.desc p { font-size: 14px; margin: 6px 0 0; }
     <select id="f-cat" aria-label="Categoria"><option value="">Todas as categorias</option></select>
     <select id="f-laya" aria-label="Laya"><option value="">Laya: todos</option><option value="sim">Laya concorda</option><option value="nao">Laya discorda</option></select>
     <select id="f-jev" aria-label="JEV"><option value="">JEV: todos</option><option value="sim">JEV concorda</option><option value="nao">JEV discorda</option></select>
+    <select id="f-verif" aria-label="Verificação"><option value="">Verificação: todas</option><option value="confirma">Confirma</option><option value="contradiz">Contradiz</option><option value="insuficiente">Insuficiente</option></select>
     <select id="f-rev" aria-label="Revisão"><option value="">Revisão: todos</option><option value="pendente">Pendentes</option><option value="certo">Certos</option><option value="errado">Errados</option></select>
     <select id="ordem" aria-label="Ordem"><option value="duracao">Ordem: duração</option><option value="margem">Ordem: menor margem</option><option value="id">Ordem: id</option><option value="custo">Ordem: custo</option></select>
     <button id="baixar" class="primario">Baixar revisões</button>
@@ -167,6 +170,8 @@ $("#sub").textContent = `Rodada de ${R.gerado_em.replace("T", " às ")} · proje
 
 const nLaya = C.filter(c => concorda(c) === true).length;
 const comJevVoto = C.filter(c => c.jev && c.jev.categoria), nJev = comJevVoto.filter(c => concordaJev(c)).length;
+const verif = c => c.jev_verificacao && c.jev_verificacao.categoria;
+const comVerif = C.filter(verif), nContradiz = comVerif.filter(c => verif(c) === "contradiz").length;
 const comAnterior = C.filter(c => c.anterior), nEstavel = comAnterior.filter(c => c.anterior.categoria === c.categoria).length;
 const durTotal = C.reduce((a, c) => a + c.duracao, 0), segTotal = C.reduce((a, c) => a + (c.segundos || 0), 0);
 $("#stats").innerHTML = [
@@ -177,6 +182,7 @@ $("#stats").innerHTML = [
   [tempo(segTotal), `de processamento para ${tempo(durTotal)} de vídeo`],
   [`${nLaya} de ${C.length}`, "Laya concorda"],
   [comJevVoto.length ? `${nJev} de ${comJevVoto.length}` : "—", "JEV concorda"],
+  ...(comVerif.length ? [[`${nContradiz} de ${comVerif.length}`, "verificador do JEV contradiz"]] : []),
   ...(comAnterior.length ? [[`${nEstavel} de ${comAnterior.length}`, "mesma categoria da rodada anterior"]] : []),
   [S.restantes != null ? usd(S.projecao_restantes_usd) : "—", `projeção para os ${S.restantes ?? "?"} restantes`],
 ].map(([b, s]) => `<div class="stat"><b>${esc(b)}</b><span>${esc(s)}</span></div>`).join("");
@@ -209,6 +215,13 @@ function distBarras(dist, marcada) {
   const xs = Object.entries(dist || {}).sort((a, b) => b[1] - a[1]);
   return xs.length ? `<div class="dist">${xs.map(([k, v]) => `<span class="${k === marcada ? "marca" : ""}">${esc(k)}${k === marcada ? " ◂" : ""}</span>
       <span class="trilho"><i style="width:${(v * 100).toFixed(1)}%;background:${COR(k)}"></i></span><span class="num">${(v * 100).toFixed(0)}%</span>`).join("")}</div>` : "";
+}
+function verificacao(d) {
+  if (!d.categoria) return `<div class="vazio">Verificação: ${esc(d.erro || "não respondeu")}.</div>`;
+  const texto = { confirma: "✓ as evidências confirmam a categoria", contradiz: "✗ as evidências apontam outra coisa", insuficiente: "? evidências insuficientes" }[d.categoria] || d.categoria;
+  return `<div class="linha"><span class="pilula" style="background:${COR(d.categoria)}">${esc(d.categoria)}</span>
+    <span class="conf">${d.confianca != null ? (d.confianca * 100).toFixed(0) + "%" : ""}</span><span class="acordo ${d.categoria === "confirma" ? "sim" : "nao"}">${texto}</span></div>
+    ${distBarras(d.distribuicao, d.categoria)}`;
 }
 function voto(nome, d, categoriaTriagem) {
   if (!d) return `<div class="vazio">${nome}: sem voto registrado.</div>`;
@@ -255,7 +268,9 @@ function cartao(c) {
         <div><b>${esc(c.titulo || "—")}</b></div>
         <div class="rotulo">Laya (sombra)</div>
         ${voto("Laya", c.laya, c.categoria)}
-        ${c.jev ? `<div class="rotulo">JEV</div>${voto("JEV", c.jev, c.categoria)}` : ""}
+        ${c.jev ? `<div class="rotulo">JEV (direto: nome, pasta, fala)${c.jev.versao ? " · " + esc(c.jev.versao) : ""}</div>${voto("JEV", c.jev, c.categoria)}` : ""}
+        ${c.jev_verificacao ? `<div class="rotulo">Verificação do JEV</div>${verificacao(c.jev_verificacao)}` : ""}
+        ${c.jev_visao ? `<details class="desc"><summary>JEV escolhendo com o que a visão viu: ${esc(c.jev_visao.categoria || "erro")}</summary>${voto("JEV com visão", c.jev_visao, c.categoria)}</details>` : ""}
         ${c.descricao_anterior ? `<details class="desc"><summary>Descrição da análise de quadros anterior</summary><p>${esc(c.descricao_anterior)}</p></details>` : ""}
       </div>
     </div>
@@ -276,12 +291,13 @@ function cartao(c) {
 }
 
 function filtrados() {
-  const q = $("#busca").value.trim().toLowerCase(), cat = $("#f-cat").value, la = $("#f-laya").value, rev = $("#f-rev").value, je = $("#f-jev").value;
+  const q = $("#busca").value.trim().toLowerCase(), cat = $("#f-cat").value, la = $("#f-laya").value, rev = $("#f-rev").value, je = $("#f-jev").value, ve = $("#f-verif").value;
   const ordem = $("#ordem").value;
   return C.filter(c => {
     if (cat && c.categoria !== cat) return false;
     if (la && String(concorda(c) === true ? "sim" : "nao") !== la) return false;
     if (je && String(concordaJev(c) === true ? "sim" : "nao") !== je) return false;
+    if (ve && verif(c) !== ve) return false;
     const v = (revisoes[c.id] || {}).veredito;
     if (rev === "pendente" && v) return false;
     if (rev && rev !== "pendente" && v !== rev) return false;
@@ -300,7 +316,7 @@ function atualizarContagem(mostrando) {
   const vis = mostrando ?? document.querySelectorAll(".clipe").length;
   $("#contagem").textContent = `${vis} na tela · revisados ${feitos}/${C.length}` + (feitos ? ` · ${errados} errado${errados === 1 ? "" : "s"}` : "");
 }
-["#busca", "#f-cat", "#f-laya", "#f-jev", "#f-rev", "#ordem"].forEach(s => $(s).addEventListener("input", desenhar));
+["#busca", "#f-cat", "#f-laya", "#f-jev", "#f-verif", "#f-rev", "#ordem"].forEach(s => $(s).addEventListener("input", desenhar));
 
 $("#lista").addEventListener("click", e => {
   const art = e.target.closest(".clipe"); if (!art) return;
@@ -335,6 +351,8 @@ $("#baixar").onclick = () => {
     const rv = revisoes[c.id];
     return { video_id: c.id, arquivo: c.arquivo, veredito: rv.veredito, categoria_triagem: c.categoria,
              categoria_laya: c.laya && c.laya.categoria, categoria_jev: c.jev && c.jev.categoria,
+             categoria_jev_com_visao: c.jev_visao && c.jev_visao.categoria,
+             verificacao_jev: verif(c) || null, verificacao_jev_confianca: c.jev_verificacao ? c.jev_verificacao.confianca : null,
              margem: c.margem, categoria_rodada_anterior: c.anterior && c.anterior.categoria, categoria_certa: rv.veredito === "certo" ? c.categoria : (rv.categoria_certa || null),
              fora_do_projeto: !!rv.fora_do_projeto, nota: rv.nota || "" };
   });
