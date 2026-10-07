@@ -330,3 +330,45 @@ Ainda não feito:
 - **Áudio**: plano em `docs/PLANO_AUDIO_CATEGORIAS.md` (categorias aprovadas, calibração pendente).
   O vídeo 555 (`Trilha`) vira `trilha` quando a camada de áudio existir.
 - Campo de objetivo nas configurações do projeto (hoje só o Welcome Hub pergunta, na criação).
+
+
+## 14. Feito em 07/10/2026: áudio, rodada de triagem e calibração
+
+| Commit | O que entrou |
+|---|---|
+| `e12e23e` | Camada 1 do áudio: `video.natureza` (sem imagem ou imagem parada = `audio`), fora da visão |
+| `f86c6e4` | Camada 2 do áudio: tipo de som local (PANNs Cnn10), só fala vai ao ASR (`docs/PLANO_AUDIO_CATEGORIAS.md`, local) |
+| `e1f8135` | `scripts/triagem_rodada.py`: só triagem, dry-run por padrão, piloto espalhado pela duração, teto de gasto, gasto real pelo `usage` da OpenRouter |
+| `ebf7df9` | `scripts/triagem_relatorio.py`: relatório HTML para revisar (vídeo, falas clicáveis, Laya, JEV, revisão exportável em JSON) |
+
+Piloto de 20 clipes (1,5 s a 66 min): **US$ 0,022** (US$ 0,0009 por clipe, 2.212 tokens de entrada
+e 103 de saída em média), ~10 min. A estimativa feita antes (US$ 0,004 a 0,005 por clipe) supunha
+~1.550 tokens por quadro; na prática são algumas centenas. Projeção para os 506 restantes: ~US$ 0,73.
+
+Decisões do Fernando:
+- **Laya e JEV seguem em sombra, para calibrar.** Quando estiverem calibrados, entram como
+  confirmação da triagem (os dois juntos). No piloto: Laya concorda com a triagem em 3/20, JEV em
+  10/20; nas 8 vezes em que o JEV declarou >= 0,9 ele bateu com a triagem. Laya e JEV não veem
+  imagem (só nome, pasta, duração e fala).
+- **A triagem devolve a distribuição** pelas 8 categorias (`video.triagem_detalhe`: distribuição,
+  margem entre 1ª e 2ª, justificativa). `category_confidence` = probabilidade da escolhida. O
+  exemplo `"confianca": 0.85` saiu do prompt (o modelo copiava o número). Calibrar com as revisões
+  do relatório.
+- **Nomes pela grafia do cadastro** (`src/nlp/nomes.py`, camada de semelhança no `name_fixer`):
+  título da triagem e resumo. Diferença só de acento não é corrigida (o cadastro tem "Joâo Antonio
+  Ator"). Roteiro, documentos de produção e créditos não estão neste computador; virão pela
+  sessão de sincronização com o outro computador (ainda não implementada).
+
+Pendências:
+- A chave do TypeSafe salva nas Configurações (`api.typesafe_key`) é recusada (HTTP 401); a do
+  `.env` funciona. O app usa a das Configurações: o Fernando decide qual fica.
+- Rodada completa (506 vídeos): só quando o Fernando pedir, com o app fechado (Qdrant).
+- Reindexar na busca as transcrições dos vídeos 39 e 361 (feitas com o app aberto no 1º piloto).
+
+Ideias para depois (não agora):
+- **Duas opiniões:** segunda chamada com outros quadros; discordância vai para a revisão. Ou outro
+  tipo de análise que confirme a triagem.
+- **Cruzar tudo no fim:** com todas as análises prontas (triagem, Laya, JEV, resumo, rostos,
+  objetos, fala), comparar os sinais e sugerir alterações de categoria para revisão humana.
+- **Mais tempo e custo por clipe** (mais quadros, modelo maior) pode melhorar a triagem: medir
+  depois, contra as revisões.

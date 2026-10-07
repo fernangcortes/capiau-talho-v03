@@ -23,14 +23,15 @@ from src.services.system1_service import (
 )
 
 
-def selecionar(project_id: int, limite: int):
+def selecionar(project_id: int, limite: int, ids=None):
     with get_db() as conn:
         linhas = conn.execute(
             "SELECT v.id, v.filepath, v.duration, v.category, "
             "(SELECT right_category FROM triage_feedback f WHERE f.media_kind='video' AND f.media_id=v.id "
             " ORDER BY f.created_at DESC LIMIT 1) AS humano "
             "FROM video v WHERE v.project_id = ? AND v.category IS NOT NULL AND v.category != '' "
-            "ORDER BY v.id LIMIT ?", (project_id, limite)).fetchall()
+            + (f"AND v.id IN ({','.join('?' * len(ids))}) " if ids else "")
+            + "ORDER BY v.id LIMIT ?", (project_id, *(ids or []), limite)).fetchall()
         itens = []
         for r in linhas:
             try:
@@ -46,9 +47,13 @@ def main():
     ap.add_argument("--project", type=int, required=True)
     ap.add_argument("--limit", type=int, default=40)
     ap.add_argument("--jev", action="store_true", help="compara com o Jev (gasta crédito TypeSafe)")
+    ap.add_argument("--videos", default="", help="ids separados por vírgula (no lugar dos primeiros --limit)")
     args = ap.parse_args()
 
-    itens = selecionar(args.project, args.limit)
+    ids = [int(x) for x in args.videos.split(",") if x.strip()] or None
+    itens = selecionar(args.project, len(ids) if ids else args.limit, ids)
+    from src.nlp.prompt_templates import objetivo_do_projeto
+    objetivo = objetivo_do_projeto(args.project)  # o mesmo contexto da triagem do pipeline
     if not itens:
         print("Nenhum vídeo com categoria neste projeto.")
         return
@@ -63,7 +68,7 @@ def main():
 
     for v, fala in itens:
         caminho = Path(v["filepath"])
-        estado = {"filename": caminho.name, "folder": caminho.parent.name, "duration_s": v["duration"],
+        estado = {"objetivo": objetivo, "filename": caminho.name, "folder": caminho.parent.name, "duration_s": v["duration"],
                   "has_audio": has_audio_stream(caminho) if caminho.exists() else False, "speech": fala}
         referencia = v["humano"] or v["category"]
         origem = "humano" if v["humano"] else "visão"

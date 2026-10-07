@@ -46,9 +46,11 @@ def _banco_leitura() -> sqlite3.Connection:
 def selecionar(project_id: int, limite: int = 0, ids: Optional[List[int]] = None) -> List[Dict[str, Any]]:
     conn = _banco_leitura()
     try:
+        # Com ids explícitos vale também vídeo já triado (refazer o piloto); sem ids, só os sem categoria
         sql = ("SELECT v.id, v.filename, v.duration, v.video_type, v.natureza, "
                "EXISTS(SELECT 1 FROM transcript t WHERE t.video_id = v.id) AS tem_fala "
-               "FROM video v WHERE v.project_id = ? AND (v.category IS NULL OR v.category = '')")
+               "FROM video v WHERE v.project_id = ?"
+               + ("" if ids else " AND (v.category IS NULL OR v.category = '')"))
         linhas = [dict(r) for r in conn.execute(sql + " ORDER BY v.duration, v.id", (project_id,))]
     finally:
         conn.close()
@@ -85,6 +87,9 @@ def plano(videos: List[Dict[str, Any]], preco_asr: float) -> Dict[str, Any]:
 
 
 def executar(videos: List[Dict[str, Any]], teto: float, preco_asr: float) -> Dict[str, Any]:
+    # As mesmas migrações que o servidor roda ao subir (colunas novas da triagem)
+    from src.db.schema import init_db
+    init_db()
     from src.services import pipeline as P
     chamadas: List[Dict[str, Any]] = []
     P.OBSERVADORES_DE_USO.append(chamadas.append)
@@ -169,7 +174,7 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--project", type=int, required=True)
     ap.add_argument("--limite", type=int, default=0, help="piloto: N vídeos espalhados pela duração (0 = todos)")
-    ap.add_argument("--videos", default="", help="ids separados por vírgula (no lugar da seleção)")
+    ap.add_argument("--videos", default="", help="ids separados por vírgula (no lugar da seleção; refaz mesmo os já triados)")
     ap.add_argument("--teto-usd", type=float, default=4.0, help="para antes do próximo vídeo ao passar disto")
     ap.add_argument("--executar", action="store_true", help="chama a API de verdade (custa); sem isto só planeja")
     args = ap.parse_args(argv)

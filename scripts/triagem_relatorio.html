@@ -103,7 +103,9 @@ details.desc p { font-size: 14px; margin: 6px 0 0; }
     <ol>
       <li><b>O que a triagem fez em cada clipe:</b> olhou até 6 quadros (um no meio de cada plano, dos mais longos primeiro), leu o começo da fala transcrita, o nome do arquivo e da pasta, o objetivo do projeto e a lista de nomes conhecidos, e escolheu <b>uma</b> categoria. Não houve análise de quadros completa: isto é só o "o que é este clipe".</li>
       <li><b>Laya</b> roda local, de graça, em <b>modo sombra</b>: vota mas não decide. Está em teste e calibração; cada cartão mostra a distribuição de probabilidade dela pelas 8 categorias, para você ver se ela errou "perto" ou "longe".</li>
-      <li><b>Confiança</b> é o número que o próprio modelo declara. Até aqui ele quase sempre diz 0,85 a 0,95, então ela ainda não separa o fácil do difícil: não confie nela para escolher o que revisar.</li>
+      <li><b>Distribuição e margem.</b> A triagem agora devolve a probabilidade de cada categoria (as barras do cartão). A <b>margem</b> é a distância entre a 1ª e a 2ª colocada: margem pequena = o modelo ficou em dúvida entre duas. Rodadas antigas só tinham um número de confiança, que quase sempre saía 0,85 a 0,95 e não separava o fácil do difícil.</li>
+      <li><b>JEV</b> (TypeSafe, em nuvem) também vota em sombra, como a Laya, para calibrar os dois. Laya e JEV <b>não veem imagem</b>: só nome do arquivo, pasta, duração e fala.</li>
+      <li><b>Rodada anterior:</b> quando o mesmo clipe já foi triado antes, o cartão mostra o que saiu lá. Se a resposta muda entre rodadas, é sinal de caso difícil.</li>
       <li><b>Revise</b> marcando <b>Certo</b> ou <b>Errado</b> (e a categoria que deveria ser). Fica salvo neste navegador; no fim, <b>Baixar revisões</b> gera um JSON que o app aplica como correção humana.</li>
       <li>As <b>falas</b> do cartão são as que a triagem leu: clique no horário para o vídeo pular até lá.</li>
     </ol>
@@ -116,15 +118,17 @@ details.desc p { font-size: 14px; margin: 6px 0 0; }
   <div class="graficos">
     <div class="painel"><h3>Categoria da triagem</h3><div id="g-triagem"></div></div>
     <div class="painel"><h3>Triagem x Laya, por categoria da triagem</h3><div id="g-laya"></div>
-      <p class="sub" style="margin:8px 0 0;font-size:13px">Verde: a Laya votou igual. Vermelho: votou outra coisa.</p></div>
+      <p class="sub" style="margin:8px 0 0;font-size:13px">Verde: votou igual. Vermelho: votou outra coisa.</p></div>
+    <div class="painel"><h3>Triagem x JEV, por categoria da triagem</h3><div id="g-jev"></div></div>
   </div>
 
   <div class="ferramentas">
     <input id="busca" type="search" placeholder="Buscar em título, arquivo, fala…" aria-label="Buscar">
     <select id="f-cat" aria-label="Categoria"><option value="">Todas as categorias</option></select>
     <select id="f-laya" aria-label="Laya"><option value="">Laya: todos</option><option value="sim">Laya concorda</option><option value="nao">Laya discorda</option></select>
+    <select id="f-jev" aria-label="JEV"><option value="">JEV: todos</option><option value="sim">JEV concorda</option><option value="nao">JEV discorda</option></select>
     <select id="f-rev" aria-label="Revisão"><option value="">Revisão: todos</option><option value="pendente">Pendentes</option><option value="certo">Certos</option><option value="errado">Errados</option></select>
-    <select id="ordem" aria-label="Ordem"><option value="duracao">Ordem: duração</option><option value="id">Ordem: id</option><option value="custo">Ordem: custo</option></select>
+    <select id="ordem" aria-label="Ordem"><option value="duracao">Ordem: duração</option><option value="margem">Ordem: menor margem</option><option value="id">Ordem: id</option><option value="custo">Ordem: custo</option></select>
     <button id="baixar" class="primario">Baixar revisões</button>
     <span class="contagem" id="contagem"></span>
   </div>
@@ -155,11 +159,15 @@ $("#tema").onclick = () => {
 };
 
 const R = DADOS.rodada, S = R.resumo || {}, C = DADOS.clipes;
-const concorda = c => c.laya && c.laya.categoria && c.categoria ? c.laya.categoria === c.categoria : null;
+const bate = (d, c) => d && d.categoria && c.categoria ? d.categoria === c.categoria : null;
+const concorda = c => bate(c.laya, c);
+const concordaJev = c => bate(c.jev, c);
 $("#sub").textContent = `Rodada de ${R.gerado_em.replace("T", " às ")} · projeto ${R.projeto} · ${C.length} clipes`
   + (DADOS.backup ? ` · títulos antigos do backup ${DADOS.backup}` : "");
 
 const nLaya = C.filter(c => concorda(c) === true).length;
+const comJevVoto = C.filter(c => c.jev && c.jev.categoria), nJev = comJevVoto.filter(c => concordaJev(c)).length;
+const comAnterior = C.filter(c => c.anterior), nEstavel = comAnterior.filter(c => c.anterior.categoria === c.categoria).length;
 const durTotal = C.reduce((a, c) => a + c.duracao, 0), segTotal = C.reduce((a, c) => a + (c.segundos || 0), 0);
 $("#stats").innerHTML = [
   [C.length, "clipes triados"],
@@ -168,13 +176,15 @@ $("#stats").innerHTML = [
   [(S.tokens_entrada_medio || 0) + " / " + (S.tokens_saida_medio || 0), "tokens médios (entrada / saída)"],
   [tempo(segTotal), `de processamento para ${tempo(durTotal)} de vídeo`],
   [`${nLaya} de ${C.length}`, "Laya concorda"],
+  [comJevVoto.length ? `${nJev} de ${comJevVoto.length}` : "—", "JEV concorda"],
+  ...(comAnterior.length ? [[`${nEstavel} de ${comAnterior.length}`, "mesma categoria da rodada anterior"]] : []),
   [S.restantes != null ? usd(S.projecao_restantes_usd) : "—", `projeção para os ${S.restantes ?? "?"} restantes`],
 ].map(([b, s]) => `<div class="stat"><b>${esc(b)}</b><span>${esc(s)}</span></div>`).join("");
 
 $("#cats").innerHTML = CATS.map(c => `<span class="pilula" style="background:${COR(c)}">${c}</span><span>${esc(DADOS.categorias[c])}</span>`).join("");
-const comJev = C.filter(c => c.jev).length;
+const comJev = comJevVoto.length;
 $("#nota-jev").innerHTML = comJev
-  ? `<b>JEV:</b> ${comJev} destes clipes têm voto do JEV (TypeSafe), mostrado no cartão.`
+  ? `<b>JEV:</b> ${comJev} destes clipes têm voto do JEV (TypeSafe), mostrado no cartão ao lado do da Laya.`
   : `<b>JEV:</b> nenhum destes clipes tem voto do JEV. A comparação com o JEV (TypeSafe, em nuvem, gasta crédito) está desligada nas Configurações (<code>triage.system1_compare_jev</code>); ele só rodou em 30/09, pelo script de avaliação, em outros 23 vídeos.`;
 
 function barras(alvo, linhas, max) {
@@ -185,24 +195,29 @@ function barras(alvo, linhas, max) {
 const porCat = CATS.map(c => [c, C.filter(x => x.categoria === c)]).filter(([, xs]) => xs.length);
 const maxCat = Math.max(1, ...porCat.map(([, xs]) => xs.length));
 barras($("#g-triagem"), porCat.map(([c, xs]) => [c, [[xs.length, COR(c)]], xs.length]), maxCat);
-barras($("#g-laya"), porCat.map(([c, xs]) => {
-  const sim = xs.filter(x => concorda(x) === true).length;
+const acordoPor = f => porCat.map(([c, xs]) => {
+  const sim = xs.filter(x => f(x) === true).length;
   return [c, [[sim, "var(--ok)"], [xs.length - sim, "var(--bad)"]], `${sim}/${xs.length}`];
-}), maxCat);
+});
+barras($("#g-laya"), acordoPor(concorda), maxCat);
+barras($("#g-jev"), acordoPor(concordaJev), maxCat);
 
 const fCat = $("#f-cat");
 CATS.forEach(c => fCat.insertAdjacentHTML("beforeend", `<option value="${c}">${c}</option>`));
 
+function distBarras(dist, marcada) {
+  const xs = Object.entries(dist || {}).sort((a, b) => b[1] - a[1]);
+  return xs.length ? `<div class="dist">${xs.map(([k, v]) => `<span class="${k === marcada ? "marca" : ""}">${esc(k)}${k === marcada ? " ◂" : ""}</span>
+      <span class="trilho"><i style="width:${(v * 100).toFixed(1)}%;background:${COR(k)}"></i></span><span class="num">${(v * 100).toFixed(0)}%</span>`).join("")}</div>` : "";
+}
 function voto(nome, d, categoriaTriagem) {
   if (!d) return `<div class="vazio">${nome}: sem voto registrado.</div>`;
   if (!d.categoria) return `<div class="vazio">${nome}: ${esc(d.erro || "não respondeu")}.</div>`;
   const ac = d.categoria === categoriaTriagem;
-  const dist = Object.entries(d.distribuicao || {}).sort((a, b) => b[1] - a[1]);
   return `<div class="linha"><span class="pilula" style="background:${COR(d.categoria)}">${esc(d.categoria)}</span>
       <span class="conf">${d.confianca != null ? (d.confianca * 100).toFixed(0) + "%" : ""}</span>
       <span class="acordo ${ac ? "sim" : "nao"}">${ac ? "✓ concorda com a triagem" : "✗ discorda da triagem"}</span></div>
-    ${dist.length ? `<div class="dist">${dist.map(([k, v]) => `<span class="${k === categoriaTriagem ? "marca" : ""}">${esc(k)}${k === categoriaTriagem ? " ◂" : ""}</span>
-      <span class="trilho"><i style="width:${(v * 100).toFixed(1)}%;background:${COR(k)}"></i></span><span class="num">${(v * 100).toFixed(0)}%</span>`).join("")}</div>` : ""}`;
+    ${distBarras(d.distribuicao, categoriaTriagem)}`;
 }
 
 function cartao(c) {
@@ -229,7 +244,12 @@ function cartao(c) {
         <div class="rotulo">Triagem</div>
         <div class="linha"><span class="pilula" style="background:${COR(c.categoria)}">${esc(c.categoria || "sem categoria")}</span>${conf}
           ${(c.secundarias || []).map(s => `<span class="chip">também: ${esc(s)}</span>`).join("")}
-          ${c.fora_do_projeto ? `<span class="chip" style="color:var(--warn)">fora do projeto</span>` : ""}</div>
+          ${c.fora_do_projeto ? `<span class="chip" style="color:var(--warn)">fora do projeto</span>` : ""}
+          ${c.margem != null ? `<span class="chip" title="Distância entre a 1ª e a 2ª categoria">margem ${(c.margem * 100).toFixed(0)}%</span>` : ""}</div>
+        ${c.distribuicao ? distBarras(c.distribuicao, c.categoria) : ""}
+        ${c.justificativa ? `<div class="nota" style="margin:8px 0 0">${esc(c.justificativa)}</div>` : ""}
+        ${c.anterior ? `<div class="linha" style="margin-top:6px"><span class="chip">rodada anterior: ${esc(c.anterior.categoria)}${c.anterior.confianca != null ? " " + (c.anterior.confianca * 100).toFixed(0) + "%" : ""}</span>
+          <span class="acordo ${c.anterior.categoria === c.categoria ? "sim" : "nao"}">${c.anterior.categoria === c.categoria ? "✓ estável" : "≠ mudou"}</span></div>` : ""}
         <div class="rotulo">Título</div>
         ${c.titulo_antes && c.titulo_antes !== c.titulo ? `<div class="titulo-antes">${esc(c.titulo_antes)}</div>` : ""}
         <div><b>${esc(c.titulo || "—")}</b></div>
@@ -256,11 +276,12 @@ function cartao(c) {
 }
 
 function filtrados() {
-  const q = $("#busca").value.trim().toLowerCase(), cat = $("#f-cat").value, la = $("#f-laya").value, rev = $("#f-rev").value;
+  const q = $("#busca").value.trim().toLowerCase(), cat = $("#f-cat").value, la = $("#f-laya").value, rev = $("#f-rev").value, je = $("#f-jev").value;
   const ordem = $("#ordem").value;
   return C.filter(c => {
     if (cat && c.categoria !== cat) return false;
     if (la && String(concorda(c) === true ? "sim" : "nao") !== la) return false;
+    if (je && String(concordaJev(c) === true ? "sim" : "nao") !== je) return false;
     const v = (revisoes[c.id] || {}).veredito;
     if (rev === "pendente" && v) return false;
     if (rev && rev !== "pendente" && v !== rev) return false;
@@ -269,7 +290,8 @@ function filtrados() {
       if (!texto.includes(q)) return false;
     }
     return true;
-  }).sort((a, b) => ordem === "id" ? a.id - b.id : ordem === "custo" ? b.custo_visao - a.custo_visao : a.duracao - b.duracao);
+  }).sort((a, b) => ordem === "id" ? a.id - b.id : ordem === "custo" ? b.custo_visao - a.custo_visao
+    : ordem === "margem" ? (a.margem ?? 2) - (b.margem ?? 2) : a.duracao - b.duracao);
 }
 function desenhar() { const xs = filtrados(); $("#lista").innerHTML = xs.map(cartao).join("") || `<p class="vazio">Nada com esses filtros.</p>`; atualizarContagem(xs.length); }
 function atualizarContagem(mostrando) {
@@ -278,7 +300,7 @@ function atualizarContagem(mostrando) {
   const vis = mostrando ?? document.querySelectorAll(".clipe").length;
   $("#contagem").textContent = `${vis} na tela · revisados ${feitos}/${C.length}` + (feitos ? ` · ${errados} errado${errados === 1 ? "" : "s"}` : "");
 }
-["#busca", "#f-cat", "#f-laya", "#f-rev", "#ordem"].forEach(s => $(s).addEventListener("input", desenhar));
+["#busca", "#f-cat", "#f-laya", "#f-jev", "#f-rev", "#ordem"].forEach(s => $(s).addEventListener("input", desenhar));
 
 $("#lista").addEventListener("click", e => {
   const art = e.target.closest(".clipe"); if (!art) return;
@@ -312,7 +334,8 @@ $("#baixar").onclick = () => {
   const linhas = C.filter(c => revisoes[c.id] && revisoes[c.id].veredito).map(c => {
     const rv = revisoes[c.id];
     return { video_id: c.id, arquivo: c.arquivo, veredito: rv.veredito, categoria_triagem: c.categoria,
-             categoria_laya: c.laya && c.laya.categoria, categoria_certa: rv.veredito === "certo" ? c.categoria : (rv.categoria_certa || null),
+             categoria_laya: c.laya && c.laya.categoria, categoria_jev: c.jev && c.jev.categoria,
+             margem: c.margem, categoria_rodada_anterior: c.anterior && c.anterior.categoria, categoria_certa: rv.veredito === "certo" ? c.categoria : (rv.categoria_certa || null),
              fora_do_projeto: !!rv.fora_do_projeto, nota: rv.nota || "" };
   });
   const blob = new Blob([JSON.stringify({ rodada: R.gerado_em, projeto: R.projeto, revisoes: linhas }, null, 1)], { type: "application/json" });

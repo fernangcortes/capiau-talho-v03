@@ -51,8 +51,10 @@ def _relativo(arquivo: Path, base: Path) -> str:
 
 
 def _ultima_decisao(conn, video_id: int, motor: str) -> Optional[Dict[str, Any]]:
+    # a última que respondeu; sem nenhuma, a última tentativa (para mostrar o erro)
     r = conn.execute("SELECT categoria, confianca, resposta_json, erro, modo, created_at FROM system1_decisao "
-                     "WHERE media_kind = 'video' AND media_id = ? AND motor = ? ORDER BY id DESC LIMIT 1",
+                     "WHERE media_kind = 'video' AND media_id = ? AND motor = ? "
+                     "ORDER BY categoria IS NOT NULL DESC, id DESC LIMIT 1",
                      (video_id, motor)).fetchone()
     if not r:
         return None
@@ -65,7 +67,24 @@ def _ultima_decisao(conn, video_id: int, motor: str) -> Optional[Dict[str, Any]]
             "erro": r["erro"], "modo": r["modo"], "quando": r["created_at"]}
 
 
-def coletar(rodada: Dict[str, Any], base: Path) -> Dict[str, Any]:
+def _rodadas_anteriores(atual: Path) -> Dict[int, Dict[str, Any]]:
+    """Resultado de cada vídeo na rodada executada mais recente ANTES desta (estabilidade)."""
+    anteriores: Dict[int, Dict[str, Any]] = {}
+    for p in sorted(PASTA.glob("*.json")):
+        if p.stem.endswith("_plano") or p.stem >= atual.stem:
+            continue
+        try:
+            dados = json.loads(p.read_text(encoding="utf-8"))
+        except ValueError:
+            continue
+        for r in dados.get("resultados", []):
+            if r.get("categoria"):
+                anteriores[r["video_id"]] = {"rodada": p.stem, "categoria": r.get("categoria"),
+                                             "confianca": r.get("confianca"), "titulo": r.get("titulo")}
+    return anteriores
+
+
+def coletar(rodada: Dict[str, Any], base: Path, anteriores: Optional[Dict[int, Dict[str, Any]]] = None) -> Dict[str, Any]:
     conn = _ro(CONFIG.DB_PATH)
     backup = _backup_anterior(rodada["gerado_em"])
     antigo = _ro(backup) if backup else None
@@ -89,15 +108,23 @@ def coletar(rodada: Dict[str, Any], base: Path) -> Dict[str, Any]:
             except ValueError:
                 secundarias = []
             usos = [c.get("uso") or {} for c in r.get("chamadas", [])]
+            try:
+                detalhe = json.loads(v.get("triagem_detalhe") or "{}")
+            except ValueError:
+                detalhe = {}
             clipes.append({
                 "id": vid, "arquivo": v["filename"], "caminho": v["filepath"],
                 "duracao": v.get("duration") or 0, "tipo": v.get("video_type"), "natureza": v.get("natureza"),
                 "video": _relativo(proxy, base) if proxy.exists() else None,
                 "capa": _relativo(capa, base) if capa.exists() else None,
-                "resultado": r.get("resultado"), "categoria": v.get("category"),
-                "confianca": v.get("category_confidence"), "secundarias": secundarias,
+                "resultado": r.get("resultado"), "categoria": r.get("categoria") or v.get("category"),
+                "confianca": r.get("confianca", v.get("category_confidence")), "secundarias": secundarias,
+                "distribuicao": r.get("distribuicao") or detalhe.get("distribuicao"),
+                "margem": r.get("margem", detalhe.get("margem")),
+                "justificativa": detalhe.get("justificativa"),
+                "anterior": (anteriores or {}).get(vid),
                 "fora_do_projeto": bool(v.get("fora_do_projeto")),
-                "titulo": v.get("title"), "titulo_antes": titulo_antes,
+                "titulo": r.get("titulo") or v.get("title"), "titulo_antes": titulo_antes,
                 "descricao_anterior": v.get("description"),
                 # o que a triagem leu: os 6 primeiros blocos de fala, com o instante para pular
                 "fala_vista": [{"t": d["start_time"], "falante": d["speaker_id"], "texto": d["text"]}
@@ -124,7 +151,7 @@ def gerar(caminho_json: Path) -> Path:
     rodada = json.loads(caminho_json.read_text(encoding="utf-8"))
     if not rodada.get("executado"):
         raise SystemExit(f"{caminho_json.name} é um plano (dry-run): não há resultados para relatar.")
-    dados = coletar(rodada, caminho_json.parent)
+    dados = coletar(rodada, caminho_json.parent, _rodadas_anteriores(caminho_json))
     modelo = (Path(__file__).with_name("triagem_relatorio.html")).read_text(encoding="utf-8")
     bruto = json.dumps(dados, ensure_ascii=False).replace("</", "<\\/")
     destino = caminho_json.with_suffix(".html")
