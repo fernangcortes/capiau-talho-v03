@@ -502,3 +502,38 @@ Vale para colunas do editor, pilhas de coluna, faixas, janelas destacadas simple
   3. Permitir trocar de lugar por arrasto (e escolha explícita onde houver posição especial).
   4. Se for outra janela: expor `capiauSetPanelCollapsed` / `capiauPanelEdge` e repassar teclas.
   5. Autoteste das regras puras em `tests/` (ver `tests/autoteste_panel_collapse.mjs`).
+
+## X. Padrão da Barra de Decupagem Visual & Cenas Cromáticas da Biblioteca
+### 18. Diretrizes de Interação e Navegação por Cor / Escala / Falantes
+* **Princípio de Alinhamento Cromático:**
+  * As mesmas cores e blocos de agrupamento computados para a calha vertical (`#library-scroll-color-ribbon`) por `coalesceColorBlocks` (usando distância euclidiana ponderada $\le 52$) são compartilhados com a Barra de Decupagem Visual horizontal (`#library-decoupage-strip`) e os blocos de cenas da galeria (`.gallery-sticky-header.scene-decoupage-header`).
+* **Regras Estritas de Gestos:**
+  * **Clique Simples no Segmento:** Executa rolagem suave (`scrollIntoView({ behavior: 'smooth' })`) até o grupo correspondente e dispara o pulso de destaque (`applyRevealPulse`) nos clipes.
+  * **Alt + Clique no Segmento ou Calha:** Filtra exclusivamente a biblioteca para exibir apenas aquele bloco/cena. Ativa o botão `[X Todas]` e destaca o segmento com borda brilhante e fundo saturado.
+  * **Tecla Escape ou Botão [X]:** Limpa instantaneamente qualquer filtro de decupagem ativo, restaurando a visão completa do acervo.
+  * **NÃO usar Duplo Clique para Filtragem:** O gesto de duplo clique nos cabeçalhos (`.gallery-sticky-header`) é estritamente reservado para recolher/expandir o mosaico de clipes do bloco (Design System Seção VIII).
+  * **Isolamento de Cliques em Ações:** Todos os botões internos de cabeçalhos (`.scene-header-btn`, `.btn-select-scene-clips`, `.btn-filter-color-global`) devem obrigatoriamente chamar `e.stopPropagation()` para não acionar a retração do bloco.
+* **Filtro Global de Paleta (`.btn-filter-color-global`):**
+  * Permite ao montador buscar e isolar todos os planos do projeto inteiro que compartilham uma dada paleta/temperatura de cor (distância $\le 52$), independentemente de quando ou onde foram gravados.
+
+### 19. Chips Minimalistas Inteligentes da Fita de Decupagem (Tiered Smart Chips)
+* **Objetivo:** Maximizar a visibilidade horizontal na barra de decupagem em sidebars estreitas ($\ge 10$ a $15$ chips simultâneos sem necessidade de rolagem) sem sobrecarga cognitiva ou poluição textual.
+* **Regra Fundamental de Cor:**
+  * **Cores nunca exibem nomes textuais** (como "Rubi", "Azul", "Esmeralda", "Dourado"). A própria cor de fundo do chip é a sua identidade visual autossuficiente.
+  * Grupos de cor com $\le 3$ itens (ou $\le 2$ em cenas) são renderizados como swatches puros sem texto (`.chip-swatch-only`, $16 \times 16\text{px}$).
+  * Grupos de cor maiores exibem estritamente a contagem numérica (`.chip-number-only`, ex: `145`, `248`).
+* **Apresentação Compacta por Categoria:**
+  * **Escala de Plano (`shot_scale`):** Siglas padrão de decupagem NLE cinematográfica (`CU` para Close-Up, `PM` para Médio, `PA` para Americano, `PG` para Geral, `DET` para Detalhe, `AER` para Aéreo, `VAR` para Variado) acompanhadas da contagem (ex: `CU 12`).
+  * **Falantes (`speakers`):** Apenas o primeiro nome ou primeiro nome + contagem (`Emily 12`, `Dina 20`).
+  * **Data de Gravação (`date`):** Formato ultra-enxuto dia + mês abreviado + contagem (ex: `24 Out 15`).
+  * **Smart Bins (`smart_bins`):** Termos sucintos de taxonomia (`Entrev.`, `Elenco`, `Ação`, `Câmera`, `Luz`, `Direção`, `Áudio`, `Set`, `Bastid.`).
+  * **Palavras-chave (`keyword`):** Máximo de 7 caracteres truncados + contagem.
+* **Escala de Classes CSS:**
+  * `.chip-swatch-only`: $16 \times 16\text{px}$, sem label de texto.
+  * `.chip-number-only`: $16\text{px}$ de altura, min-width $20\text{px}$, máx $34\text{px}$ (apenas números).
+  * `.chip-micro`: $16\text{px}$ de altura, min-width $20\text{px}$, máx $38\text{px}$ (índice ou sigla curta).
+  * `.chip-compact`: $16\text{px}$ de altura, min-width $26\text{px}$, máx $62\text{px}$.
+  * `.chip-standard`: $16\text{px}$ de altura, min-width $38\text{px}$, máx $85\text{px}$.
+* **Preservação de Detalhes em Tooltips Globais:**
+  * Mesmo nos chips mais compactos ou swatches puros, o atributo `data-tooltip` carrega a descrição completa: nome da família de cor / categoria, minutagem total (`00:00:00`), contagem exata de mídias e instruções claras dos atalhos de clique (`Clique: Rolar | Alt+Clique: Filtrar`).
+

@@ -10968,6 +10968,379 @@ input[type="number"] {
     background: rgba(255, 255, 255, 0.28) !important;
 }
 
+/* ==========================================================================
+   Barra de Decupagem Visual & Cenas Cromáticas (Régua Interativa Superior)
+   ========================================================================== */
+.library-decoupage-strip {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    height: 24px;
+    min-height: 24px;
+    padding: 0 var(--sp-6);
+    box-sizing: border-box;
+    background: rgba(14, 14, 20, 0.96);
+    border-bottom: 1px solid var(--border-glass);
+    flex-shrink: 0;
+    position: relative;
+    z-index: 40;
+    gap: var(--sp-4);
+    user-select: none;
+    transition: height 0.2s ease, max-height 0.2s ease, padding 0.2s ease;
+}
+
+.decoupage-mode-dropdown-container {
+    position: relative;
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+    z-index: 60;
+}
+
+.decoupage-mode-trigger {
+    height: 18px;
+    padding: 0 var(--sp-6);
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid var(--border-glass);
+    border-radius: 3px;
+    color: #e2e8f0;
+    font-size: var(--fs-9);
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-4);
+    transition: background 0.15s, border-color 0.15s;
+    user-select: none;
+    white-space: nowrap;
+}
+
+.decoupage-mode-trigger:hover {
+    background: rgba(255, 255, 255, 0.15);
+    border-color: var(--accent);
+    color: #ffffff;
+}
+
+.decoupage-mode-dropdown-menu {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    min-width: 220px;
+    background: var(--t-surface-2, rgba(20, 18, 25, 0.98));
+    border: 1px solid var(--t-line-strong, rgba(6, 182, 212, 0.4));
+    border-radius: 6px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.7);
+    padding: var(--sp-4) 0;
+    z-index: 1000;
+    display: none;
+    flex-direction: column;
+}
+
+.decoupage-mode-dropdown-menu.show {
+    display: flex;
+}
+
+.decoupage-mode-option {
+    padding: var(--sp-6) var(--sp-10);
+    display: flex;
+    align-items: center;
+    gap: var(--sp-8);
+    font-size: var(--fs-10);
+    color: #cbd5e1;
+    cursor: pointer;
+    transition: background 0.12s, color 0.12s;
+}
+
+.decoupage-mode-option:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: #ffffff;
+}
+
+.decoupage-mode-option.active {
+    background: var(--t-tint-3, rgba(6, 182, 212, 0.15));
+    color: var(--accent);
+    font-weight: 600;
+}
+
+.decoupage-strip-track {
+    display: flex;
+    align-items: center;
+    flex: 1;
+    height: 18px;
+    gap: 3px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    min-width: 0;
+}
+.decoupage-strip-track::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
+}
+
+.decoupage-strip-segment {
+    flex: 0 0 auto;
+    min-width: 16px;
+    height: 16px;
+    border-radius: 3px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: var(--fs-9);
+    font-weight: 700;
+    font-family: var(--font-heading);
+    color: #ffffff;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85);
+    user-select: none;
+    transition: transform 0.15s ease, filter 0.15s ease, box-shadow 0.15s ease;
+    position: relative;
+    overflow: hidden;
+    white-space: nowrap;
+    padding: 0 var(--sp-4);
+    box-sizing: border-box;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+}
+
+.decoupage-strip-segment:hover {
+    filter: brightness(1.25);
+    transform: scale(1.08);
+    z-index: 5;
+    box-shadow: 0 0 8px rgba(255, 255, 255, 0.5);
+}
+
+.decoupage-strip-segment.active {
+    outline: 1.5px solid #ffffff;
+    box-shadow: 0 0 10px rgba(255, 255, 255, 0.85);
+    z-index: 6;
+}
+
+/* Nível 1: Swatch Puro (Apenas Cor, sem texto) */
+.decoupage-strip-segment.chip-swatch-only {
+    width: 16px !important;
+    min-width: 16px !important;
+    max-width: 16px !important;
+    height: 16px !important;
+    padding: 0 !important;
+    margin: 0 1px;
+    border-radius: 3px;
+    border: 1px solid rgba(255, 255, 255, 0.28);
+}
+.decoupage-strip-segment.chip-swatch-only .segment-label {
+    display: none !important;
+}
+
+/* Nível 2a: Apenas Número (Contagem de Mídias em Paletas/Cenas) */
+.decoupage-strip-segment.chip-number-only {
+    min-width: 20px;
+    max-width: 34px;
+    height: 16px;
+    padding: 0 3px;
+    font-weight: 700;
+    font-size: 8.5px;
+    letter-spacing: 0.2px;
+}
+
+/* Nível 2b: Micro / Código Reduzido (Cenas pequenas, iniciais) */
+.decoupage-strip-segment.chip-micro {
+    min-width: 20px;
+    max-width: 38px;
+    height: 16px;
+    padding: 0 3px;
+    font-size: 8px;
+    letter-spacing: 0.2px;
+}
+
+/* Nível 2c: Compacto (Escalas NLE CU/PM/PA, Nomes curtos, Datas) */
+.decoupage-strip-segment.chip-compact {
+    min-width: 26px;
+    max-width: 62px;
+    height: 16px;
+    padding: 0 4px;
+    font-size: 8.5px;
+}
+
+/* Nível 3: Destaque Padrão */
+.decoupage-strip-segment.chip-standard {
+    min-width: 38px;
+    max-width: 85px;
+    height: 16px;
+    padding: 0 5px;
+    font-size: 8.5px;
+}
+
+.decoupage-strip-segment .segment-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.btn-clear-decoupage-filter {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-4);
+    font-size: var(--fs-9);
+    height: 18px;
+    padding: 0 var(--sp-6);
+    background: rgba(244, 63, 94, 0.2);
+    border: 1px solid rgba(244, 63, 94, 0.45);
+    border-radius: 3px;
+    color: #fca5a5;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+.btn-clear-decoupage-filter:hover {
+    background: rgba(244, 63, 94, 0.4);
+    color: #ffffff;
+}
+
+.btn-hide-decoupage-strip {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    flex-shrink: 0;
+    border-radius: 3px;
+    font-size: var(--fs-9);
+    transition: color 0.15s, background 0.15s;
+}
+.btn-hide-decoupage-strip:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: #ffffff;
+}
+
+.btn-decoupage-scroll-track {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 14px;
+    height: 18px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border-glass);
+    border-radius: 2px;
+    color: var(--text-muted);
+    cursor: pointer;
+    flex-shrink: 0;
+    font-size: 8px;
+    transition: color 0.15s, background 0.15s, border-color 0.15s;
+}
+.btn-decoupage-scroll-track:hover {
+    background: rgba(255, 255, 255, 0.15);
+    border-color: var(--accent);
+    color: #ffffff;
+}
+
+/* Botão de Expandir Régua em Múltiplas Linhas (Ver Todos os Chips) */
+.btn-decoupage-wrap-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid var(--border-glass);
+    border-radius: 3px;
+    color: var(--text-muted);
+    cursor: pointer;
+    flex-shrink: 0;
+    font-size: 8px;
+    transition: color 0.15s, background 0.15s, border-color 0.15s, transform 0.2s ease;
+}
+.btn-decoupage-wrap-toggle:hover {
+    background: rgba(255, 255, 255, 0.18);
+    border-color: var(--accent);
+    color: #ffffff;
+}
+.btn-decoupage-wrap-toggle i {
+    transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Estado Expandido da Régua (Modo Múltiplas Linhas / Wrap) */
+.library-decoupage-strip.is-expanded {
+    height: auto !important;
+    min-height: 28px !important;
+    max-height: 180px !important;
+    padding: var(--sp-4) var(--sp-6) !important;
+    align-items: flex-start !important;
+}
+.library-decoupage-strip.is-expanded .decoupage-strip-track {
+    flex-wrap: wrap !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    max-height: 160px !important;
+    height: auto !important;
+    gap: var(--sp-4) !important;
+    scrollbar-width: thin !important;
+    scrollbar-color: rgba(255, 255, 255, 0.15) transparent !important;
+}
+.library-decoupage-strip.is-expanded .decoupage-strip-track::-webkit-scrollbar {
+    display: block !important;
+    width: 4px !important;
+}
+.library-decoupage-strip.is-expanded .decoupage-strip-track::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2) !important;
+    border-radius: 2px !important;
+}
+.library-decoupage-strip.is-expanded #btn-decoupage-wrap-toggle i {
+    transform: rotate(180deg);
+}
+.library-decoupage-strip.is-expanded .btn-decoupage-scroll-track {
+    display: none !important;
+}
+
+/* Cabeçalhos de Decupagem Cromática e Estilos de Bloco */
+.gallery-sticky-header.scene-decoupage-header {
+    border-left: 4px solid var(--scene-color, var(--accent));
+    background: linear-gradient(90deg,
+        color-mix(in srgb, var(--scene-color, var(--accent)) 16%, rgba(18, 18, 24, 0.95)) 0%,
+        rgba(14, 14, 18, 0.98) 100%
+    ) !important;
+    transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.scene-header-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-6);
+    margin-left: auto;
+    flex-shrink: 0;
+}
+
+.scene-header-btn {
+    background: transparent !important;
+    border: none !important;
+    color: var(--text-muted);
+    font-size: var(--fs-10);
+    cursor: pointer;
+    padding: 2px 5px;
+    border-radius: 3px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    transition: color 0.15s ease, transform 0.15s ease;
+}
+.scene-header-btn:hover {
+    color: var(--color-cyan);
+    transform: scale(1.08);
+}
+
+.scene-color-swatch-badge {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    display: inline-block;
+    flex-shrink: 0;
+    margin-right: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    box-shadow: 0 0 5px var(--scene-color, transparent);
+}
+
 /* Fita Cromática da Biblioteca (Scene Color Minimap) */
 #library-scroll-color-ribbon,
 .library-scroll-color-ribbon {

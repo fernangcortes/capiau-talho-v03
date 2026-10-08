@@ -404,6 +404,10 @@
                             <span class="display-opt-select-label">Agrupamento:</span>
                             <select id="sel-gallery-grouping" class="nle-select" style="flex: 1; height: 20px; font-size: var(--fs-9); padding: 0 var(--sp-4); background: rgba(255,255,255,0.04); border: 1px solid var(--border-glass); color: #fff; border-radius: 3px; cursor: pointer;">
                                 <option value="date" selected>Diárias / Datas</option>
+                                <option value="color_scenes">🎨 Cenas por Cor (Fita Cromática)</option>
+                                <option value="color_palette_global">🌈 Paletas Globais de Cor</option>
+                                <option value="shot_scale">📐 Escala de Plano (Closes, Gerais)</option>
+                                <option value="speakers">👤 Pessoas & Falantes</option>
                                 <option value="smart_bins">Smart Bins / Temas (IA)</option>
                                 <option value="keyword">Palavras-Chave / Assuntos</option>
                                 <option value="folder">Pastas / Bins</option>
@@ -474,6 +478,7 @@
                         <!-- Esquerda: Modo de Exibição e Zoom (Expande para preencher o espaço disponível) -->
                         <div style="display: flex; align-items: center; gap: var(--sp-6); flex: 1; min-width: 0; margin-right: var(--sp-8);">
                             <button id="btn-view-mode-gallery" class="lib-action-btn active" title="Galeria Clean (Google Fotos)"><i class="fa-solid fa-grip"></i></button>
+                            <button id="btn-view-mode-scenes" class="lib-action-btn" title="Cenas por Cor (Decupagem Cromática)"><i class="fa-solid fa-palette"></i></button>
                             <button id="btn-view-mode-grid" class="lib-action-btn" title="Grade de Cards"><i class="fa-solid fa-table-cells-large"></i></button>
                             <button id="btn-view-mode-list" class="lib-action-btn" title="Árvore / Lista Detalhada"><i class="fa-solid fa-list"></i></button>
                             
@@ -497,6 +502,7 @@
                             
                             <div style="width: 1px; height: 10px; background: rgba(255,255,255,0.12); margin: 0 var(--sp-2);"></div>
                             
+                            <button id="btn-toggle-decoupage-strip" class="lib-action-btn active" data-tooltip="Mostrar/Ocultar Régua de Decupagem"><i class="fa-solid fa-ruler-horizontal"></i></button>
                             <button id="btn-library-sort" class="lib-action-btn" data-tooltip="Ordenar Mídias"><i class="fa-solid fa-arrow-down-a-z"></i></button>
                         </div>
                     </div>
@@ -549,6 +555,35 @@
                         <option value="type_interview">type_interview</option>
                         <option value="type_broll">type_broll</option>
                     </select>
+                </div>
+
+                <!-- Barra de Decupagem Visual & Cenas Cromáticas (Régua Interativa Superior) -->
+                <div id="library-decoupage-strip" class="library-decoupage-strip" style="display: none;">
+                    <div class="decoupage-mode-dropdown-container">
+                        <button id="btn-decoupage-mode-trigger" class="decoupage-mode-trigger" data-tooltip="Modo de Agrupamento & Decupagem">
+                            <i class="fa-solid fa-palette" id="decoupage-mode-icon" style="color: #06b6d4;"></i>
+                            <span id="decoupage-mode-text">Cenas</span>
+                            <i class="fa-solid fa-chevron-down" style="font-size: 7px; opacity: 0.7;"></i>
+                        </button>
+                        <div class="decoupage-mode-dropdown-menu glassmorphism" id="decoupage-mode-dropdown">
+                            <div class="decoupage-mode-option active" data-grouping="color_scenes"><i class="fa-solid fa-palette" style="color: #06b6d4;"></i> <span>🎨 Cenas por Cor (Fita Cromática)</span></div>
+                            <div class="decoupage-mode-option" data-grouping="color_palette_global"><i class="fa-solid fa-droplet" style="color: #ec4899;"></i> <span>🌈 Paletas Globais de Cor</span></div>
+                            <div class="decoupage-mode-option" data-grouping="shot_scale"><i class="fa-solid fa-expand" style="color: #f59e0b;"></i> <span>📐 Escala de Plano (Closes, Gerais)</span></div>
+                            <div class="decoupage-mode-option" data-grouping="speakers"><i class="fa-solid fa-microphone-lines" style="color: #8b5cf6;"></i> <span>👤 Pessoas & Falantes</span></div>
+                            <div class="decoupage-mode-option" data-grouping="date"><i class="fa-solid fa-calendar-days" style="color: #10b981;"></i> <span>📅 Diárias / Datas</span></div>
+                            <div class="decoupage-mode-option" data-grouping="smart_bins"><i class="fa-solid fa-wand-magic-sparkles" style="color: #c084fc;"></i> <span>📁 Smart Bins / Temas</span></div>
+                            <div class="decoupage-mode-option" data-grouping="keyword"><i class="fa-solid fa-tags" style="color: #38bdf8;"></i> <span>🏷️ Palavras-Chave / Assuntos</span></div>
+                        </div>
+                    </div>
+                    <button id="btn-track-scroll-left" class="btn-decoupage-scroll-track" data-tooltip="Rolar régua para a esquerda"><i class="fa-solid fa-chevron-left"></i></button>
+                    <div class="decoupage-strip-track" id="decoupage-strip-track"></div>
+                    <button id="btn-track-scroll-right" class="btn-decoupage-scroll-track" data-tooltip="Rolar régua para a direita"><i class="fa-solid fa-chevron-right"></i></button>
+                    <button id="btn-decoupage-wrap-toggle" class="btn-decoupage-wrap-toggle" data-tooltip="Expandir em múltiplas linhas / Ver todos os chips"><i class="fa-solid fa-chevron-down"></i></button>
+                    <button id="btn-clear-decoupage-filter" class="btn-clear-decoupage-filter" data-tooltip="Voltar a ver todas as cenas (Esc ou clique)" style="display: none;">
+                        <i class="fa-solid fa-xmark"></i>
+                        <span class="clear-filter-label">Todas</span>
+                    </button>
+                    <button id="btn-hide-decoupage-strip" class="btn-hide-decoupage-strip" data-tooltip="Ocultar Régua de Decupagem"><i class="fa-solid fa-xmark"></i></button>
                 </div>
                 
                 <div class="sidebar-content scrollable">

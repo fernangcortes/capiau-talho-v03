@@ -7438,13 +7438,75 @@ export class LibraryManager {
         
         applyDisplayClasses();
 
-        // Modo de Visualização (Galeria Clean vs Grade de Cards vs Lista)
+        // Modo de Visualização (Galeria Clean vs Cenas Cromáticas vs Grade de Cards vs Lista)
         const btnViewModeGallery = document.getElementById("btn-view-mode-gallery");
+        const btnViewModeScenes = document.getElementById("btn-view-mode-scenes");
         const btnViewModeGrid = document.getElementById("btn-view-mode-grid");
         const btnViewModeList = document.getElementById("btn-view-mode-list");
         
+        function syncActiveGroupingUI(groupingKey) {
+            const GROUP_CONFIG = {
+                "color_scenes": { icon: "fa-palette", color: "#06b6d4", title: "Cenas por Cor (Decupagem Cromática)", label: "Cenas" },
+                "color_palette_global": { icon: "fa-droplet", color: "#ec4899", title: "Paletas Globais de Cor", label: "Paletas" },
+                "shot_scale": { icon: "fa-expand", color: "#f59e0b", title: "Escala de Plano (Closes, Gerais)", label: "Escalas" },
+                "speakers": { icon: "fa-microphone-lines", color: "#8b5cf6", title: "Pessoas & Falantes", label: "Falantes" },
+                "date": { icon: "fa-calendar-days", color: "#10b981", title: "Diárias / Datas", label: "Datas" },
+                "smart_bins": { icon: "fa-wand-magic-sparkles", color: "#c084fc", title: "Smart Bins & Temas", label: "Smart Bins" },
+                "keyword": { icon: "fa-tags", color: "#38bdf8", title: "Palavras-Chave & Assuntos", label: "Assuntos" },
+                "folder": { icon: "fa-folder", color: "#a855f7", title: "Pastas / Bins", label: "Pastas" },
+                "none": { icon: "fa-grip", color: "#94a3b8", title: "Sem Agrupamento (Contínuo)", label: "Contínuo" }
+            };
+            const conf = GROUP_CONFIG[groupingKey] || GROUP_CONFIG["color_scenes"];
+
+            getAllLibraryDocuments().forEach(doc => {
+                const btnScn = doc.getElementById("btn-view-mode-scenes");
+                if (btnScn) {
+                    btnScn.title = conf.title;
+                    btnScn.setAttribute("data-tooltip", conf.title);
+                    btnScn.innerHTML = `<i class="fa-solid ${conf.icon}" style="color: ${conf.color};"></i>`;
+                }
+                const modeIcon = doc.getElementById("decoupage-mode-icon");
+                const modeText = doc.getElementById("decoupage-mode-text");
+                if (modeIcon) {
+                    modeIcon.className = `fa-solid ${conf.icon}`;
+                    modeIcon.style.color = conf.color;
+                }
+                if (modeText) {
+                    modeText.textContent = conf.label;
+                }
+                const dropdown = doc.getElementById("decoupage-mode-dropdown");
+                if (dropdown) {
+                    dropdown.querySelectorAll(".decoupage-mode-option").forEach(opt => {
+                        opt.classList.toggle("active", opt.dataset.grouping === groupingKey);
+                    });
+                }
+                const sel = doc.getElementById("sel-gallery-grouping");
+                if (sel && sel.value !== groupingKey) {
+                    sel.value = groupingKey;
+                }
+            });
+        }
+        window.syncActiveGroupingUI = syncActiveGroupingUI;
+
         function setViewMode(mode) {
-            const validMode = (mode === "grid" || mode === "list") ? mode : "gallery";
+            let validMode = (mode === "grid" || mode === "list") ? mode : "gallery";
+            let isScenes = (mode === "scenes");
+            let curGroup = localStorage.getItem("gallery-pref-grouping") || "date";
+            
+            if (isScenes) {
+                validMode = "gallery";
+                if (curGroup === "none") {
+                    curGroup = "color_scenes";
+                    localStorage.setItem("gallery-pref-grouping", curGroup);
+                }
+                syncActiveGroupingUI(curGroup);
+            } else if (mode === "gallery") {
+                if (curGroup && curGroup !== "none") {
+                    isScenes = true;
+                }
+                syncActiveGroupingUI(curGroup);
+            }
+
             const lists = getAllMediaLists();
             lists.forEach(list => {
                 list.classList.remove("view-mode-grid", "view-mode-gallery");
@@ -7455,12 +7517,21 @@ export class LibraryManager {
             getAllLibraryDocuments().forEach(doc => {
                 try {
                     const btnGal = doc.getElementById("btn-view-mode-gallery");
+                    const btnScn = doc.getElementById("btn-view-mode-scenes");
                     const btnGrd = doc.getElementById("btn-view-mode-grid");
                     const btnLst = doc.getElementById("btn-view-mode-list");
-                    [btnGal, btnGrd, btnLst].forEach(b => b?.classList.remove("active"));
-                    if (validMode === "gallery") btnGal?.classList.add("active");
-                    else if (validMode === "grid") btnGrd?.classList.add("active");
-                    else if (validMode === "list") btnLst?.classList.add("active");
+                    [btnGal, btnScn, btnGrd, btnLst].forEach(b => b?.classList.remove("active"));
+                    if (validMode === "gallery") {
+                        if (isScenes) {
+                            btnScn?.classList.add("active");
+                        } else {
+                            btnGal?.classList.add("active");
+                        }
+                    } else if (validMode === "grid") {
+                        btnGrd?.classList.add("active");
+                    } else if (validMode === "list") {
+                        btnLst?.classList.add("active");
+                    }
                 } catch (e) {}
             });
 
@@ -7472,9 +7543,25 @@ export class LibraryManager {
                 window.libraryScrollIndex.requestRibbonRedraw();
             }
         }
+        window._setViewMode = setViewMode;
         
         if (btnViewModeGallery) {
-            btnViewModeGallery.addEventListener("click", () => setViewMode("gallery"));
+            btnViewModeGallery.addEventListener("click", () => {
+                localStorage.setItem("gallery-pref-grouping", "date");
+                syncActiveGroupingUI("date");
+                setViewMode("gallery");
+            });
+        }
+        if (btnViewModeScenes) {
+            btnViewModeScenes.addEventListener("click", () => {
+                let curGroup = localStorage.getItem("gallery-pref-grouping") || "color_scenes";
+                if (curGroup === "none") {
+                    curGroup = "color_scenes";
+                    localStorage.setItem("gallery-pref-grouping", curGroup);
+                }
+                syncActiveGroupingUI(curGroup);
+                setViewMode("scenes");
+            });
         }
         if (btnViewModeGrid) {
             btnViewModeGrid.addEventListener("click", () => setViewMode("grid"));
@@ -7486,10 +7573,21 @@ export class LibraryManager {
         // Configurações do Modo Galeria Clean
         const selGrouping = document.getElementById("sel-gallery-grouping");
         if (selGrouping) {
-            selGrouping.value = localStorage.getItem("gallery-pref-grouping") || "date";
+            const initialGroup = localStorage.getItem("gallery-pref-grouping") || "date";
+            selGrouping.value = initialGroup;
+            syncActiveGroupingUI(initialGroup);
             selGrouping.addEventListener("change", (e) => {
-                localStorage.setItem("gallery-pref-grouping", e.target.value);
-                if (window.libraryInstance) window.libraryInstance.scheduleRenderMedia({ preserveScroll: true });
+                const newVal = e.target.value;
+                localStorage.setItem("gallery-pref-grouping", newVal);
+                syncActiveGroupingUI(newVal);
+                getAllLibraryDocuments().forEach(doc => {
+                    const otherSel = doc.getElementById("sel-gallery-grouping");
+                    if (otherSel && otherSel !== e.target) otherSel.value = newVal;
+                });
+                if (window.libraryInstance) {
+                    window.libraryInstance.clearDecoupageFilter();
+                    window.libraryInstance.scheduleRenderMedia({ preserveScroll: false });
+                }
             });
         }
 
@@ -7609,6 +7707,37 @@ export class LibraryManager {
         const savedZoom = localStorage.getItem("lib-pref-zoom") || "110";
         setZoomValue(parseInt(savedZoom));
 
+        // Alternância da Régua de Decupagem (Mostrar / Ocultar)
+        const syncDecoupageStripVisibility = (visible) => {
+            getAllLibraryDocuments().forEach(d => {
+                const strip = d.getElementById("library-decoupage-strip");
+                const btn = d.getElementById("btn-toggle-decoupage-strip");
+                if (btn) btn.classList.toggle("active", visible);
+                if (strip && !visible) {
+                    strip.style.display = "none";
+                }
+            });
+        };
+
+        const isDecoupageStripPrefVisible = localStorage.getItem("library-decoupage-strip-visible") !== "false";
+        syncDecoupageStripVisibility(isDecoupageStripPrefVisible);
+
+        getAllLibraryDocuments().forEach(doc => {
+            const btnToggleStrip = doc.getElementById("btn-toggle-decoupage-strip");
+            if (btnToggleStrip && !btnToggleStrip._hasBoundClick) {
+                btnToggleStrip._hasBoundClick = true;
+                btnToggleStrip.addEventListener("click", () => {
+                    const cur = localStorage.getItem("library-decoupage-strip-visible") !== "false";
+                    const next = !cur;
+                    localStorage.setItem("library-decoupage-strip-visible", String(next));
+                    syncDecoupageStripVisibility(next);
+                    if (next && window.libraryInstance) {
+                        window.libraryInstance.scheduleRenderMedia({ preserveScroll: true });
+                    }
+                });
+            }
+        });
+
         // Busca de mídias (Filtro em tempo real)
         const searchInput = document.getElementById("library-search-input");
         if (searchInput) {
@@ -7697,6 +7826,23 @@ export class LibraryManager {
                     e.preventDefault();
                     this.toggleMediaInspector(STATE.activeVideo);
                 }
+            }
+        });
+
+        // Atalho Escape limpa o filtro exclusivo da Barra de Decupagem
+        document.addEventListener("keydown", (e) => {
+            if (e.key === "Escape" && this._activeDecoupageFilterKey) {
+                this.clearDecoupageFilter();
+            }
+        });
+
+        // Fechar dropdown de modo de decupagem ao clicar fora
+        document.addEventListener("click", (e) => {
+            if (!e.target.closest(".decoupage-mode-dropdown-container")) {
+                getAllLibraryDocuments().forEach(d => {
+                    const dd = d.getElementById("decoupage-mode-dropdown");
+                    if (dd) dd.classList.remove("show");
+                });
             }
         });
 
@@ -8691,7 +8837,127 @@ export class LibraryManager {
         
         // Agrupa os itens respeitando a ordenação ativa
         let groups = [];
-        if (groupingMode === "smart_bins") {
+        if (groupingMode === "color_scenes") {
+            const allVideos = STATE.allVideos || [];
+            const allPhotos = STATE.allPhotos || [];
+            const extractor = this.colorExtractor || window.libraryScrollIndex?.colorExtractor;
+            const itemsWithColors = sortedItems.map((item, idx) => {
+                let col = "#64748b";
+                if (extractor) {
+                    col = (item._mediaKind === "photo" || item.duration === undefined)
+                        ? extractor.getPhotoColor(item)
+                        : extractor.getVideoColor(item);
+                }
+                return { index: idx, item, color: col || "#64748b" };
+            });
+            const rawBlocks = coalesceColorBlocks(itemsWithColors);
+            groups = rawBlocks.map((b, bIdx) => {
+                const desc = getColorDescriptor(b.color);
+                const dur = b.items.reduce((acc, it) => acc + (it.item.duration || 0), 0);
+                return {
+                    key: `color_scene_${bIdx}`,
+                    color: b.color,
+                    colorDesc: desc,
+                    label: `🎨 Cena ${bIdx + 1} • ${desc.name}`,
+                    badge: `${b.items.length} ${b.items.length === 1 ? 'plano' : 'planos'}`,
+                    durationText: dur > 0 ? formatShortDuration(dur) : null,
+                    items: b.items.map(it => it.item)
+                };
+            });
+        } else if (groupingMode === "color_palette_global") {
+            const allVideos = STATE.allVideos || [];
+            const allPhotos = STATE.allPhotos || [];
+            const extractor = this.colorExtractor || window.libraryScrollIndex?.colorExtractor;
+            const itemsWithColors = sortedItems.map((item, idx) => {
+                let col = "#64748b";
+                if (extractor) {
+                    col = (item._mediaKind === "photo" || item.duration === undefined)
+                        ? extractor.getPhotoColor(item)
+                        : extractor.getVideoColor(item);
+                }
+                return { index: idx, item, color: col || "#64748b" };
+            });
+
+            // Agrupa por Família Cromática Cinematográfica única (evita fragmentações e botões duplicados)
+            const familyMap = new Map();
+            for (const entry of itemsWithColors) {
+                const desc = getColorDescriptor(entry.color);
+                const famKey = desc.family || "neutral";
+                if (!familyMap.has(famKey)) {
+                    familyMap.set(famKey, {
+                        family: famKey,
+                        name: desc.name,
+                        colorDesc: desc,
+                        colors: [],
+                        items: []
+                    });
+                }
+                const fam = familyMap.get(famKey);
+                fam.colors.push(entry.color);
+                fam.items.push(entry.item);
+            }
+
+            // Ordena os grupos pela quantidade de mídias decrescente
+            const sortedFamilies = Array.from(familyMap.values()).sort((a, b) => b.items.length - a.items.length);
+
+            groups = sortedFamilies.map((fam, fIdx) => {
+                // Encontra a cor mais saturada ou representativa da família
+                let repColor = fam.colors[0] || "#64748b";
+                let maxSat = -1;
+                for (const c of fam.colors) {
+                    const [r, g, b] = hexToRgb(c);
+                    const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+                    const sat = mx > 0 ? (mx - mn) / mx : 0;
+                    if (sat > maxSat) {
+                        maxSat = sat;
+                        repColor = c;
+                    }
+                }
+
+                const dur = fam.items.reduce((acc, it) => acc + (it.duration || 0), 0);
+                return {
+                    key: `palette_fam_${fam.family}`,
+                    color: repColor,
+                    colorDesc: fam.colorDesc,
+                    label: `🌈 Paleta • ${fam.name}`,
+                    badge: `${fam.items.length} ${fam.items.length === 1 ? 'plano' : 'planos'}`,
+                    durationText: dur > 0 ? formatShortDuration(dur) : null,
+                    items: fam.items
+                };
+            });
+        } else if (groupingMode === "shot_scale") {
+            const SHOT_LABELS = {
+                "close": "👤 Close-up",
+                "plano_medio": "🧍 Plano Médio",
+                "plano_americano": "🎬 Plano Americano",
+                "plano_geral": "🏞️ Plano Geral",
+                "detalhe": "🔍 Detalhe",
+                "aereo": "🦅 Aéreo / Plongée",
+                "outros": "🎞️ Geral / Variados"
+            };
+            const scaleOrder = ["close", "plano_medio", "plano_americano", "plano_geral", "detalhe", "aereo", "outros"];
+            const scaleMap = new Map();
+            scaleOrder.forEach(sc => scaleMap.set(sc, { key: `scale_${sc}`, label: SHOT_LABELS[sc] || sc, items: [] }));
+            for (const item of sortedItems) {
+                const sc = getMediaShotScale(item);
+                if (scaleMap.has(sc)) {
+                    scaleMap.get(sc).items.push(item);
+                } else {
+                    scaleMap.get("outros").items.push(item);
+                }
+            }
+            groups = Array.from(scaleMap.values()).filter(g => g.items.length > 0);
+        } else if (groupingMode === "speakers") {
+            const spkMap = new Map();
+            for (const item of sortedItems) {
+                const spk = getMediaSpeaker(item);
+                if (!spkMap.has(spk)) {
+                    spkMap.set(spk, { key: `spk_${spk}`, label: `🎙️ ${spk}`, items: [] });
+                }
+                spkMap.get(spk).items.push(item);
+            }
+            groups = Array.from(spkMap.values()).sort((a, b) => b.items.length - a.items.length);
+        } else if (groupingMode === "smart_bins") {
             loadManualSmartBinsState(getActiveProjectId());
             const binMap = new Map();
             SMART_BINS_TAXONOMY.forEach(bin => {
@@ -8802,17 +9068,101 @@ export class LibraryManager {
 
             if (group.label) {
                 const header = document.createElement("div");
-                header.className = "gallery-sticky-header";
+                header.className = "gallery-sticky-header" + (group.color ? " scene-decoupage-header" : "");
+                if (group.color) {
+                    header.style.setProperty("--scene-color", group.color);
+                }
+
+                let swatchHtml = "";
+                if (group.color) {
+                    swatchHtml = `<span class="scene-color-swatch-badge" style="background-color: ${group.color};"></span>`;
+                }
+
+                let globalColorActionHtml = "";
+                if (group.color) {
+                    globalColorActionHtml = `
+                        <button class="scene-header-btn btn-filter-color-global" data-tooltip="Buscar todos os planos desta cor no projeto todo (Alt+Clique)">
+                            <i class="fa-solid fa-palette"></i>
+                        </button>
+                    `;
+                }
+
+                const selectAllActionHtml = `
+                    <button class="scene-header-btn btn-select-scene-clips" data-tooltip="Selecionar todos os ${group.items.length} planos deste grupo">
+                        <i class="fa-solid fa-check-double"></i>
+                    </button>
+                `;
+
                 header.innerHTML = `
-                    <div class="gallery-header-title">
-                        <span>${escapeHtml(group.label)}</span>
+                    <div class="gallery-header-title" style="display: flex; align-items: center;">
+                        ${swatchHtml}<span>${escapeHtml(group.label)}</span>
                     </div>
-                    <div class="gallery-header-meta">
-                        ${group.items.length} ${group.items.length === 1 ? 'mídia' : 'mídias'}
+                    <div class="gallery-header-meta" style="display: flex; align-items: center; gap: 8px;">
+                        <span>${group.items.length} ${group.items.length === 1 ? 'mídia' : 'mídias'}${group.durationText ? ' • ' + group.durationText : ''}</span>
+                        <div class="scene-header-actions">
+                            ${globalColorActionHtml}
+                            ${selectAllActionHtml}
+                        </div>
                     </div>
                 `;
 
-                // Drag & Drop no cabeçalho do bloco quando em modo smart_bins
+                // Configura ações nos botões do cabeçalho
+                const btnSelect = header.querySelector(".btn-select-scene-clips");
+                if (btnSelect) {
+                    btnSelect.addEventListener("click", (e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        const cards = blockDiv.querySelectorAll(".gallery-item, .media-card");
+                        let newlySelected = 0;
+                        cards.forEach(card => {
+                            card.classList.toggle("active");
+                            if (card.classList.contains("active")) newlySelected++;
+                        });
+                        if (typeof window.showToast === "function") {
+                            window.showToast(`${newlySelected || group.items.length} planos selecionados!`, "info");
+                        }
+                    });
+                }
+
+                const btnGlobalColor = header.querySelector(".btn-filter-color-global");
+                if (btnGlobalColor && group.color) {
+                    btnGlobalColor.addEventListener("click", (e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        if (window.libraryInstance && typeof window.libraryInstance.filterByGlobalPalette === "function") {
+                            window.libraryInstance.filterByGlobalPalette(group.color);
+                        }
+                    });
+                }
+
+                // Drag & Drop no cabeçalho: permite arrastar a cena ou grupo inteiro para a timeline
+                header.draggable = true;
+                header.addEventListener("dragstart", (e) => {
+                    if (group.items.length > 0) {
+                        const firstItem = group.items[0];
+                        const isVideo = firstItem._mediaKind === "video" || (firstItem.duration !== undefined);
+                        const payload = {
+                            type: isVideo ? "video" : "photo",
+                            id: firstItem.parent_video_id || firstItem.id,
+                            name: group.label,
+                            is_batch: true,
+                            batch_count: group.items.length,
+                            items: group.items.map(it => ({
+                                type: (it._mediaKind === "video" || it.duration !== undefined) ? "video" : "photo",
+                                id: it.parent_video_id || it.id,
+                                duration: it.duration || 5.0,
+                                in: it.in || 0,
+                                out: it.out || (it.duration || 5.0)
+                            }))
+                        };
+                        STATE.activeDragMedia = payload;
+                        e.dataTransfer.setData("application/x-capiau-media", JSON.stringify(payload));
+                        e.dataTransfer.setData("application/x-capiau-media-batch", JSON.stringify(payload));
+                        e.dataTransfer.effectAllowed = "copy";
+                    }
+                });
+
+                // Drag & Drop de itens para dentro do bloco quando em modo smart_bins
                 if (groupingMode === "smart_bins") {
                     header.addEventListener("dragover", (e) => {
                         e.preventDefault();
@@ -8849,6 +9199,7 @@ export class LibraryManager {
                 
                 // Duplo clique colapsa/expande o bloco (Seção VIII Design System)
                 header.addEventListener("dblclick", (e) => {
+                    if (e.target.closest("button, .scene-header-btn, input")) return;
                     e.preventDefault();
                     window.getSelection()?.removeAllRanges();
                     const mosaic = blockDiv.querySelector(".gallery-block-mosaic");
@@ -8859,7 +9210,8 @@ export class LibraryManager {
                     }
                 });
                 
-                header.addEventListener("click", () => {
+                header.addEventListener("click", (e) => {
+                    if (e.target.closest("button, .scene-header-btn, input")) return;
                     const mosaic = blockDiv.querySelector(".gallery-block-mosaic");
                     if (mosaic) {
                         const isHidden = mosaic.style.display === "none";
@@ -9117,8 +9469,470 @@ export class LibraryManager {
 
         targetEl.appendChild(fragment);
 
+        this.renderDecoupageStrip(groups, groupingMode);
+
         if (window.libraryScrollIndex && typeof window.libraryScrollIndex.requestRibbonRedraw === "function") {
             window.libraryScrollIndex.requestRibbonRedraw();
+        }
+    }
+
+    /**
+     * Resolve a apresentação visual minimalista e escalonada de um chip de decupagem.
+     * Diretriz fundamental: NUNCA exibir nomes de cores (apenas swatch puro ou número da contagem).
+     */
+    resolveChipPresentation(groupingMode, g, idx) {
+        const count = g.items ? g.items.length : (g.count || 0);
+        let shortLabel = "";
+        let tierClass = "chip-compact";
+
+        if (groupingMode === "color_palette_global") {
+            // NUNCA exibir nome de cor: a cor do próprio chip já mostra o que é
+            if (count <= 3) {
+                tierClass = "chip-swatch-only";
+                shortLabel = "";
+            } else {
+                tierClass = "chip-number-only";
+                shortLabel = String(count);
+            }
+        } else if (groupingMode === "color_scenes") {
+            // Cenas por cor: inserts rápidos como swatch, médias com número e grandes com contagem
+            if (count <= 2) {
+                tierClass = "chip-swatch-only";
+                shortLabel = "";
+            } else if (count <= 9) {
+                tierClass = "chip-micro";
+                shortLabel = String(idx + 1);
+            } else {
+                tierClass = "chip-compact";
+                shortLabel = `${idx + 1} • ${count}`;
+            }
+        } else if (groupingMode === "shot_scale") {
+            // Códigos cinematográficos clássicos de NLE (CU, PM, PA, PG, DET, AER, VAR)
+            const SCALE_SHORT = {
+                "scale_close": "CU",
+                "scale_plano_medio": "PM",
+                "scale_plano_americano": "PA",
+                "scale_plano_geral": "PG",
+                "scale_detalhe": "DET",
+                "scale_aereo": "AER",
+                "scale_outros": "VAR"
+            };
+            const code = SCALE_SHORT[g.key] || g.key.replace("scale_", "").slice(0, 3).toUpperCase();
+            tierClass = count <= 1 ? "chip-micro" : "chip-compact";
+            shortLabel = `${code} ${count}`;
+        } else if (groupingMode === "speakers") {
+            // Primeiro nome + contagem
+            const raw = g.label.replace(/^[^\w\s]+\s*/, "").trim();
+            const firstName = raw.split(" ")[0].trim();
+            tierClass = count <= 1 ? "chip-micro" : "chip-compact";
+            shortLabel = count <= 1 ? `${firstName.slice(0, 4)} 1` : `${firstName} ${count}`;
+        } else if (groupingMode === "date") {
+            // Dia e mês abreviado (ex: 24 Out 15)
+            const parts = g.label.replace(/^📅\s*/, "").split(",");
+            const dateText = (parts[1] || parts[0] || "").trim();
+            const match = dateText.match(/(\d+)\s+de\s+([A-Za-zç]+)/i);
+            const shortDate = match ? `${match[1]} ${match[2].slice(0, 3)}` : dateText.slice(0, 8).trim();
+            tierClass = "chip-compact";
+            shortLabel = `${shortDate} ${count}`;
+        } else if (groupingMode === "smart_bins") {
+            // Taxonomia concisa de 1 palavra
+            const SMART_BIN_SHORT = {
+                "Entrevistas & Depoimentos": "Entrev.",
+                "Elenco & Personagens": "Elenco",
+                "Ação, Dublês & Efeitos": "Ação",
+                "Câmera, Enquadramento & Planos": "Câmera",
+                "Iluminação, Luz & Cores": "Luz",
+                "Direção, Marcação & Ensaios": "Direção",
+                "Trilha Sonora & Áudio": "Áudio",
+                "Set de Filmagem & Bastidores": "Set",
+                "Cenas & Bastidores": "Bastid."
+            };
+            let shortName = null;
+            for (const [full, s] of Object.entries(SMART_BIN_SHORT)) {
+                if (g.label.includes(full)) { shortName = s; break; }
+            }
+            if (!shortName) {
+                shortName = g.label.replace(/^[^\w\s]+\s*/, "").split(" ")[0].trim().slice(0, 7);
+            }
+            tierClass = "chip-compact";
+            shortLabel = `${shortName} ${count}`;
+        } else {
+            const clean = g.label.replace(/^[^\w\s]+\s*/, "").trim().slice(0, 7);
+            tierClass = "chip-compact";
+            shortLabel = `${clean} ${count}`;
+        }
+
+        return { shortLabel, tierClass };
+    }
+
+    /**
+     * Renderiza e sincroniza a Barra Superior de Decupagem Visual (Chips de Cenas, Escalas ou Falantes).
+     */
+    renderDecoupageStrip(groups, groupingMode) {
+        const savedViewMode = localStorage.getItem("lib-pref-view-mode") || "gallery";
+
+        getAllLibraryDocuments().forEach(doc => {
+            const stripEl = doc.getElementById("library-decoupage-strip");
+            if (!stripEl) return;
+
+            const isStripPrefVisible = (typeof localStorage !== "undefined" && localStorage.getItem("library-decoupage-strip-visible") === "false") ? false : true;
+            const toggleBtn = doc.getElementById("btn-toggle-decoupage-strip");
+            if (toggleBtn) toggleBtn.classList.toggle("active", isStripPrefVisible);
+
+            if (!isStripPrefVisible || savedViewMode !== "gallery" || !groups || groups.length === 0 || (groups.length === 1 && !groups[0].label)) {
+                stripEl.style.display = "none";
+                return;
+            }
+
+            stripEl.style.display = "flex";
+            const track = stripEl.querySelector("#decoupage-strip-track");
+            const clearBtn = stripEl.querySelector("#btn-clear-decoupage-filter");
+            const modeTrigger = stripEl.querySelector("#btn-decoupage-mode-trigger");
+            const modeIcon = stripEl.querySelector("#decoupage-mode-icon");
+            const modeText = stripEl.querySelector("#decoupage-mode-text");
+            const dropdown = stripEl.querySelector("#decoupage-mode-dropdown");
+            const btnLeft = stripEl.querySelector("#btn-track-scroll-left");
+            const btnRight = stripEl.querySelector("#btn-track-scroll-right");
+            const btnWrap = stripEl.querySelector("#btn-decoupage-wrap-toggle");
+            const btnHide = stripEl.querySelector("#btn-hide-decoupage-strip");
+            if (!track) return;
+
+            // Sincroniza badge de modo e toolbar
+            if (typeof window.syncActiveGroupingUI === "function") {
+                window.syncActiveGroupingUI(groupingMode);
+            }
+
+            const modeLabels = {
+                "color_scenes": { text: "Cenas", icon: "fa-palette", color: "#06b6d4" },
+                "color_palette_global": { text: "Paletas", icon: "fa-droplet", color: "#ec4899" },
+                "shot_scale": { text: "Escalas", icon: "fa-expand", color: "#f59e0b" },
+                "speakers": { text: "Falantes", icon: "fa-microphone-lines", color: "#8b5cf6" },
+                "date": { text: "Datas", icon: "fa-calendar-days", color: "#10b981" },
+                "smart_bins": { text: "Smart Bins", icon: "fa-wand-magic-sparkles", color: "#c084fc" },
+                "keyword": { text: "Assuntos", icon: "fa-tags", color: "#38bdf8" }
+            };
+            const currentModeInfo = modeLabels[groupingMode] || { text: "Grupos", icon: "fa-layer-group", color: "#94a3b8" };
+            if (modeText) modeText.textContent = currentModeInfo.text;
+            if (modeIcon) {
+                modeIcon.className = `fa-solid ${currentModeInfo.icon}`;
+                modeIcon.style.color = currentModeInfo.color;
+            }
+
+            // Click listener do trigger de modo
+            if (modeTrigger && !modeTrigger._hasBoundClick) {
+                modeTrigger._hasBoundClick = true;
+                modeTrigger.addEventListener("click", (e) => {
+                    e.stopPropagation();
+                    if (dropdown) dropdown.classList.toggle("show");
+                });
+            }
+
+            // Click listener das opções do menu
+            if (dropdown && !dropdown._hasBoundOptions) {
+                dropdown._hasBoundOptions = true;
+                dropdown.querySelectorAll(".decoupage-mode-option").forEach(opt => {
+                    opt.addEventListener("click", (e) => {
+                        e.stopPropagation();
+                        dropdown.classList.remove("show");
+                        const targetGrouping = opt.dataset.grouping;
+                        if (!targetGrouping) return;
+                        localStorage.setItem("gallery-pref-grouping", targetGrouping);
+                        if (typeof window.syncActiveGroupingUI === "function") {
+                            window.syncActiveGroupingUI(targetGrouping);
+                        }
+                        getAllLibraryDocuments().forEach(d => {
+                            const sel = d.getElementById("sel-gallery-grouping");
+                            if (sel) sel.value = targetGrouping;
+                        });
+                        this.clearDecoupageFilter();
+                        if (typeof window._setViewMode === "function") {
+                            window._setViewMode("scenes");
+                        } else {
+                            this.scheduleRenderMedia({ preserveScroll: false });
+                        }
+                    });
+                });
+            }
+
+            if (dropdown) {
+                dropdown.querySelectorAll(".decoupage-mode-option").forEach(opt => {
+                    if (opt.dataset.grouping === groupingMode) opt.classList.add("active");
+                    else opt.classList.remove("active");
+                });
+            }
+
+            // Botão de alternância de linhas (Wrap Toggle: ver todos os chips vs barra única)
+            const isExpandedPref = (typeof localStorage !== "undefined" && localStorage.getItem("library-decoupage-strip-expanded") === "true");
+            stripEl.classList.toggle("is-expanded", isExpandedPref);
+            if (btnWrap) {
+                btnWrap.innerHTML = `<i class="fa-solid ${isExpandedPref ? 'fa-chevron-up' : 'fa-chevron-down'}"></i>`;
+                btnWrap.setAttribute("data-tooltip", isExpandedPref ? "Recolher régua para uma linha" : "Expandir em múltiplas linhas / Ver todos os chips");
+                if (!btnWrap._hasBoundClick) {
+                    btnWrap._hasBoundClick = true;
+                    btnWrap.addEventListener("click", (e) => {
+                        e.stopPropagation();
+                        const nowExpanded = !stripEl.classList.contains("is-expanded");
+                        getAllLibraryDocuments().forEach(d => {
+                            const s = d.getElementById("library-decoupage-strip");
+                            const b = d.getElementById("btn-decoupage-wrap-toggle");
+                            if (s) s.classList.toggle("is-expanded", nowExpanded);
+                            if (b) {
+                                b.innerHTML = `<i class="fa-solid ${nowExpanded ? 'fa-chevron-up' : 'fa-chevron-down'}"></i>`;
+                                b.setAttribute("data-tooltip", nowExpanded ? "Recolher régua para uma linha" : "Expandir em múltiplas linhas / Ver todos os chips");
+                            }
+                        });
+                        localStorage.setItem("library-decoupage-strip-expanded", nowExpanded ? "true" : "false");
+                    });
+                }
+            }
+
+            // Botões de rolagem horizontal e suporte a roda do mouse na régua
+            if (btnLeft && !btnLeft._hasBoundScroll) {
+                btnLeft._hasBoundScroll = true;
+                btnLeft.addEventListener("click", (e) => {
+                    e.stopPropagation();
+                    track.scrollBy({ left: -160, behavior: "smooth" });
+                });
+            }
+            if (btnRight && !btnRight._hasBoundScroll) {
+                btnRight._hasBoundScroll = true;
+                btnRight.addEventListener("click", (e) => {
+                    e.stopPropagation();
+                    track.scrollBy({ left: 160, behavior: "smooth" });
+                });
+            }
+            if (!track._hasBoundWheel) {
+                track._hasBoundWheel = true;
+                track.addEventListener("wheel", (e) => {
+                    if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+                        e.preventDefault();
+                        track.scrollLeft += e.deltaY;
+                    }
+                }, { passive: false });
+            }
+
+            // Botão de ocultar a régua de decupagem
+            if (btnHide && !btnHide._hasBoundClick) {
+                btnHide._hasBoundClick = true;
+                btnHide.addEventListener("click", (e) => {
+                    e.stopPropagation();
+                    localStorage.setItem("library-decoupage-strip-visible", "false");
+                    getAllLibraryDocuments().forEach(d => {
+                        const s = d.getElementById("library-decoupage-strip");
+                        if (s) s.style.display = "none";
+                        const b = d.getElementById("btn-toggle-decoupage-strip");
+                        if (b) b.classList.remove("active");
+                    });
+                });
+            }
+
+            track.innerHTML = "";
+            const activeFilterKey = this._activeDecoupageFilterKey || null;
+
+            if (clearBtn) {
+                clearBtn.style.display = activeFilterKey ? "flex" : "none";
+                if (!clearBtn._hasBoundClick) {
+                    clearBtn._hasBoundClick = true;
+                    clearBtn.addEventListener("click", () => {
+                        this.clearDecoupageFilter();
+                    });
+                }
+            }
+
+            groups.forEach((g, idx) => {
+                const count = g.items.length;
+                const { shortLabel, tierClass } = this.resolveChipPresentation(groupingMode, g, idx);
+
+                const seg = doc.createElement("div");
+                seg.className = `decoupage-strip-segment ${tierClass}${activeFilterKey === g.key ? " active" : ""}`;
+                seg.dataset.groupKey = g.key;
+
+                let bgColor = g.color;
+                if (!bgColor) {
+                    if (groupingMode === "date") {
+                        const dateColors = ["#3b82f6", "#06b6d4", "#10b981", "#8b5cf6", "#f59e0b", "#ec4899"];
+                        bgColor = dateColors[idx % dateColors.length];
+                    } else if (groupingMode === "shot_scale") {
+                        const scaleColors = {
+                            "scale_close": "#f43f5e",
+                            "scale_plano_medio": "#f59e0b",
+                            "scale_plano_americano": "#8b5cf6",
+                            "scale_plano_geral": "#06b6d4",
+                            "scale_detalhe": "#ec4899",
+                            "scale_aereo": "#10b981",
+                            "scale_outros": "#64748b"
+                        };
+                        bgColor = scaleColors[g.key] || "#64748b";
+                    } else if (groupingMode === "speakers") {
+                        const spkColors = ["#8b5cf6", "#06b6d4", "#10b981", "#f59e0b", "#ec4899", "#3b82f6"];
+                        bgColor = spkColors[idx % spkColors.length];
+                    } else {
+                        bgColor = "#8b5cf6";
+                    }
+                }
+
+                seg.style.backgroundColor = bgColor;
+                const boostedRgb = window.hexToRgb ? window.hexToRgb(bgColor) : [6, 182, 212];
+                seg.style.boxShadow = `0 0 4px rgba(${boostedRgb.join(",")}, 0.35)`;
+
+                seg.setAttribute("data-tooltip", `${g.label} • ${g.items.length} ${g.items.length === 1 ? 'mídia' : 'mídias'} (Clique: Rolar | Alt+Clique: Filtrar)`);
+                if (tierClass === "chip-swatch-only") {
+                    seg.innerHTML = "";
+                } else {
+                    seg.innerHTML = `<span class="segment-label">${escapeHtml(shortLabel)}</span>`;
+                }
+
+                seg.addEventListener("click", (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+
+                    if (e.altKey) {
+                        this.applyDecoupageExclusiveFilter(g.key, g.label);
+                    } else {
+                        if (this._activeDecoupageFilterKey) {
+                            this.clearDecoupageFilter();
+                        }
+                        this.scrollToDecoupageGroup(g.key, g.color || bgColor);
+                    }
+                });
+
+                track.appendChild(seg);
+            });
+        });
+    }
+
+    scrollToDecoupageGroup(groupKey, highlightColor = null) {
+        getAllLibraryDocuments().forEach(doc => {
+            const block = doc.querySelector(`.gallery-block[data-group-key="${groupKey}"]`);
+            const container = doc.querySelector("#sidebar-left .sidebar-content.scrollable") || (block ? block.closest(".scrollable") : null);
+            if (block && container) {
+                const containerRect = container.getBoundingClientRect();
+                const blockRect = block.getBoundingClientRect();
+                const targetScrollTop = container.scrollTop + (blockRect.top - containerRect.top);
+                const maxScroll = Math.max(0, container.scrollHeight - container.clientHeight);
+                const finalScrollTop = Math.max(0, Math.min(maxScroll, targetScrollTop));
+
+                container.scrollTo({ top: finalScrollTop, behavior: "smooth" });
+
+                if (window.libraryScrollIndex && typeof window.libraryScrollIndex.updateCursorPosition === "function") {
+                    window.libraryScrollIndex.updateCursorPosition();
+                }
+
+                const cards = block.querySelectorAll(".gallery-item, .media-card");
+                const count = Math.min(cards.length, 24);
+                for (let i = 0; i < count; i++) {
+                    applyRevealPulse(cards[i], highlightColor);
+                }
+            }
+        });
+    }
+
+    applyDecoupageExclusiveFilter(groupKey, label) {
+        this._activeDecoupageFilterKey = groupKey;
+        getAllLibraryDocuments().forEach(doc => {
+            const clearBtn = doc.getElementById("btn-clear-decoupage-filter");
+            if (clearBtn) {
+                clearBtn.style.display = "flex";
+                const lbl = clearBtn.querySelector(".clear-filter-label");
+                if (lbl) lbl.textContent = `Todas`;
+                clearBtn.setAttribute("data-tooltip", `Exibindo apenas "${label}". Clique ou pressione Esc para voltar a ver todas.`);
+            }
+
+            const segments = doc.querySelectorAll(".decoupage-strip-segment");
+            segments.forEach(s => {
+                if (s.dataset.groupKey === groupKey) {
+                    s.classList.add("active");
+                } else {
+                    s.classList.remove("active");
+                }
+            });
+
+            const blocks = doc.querySelectorAll(".gallery-block");
+            blocks.forEach(b => {
+                if (b.dataset.groupKey === groupKey) {
+                    b.style.display = "";
+                    const cards = b.querySelectorAll(".gallery-item, .media-card");
+                    cards.forEach(c => c.style.display = "");
+                } else {
+                    b.style.display = "none";
+                }
+            });
+        });
+
+        if (typeof window.showToast === "function") {
+            window.showToast(`Filtro exclusivo: ${label}`, "info");
+        }
+    }
+
+    clearDecoupageFilter() {
+        this._activeDecoupageFilterKey = null;
+        getAllLibraryDocuments().forEach(doc => {
+            const clearBtn = doc.getElementById("btn-clear-decoupage-filter");
+            if (clearBtn) clearBtn.style.display = "none";
+
+            const segments = doc.querySelectorAll(".decoupage-strip-segment");
+            segments.forEach(s => s.classList.remove("active"));
+
+            const blocks = doc.querySelectorAll(".gallery-block");
+            blocks.forEach(b => {
+                b.style.display = "";
+                const cards = b.querySelectorAll(".gallery-item, .media-card");
+                cards.forEach(c => c.style.display = "");
+            });
+        });
+
+        if (typeof window.showToast === "function") {
+            window.showToast("Exibindo todas as mídias da biblioteca", "info");
+        }
+    }
+
+    filterByGlobalPalette(targetColor) {
+        if (!targetColor) return;
+        const desc = getColorDescriptor(targetColor);
+        const extractor = this.colorExtractor || window.libraryScrollIndex?.colorExtractor;
+        const allVideos = STATE.allVideos || [];
+        const allPhotos = STATE.allPhotos || [];
+        this._activeDecoupageFilterKey = `color_${targetColor}`;
+
+        getAllLibraryDocuments().forEach(doc => {
+            const stripEl = doc.getElementById("library-decoupage-strip");
+            if (stripEl) stripEl.style.display = "flex";
+            const clearBtn = doc.getElementById("btn-clear-decoupage-filter");
+            if (clearBtn) {
+                clearBtn.style.display = "flex";
+                const lbl = clearBtn.querySelector(".clear-filter-label");
+                if (lbl) lbl.textContent = `Todas`;
+            }
+
+            const segments = doc.querySelectorAll(".decoupage-strip-segment");
+            segments.forEach(s => s.classList.remove("active"));
+
+            let totalMatches = 0;
+            const blocks = doc.querySelectorAll(".gallery-block");
+            blocks.forEach(b => {
+                let blockHasMatch = false;
+                const items = b.querySelectorAll(".gallery-item, .media-card");
+                items.forEach(item => {
+                    const itemColor = extractor ? extractor.getColor(item, allVideos, allPhotos) : null;
+                    if (itemColor && colorDistance(itemColor, targetColor) <= 52) {
+                        item.style.display = "";
+                        applyRevealPulse(item, targetColor);
+                        blockHasMatch = true;
+                        totalMatches++;
+                    } else {
+                        item.style.display = "none";
+                    }
+                });
+                b.style.display = blockHasMatch ? "" : "none";
+            });
+
+            if (clearBtn) {
+                clearBtn.setAttribute("data-tooltip", `Exibindo ${totalMatches} planos com paleta ${desc.name}. Clique ou pressione Esc para voltar.`);
+            }
+        });
+
+        if (typeof window.showToast === "function") {
+            window.showToast(`Paleta ${desc.name} filtrada (${targetColor}) em todo o acervo!`, "success");
         }
     }
 
@@ -11124,8 +11938,13 @@ class MediaColorExtractor {
             projectId = (typeof getActiveProjectId === "function" ? getActiveProjectId() : (window.STATE?.currentProjectId || 1));
         }
         this._currentProjectId = projectId;
+        this.cache.clear();
         try {
-            const raw = localStorage.getItem(`capiau_media_colors_proj_${projectId}`);
+            // Limpa chave v1 antiga se existir para remover classificações legadas sem ponderação de dominância
+            if (typeof localStorage !== "undefined" && localStorage.getItem(`capiau_media_colors_proj_${projectId}`)) {
+                localStorage.removeItem(`capiau_media_colors_proj_${projectId}`);
+            }
+            const raw = typeof localStorage !== "undefined" ? localStorage.getItem(`capiau_media_colors_v2_proj_${projectId}`) : null;
             if (raw) {
                 const parsed = JSON.parse(raw);
                 if (parsed && typeof parsed === "object") {
@@ -11153,7 +11972,9 @@ class MediaColorExtractor {
                     obj[k] = v;
                     if (++count > 4000) break;
                 }
-                localStorage.setItem(`capiau_media_colors_proj_${projectId}`, JSON.stringify(obj));
+                if (typeof localStorage !== "undefined") {
+                    localStorage.setItem(`capiau_media_colors_v2_proj_${projectId}`, JSON.stringify(obj));
+                }
             } catch (e) {
                 console.warn("[MediaColorExtractor] Falha ao salvar cache no localStorage:", e);
             }
@@ -11177,11 +11998,12 @@ class MediaColorExtractor {
         if (cleanList.length === 0) return null;
         if (cleanList.length === 1) return cleanList[0];
 
-        // Avalia luminosidade e saturação para evitar letterbox preto (<20) ou estouro de branco (>245)
+        // Avalia luminosidade e saturação ponderada pela dominância do cluster k-means OpenCV
         let bestColor = null;
         let bestScore = -1;
 
-        for (const hex of cleanList) {
+        for (let idx = 0; idx < cleanList.length; idx++) {
+            const hex = cleanList[idx];
             const clean = hex.replace("#", "");
             const val = parseInt(clean.length === 3 ? clean.split("").map(ch => ch + ch).join("") : clean, 16) || 0;
             const r = (val >> 16) & 255;
@@ -11189,14 +12011,18 @@ class MediaColorExtractor {
             const b = val & 255;
             const lum = 0.299 * r + 0.587 * g + 0.114 * b;
             
-            // Rejeita letterbox preto e estouro de branco puro
+            // Rejeita letterbox preto (<20) e estouro de branco puro (>245)
             if (lum < 20 || lum > 245) continue;
             
             const max = Math.max(r, g, b);
             const min = Math.min(r, g, b);
             const sat = max > 0 ? (max - min) / max : 0;
             const lumMidWeight = 1 - Math.abs(lum - 128) / 128;
-            const score = sat * 2.2 + lumMidWeight * 0.8;
+            
+            // Pondera pela dominância de cluster (índice 0 é o cluster mais abundante de pixels da cena)
+            // Impede que acentos isolados de 5% sobreponham o tom ambiente dominante
+            const dominanceWeight = Math.max(0.25, 1.0 - (idx * 0.22));
+            const score = (sat * 1.4 + lumMidWeight * 0.6) * dominanceWeight;
             
             if (score > bestScore) {
                 bestScore = score;
@@ -11243,12 +12069,14 @@ class MediaColorExtractor {
 
         // Caso 1.5: Cabeçalho da Galeria Clean (.gallery-sticky-header)
         if (itemEl.classList.contains("gallery-sticky-header")) {
+            const sceneColor = itemEl.style.getPropertyValue("--scene-color");
+            if (sceneColor) return sceneColor.trim();
             const blockEl = itemEl.closest(".gallery-block");
             const groupKey = blockEl?.dataset?.groupKey || "";
             if (groupKey && typeof virtualFolderColors !== "undefined" && virtualFolderColors[groupKey]) {
                 return virtualFolderColors[groupKey];
             }
-            const headerTitle = itemEl.querySelector(".gallery-header-title span")?.textContent?.replace(/^📁\s*/, "").trim() || "";
+            const headerTitle = itemEl.querySelector(".gallery-header-title span:last-child")?.textContent?.replace(/^📁\s*/, "").trim() || "";
             if (headerTitle && typeof virtualFolderColors !== "undefined" && virtualFolderColors[headerTitle]) {
                 return virtualFolderColors[headerTitle];
             }
@@ -11547,26 +12375,101 @@ export function applyRevealPulse(item, customColor = null) {
     }, 1200);
 }
 
+/**
+ * Calcula a distância perceptual Euclidiana ponderada entre duas cores hexadecimais.
+ */
+export function colorDistance(c1, c2) {
+    const [r1, g1, b1] = hexToRgb(c1);
+    const [r2, g2, b2] = hexToRgb(c2);
+    const dr = r1 - r2;
+    const dg = g1 - g2;
+    const db = b1 - b2;
+    return Math.sqrt(0.30 * dr * dr + 0.59 * dg * dg + 0.11 * db * db);
+}
+
+/**
+ * Descreve o matiz, família e temperatura de cor de forma amigável para cinema e NLE.
+ * @param {string} hex - Cor hexadecimal (ex: "#d97706")
+ * @returns {{ name: string, family: string, temp: "quente"|"neutro"|"frio", hex: string }}
+ */
+export function getColorDescriptor(hex) {
+    if (!hex || typeof hex !== "string") {
+        return { name: "Neutro / Cinza", family: "neutral", temp: "neutro", hex: "#64748b" };
+    }
+    const [r, g, b] = hexToRgb(hex);
+    const rN = r / 255, gN = g / 255, bN = b / 255;
+    const max = Math.max(rN, gN, bN), min = Math.min(rN, gN, bN);
+    const delta = max - min;
+    let h = 0, s = max === 0 ? 0 : delta / max, v = max;
+
+    if (delta !== 0) {
+        if (max === rN) h = (gN - bN) / delta + (gN < bN ? 6 : 0);
+        else if (max === gN) h = (bN - rN) / delta + 2;
+        else h = (rN - gN) / delta + 4;
+        h *= 60;
+    }
+
+    if (s < 0.16 || v < 0.16) {
+        if (v < 0.22) return { name: "Sombra / Escuro", family: "dark", temp: "neutro", hex };
+        if (v > 0.85 && s < 0.10) return { name: "Luz Clara / Branco", family: "light", temp: "neutro", hex };
+        return { name: "Neutro / Monocromático", family: "neutral", temp: "neutro", hex };
+    }
+
+    let name = "Cor";
+    let family = "other";
+    let temp = "neutro";
+
+    if (h >= 345 || h < 18) {
+        name = "Rubi / Vermelho";
+        family = "red";
+        temp = "quente";
+    } else if (h >= 18 && h < 48) {
+        name = "Âmbar / Pôr do Sol";
+        family = "amber";
+        temp = "quente";
+    } else if (h >= 48 && h < 72) {
+        name = "Dourado / Amarelo";
+        family = "gold";
+        temp = "quente";
+    } else if (h >= 72 && h < 165) {
+        name = "Verde / Natureza";
+        family = "green";
+        temp = "neutro";
+    } else if (h >= 165 && h < 205) {
+        name = "Ciano / Céu Claro";
+        family = "cyan";
+        temp = "frio";
+    } else if (h >= 205 && h < 265) {
+        name = "Azul / Noite";
+        family = "blue";
+        temp = "frio";
+    } else if (h >= 265 && h < 315) {
+        name = "Violeta / Púrpura";
+        family = "violet";
+        temp = "frio";
+    } else {
+        name = "Carmim / Rosa";
+        family = "magenta";
+        temp = "quente";
+    }
+
+    return { name, family, temp, hex };
+}
+
 if (typeof window !== "undefined") {
     window.hexToRgb = hexToRgb;
     window.calculateBoostedColor = calculateBoostedColor;
     window.applyRevealPulse = applyRevealPulse;
+    window.colorDistance = colorDistance;
+    window.getColorDescriptor = getColorDescriptor;
+    window.coalesceColorBlocks = coalesceColorBlocks;
 }
 
 /**
  * Coalesce itens adjacentes que compartilham cores similares em blocos contíguos de cena.
  */
-function coalesceColorBlocks(itemsWithColors) {
+export function coalesceColorBlocks(itemsWithColors) {
     if (!itemsWithColors || itemsWithColors.length === 0) return [];
-
-    const colorDistance = (c1, c2) => {
-        const [r1, g1, b1] = hexToRgb(c1);
-        const [r2, g2, b2] = hexToRgb(c2);
-        const dr = r1 - r2;
-        const dg = g1 - g2;
-        const db = b1 - b2;
-        return Math.sqrt(0.30 * dr * dr + 0.59 * dg * dg + 0.11 * db * db);
-    };
 
     const blocks = [];
     let currentBlock = {
@@ -11797,6 +12700,10 @@ export class LibraryScrollIndexTracker {
             });
             STATE.on("projectLoaded", (proj) => {
                 this.colorExtractor?.initForProject(proj?.id);
+                this.requestRibbonRedraw();
+            });
+            STATE.on("projectChanged", (projId) => {
+                this.colorExtractor?.initForProject(projId);
                 this.requestRibbonRedraw();
             });
             STATE.on("videoThumbnailUpdated", ({ videoId, video }) => {
@@ -12556,13 +13463,29 @@ export class LibraryScrollIndexTracker {
 
         const containerRect = container.getBoundingClientRect();
         const itemRect = item.getBoundingClientRect();
-        const itemCenter = (itemRect.top - containerRect.top) + container.scrollTop + (itemRect.height / 2);
-        const desiredScrollTop = itemCenter - (containerRect.height / 2);
+        const isHeader = item.classList.contains("gallery-sticky-header") || item.classList.contains("tree-folder-header");
+        const targetBlock = item.closest(".gallery-block");
+        let desiredScrollTop;
+        if (isHeader && targetBlock) {
+            const bRect = targetBlock.getBoundingClientRect();
+            desiredScrollTop = container.scrollTop + (bRect.top - containerRect.top);
+        } else if (item.classList.contains("gallery-item") || item.classList.contains("media-card")) {
+            // Se for um item de mídia específico, ancora o item visível logo abaixo do cabeçalho sticky (~40px)
+            const itemTop = (itemRect.top - containerRect.top) + container.scrollTop;
+            desiredScrollTop = Math.max(0, itemTop - 42);
+        } else if (targetBlock) {
+            const bRect = targetBlock.getBoundingClientRect();
+            desiredScrollTop = container.scrollTop + (bRect.top - containerRect.top);
+        } else {
+            const itemCenter = (itemRect.top - containerRect.top) + container.scrollTop + (itemRect.height / 2);
+            desiredScrollTop = itemCenter - (containerRect.height / 2);
+        }
         const maxScroll = Math.max(0, container.scrollHeight - container.clientHeight);
         const targetScroll = Math.max(0, Math.min(maxScroll, desiredScrollTop));
 
         if (!smooth) {
             container.scrollTop = targetScroll;
+            this.updateCursorPosition();
             triggerHighlight();
             return;
         }
@@ -12575,10 +13498,11 @@ export class LibraryScrollIndexTracker {
                 const currentCenter = iRect.top + (iRect.height / 2);
                 const contCenter = cRect.top + (cRect.height / 2);
                 const diff = currentCenter - contCenter;
-                if (Math.abs(diff) > 8) {
+                if (!targetBlock && !item.classList.contains("gallery-item") && Math.abs(diff) > 8) {
                     container.scrollTop = Math.max(0, Math.min(container.scrollHeight - container.clientHeight, container.scrollTop + diff));
                 }
             }
+            this.updateCursorPosition();
             triggerHighlight();
         });
     }
@@ -12673,6 +13597,9 @@ export class LibraryScrollIndexTracker {
         if (this.tooltipEl && this.tooltipEl.classList.contains("visible") && e.target && this.tooltipEl.contains(e.target)) {
             const targetItem = this.currentTargetItem;
             this.suppressUntilMove(e.clientX, e.clientY);
+            if (!e.altKey && window.libraryInstance && window.libraryInstance._activeDecoupageFilterKey) {
+                window.libraryInstance.clearDecoupageFilter();
+            }
             if (targetItem) {
                 this.navigateToItem(targetItem, true);
             }
@@ -12708,11 +13635,27 @@ export class LibraryScrollIndexTracker {
 
             this.updateAtRatio(exactRatio, e, activeTab);
 
+            // Alt + Clique na calha: Filtra exclusivamente a cena cromática correspondente
+            if (e.altKey && this.currentTargetItem) {
+                const targetBlock = this.currentTargetItem.closest(".gallery-block") || (this.currentTargetItem.classList?.contains("gallery-block") ? this.currentTargetItem : null);
+                const groupKey = targetBlock?.dataset?.groupKey;
+                const headerLabel = targetBlock?.querySelector(".gallery-header-title span:last-child")?.textContent || "Cena";
+                if (groupKey && window.libraryInstance && typeof window.libraryInstance.applyDecoupageExclusiveFilter === "function") {
+                    window.libraryInstance.applyDecoupageExclusiveFilter(groupKey, headerLabel);
+                    this.suppressUntilMove(e.clientX, e.clientY);
+                    return;
+                }
+            } else if (!e.altKey && window.libraryInstance && window.libraryInstance._activeDecoupageFilterKey) {
+                // Se havia filtro exclusivo ativo e o usuário deu um clique normal (sem Alt) na calha/fita, descarta o filtro
+                window.libraryInstance.clearDecoupageFilter();
+            }
+
             if (this.currentTargetItem) {
                 this.navigateToItem(this.currentTargetItem, true);
             } else {
                 const targetScrollTop = exactRatio * (container.scrollHeight - container.clientHeight);
                 container.scrollTo({ top: targetScrollTop, behavior: "smooth" });
+                this.updateCursorPosition();
             }
 
             // Oculta imediatamente o card e suprime até que o mouse se movimente novamente
@@ -12938,14 +13881,14 @@ export class LibraryScrollIndexTracker {
         const itemColor = this.colorExtractor ? this.colorExtractor.getColor(itemEl, STATE.allVideos || [], STATE.allPhotos || []) : null;
         let cardAccent = itemColor;
         if (!cardAccent || cardAccent === "#64748b" || cardAccent === "#475569") {
-            cardAccent = isFolder ? "#8b5cf6" : "var(--color-cyan)";
+            cardAccent = isFolder ? "#8b5cf6" : "var(--accent)";
         }
         this.tooltipEl.style.setProperty("--card-accent-color", cardAccent);
         if (folderIcon) folderIcon.style.color = cardAccent;
 
         if (isFolder) {
             const isStickyHeader = itemEl.classList.contains("gallery-sticky-header");
-            const folderName = itemEl.querySelector(".folder-name, .gallery-header-title span")?.textContent?.trim() || (isStickyHeader ? "Grupo" : "Pasta");
+            const folderName = itemEl.querySelector(".folder-name, .gallery-header-title span:last-child")?.textContent?.trim() || (isStickyHeader ? "Grupo" : "Pasta");
             if (folderSpan) folderSpan.textContent = isStickyHeader ? "Grupo Galeria" : "Diretório";
             if (titleEl) titleEl.textContent = folderName;
             if (badgeEl) {
@@ -12974,7 +13917,7 @@ export class LibraryScrollIndexTracker {
             const isPhoto = itemEl.hasAttribute("data-photo-id") || Boolean(itemEl.dataset?.photoId) || activeTabId === "tab-photos";
             
             const parentFolderName = itemEl.closest(".tree-folder-container")?.querySelector(".tree-folder-header .folder-name")?.textContent
-                || itemEl.closest(".gallery-block")?.querySelector(".gallery-sticky-header .gallery-header-title span")?.textContent
+                || itemEl.closest(".gallery-block")?.querySelector(".gallery-sticky-header .gallery-header-title span:last-child")?.textContent
                 || "Biblioteca";
             if (folderSpan) folderSpan.textContent = parentFolderName;
 
