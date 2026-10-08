@@ -34,7 +34,10 @@ class ResolvedSettings:
     def get(self, key: str) -> Any:
         if key not in self._values:
             raise KeyError(f"Configuração desconhecida: '{key}' (não está no SETTINGS_REGISTRY)")
-        return self._values[key]
+        val = self._values[key]
+        if key in ("llm.text_model", "agent.model") and isinstance(val, str):
+            return CONFIG.resolve_model_for_openrouter(val)
+        return val
 
     def api_key(self, provider: str) -> str:
         """Chave de API resolvida: valor do banco se não-vazio, senão fallback de CONFIG/.env."""

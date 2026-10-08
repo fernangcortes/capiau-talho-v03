@@ -75,7 +75,7 @@ Responda estritamente em Português e em formato JSON com a seguinte estrutura (
         return False
         
     payload = {
-        "model": CONFIG.TEXT_MODEL,
+        "model": CONFIG.resolve_model_for_openrouter(CONFIG.TEXT_MODEL),
         "messages": [{"role": "user", "content": prompt}],
         "temperature": 0.3
     }

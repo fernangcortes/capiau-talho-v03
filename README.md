@@ -600,11 +600,11 @@ e o valor salvo no painel **tem prioridade sobre o `.env`**.
 
 | Variável | Padrão | Para que serve |
 |---|---|---|
-| `TEXT_MODEL` | `deepseek/deepseek-v4-flash` | Resumos, temas, sugestões de timeline e chat. `deepseek/deepseek-v4-pro` entrega melhor qualidade a um custo maior. *Ajustável na interface.* |
+| `TEXT_MODEL` | `deepseek/deepseek-v4.1-flash` | Resumos, temas, sugestões de timeline e chat. `deepseek/deepseek-v4-pro` entrega melhor qualidade; `~deepseek/deepseek-flash-latest` seleciona sempre a versão mais nova automaticamente. *Ajustável na interface.* |
 | `VISION_MODEL` | `google/gemini-2.5-flash` | Descrição de frames e fotos. *Ajustável na interface.* |
-| `VISION_MODEL_FALLBACK` | `nvidia/nemotron-nano-12b-v2-vl:free` | Modelo reserva, acionado só depois que o principal falha. *Ajustável na interface.* |
+| `VISION_MODEL_FALLBACK` | `nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free` | Modelo reserva, acionado só depois que o principal falha. *Ajustável na interface.* |
 | `VISION_MAX_RETRIES` | `2` | Quantas tentativas no modelo principal antes de cair para a reserva |
-| `AGENT_MODEL` | `deepseek/deepseek-v4-flash` | Modelo do agente que edita a timeline por comandos de chat |
+| `AGENT_MODEL` | `deepseek/deepseek-v4.1-flash` | Modelo do agente que edita a timeline por comandos de chat |
 | `EMBEDDING_MODEL` | `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2` | Embeddings de texto. Ao trocar, rode `POST /api/search/reindex` para reindexar o acervo |
 
 > **Sobre modelos gratuitos (`:free`).** O limite da OpenRouter é de 20 pedidos por minuto sempre, e

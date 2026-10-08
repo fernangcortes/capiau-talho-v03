@@ -17,7 +17,9 @@ class Config:
     TEXT_MODEL = os.getenv("TEXT_MODEL", "deepseek/deepseek-v4.1-flash")
     TEXT_MODELS = [
         "deepseek/deepseek-v4.1-flash",
+        "deepseek-flash",
         "~deepseek/deepseek-flash-latest",
+        "deepseek/deepseek-flash",
         "deepseek/deepseek-v4-pro",
         "google/gemini-3.8-flash",
         "anthropic/claude-sonnet-5.5",
@@ -27,7 +29,9 @@ class Config:
     # Nome legível de cada ID, mostrado nas listas das Configurações.
     MODEL_LABELS = {
         "deepseek/deepseek-v4.1-flash": "DeepSeek V4.1 Flash (rápido e barato)",
-        "~deepseek/deepseek-flash-latest": "DeepSeek Flash, sempre o mais novo",
+        "deepseek-flash": "DeepSeek Flash (oficial api-docs.deepseek.com)",
+        "~deepseek/deepseek-flash-latest": "DeepSeek Flash, sempre o mais novo (OpenRouter)",
+        "deepseek/deepseek-flash": "DeepSeek Flash (OpenRouter)",
         "deepseek/deepseek-v4-pro": "DeepSeek V4 Pro (mais qualidade, mais caro)",
         "deepseek/deepseek-v4-flash": "DeepSeek V4 Flash (geração anterior)",
         "google/gemini-2.5-flash": "Gemini 2.5 Flash",
@@ -70,6 +74,9 @@ class Config:
     AGENT_MODEL = os.getenv("AGENT_MODEL", "deepseek/deepseek-v4.1-flash")
     AGENT_MODELS = [
         "deepseek/deepseek-v4.1-flash",
+        "deepseek-flash",
+        "~deepseek/deepseek-flash-latest",
+        "deepseek/deepseek-flash",
         "deepseek/deepseek-v4-pro",
         "google/gemini-3.8-flash",
         "google/gemini-3.5-flash",
@@ -79,18 +86,34 @@ class Config:
         "openai/gpt-4o-mini",
         "deepseek/deepseek-v4-flash",
     ]
+
+    @classmethod
+    def resolve_model_for_openrouter(cls, model_name: str) -> str:
+        """Resolve aliases de modelos (ex.: 'deepseek-flash') para o slug OpenRouter compatível.
+        
+        Permite que o usuário use 'deepseek-flash' diretamente (conforme api-docs.deepseek.com)
+        sem que a OpenRouter retorne erro 404 por falta do namespace.
+        """
+        if not model_name:
+            return "deepseek/deepseek-v4.1-flash"
+        m = str(model_name).strip()
+        if m in ("deepseek-flash", "deepseek/deepseek-flash"):
+            return "~deepseek/deepseek-flash-latest"
+        if m.startswith("deepseek-v"):
+            return f"deepseek/{m}"
+        return m
     
     # ── Paths locais ───────────────────────────────────────────
     BASE_DIR = Path(__file__).resolve().parent.parent
     
-    DB_PATH = BASE_DIR / os.getenv("capiau_DB", "data/capiau.db")
-    WATCH_FOLDER = BASE_DIR / os.getenv("capiau_WATCH", "watch")
-    ORIGINALS_DIR = BASE_DIR / os.getenv("capiau_ORIGINALS", "data/originals")
-    PROXIES_DIR = BASE_DIR / os.getenv("capiau_PROXIES", "data/proxies")
-    CACHE_DIR = BASE_DIR / os.getenv("capiau_CACHE", "data/cache")
+    DB_PATH = BASE_DIR / (os.getenv("CAPIAU_DB_PATH") or os.getenv("CAPIAU_DB") or os.getenv("capiau_DB") or "data/capiau.db")
+    WATCH_FOLDER = BASE_DIR / (os.getenv("CAPIAU_WATCH") or os.getenv("CAPIAU_WATCH_FOLDER") or os.getenv("capiau_WATCH") or "watch")
+    ORIGINALS_DIR = BASE_DIR / (os.getenv("CAPIAU_ORIGINALS") or os.getenv("CAPIAU_ORIGINALS_DIR") or os.getenv("capiau_ORIGINALS") or "data/originals")
+    PROXIES_DIR = BASE_DIR / (os.getenv("CAPIAU_PROXIES") or os.getenv("CAPIAU_PROXIES_DIR") or os.getenv("capiau_PROXIES") or "data/proxies")
+    CACHE_DIR = BASE_DIR / (os.getenv("CAPIAU_CACHE") or os.getenv("CAPIAU_CACHE_DIR") or os.getenv("capiau_CACHE") or "data/cache")
     WAVEFORMS_DIR = CACHE_DIR / "waveforms"
-    EXPORTS_DIR = BASE_DIR / os.getenv("capiau_EXPORTS", "data/exports")
-    QDRANT_DB_PATH = BASE_DIR / os.getenv("capiau_QDRANT_DB", "data/qdrant.db")
+    EXPORTS_DIR = BASE_DIR / (os.getenv("CAPIAU_EXPORTS_DIR") or os.getenv("CAPIAU_EXPORTS") or os.getenv("capiau_EXPORTS") or "data/exports")
+    QDRANT_DB_PATH = BASE_DIR / (os.getenv("CAPIAU_QDRANT_DB") or os.getenv("capiau_QDRANT_DB") or "data/qdrant.db")
     THUMBNAILS_DIR = PROXIES_DIR / "thumbnails"
     
     # ── Configurações de Ingestão e Proxy ──────────────────────
