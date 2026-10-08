@@ -79,6 +79,20 @@ O CapIAu-Talho suporta múltiplos modos de ingestão instantânea via **combina�
 | **`Ctrl + U`** *(no Source Player)* | **Criar Subclipe Virtual** | Gera subclipe virtual não-destrutivo com hard boundaries a partir dos pontos [In–Out] com sugestões de títulos por IA. | Inalterada |
 | **`R` / `Shift + R`** *(na Biblioteca/Galeria)* | **Girar Mídia 90°** | Gira a orientação da mídia em 90° no sentido horário (`R`) ou anti-horário (`Shift+R`). | Inalterada |
 
+### 4.1 Navegação & Decupagem Visual na Biblioteca (Barra de Decupagem & Fita Cromática)
+
+| Gesto / Atalho | Onde | Ação Executada |
+| :--- | :--- | :--- |
+| **`Clique Simples`** | Chip da Régua | Descarta filtros ativos e rola suavemente até o bloco correspondente, disparando pulso visual nos clipes. |
+| **`Alt + Clique`** | Chip da Régua ou Fita | **Filtra exclusivamente** a biblioteca para exibir apenas aquele bloco/cena cromática (`[X Todas]` fica ativo). |
+| **`Clique Normal pós-Filtro`** | Chip da Régua ou Fita | **Descarta o filtro exclusivo automaticamente** e navega direto para o novo bloco selecionado. |
+| **`Escape`** *(ou botão `[X Todas]`)* | Qualquer lugar | Limpa o filtro de decupagem ativo e restaura a visualização integral do acervo. |
+| **`Duplo Clique` (Cabeçalho)** | Cabeçalho Sticky de Cena | **Padrão universal CapIAu:** recolhe ou expande o mosaico de clipes daquele grupo. |
+| **`Botão [⌄ Expandir / Recolher]`** | Régua de Decupagem | Alterna entre visualização em múltiplas linhas (wrap) e linha única compacta com scroll. |
+| **`Scroll Wheel`** | Régua de Decupagem | Rola horizontalmente os chips quando em linha única. |
+| **`Botão Régua`** (`fa-ruler-horizontal`) | Barra de Ferramentas | Mostra ou oculta a régua de decupagem, memorizando a preferência no navegador. |
+| **`Botão [✕]`** | Canto da Régua | Oculta a régua de decupagem instantaneamente. |
+
 ---
 
 ## ✂️ 5. Marcação de Pontos e Edição na Timeline

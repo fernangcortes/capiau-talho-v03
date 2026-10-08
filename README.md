@@ -165,6 +165,16 @@ semiautônomos — exportáveis para **Kdenlive, Premiere, Resolve e Final Cut**
   persistência protegida contra sobrescrita de auditoria humana e ferramenta de auditoria de acervo
   (`scripts/auditar_cor.py`), preparando a pipeline para transformações OCIO.
 
+- **Decupagem por Cenas Cromáticas & Barra de Decupagem Visual com Chips Minimalistas.** 
+  Uma régua superior interativa na biblioteca integrada à fita cromática vertical (`#library-scroll-color-ribbon`), permitindo navegar, filtrar e organizar acervos volumosos por múltiplos critérios cinematográficos:
+  - **Cenas por Cor (Fita Cromática):** Agrupamento contíguo de planos por distância cromática euclidiana ponderada ($\le 52$), com detecção de dominância k-means OpenCV calibrada contra letterboxes e luzes espúrias.
+  - **Paletas Globais de Cor:** Unificação de todo o acervo por famílias cromáticas (âmbar, frio, rubi, etc.), permitindo encontrar instantaneamente todos os planos de mesma temperatura e atmosfera gravados no projeto.
+  - **Chips Minimalistas Inteligentes (Tiered Smart Chips):** Escala geométrica ultracompacta (altura 16px, largura a partir de 16px) que acomoda 10 a 15 grupos simultâneos em barras laterais de 380px sem rolagem:
+    - *Regra estrita de cor:* Cores nunca exibem nomes textuais; swatches puros sem texto para $\le 3$ itens e apenas a contagem numérica para $\ge 4$ itens.
+    - *Apresentação compacta em todas as categorias:* Escalas em siglas NLE (`CU`, `PM`, `PA`, `PG`, `DET`, `AER`, `VAR`), falantes por primeiro nome (`Emily 12`), datas abreviadas (`24 Out 15`) e smart bins com taxonomia sucinta (`Entrev. 8`).
+    - *Ferramentas de controle:* Alternância multi-linhas / wrap toggle (`fa-chevron-down`/`up`), rolagem lateral suave, ocultação com um clique e auto-descarte de filtros exclusivos (`Alt + Clique`) no clique normal.
+    - *Preservação em Tooltips Globais:* Metadados detalhados (nome da paleta, minutagem, contagem e atalhos) exibidos ao passar o mouse sem poluição visual.
+
 ### ✂️ Timeline e edição <a id="timeline-e-edicao"></a>
 
 - **Arquitetura Track-Based clássica de NLE.** A timeline opera no padrão multipista profissional

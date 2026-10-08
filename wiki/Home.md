@@ -38,7 +38,7 @@ Explore a documentação completa através dos módulos abaixo:
 | 🎨 **Interface** | [[03. Design System e Interface NLE\|03.-Design-System-e-Interface-NLE]] | Layout seamless sem gaps, sidebars adaptativas, linhas restauradoras de 4px. |
 | 📂 **Acervo** | [[04. Ingestão e Gestão de Acervos\|04.-Ingestao-e-Gestao-de-Acervos]] | Ingestão in-place sem cópia, watch folder, proxies 720p/360p, RAW CR2 e MTS. |
 | ✂️ **Edição** | [[05. Timeline e Edição Multipista\|05.-Timeline-e-Edicao-Multipista]] | Canvas 2D NLE, pistas V/A, Sync Lock, Magnetismo, J/L-Cuts e ferramentas de Trim. |
-| 🎞️ **Visão** | [[06. Decupagem e Visão Computacional\|06.-Decupagem-Inteligente-e-Visao]] | PySceneDetect (shots/beats), movimento de câmera, títulos de IA e CLIP local. |
+| 🎞️ **Visão** | [[06. Decupagem e Visão Computacional\|06.-Decupagem-Inteligente-e-Visao]] | PySceneDetect (shots/beats), decupagem cromática, chips minimalistas, títulos de IA e CLIP local. |
 | 🎙️ **Texto** | [[07. Transcrição e Edição por Texto\|07.-Transcricao-ASR-e-Edicao-por-Texto]] | AssemblyAI/Whisper, diarização, gaveta de pistas, waveform e inserção rápida. |
 | 🔍 **Busca** | [[08. Busca Híbrida e Semântica\|08.-Busca-Hibrida-e-Semantica]] | Busca semântica RAG, similares visuais, filtros avançados e explicações de IA. |
 | 👥 **Faces** | [[09. Reconhecimento Facial e Elenco\|09.-Reconhecimento-Facial-e-Elenco]] | InsightFace ONNX CPU, DBSCAN local, rotulação, fusão de clusters e caixas manuais. |
