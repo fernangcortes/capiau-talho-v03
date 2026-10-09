@@ -644,7 +644,8 @@ def montar_comando(seq, pedido, destino, *, rel_midia=None,
             desfoque = camada[3] if len(camada) > 3 else None
             if desfoque:
                 atual = _desfoque_caixa(filtros, atual, k, base_t + int(desfoque["mascara"]),
-                                        loc, dur, desfoque.get("sigmas") or [])
+                                        loc, dur, desfoque.get("sigmas") or [],
+                                        duracao_janela, float(seq.fps))
             rot_img, rot_sai = f"[tit{k}]", f"[vtit{k}]"
             filtros.append(
                 f"[{base_t + k}:v]format=rgba,setpts=PTS-STARTPTS+{_fmt(loc)}/TB{rot_img}")
@@ -760,14 +761,20 @@ def montar_comando(seq, pedido, destino, *, rel_midia=None,
 
 
 def _desfoque_caixa(filtros: List[str], atual: str, k: int, entrada_mascara: int,
-                    loc: float, dur: float, sigmas: List[Tuple[float, float]]) -> str:
+                    loc: float, dur: float, sigmas: List[Tuple[float, float]],
+                    dur_render: float, fps: float) -> str:
     """Desfoque do video atras da caixa do titulo (backdrop-filter do preview).
 
-    O video ja composto e desfocado so na janela do titulo (trim), recortado pela
+    O video ja composto e desfocado so na janela do titulo, recortado pela
     mascara da caixa (PNG cinza = alfa da camada, ver titulos.py) e sobreposto antes
     da foto do titulo. Desfoca em gbrp: em yuv420 o croma subamostrado sairia desfocado em
     dobro (medido: cor lavada). Sigma variavel (escala animada) entra por sendcmd.
     Devolve o novo rotulo do video.
+
+    A janela sai de grafo_video._compor_em_janela (cabeca | janela | cauda com
+    concat). Split + trim + overlay de volta sobre o video inteiro fazia o overlay
+    segurar todos os quadros desde t=0 ate o comeco do titulo (medido no ffmpeg 5.1:
+    ~3 MB por quadro em 1080p; titulo aos 60 s a 59,94 fps passava de 5 GB).
     """
     from .titulos import PASSOS_GBLUR
     sigma0 = float(sigmas[0][1]) if sigmas else 0.0
@@ -776,17 +783,28 @@ def _desfoque_caixa(filtros: List[str], atual: str, k: int, entrada_mascara: int
     if len(sigmas) > 1:
         cmds = ";".join(f"{_fmt(t)} {nome} sigma {_fmt(s)}" for t, s in sigmas[1:])
         trocas = f"sendcmd=c='{cmds}',"
-    filtros.append(f"{atual}split=2[tdb{k}][tds{k}]")
-    filtros.append(
-        f"[tds{k}]trim=start={_fmt(loc)}:end={_fmt(loc + dur)},setpts=PTS-STARTPTS,"
-        f"format=gbrp,{trocas}{nome}=sigma={_fmt(sigma0)}:steps={PASSOS_GBLUR}[tdg{k}]")
-    filtros.append(f"[{entrada_mascara}:v]format=gray[tdm{k}]")
-    filtros.append(
-        f"[tdg{k}][tdm{k}]alphamerge,setpts=PTS-STARTPTS+{_fmt(loc)}/TB[tdgm{k}]")
-    filtros.append(
-        f"[tdb{k}][tdgm{k}]overlay=x=0:y=0:eof_action=pass:"
-        f"enable='between(t,{_fmt(loc)},{_fmt(loc + dur)})'[tdv{k}]")
-    return f"[tdv{k}]"
+    pfx = f"td{k}"
+
+    def corpo(rot_janela: str, ini_rel: float, dur_clipe: float, _dur_jan: float):
+        # O trim aqui so corta o que a janela absorveu (no maximo 1 quadro de cabeca
+        # ou a cauda depois de um titulo de 1 quadro): o overlay espera 1 quadro, nao o
+        # video inteiro. Relogio do sendcmd e da mascara = inicio do titulo. round():
+        # o setpts trunca (o `+loc/TB` antigo dava o desfoque do quadro seguinte).
+        volta = f"+round({_fmt(ini_rel)}/TB)" if ini_rel > 0 else ""
+        return [
+            f"[{rot_janela}]split=2[{pfx}_b][{pfx}_s]",
+            f"[{pfx}_s]trim=start={_fmt(ini_rel)}:end={_fmt(ini_rel + dur_clipe)},"
+            f"setpts=PTS-STARTPTS,format=gbrp,{trocas}"
+            f"{nome}=sigma={_fmt(sigma0)}:steps={PASSOS_GBLUR}[{pfx}_g]",
+            f"[{entrada_mascara}:v]format=gray[{pfx}_m]",
+            f"[{pfx}_g][{pfx}_m]alphamerge,setpts=PTS-STARTPTS{volta}[{pfx}_gm]",
+            f"[{pfx}_b][{pfx}_gm]overlay=x=0:y=0:eof_action=pass:"
+            f"{grafo_video._enable_janela(ini_rel, ini_rel + dur_clipe, fps)}[{pfx}_v]",
+        ], f"{pfx}_v"
+
+    linhas, saida = grafo_video._compor_em_janela(atual, loc, dur, dur_render, fps, pfx, corpo)
+    filtros.extend(linhas)
+    return f"[{saida}]"
 
 
 def _renumerar(filtro: str, offset: int) -> str:

@@ -188,7 +188,8 @@ def test_desfoque_da_caixa_igual_ao_preview(tmp_path):
     assert grupo["mascara"] is not None and grupo["sigma"] == pytest.approx(1.05 * 10 * 1.2)
 
     filtros = []
-    atual = comando._desfoque_caixa(filtros, "[0:v]", 0, 2, 0.0, 1.0, [(0.0, grupo["sigma"])])
+    atual = comando._desfoque_caixa(filtros, "[0:v]", 0, 2, 0.0, 1.0, [(0.0, grupo["sigma"])],
+                                    1.0, 25.0)   # -loop 1 sem -framerate: 25 fps
     filtros.append(f"{atual}[1:v]overlay=0:0:format=rgb")
     arquivo = tmp_path / "arquivo.png"
     subprocess.run(["ffmpeg", "-v", "error", "-y", "-loop", "1", "-t", "1", "-i", str(xadrez),
