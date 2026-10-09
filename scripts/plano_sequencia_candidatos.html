@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Candidatos a plano-sequência</title>
+<style>
+:root {
+  --bg: #f6f5f2; --card: #ffffff; --ink: #1d1d1b; --muted: #6b6a66; --line: #e3e1dc; --soft: #efede8;
+  --accent: #2f5bd3; --ok: #1f8a4c; --bad: #c2412d; --warn: #b7791f;
+  --c-cena: #7b4fd6; --c-bastidor: #2f7fd3; --c-depoimento: #d3532f; --c-convivio: #2fa37a;
+  --c-evento: #c9a227; --c-teste: #7d8a99; --c-documento: #8a5a2b; --c-terceiros: #c2418f;
+  --c-confirma: var(--ok); --c-contradiz: var(--bad); --c-insuficiente: var(--warn);
+  --sombra: 0 1px 2px rgba(0,0,0,.05), 0 2px 8px rgba(0,0,0,.04);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #151514; --card: #1e1e1c; --ink: #ecebe7; --muted: #a09e98; --line: #33322f; --soft: #262624;
+    --accent: #7b9cff; --ok: #4cc283; --bad: #ef7a63; --warn: #e3b04b;
+    --sombra: 0 1px 2px rgba(0,0,0,.4);
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #151514; --card: #1e1e1c; --ink: #ecebe7; --muted: #a09e98; --line: #33322f; --soft: #262624;
+  --accent: #7b9cff; --ok: #4cc283; --bad: #ef7a63; --warn: #e3b04b; --sombra: 0 1px 2px rgba(0,0,0,.4);
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+main { max-width: 1180px; margin: 0 auto; padding: 24px 16px 80px; }
+h1 { font-size: 26px; margin: 0 0 4px; letter-spacing: -.01em; }
+h2 { font-size: 18px; margin: 32px 0 12px; }
+.sub { color: var(--muted); margin: 0 0 20px; }
+.grade { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+.stat { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; box-shadow: var(--sombra); }
+.stat b { display: block; font-size: 22px; font-variant-numeric: tabular-nums; }
+.stat span { color: var(--muted); font-size: 13px; }
+details.guia { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 4px 16px; margin-top: 16px; }
+details.guia > summary { cursor: pointer; font-weight: 600; padding: 10px 0; }
+.guia ol { padding-left: 20px; } .guia li { margin: 4px 0; }
+.cats { display: grid; grid-template-columns: max-content 1fr; gap: 6px 14px; margin: 8px 0 14px; }
+.nota { background: var(--soft); border-radius: 8px; padding: 10px 12px; margin: 10px 0; font-size: 14px; }
+.graficos { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
+.painel { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; box-shadow: var(--sombra); }
+.painel h3 { margin: 0 0 10px; font-size: 15px; }
+.barra-linha { display: grid; grid-template-columns: 96px 1fr 28px; align-items: center; gap: 8px; margin: 5px 0; font-size: 13px; }
+.trilho { background: var(--soft); border-radius: 4px; height: 14px; overflow: hidden; display: flex; }
+.trilho i { display: block; height: 100%; }
+.num { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
+.ferramentas { position: sticky; top: 0; z-index: 5; background: var(--bg); padding: 10px 0; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; border-bottom: 1px solid var(--line); margin-top: 24px; }
+.ferramentas input, .ferramentas select, button { font: inherit; font-size: 14px; color: var(--ink); background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; }
+.ferramentas input { flex: 1 1 180px; min-width: 0; }
+button { cursor: pointer; } button:hover { border-color: var(--accent); }
+button.primario { background: var(--accent); color: #fff; border-color: var(--accent); }
+.contagem { color: var(--muted); font-size: 13px; margin-left: auto; }
+.clipe { background: var(--card); border: 1px solid var(--line); border-radius: 12px; margin: 16px 0; box-shadow: var(--sombra); overflow: hidden; }
+.clipe.certo { border-left: 4px solid var(--ok); } .clipe.errado { border-left: 4px solid var(--bad); }
+.cab { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: baseline; padding: 12px 16px; border-bottom: 1px solid var(--line); }
+.cab .id { font-weight: 700; } .cab .arq { color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
+.corpo { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 18px; padding: 14px 16px; }
+@media (max-width: 820px) { .corpo { grid-template-columns: 1fr; } }
+video { width: 100%; aspect-ratio: 16 / 9; background: #000; border-radius: 8px; display: block; }
+.sem-video { aspect-ratio: 16/9; display: grid; place-items: center; background: var(--soft); border-radius: 8px; color: var(--muted); }
+.controles { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.controles button { padding: 3px 8px; font-size: 13px; }
+.pilula { display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px; border-radius: 999px; font-weight: 600; font-size: 13px; color: #fff; }
+.rotulo { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; margin: 12px 0 4px; }
+.rotulo:first-child { margin-top: 0; }
+.linha { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.conf { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); }
+.conf .trilho { width: 80px; height: 8px; }
+.chip { font-size: 12px; border: 1px solid var(--line); border-radius: 999px; padding: 1px 8px; color: var(--muted); }
+.acordo { font-weight: 600; font-size: 13px; } .acordo.sim { color: var(--ok); } .acordo.nao { color: var(--bad); }
+.dist { display: grid; grid-template-columns: 112px 1fr 38px; gap: 3px 8px; align-items: center; font-size: 12px; margin-top: 6px; }
+.dist .trilho { height: 9px; }
+.dist .marca { font-weight: 700; color: var(--ink); }
+.titulo-antes { text-decoration: line-through; color: var(--muted); }
+.falas { list-style: none; margin: 0; padding: 0; max-height: 210px; overflow: auto; border: 1px solid var(--line); border-radius: 8px; }
+.falas li { display: grid; grid-template-columns: 58px 1fr; gap: 8px; padding: 6px 8px; border-bottom: 1px solid var(--line); font-size: 14px; }
+.falas li:last-child { border-bottom: 0; }
+.falas button { padding: 1px 6px; font-size: 12px; font-variant-numeric: tabular-nums; align-self: start; }
+.vazio { color: var(--muted); font-style: italic; font-size: 14px; }
+details.desc summary { cursor: pointer; color: var(--muted); font-size: 13px; margin-top: 10px; }
+details.desc p { font-size: 14px; margin: 6px 0 0; }
+.rodape { display: flex; flex-wrap: wrap; gap: 6px 16px; padding: 10px 16px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.rodape code { overflow-wrap: anywhere; }
+.revisao { background: var(--soft); padding: 12px 16px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.revisao .v-certo.ativo { background: var(--ok); color: #fff; border-color: var(--ok); }
+.revisao .v-errado.ativo { background: var(--bad); color: #fff; border-color: var(--bad); }
+.revisao .detalhe { display: none; flex: 1 1 100%; gap: 8px; flex-wrap: wrap; align-items: center; }
+.revisao.mostrar .detalhe { display: flex; }
+.revisao textarea { font: inherit; font-size: 14px; flex: 1 1 260px; min-height: 36px; background: var(--card); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; }
+.revisao select { font: inherit; font-size: 14px; background: var(--card); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; }
+.tema { position: fixed; right: 12px; bottom: 12px; }
+
+.tira { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; margin-top: 8px; }
+.tira button { padding: 0; border: 2px solid transparent; border-radius: 6px; overflow: hidden; position: relative; background: #000; }
+.tira button.agora { border-color: var(--accent); }
+.tira img { width: 100%; aspect-ratio: 16/9; object-fit: cover; display: block; }
+.tira span { position: absolute; left: 3px; bottom: 2px; font-size: 11px; color: #fff; text-shadow: 0 0 3px #000, 0 0 2px #000; font-variant-numeric: tabular-nums; }
+.medida { display: grid; grid-template-columns: 150px 1fr 44px; gap: 8px; align-items: center; font-size: 13px; margin: 5px 0; }
+.medida .trilho { height: 10px; }
+.clipe.escolhido { border-left: 4px solid var(--ok); }
+.revisao .v-escolher.ativo { background: var(--ok); color: #fff; border-color: var(--ok); }
+.sugerido { color: var(--ok); border-color: var(--ok); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Candidatos a plano-sequência</h1>
+  <p class="sub" id="sub"></p>
+  <div class="grade" id="stats"></div>
+
+  <details class="guia" open>
+    <summary>Como ler esta página</summary>
+    <ol>
+      <li><b>De onde vieram:</b> todo arquivo bruto de câmera (MVI_, 000xx.MTS, handcam) com mais de 2 minutos. Cada um já é uma tomada contínua, sem corte. Entrevistas e arquivos editados ficaram de fora.</li>
+      <li><b>Movimento:</b> parte do tempo em que a câmera está se deslocando (medido a cada segundo, comparando quadros a 0,2 s de distância). 0% = tripé parado.</li>
+      <li><b>Mudança de imagem:</b> o quanto o quadro muda em 10 segundos (cor e luz). Alto = o plano passa por muita coisa diferente.</li>
+      <li><b>Saltos bruscos:</b> mudanças grandes de um segundo para o outro: chicote, mão na frente da lente, troca de luz. Não são cortes.</li>
+      <li><b>Escuro:</b> parte do tempo com imagem quase preta. Escuro demais atrapalha qualquer modelo de visão.</li>
+      <li>A <b>tira de quadros</b> mostra 12 momentos espaçados por igual; clique num quadro para o vídeo pular até lá.</li>
+      <li><b>Escolha 4</b> com o botão do cartão. Fica salvo neste navegador; <b>Baixar escolha</b> gera um JSON com os ids e suas notas.</li>
+    </ol>
+  </details>
+
+  <div class="ferramentas">
+    <select id="f-esc" aria-label="Escolha"><option value="">Todos</option><option value="sim">Escolhidos</option><option value="nao">Não escolhidos</option><option value="sug">Sugeridos</option></select>
+    <select id="ordem" aria-label="Ordem"><option value="lista">Ordem: lista</option><option value="duracao">Ordem: duração</option><option value="movimento">Ordem: movimento</option><option value="deriva">Ordem: mudança de imagem</option></select>
+    <button id="baixar" class="primario">Baixar escolha</button>
+    <span class="contagem" id="contagem"></span>
+  </div>
+  <div id="lista"></div>
+</main>
+<button class="tema" id="tema" title="Alternar tema claro/escuro">◐</button>
+
+<script>
+const DADOS = /*__DADOS__*/null;
+const C = DADOS.clipes, META = 4;
+const CHAVE = "plano-sequencia-escolha";
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, m => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
+const tempo = s => { s = Math.max(0, Math.round(s || 0)); const h = Math.floor(s/3600), m = Math.floor(s%3600/60), x = s%60;
+  return (h ? h + ":" + String(m).padStart(2,"0") : m) + ":" + String(x).padStart(2,"0"); };
+const pct = v => v == null ? "—" : Math.round(v * 100) + "%";
+
+let escolha = {};
+try { escolha = JSON.parse(localStorage.getItem(CHAVE) || "{}") || {}; } catch (e) { escolha = {}; }
+const salvar = () => { try { localStorage.setItem(CHAVE, JSON.stringify(escolha)); } catch (e) {} atualizarContagem(); };
+try { const t = localStorage.getItem("triagem-tema"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
+$("#tema").onclick = () => {
+  const escuro = getComputedStyle(document.body).backgroundColor === "rgb(21, 21, 20)";
+  document.documentElement.dataset.theme = escuro ? "light" : "dark";
+  try { localStorage.setItem("triagem-tema", document.documentElement.dataset.theme); } catch (e) {}
+};
+
+const durTotal = C.reduce((a, c) => a + c.duracao, 0);
+$("#sub").textContent = `Gerado em ${DADOS.gerado_em.replace("T", " às ")} · ${C.length} candidatos entre ${DADOS.medidos} takes brutos medidos`;
+$("#stats").innerHTML = [
+  [C.length, "candidatos"],
+  [tempo(durTotal), "de vídeo no total"],
+  [tempo(Math.max(...C.map(c => c.duracao))), "o mais longo"],
+  [pct(C.reduce((a, c) => a + (c.movimento || 0), 0) / C.length), "movimento médio"],
+  [C.filter(c => c.sugerido).map(c => "#" + c.id).join(" "), "sugeridos para o teste"],
+].map(([b, s]) => `<div class="stat"><b>${esc(b)}</b><span>${esc(s)}</span></div>`).join("");
+
+const maxSaltos = Math.max(1, ...C.map(x => x.saltos || 0));
+function medida(rot, v, cor, max = 1, fmt = pct) {
+  const w = v == null ? 0 : Math.min(100, v / max * 100);
+  return `<div class="medida"><span>${rot}</span><span class="trilho"><i style="width:${w.toFixed(1)}%;background:${cor}"></i></span><span class="num">${v == null ? "—" : fmt(v)}</span></div>`;
+}
+
+function cartao(c, n) {
+  const e = escolha[c.id] || {};
+  return `<article class="clipe ${e.escolhido ? "escolhido" : ""}" data-id="${c.id}">
+    <div class="cab"><span class="id">${n}. #${c.id}</span><span>${tempo(c.duracao)}</span>
+      ${c.sugerido ? `<span class="chip sugerido">sugerido</span>` : ""}
+      ${c.resolucao ? `<span class="chip">${esc(c.resolucao)}</span>` : ""}
+      <span class="arq">${esc(c.arquivo)}</span></div>
+    <div class="corpo">
+      <div>
+        ${c.video ? `<video controls preload="metadata" src="${esc(c.video)}"></video>` : `<div class="sem-video">Proxy não encontrado</div>`}
+        <div class="controles">
+          <button data-vel="1">1×</button><button data-vel="2">2×</button><button data-vel="4">4×</button><button data-vel="8">8×</button>
+        </div>
+        <div class="tira">${c.quadros.map(q => `<button data-pular="${q.t}" title="Pular para ${tempo(q.t)}"><img loading="lazy" src="${esc(q.img)}" alt=""><span>${tempo(q.t)}</span></button>`).join("")}</div>
+      </div>
+      <div>
+        <div class="rotulo">Título</div>
+        <div><b>${esc(c.titulo || "—")}</b></div>
+        ${c.descricao ? `<div class="rotulo">Descrição da análise de quadros anterior</div><p style="margin:0;font-size:14px">${esc(c.descricao)}</p>` : ""}
+        <div class="rotulo">Medidas</div>
+        ${medida("Movimento de câmera", c.movimento, "var(--accent)")}
+        ${medida("Mudança de imagem (10 s)", c.deriva, "var(--c-cena)")}
+        ${medida("Saltos bruscos", c.saltos, "var(--warn)", maxSaltos, v => v)}
+        ${medida("Escuro", c.escuro, "var(--muted)")}
+        ${medida("Fala (palavras/min)", c.palavras_min, "var(--c-depoimento)", 180, v => v)}
+        ${c.gravado ? `<div class="rotulo">Gravado</div><div style="font-size:14px">${esc(String(c.gravado).replace("T", " "))}</div>` : ""}
+      </div>
+    </div>
+    <div class="rodape"><code title="Arquivo original">${esc(c.caminho)}</code></div>
+    <div class="revisao mostrar">
+      <button class="v-escolher ${e.escolhido ? "ativo" : ""}" data-escolher="1">${e.escolhido ? "✓ Escolhido para o teste" : "Escolher para o teste"}</button>
+      <textarea data-campo="nota" placeholder="Observação (opcional): o que você espera que o teste pegue aqui">${esc(e.nota || "")}</textarea>
+    </div>
+  </article>`;
+}
+
+function filtrados() {
+  const f = $("#f-esc").value, ordem = $("#ordem").value;
+  const xs = C.map((c, i) => [c, i + 1]).filter(([c]) => {
+    const e = !!(escolha[c.id] || {}).escolhido;
+    return !f || (f === "sim" && e) || (f === "nao" && !e) || (f === "sug" && c.sugerido);
+  });
+  const chave = { duracao: c => -c.duracao, movimento: c => -(c.movimento || 0), deriva: c => -(c.deriva || 0) }[ordem];
+  return chave ? xs.sort((a, b) => chave(a[0]) - chave(b[0])) : xs;
+}
+function desenhar() { const xs = filtrados(); $("#lista").innerHTML = xs.map(([c, n]) => cartao(c, n)).join("") || `<p class="vazio">Nada com esse filtro.</p>`; atualizarContagem(); }
+function atualizarContagem() {
+  const n = C.filter(c => (escolha[c.id] || {}).escolhido).length;
+  $("#contagem").textContent = `escolhidos ${n}/${META}` + (n > META ? " · passou de 4" : "");
+}
+["#f-esc", "#ordem"].forEach(s => $(s).addEventListener("input", desenhar));
+
+$("#lista").addEventListener("click", ev => {
+  const art = ev.target.closest(".clipe"); if (!art) return;
+  const video = art.querySelector("video"), id = Number(art.dataset.id);
+  const b = ev.target.closest("button"); if (!b) return;
+  if (b.dataset.pular && video) { video.currentTime = Number(b.dataset.pular); video.play(); }
+  else if (b.dataset.vel && video) { video.playbackRate = Number(b.dataset.vel); }
+  else if (b.dataset.escolher) {
+    const e = escolha[id] = escolha[id] || {};
+    e.escolhido = !e.escolhido;
+    if (!e.escolhido && !e.nota) delete escolha[id];
+    salvar();
+    art.classList.toggle("escolhido", !!e.escolhido);
+    b.classList.toggle("ativo", !!e.escolhido);
+    b.textContent = e.escolhido ? "✓ Escolhido para o teste" : "Escolher para o teste";
+  }
+});
+$("#lista").addEventListener("input", ev => {
+  if (ev.target.dataset.campo !== "nota") return;
+  const id = Number(ev.target.closest(".clipe").dataset.id);
+  const e = escolha[id] = escolha[id] || {};
+  e.nota = ev.target.value; salvar();
+});
+// Destaca na tira o quadro mais próximo do ponto que está tocando
+document.addEventListener("timeupdate", ev => {
+  const v = ev.target; if (v.tagName !== "VIDEO") return;
+  const bs = [...v.closest(".clipe").querySelectorAll(".tira button")];
+  let melhor = null, dist = Infinity;
+  bs.forEach(b => { const d = Math.abs(Number(b.dataset.pular) - v.currentTime); if (d < dist) { dist = d; melhor = b; } });
+  bs.forEach(b => b.classList.toggle("agora", b === melhor));
+}, true);
+// Um vídeo tocando de cada vez
+document.addEventListener("play", e => document.querySelectorAll("video").forEach(v => { if (v !== e.target) v.pause(); }), true);
+
+$("#baixar").onclick = () => {
+  const linhas = C.filter(c => escolha[c.id] && (escolha[c.id].escolhido || escolha[c.id].nota)).map(c => ({
+    video_id: c.id, arquivo: c.arquivo, duracao: c.duracao, escolhido: !!escolha[c.id].escolhido, nota: escolha[c.id].nota || "" }));
+  const blob = new Blob([JSON.stringify({ gerado_em: DADOS.gerado_em, escolha: linhas }, null, 1)], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = "plano_sequencia_escolha.json";
+  document.body.appendChild(a); a.click(); a.remove();
+};
+desenhar();
+</script>
+</body>
+</html>

@@ -1,0 +1,873 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Teste de planos-sequência</title>
+<!--CSS-->
+<style>
+:root {
+  --e-detalhe: #c2418f; --e-close: #d3532f; --e-plano_medio: #c9a227; --e-plano_americano: #2fa37a;
+  --e-plano_geral: #2f7fd3; --e-aereo: #7b4fd6;
+  --m-parado: #9aa3ad; --m-pan: #2f7fd3; --m-tilt: #2fa37a; --m-zoom_in: #c2418f; --m-zoom_out: #e07fb8;
+  --m-dolly_in: #7b4fd6; --m-dolly_out: #a98be6; --m-travelling_lateral: #1f9fb3; --m-orbita: #c9a227;
+  --m-grua: #8a5a2b; --m-caminhando: #d3532f; --m-na_mao: #e3904b; --m-chicote: #1d1d1b;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --m-chicote: #ecebe7; } }
+:root[data-theme="dark"] { --m-chicote: #ecebe7; }
+.faixas { margin-top: 10px; position: relative; }
+.faixa { display: grid; grid-template-columns: 150px 1fr; gap: 8px; align-items: center; margin: 3px 0; font-size: 12px; }
+.faixa > span:first-child { color: var(--muted); }
+.trilha { position: relative; height: 16px; background: var(--soft); border-radius: 3px; cursor: pointer; overflow: hidden; }
+.trilha i { position: absolute; top: 0; bottom: 0; border-right: 1px solid var(--card); }
+.trilha i.mudou::after { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 2px; background: var(--ink); }
+.trilha .loop { position: absolute; top: 0; bottom: 0; border: 2px solid var(--ink); border-radius: 2px; pointer-events: none; display: none; }
+.tr.em-loop { outline: 2px solid var(--accent); outline-offset: -2px; }
+.tr.em-loop > button:first-child::after { content: " ⟳"; }
+.cursor { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--bad); pointer-events: none; }
+.legenda { display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 12px; color: var(--muted); margin: 6px 0; }
+.legenda b { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 4px; vertical-align: -1px; }
+.sugeridos { list-style: none; margin: 0; padding: 0; border: 1px solid var(--line); border-radius: 8px; max-height: 260px; overflow: auto; }
+.sugeridos li { display: grid; grid-template-columns: 96px 1fr; gap: 8px; padding: 6px 8px; border-bottom: 1px solid var(--line); font-size: 13px; }
+.sugeridos li:last-child { border-bottom: 0; }
+.sugeridos button { padding: 1px 6px; font-size: 12px; font-variant-numeric: tabular-nums; align-self: start; }
+/* Mesa de revisão: usa a largura da tela; vídeo à esquerda, lista à direita, faixas embaixo */
+main { max-width: none; padding-left: 24px; padding-right: 24px; }
+.mesa { display: grid; grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr); gap: 16px; padding: 12px 16px 8px;
+  height: max(460px, calc(100vh - 290px)); }
+.mesa .esquerda { display: flex; flex-direction: column; min-height: 0; }
+.mesa .esquerda video { flex: 0 1 auto; max-height: calc(100% - 120px); object-fit: contain; }
+.mesa .esquerda .marcas { flex: 1 1 auto; min-height: 70px; display: flex; flex-direction: column; }
+.mesa .esquerda .marcas ul { flex: 1 1 auto; max-height: none; min-height: 0; }
+.trechos { border: 1px solid var(--line); border-radius: 8px; overflow: auto; min-height: 0; height: 100%; }
+.cab .titulo-video { font-weight: 600; }
+details.sug { padding: 0 16px 12px; }
+details.sug > summary { cursor: pointer; color: var(--muted); font-size: 13px; padding: 4px 0; }
+@media (max-width: 900px) { .mesa { grid-template-columns: 1fr; height: auto; } .trechos { height: 60vh; } }
+.tr { display: grid; grid-template-columns: 92px 1fr auto; gap: 10px; padding: 8px 10px; border-bottom: 1px solid var(--line); font-size: 13px; }
+.tr:last-child { border-bottom: 0; }
+.tr.agora { background: var(--soft); }
+.tr.certo { box-shadow: inset 3px 0 var(--ok); } .tr.errado { box-shadow: inset 3px 0 var(--bad); }
+.tr button { padding: 1px 6px; font-size: 12px; font-variant-numeric: tabular-nums; }
+.tr .par { display: flex; flex-wrap: wrap; gap: 4px 10px; margin-top: 3px; color: var(--muted); font-size: 12px; }
+.tr .dif { color: var(--bad); font-weight: 600; }
+.tr .igual { color: var(--ok); }
+.tr .rev { display: flex; gap: 4px; align-items: start; }
+.tr .rev .ativo.v-certo { background: var(--ok); color: #fff; border-color: var(--ok); }
+.tr .rev .ativo.v-errado { background: var(--bad); color: #fff; border-color: var(--bad); }
+.tr .correcao { grid-column: 2 / -1; display: none; gap: 6px; flex-wrap: wrap; align-items: center; }
+.tr.errado .correcao { display: flex; }
+.tr select, .tr input[type=text] { font: inherit; font-size: 12px; background: var(--card); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 3px 6px; }
+.tr input[type=text] { flex: 1 1 200px; }
+.tr .rev .ativo.v-nota { background: var(--accent); color: #fff; border-color: var(--accent); }
+.tr .comentario { grid-column: 2 / -1; display: none; }
+.tr.com-nota .comentario, .tr.abrir-nota .comentario { display: block; }
+/* Comentário compacto (2 linhas); cresce ao focar e volta ao sair */
+.tr .comentario textarea { width: 100%; height: 42px; font: inherit; font-size: 13px; line-height: 1.4; background: var(--card); color: var(--ink);
+  border: 1px solid var(--line); border-radius: 6px; padding: 4px 8px; resize: none; overflow: hidden;
+  transition: height .18s ease, border-color .18s ease, box-shadow .18s ease; }
+.tr .comentario textarea:hover { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
+.tr .comentario textarea:focus { height: 128px; overflow: auto; outline: none; border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent); }
+/* Barras de rolagem: só o seletor, fino, na cor do tema */
+:root { --rolagem: color-mix(in srgb, var(--ink) 22%, transparent); --rolagem-sobre: color-mix(in srgb, var(--ink) 40%, transparent); }
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track, ::-webkit-scrollbar-corner { background: transparent; }
+::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
+::-webkit-scrollbar-thumb { background: var(--rolagem); border-radius: 999px; }
+::-webkit-scrollbar-thumb:hover { background: var(--rolagem-sobre); }
+@supports not selector(::-webkit-scrollbar) { * { scrollbar-width: thin; scrollbar-color: var(--rolagem) transparent; } }
+.seq { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin: 2px 0 6px; font-size: 12px; }
+.seq .alvo { min-width: 120px; display: inline-flex; gap: 3px; align-items: center; flex-wrap: wrap; padding: 2px 6px; border: 1px dashed var(--line); border-radius: 6px; }
+.seq .alvo .vazio { font-size: 12px; }
+.seq .opcoes button { padding: 0 6px; font-size: 11px; margin: 1px; }
+.seq .titulo-seq { width: 100%; color: var(--muted); }
+.seq .titulo-seq button { padding: 0 6px; font-size: 11px; margin-left: 6px; }
+.seq .alvo .item-seq { padding: 0; border: 0; background: none; border-radius: 4px; display: inline-flex; align-items: center; gap: 2px; }
+.seq .alvo .item-seq:hover .etq, .seq .alvo .item-seq.aberto .etq { box-shadow: 0 0 0 2px var(--accent); }
+.seq .alvo .item-seq .dir { font-size: 13px; font-weight: 700; color: var(--ink); padding: 0 2px; }
+.seq .alvo .seta-seq { color: var(--muted); }
+.seletor-dir { width: 100%; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 6px 8px; margin: 2px 0;
+  background: var(--soft); border-radius: 8px; }
+.seletor-dir .rosa { display: grid; grid-template-columns: repeat(3, 26px); gap: 3px; }
+.seletor-dir .rosa button { width: 26px; height: 24px; padding: 0; font-size: 14px; }
+.seletor-dir .eixo { display: flex; flex-direction: column; gap: 3px; }
+.seletor-dir button { font-size: 12px; padding: 1px 8px; }
+.seletor-dir button.ligado { background: var(--accent); color: #fff; border-color: var(--accent); }
+.tracos .grupo-traco { color: var(--muted); font-size: 11px; min-width: 52px; }
+.tracos .opcoes { width: calc(100% - 60px); }
+.tracos button.traco { border-radius: 999px; }
+.tracos button.traco.ligado { background: var(--ink); color: var(--card); border-color: var(--ink); }
+.marcas { margin-top: 8px; border: 1px solid var(--line); border-radius: 8px; padding: 8px; font-size: 13px; }
+.marcas .barra-io { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.marcas .barra-io button { padding: 2px 8px; font-size: 12px; }
+kbd { font: 11px ui-monospace, monospace; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; padding: 0 4px; color: var(--muted); }
+.marcas .io { color: var(--muted); font-variant-numeric: tabular-nums; }
+.marcas form { display: none; gap: 6px; margin-top: 6px; }
+.marcas form.aberto { display: flex; }
+.marcas form input { flex: 1 1 auto; font: inherit; font-size: 13px; background: var(--card); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 4px 6px; }
+.marcas ul { list-style: none; margin: 6px 0 0; padding: 0; max-height: 160px; overflow: auto; }
+.marcas li { display: grid; grid-template-columns: auto 1fr auto; gap: 8px; padding: 3px 0; border-top: 1px solid var(--line); align-items: start; }
+.marcas li button { padding: 0 6px; font-size: 12px; font-variant-numeric: tabular-nums; }
+.trilha .marca { position: absolute; top: 0; bottom: 0; min-width: 3px; background: var(--accent); opacity: .85; }
+.trilha .io-sel { position: absolute; top: 0; bottom: 0; background: color-mix(in srgb, var(--accent) 30%, transparent); border-left: 2px solid var(--accent); pointer-events: none; display: none; }
+.ferramentas label { white-space: nowrap; }
+#b-filtros.ativo, #b-padroes.ativo { border-color: var(--accent); color: var(--accent); }
+.resumo-filtro { flex: 1 1 100%; display: none; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 13px; color: var(--muted); }
+.resumo-filtro.on { display: flex; }
+.resumo-filtro .chip-f { border: 1px solid var(--accent); color: var(--accent); border-radius: 999px; padding: 0 8px; font-size: 12px; cursor: pointer; background: none; }
+.resumo-filtro .chip-f:hover { text-decoration: line-through; }
+.painel-filtros { flex: 1 1 100%; max-height: 46vh; overflow: auto; background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+.painel-filtros .grupo { display: grid; grid-template-columns: 150px 1fr; gap: 6px 10px; align-items: start; padding: 5px 0; border-bottom: 1px solid var(--line); }
+.painel-filtros .grupo:last-child { border-bottom: 0; }
+.painel-filtros .grupo > span { color: var(--muted); font-size: 12px; padding-top: 3px; }
+.painel-filtros .grupo > span small { display: block; font-size: 11px; opacity: .8; }
+.painel-filtros .ops { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.painel-filtros .ops button { font-size: 12px; padding: 1px 8px; border-radius: 999px; }
+.painel-filtros .ops button .n { color: var(--muted); font-size: 11px; margin-left: 3px; }
+.painel-filtros .ops button.ligado { background: var(--accent); color: #fff; border-color: var(--accent); }
+.painel-filtros .ops button.ligado .n { color: #fff; opacity: .8; }
+.painel-filtros .ops button:disabled { opacity: .35; cursor: default; }
+.painel-filtros input[type=search] { font: inherit; font-size: 13px; flex: 1 1 260px; background: var(--bg); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 4px 8px; }
+.painel-filtros input[type=range] { width: 160px; }
+.padrao { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; text-align: left; border-radius: 8px !important; padding: 6px 10px !important; max-width: 340px; }
+.padrao b { font-size: 13px; } .padrao small { grid-column: 1 / -1; color: var(--muted); font-size: 11px; line-height: 1.3; }
+.padrao.ligado small { color: #fff; opacity: .85; }
+.padrao .n { justify-self: end; }
+.painel-filtros h4 { margin: 4px 0 6px; font-size: 12px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+.clipe.ativo { box-shadow: 0 0 0 2px var(--accent); }
+.etq { display: inline-block; border-radius: 4px; padding: 0 5px; color: #fff; font-size: 11px; font-weight: 600; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Teste de planos-sequência</h1>
+  <p class="sub" id="sub"></p>
+  <div class="grade" id="stats"></div>
+
+  <details class="guia" open>
+    <summary>Como ler este relatório</summary>
+    <ol>
+      <li><b>O método:</b> cada take foi cortado em trechos curtos que se sobrepõem (veja os parâmetros acima). De cada trecho, alguns quadros espaçados por igual foram ao modelo de visão, que respondeu a escala no começo e no fim, o movimento de câmera, uma descrição e se o ambiente ou o assunto mudou.</li>
+      <li><b>"Hoje" é o que o Talho já faz sem API</b>, nos mesmos trechos: escala pelo CLIP (comparando o quadro com descrições de cada escala) e movimento pelo fluxo óptico (parado, pan, tilt, caminhando, na mão, chicote). Ele não conhece zoom, dolly, órbita nem grua.</li>
+      <li><b>Faixas:</b> cada bloco é um trecho, colorido pela resposta. Nas faixas de escala, a metade esquerda do bloco é a escala no começo e a direita, no fim. Um risco escuro no começo do bloco = o modelo disse que algo mudou ali. Clique numa faixa para o vídeo pular; o traço vermelho é onde o vídeo está.</li>
+      <li><b>Trechos sugeridos:</b> trechos vizinhos com a mesma escala, juntados, cortando onde o modelo viu mudança. É a subdivisão do plano-sequência que o Talho poderia oferecer na decupagem.</li>
+      <li><b>Revise</b> trecho a trecho: <b>✓</b> se escala e movimento do <b>modelo de visão</b> (as etiquetas coloridas) estão certos, <b>✗</b> se não. No ✗, monte a <b>sequência certa</b> clicando nas opções em ordem (ex.: close → plano médio; zoom in → tilt); vazio = "o modelo acertou isso". Clique num movimento da sequência para dar a <b>direção</b> (8 setas, frente ou trás) ou remover só ele. O que vale o <b>trecho inteiro</b> (suporte: na mão, tripé, grua…; imagem: tremida, fora de foco…) não entra na sequência: liga e desliga em <b>Características</b>, que já vêm com o que o modelo disse. <b>💬</b> comenta qualquer trecho, certo ou errado. Fica salvo neste navegador; <b>Baixar revisões</b> gera um JSON e <b>Importar revisões</b> traz de volta.</li>
+      <li><b>Filtros</b> (na barra de cima): por movimento, escala e características do modelo, pela sua revisão (não revisado, certo, errado, corrigido, com direção…), por sinais (escala muda, diverge do CLIP ou do fluxo), pelo movimento que o Talho mede hoje, pela confiança e por texto. Dentro de um grupo vale qualquer opção; entre grupos, todas. O número em cada botão é quantos trechos sobram se você ligá-lo. <b>Padrões de erro</b> são atalhos: os já vistos nesta revisão e os <b>aprendidos das suas correções</b> (ex.: "travelling → você pôs pan", mostrando os outros travelling ainda não revisados). Vídeos sem trecho no filtro somem; um trecho que deixa de passar no filtro enquanto você o edita só sai na próxima vez que a lista for redesenhada.</li>
+      <li><b>Marcas no player</b> (embaixo de cada vídeo): comente no segundo exato ou num intervalo marcado com entrada e saída. Atalhos valem para o vídeo com contorno azul (o último em que você mexeu): <kbd>Espaço</kbd> toca/pausa, <kbd>I</kbd> entrada, <kbd>O</kbd> saída, <kbd>C</kbd> comentar (no intervalo I–O, ou no segundo atual), <kbd>Esc</kbd> limpa I/O, <kbd>←</kbd> <kbd>→</kbd> 1 s (com <kbd>Shift</kbd>, 5 s).</li>
+    </ol>
+    <div class="rotulo">Escalas</div><div class="legenda" id="leg-esc"></div>
+    <div class="rotulo">Movimentos</div><div class="legenda" id="leg-mov"></div>
+  </details>
+
+  <div class="ferramentas">
+    <select id="f-vid" aria-label="Vídeo"><option value="">Todos os vídeos</option></select>
+    <button id="b-filtros" aria-expanded="false" title="Filtrar trechos por movimento, escala, características, revisão, sinais…">Filtros</button>
+    <button id="b-padroes" aria-expanded="false" title="Atalhos para padrões de erro do modelo">Padrões de erro</button>
+    <label class="conf" title="Ao clicar num trecho, o vídeo repete só aquele trecho até você clicar em outro ou numa faixa"><input type="checkbox" id="o-loop"> Loop do trecho</label>
+    <label class="conf" title="A lista rola sozinha para o trecho que está tocando"><input type="checkbox" id="o-rolar"> Lista acompanha o vídeo</label>
+    <button id="importar" title="Trazer de volta um JSON baixado por este relatório">Importar revisões</button>
+    <input type="file" id="arq-importar" accept="application/json,.json" hidden>
+    <button id="baixar" class="primario">Baixar revisões</button>
+    <span class="contagem" id="contagem"></span>
+    <div id="resumo-filtro" class="resumo-filtro"></div>
+    <div id="painel-filtros" class="painel-filtros" hidden></div>
+    <div id="painel-padroes" class="painel-filtros" hidden></div>
+  </div>
+  <div id="lista"></div>
+</main>
+<button class="tema" id="tema" title="Alternar tema claro/escuro">◐</button>
+
+<script>
+const DADOS = /*__DADOS__*/null;
+const V = DADOS.videos, P = DADOS.parametros;
+const ESCALAS = ["detalhe", "close", "plano_medio", "plano_americano", "plano_geral", "aereo"];
+const MOVS = ["parado", "pan", "tilt", "zoom_in", "zoom_out", "dolly_in", "dolly_out", "travelling_lateral", "orbita", "grua", "caminhando", "na_mao", "chicote"];
+// Características valem o trecho inteiro (não são passo de sequência): o suporte da câmera e problemas de imagem.
+// "na mão" e "grua" o modelo devolve como movimento; aqui viram característica.
+const SUPORTES = ["na_mao", "tripe", "grua", "estabilizador", "drone"];
+const PROBLEMAS = ["tremida", "fora_de_foco", "escura", "estourada", "obstruida"];
+const TRACOS = [...SUPORTES, ...PROBLEMAS];
+const MOVS_SEQ = MOVS.filter(k => !TRACOS.includes(k));
+// Direção de cada movimento: 8 setas no plano do quadro + frente/trás (eixo da lente)
+const DIRECOES = { cima_esquerda: "↖", cima: "↑", cima_direita: "↗", esquerda: "←", direita: "→",
+  baixo_esquerda: "↙", baixo: "↓", baixo_direita: "↘", frente: "⤒ frente", tras: "⤓ trás" };
+const NOME_DIR = { cima_esquerda: "para cima e à esquerda", cima: "para cima", cima_direita: "para cima e à direita",
+  esquerda: "para a esquerda", direita: "para a direita", baixo_esquerda: "para baixo e à esquerda", baixo: "para baixo",
+  baixo_direita: "para baixo e à direita", frente: "para a frente", tras: "para trás" };
+const SEM_DIRECAO = ["parado"];
+// Zoom e dolly já dizem o sentido no nome (in = frente, out = trás): sem frente/trás no seletor
+const SEM_EIXO = ["zoom_in", "zoom_out", "dolly_in", "dolly_out"];
+let editandoItem = null;  // {chave, campo, i}: item da sequência com o seletor aberto
+// O que o modelo disse, lido como características: movimento que é suporte + qualidade que é problema
+const tracosModelo = m => [...(TRACOS.includes(m.movimento) ? [m.movimento] : []), ...(PROBLEMAS.includes(m.qualidade) ? [m.qualidade] : [])];
+const NOME = { plano_medio: "plano médio", plano_americano: "americano", plano_geral: "geral", aereo: "aéreo", zoom_in: "zoom in", zoom_out: "zoom out",
+  dolly_in: "dolly in", dolly_out: "dolly out", travelling_lateral: "travelling", orbita: "órbita", na_mao: "na mão", tripe: "tripé", fora_de_foco: "fora de foco", obstruida: "obstruída" };
+const nome = k => NOME[k] || k || "—";
+// Rótulos do fluxo óptico (src/vision/segmentation.classify_motion) no vocabulário do teste
+const MOV_LOCAL = { static: "parado", pan: "pan", tilt: "tilt", walk: "caminhando", handheld: "na_mao", whip: "chicote" };
+const corE = k => `var(--e-${k}, var(--muted))`, corM = k => `var(--m-${k}, var(--muted))`;
+const CHAVE = "plano-sequencia-teste-" + DADOS.gerado_em;
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, m => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
+const tempo = s => { s = Math.max(0, Math.round(s || 0)); return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0"); };
+const usd = v => "US$ " + Number(v || 0).toLocaleString("pt-BR", { minimumFractionDigits: 3, maximumFractionDigits: 4 });
+const etq = (k, cor) => `<span class="etq" style="background:${cor(k)}">${esc(nome(k))}</span>`;
+
+let rev = {};
+try { rev = JSON.parse(localStorage.getItem(CHAVE) || "{}") || {}; } catch (e) { rev = {}; }
+// Correção agora é sequência (["close", "plano_medio"]); revisões antigas guardavam um valor só
+const comoSeq = x => Array.isArray(x) ? x.filter(Boolean) : (x ? [x] : []);
+function migrar(r, k) {
+  r.escala_certa = comoSeq(r.escala_certa); r.movimento_certo = comoSeq(r.movimento_certo);
+  const soltos = r.movimento_certo.filter(x => TRACOS.includes(x));
+  if (soltos.length) {
+    const t = T.find(x => x.chave === k), base = r.caracteristicas || (t && t.vlm ? tracosModelo(t.vlm) : []);
+    r.caracteristicas = [...new Set([...base, ...soltos])];
+    const dirs = r.movimento_dir || [];
+    r.movimento_dir = r.movimento_certo.map((x, i) => [x, dirs[i] ?? null]).filter(([x]) => !TRACOS.includes(x)).map(([, d]) => d);
+    r.movimento_certo = r.movimento_certo.filter(x => !TRACOS.includes(x));
+    if (!r.movimento_certo.length) { r.movimento_certo = ["parado"]; r.movimento_dir = [null]; }  // era só "na mão": câmera parada na mão
+  }
+  r.movimento_dir = r.movimento_certo.map((x, i) => {
+    const d = (r.movimento_dir || [])[i] ?? null;
+    return SEM_EIXO.includes(x) && (d === "frente" || d === "tras") ? null : d;  // redundante em zoom/dolly
+  });
+  return r;
+}
+const salvar = () => { try { localStorage.setItem(CHAVE, JSON.stringify(rev)); } catch (e) {} _aprendidos = null; contar();
+  clearTimeout(window._tp); window._tp = setTimeout(() => {  // sem redesenhar a lista (o trecho editado não some debaixo do mouse)
+    if (!$("#painel-filtros").hidden) desenharPainel(); if (!$("#painel-padroes").hidden) desenharPadroes(); desenharResumo(); }, 300); };
+// Marcas no player: {video_id: [{inicio, fim|null, texto}]}
+let marcas = {};
+try { marcas = JSON.parse(localStorage.getItem(CHAVE + "-marcas") || "{}") || {}; } catch (e) { marcas = {}; }
+const salvarMarcas = () => { try { localStorage.setItem(CHAVE + "-marcas", JSON.stringify(marcas)); } catch (e) {} contar(); };
+try { const t = localStorage.getItem("triagem-tema"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
+$("#tema").onclick = () => {
+  const escuro = getComputedStyle(document.body).backgroundColor === "rgb(21, 21, 20)";
+  document.documentElement.dataset.theme = escuro ? "light" : "dark";
+  try { localStorage.setItem("triagem-tema", document.documentElement.dataset.theme); } catch (e) {}
+};
+
+// Cada trecho ganha uma chave estável (vídeo:início) e as comparações com o "hoje"
+const T = [];
+V.forEach(v => v.trechos.forEach((t, i) => {
+  t.chave = `${v.id}:${t.inicio}`; t.vid = v.id; t.idx = i;
+  t.ate = i < v.trechos.length - 1 ? v.trechos[i + 1].inicio : t.fim;  // fatia própria, sem sobreposição
+  const m = t.vlm || {}, l = t.local || {};
+  t.movLocal = MOV_LOCAL[l.movimento] || l.movimento || null;
+  t.difEsc = !!t.vlm && (m.escala_inicio !== l.escala_inicio || m.escala_fim !== l.escala_fim);
+  t.difMov = !!t.vlm && !!t.movLocal && m.movimento !== t.movLocal;
+  T.push(t);
+}));
+Object.entries(rev).forEach(([k, r]) => migrar(r, k));
+const ok = T.filter(t => t.vlm);
+const durTotal = V.reduce((a, v) => a + v.duracao, 0), seg = T.reduce((a, t) => a + (t.segundos || 0), 0);
+const pctTxt = (a, b) => b ? Math.round(a / b * 100) + "%" : "—";
+$("#sub").textContent = `Teste de ${DADOS.gerado_em.replace("T", " às ")} · ${DADOS.modelo} · trechos de ${P.trecho} s a cada ${P.passo} s, ${P.quadros} quadros por trecho`;
+$("#stats").innerHTML = [
+  [`${ok.length} de ${T.length}`, "trechos com resposta"],
+  [usd(DADOS.gasto_usd), "gasto real"],
+  [usd(DADOS.gasto_usd / (durTotal / 60)), "por minuto de vídeo"],
+  [tempo(seg), `de processamento para ${tempo(durTotal)} de vídeo`],
+  [pctTxt(ok.filter(t => !t.difEsc).length, ok.length), "escala igual ao CLIP (começo e fim)"],
+  [pctTxt(ok.filter(t => t.movLocal && !t.difMov).length, ok.filter(t => t.movLocal).length), "movimento igual ao fluxo óptico"],
+  [ok.filter(t => t.vlm.mudanca).length, "trechos em que o modelo viu mudança"],
+  [ok.filter(t => !["parado", "pan", "tilt", "caminhando", "na_mao", "chicote"].includes(t.vlm.movimento)).length, "movimentos que o fluxo óptico não conhece"],
+].map(([b, s]) => `<div class="stat"><b>${esc(b)}</b><span>${esc(s)}</span></div>`).join("");
+$("#leg-esc").innerHTML = ESCALAS.map(k => `<span><b style="background:${corE(k)}"></b>${nome(k)}</span>`).join("");
+$("#leg-mov").innerHTML = MOVS.map(k => `<span><b style="background:${corM(k)}"></b>${nome(k)}</span>`).join("");
+V.forEach(v => $("#f-vid").insertAdjacentHTML("beforeend", `<option value="${v.id}">#${v.id} ${esc(v.titulo || v.arquivo)}</option>`));
+
+// Junta trechos vizinhos de mesma escala; corta onde o modelo viu mudança
+function sugeridos(v) {
+  const out = [];
+  v.trechos.filter(t => t.vlm).forEach(t => {
+    const e = t.vlm.escala_inicio === t.vlm.escala_fim ? t.vlm.escala_fim : `${t.vlm.escala_inicio}→${t.vlm.escala_fim}`;
+    const u = out[out.length - 1];
+    const mesma = u && !t.vlm.mudanca && (u.escala === e || (u.escala === t.vlm.escala_inicio && t.vlm.escala_inicio === t.vlm.escala_fim));
+    if (mesma) { u.fim = t.ate; u.n++; u.movs[t.vlm.movimento] = (u.movs[t.vlm.movimento] || 0) + 1; }
+    else out.push({ inicio: t.inicio, fim: t.ate, escala: e, n: 1, movs: { [t.vlm.movimento]: 1 }, descricao: t.vlm.descricao, local: t.vlm.local });
+  });
+  return out;
+}
+
+function faixa(v, rotulo, f) {
+  return `<div class="faixa"><span>${rotulo}</span><div class="trilha" data-dur="${v.duracao}">${v.trechos.map(t => {
+    const l = (t.inicio / v.duracao * 100).toFixed(2), w = ((t.ate - t.inicio) / v.duracao * 100).toFixed(2);
+    return f(t, l, w);
+  }).join("")}<span class="loop"></span><span class="cursor" style="left:0"></span></div></div>`;
+}
+const blocoEsc = (a, b, t, l, w, mudou) => `<i class="${mudou ? "mudou" : ""}" style="left:${l}%;width:${w}%;background:linear-gradient(90deg, ${corE(a)} 50%, ${corE(b)} 50%)" title="${tempo(t.inicio)}: ${esc(nome(a))} → ${esc(nome(b))}"></i>`;
+
+function cartao(v, filtro) {
+  const sug = sugeridos(v);
+  const trs = v.trechos.filter(filtro);
+  return `<article class="clipe" data-id="${v.id}">
+    <div class="cab"><span class="id">#${v.id}</span><span class="titulo-video">${esc(v.titulo || "")}</span><span>${tempo(v.duracao)}</span>
+      <span class="chip">${v.trechos.length} trechos</span><span class="chip">${usd(v.trechos.reduce((a, t) => a + (t.custo_usd || 0), 0))}</span>
+      <span class="arq">${esc(v.arquivo)}</span></div>
+    <div class="mesa">
+      <div class="esquerda">
+        ${v.video ? `<video controls preload="metadata" src="${esc(v.video)}"></video>` : `<div class="sem-video">Proxy não encontrado</div>`}
+        <div class="controles"><button data-vel="0.5">½×</button><button data-vel="1">1×</button><button data-vel="2">2×</button><button data-vel="4">4×</button></div>
+        <div class="marcas">
+          <div class="barra-io">
+            <b>Marcas</b>
+            <button data-io="i" title="Marca a entrada no ponto atual">Entrada <kbd>I</kbd></button>
+            <button data-io="o" title="Marca a saída no ponto atual">Saída <kbd>O</kbd></button>
+            <button data-io="c" title="Comentar no intervalo I–O, ou no segundo atual">Comentar <kbd>C</kbd></button>
+            <span class="io"></span>
+          </div>
+          <form><input type="text" placeholder="Comentário… (Enter salva, Esc cancela)"><button type="submit" class="primario">Salvar</button></form>
+          <ul></ul>
+        </div>
+      </div>
+      <div class="trechos">${trs.map(linha).join("") || `<p class="vazio" style="padding:8px 10px">Nenhum trecho com esse filtro.</p>`}</div>
+    </div>
+    <div style="padding:0 16px 10px" class="faixas">
+      ${faixa(v, "Escala · visão", (t, l, w) => t.vlm ? blocoEsc(t.vlm.escala_inicio, t.vlm.escala_fim, t, l, w, t.vlm.mudanca) : `<i style="left:${l}%;width:${w}%"></i>`)}
+      ${faixa(v, "Escala · CLIP (hoje)", (t, l, w) => blocoEsc(t.local.escala_inicio, t.local.escala_fim, t, l, w, false))}
+      ${faixa(v, "Movimento · visão", (t, l, w) => `<i style="left:${l}%;width:${w}%;background:${t.vlm ? corM(t.vlm.movimento) : "transparent"}" title="${tempo(t.inicio)}: ${esc(nome(t.vlm && t.vlm.movimento))}"></i>`)}
+      ${faixa(v, "Movimento · fluxo (hoje)", (t, l, w) => `<i style="left:${l}%;width:${w}%;background:${corM(t.movLocal)}" title="${tempo(t.inicio)}: ${esc(nome(t.movLocal))}"></i>`)}
+      <div class="faixa"><span>Suas marcas</span><div class="trilha trilha-marcas" data-dur="${v.duracao}"><span class="io-sel"></span><span class="loop"></span><span class="cursor" style="left:0"></span></div></div>
+    </div>
+    <details class="sug"><summary>Trechos sugeridos (${sug.length}): trechos vizinhos de mesma escala, juntados</summary>
+      <ul class="sugeridos">${sug.map(s => {
+        const mov = Object.entries(s.movs).sort((a, b) => b[1] - a[1]).map(([k]) => nome(k)).slice(0, 2).join(", ");
+        const [a, b] = s.escala.split("→");
+        return `<li><button data-pular="${s.inicio}" data-fim="${s.fim}">${tempo(s.inicio)}–${tempo(s.fim)}</button><span>${etq(a, corE)}${b ? " → " + etq(b, corE) : ""} · ${esc(mov)} · ${esc(s.local)}<br>${esc(s.descricao)}</span></li>`;
+      }).join("")}</ul>
+    </details>
+  </article>`;
+}
+
+function linha(t) {
+  const m = t.vlm, l = t.local, r = rev[t.chave] || {};
+  if (!m) return `<div class="tr" data-chave="${t.chave}"><button data-pular="${t.inicio}" data-fim="${t.fim}">${tempo(t.inicio)}–${tempo(t.fim)}</button><span class="vazio">${esc(t.erro || "sem resposta")}</span><span></span></div>`;
+  return `<div class="tr ${r.veredito || ""} ${r.nota ? "com-nota" : ""}" data-chave="${t.chave}">
+    <button data-pular="${t.inicio}" data-fim="${t.fim}">${tempo(t.inicio)}–${tempo(t.fim)}</button>
+    <div>
+      <div>${etq(m.escala_inicio, corE)}${m.escala_fim !== m.escala_inicio ? " → " + etq(m.escala_fim, corE) : ""} ${etq(m.movimento, corM)}
+        ${m.movimento_obs ? `<span style="color:var(--muted)">${esc(m.movimento_obs)}</span>` : ""}
+        ${m.mudanca ? `<span class="chip">mudou</span>` : ""}${m.qualidade && m.qualidade !== "boa" ? `<span class="chip">${esc(m.qualidade.replace(/_/g, " "))}</span>` : ""}</div>
+      <div style="margin-top:3px">${esc(m.descricao)}</div>
+      <div class="par">
+        <span>hoje: escala <span class="${t.difEsc ? "dif" : "igual"}">${esc(nome(l.escala_inicio))}${l.escala_fim !== l.escala_inicio ? " → " + esc(nome(l.escala_fim)) : ""}</span></span>
+        <span>movimento <span class="${t.difMov ? "dif" : "igual"}">${esc(nome(t.movLocal))}</span></span>
+        <span>${esc(m.local)} · ${m.pessoas ?? "?"} pessoa${m.pessoas === 1 ? "" : "s"} · foco: ${esc(m.assunto)}</span>
+        ${m.confianca != null ? `<span>confiança ${Math.round(m.confianca * 100)}%</span>` : ""}
+      </div>
+    </div>
+    <div class="rev"><button class="v-certo ${r.veredito === "certo" ? "ativo" : ""}" data-veredito="certo" title="Escala e movimento certos">✓</button>
+      <button class="v-errado ${r.veredito === "errado" ? "ativo" : ""}" data-veredito="errado" title="Algo errado">✗</button>
+      <button class="v-nota ${r.nota ? "ativo" : ""}" data-nota="1" title="Comentar este trecho (certo ou errado)">💬</button></div>
+    <div class="correcao">${correcao(t, r)}</div>
+    <div class="comentario"><textarea data-campo="nota" placeholder="Comentário sobre este trecho">${esc(r.nota || "")}</textarea></div>
+  </div>`;
+}
+
+function correcao(t, r) {
+  const m = t.vlm;
+  const doModeloE = m.escala_inicio === m.escala_fim ? nome(m.escala_inicio) : `${nome(m.escala_inicio)} → ${nome(m.escala_fim)}`;
+  const doModeloM = TRACOS.includes(m.movimento) ? `${nome(m.movimento)} (é característica, abaixo)` : nome(m.movimento);
+  return `<div style="width:100%">
+    ${seqEditor("escala_certa", "Escala certa", r.escala_certa, ESCALAS, corE, doModeloE, t.chave)}
+    ${seqEditor("movimento_certo", "Movimento certo", r.movimento_certo, MOVS_SEQ, corM, doModeloM, t.chave, r.movimento_dir || [])}
+    ${tracosEditor(r, m)}
+  </div>`;
+}
+
+// Características: liga/desliga, sem ordem. Sem mexer = as que o modelo deu
+function tracosEditor(r, m) {
+  const doModelo = tracosModelo(m), mexeu = Array.isArray(r.caracteristicas), atuais = mexeu ? r.caracteristicas : doModelo;
+  const botoes = xs => xs.map(k => `<button class="traco ${atuais.includes(k) ? "ligado" : ""}" data-traco="${k}" aria-pressed="${atuais.includes(k)}">${esc(nome(k))}</button>`).join("");
+  return `<div class="seq tracos">
+    <span class="titulo-seq">Características do trecho inteiro (sem ordem) — <i>modelo de visão disse: ${doModelo.length ? esc(doModelo.map(nome).join(", ")) : "nenhuma"}</i>
+      ${mexeu ? `<button data-tracos-limpar="1" title="Voltar para as do modelo">voltar às do modelo</button>` : ""}</span>
+    <span class="grupo-traco">suporte</span><span class="opcoes">${botoes(SUPORTES)}</span>
+    <span class="grupo-traco">imagem</span><span class="opcoes">${botoes(PROBLEMAS)}</span>
+  </div>`;
+}
+
+// Monta a sequência certa clicando nas opções em ordem; vazio = o modelo de visão acertou isso
+function seqEditor(campo, titulo, valor, opcoes, cor, doModelo, chave, dirs) {
+  const seq = comoSeq(valor), comDir = !!dirs;
+  const aberto = editandoItem && editandoItem.chave === chave && editandoItem.campo === campo ? editandoItem.i : -1;
+  const chip = (k, i) => {
+    const d = comDir ? dirs[i] : null;
+    const dica = comDir && !SEM_DIRECAO.includes(k) ? "Clique para escolher a direção ou remover" : "Clique para remover";
+    return `<button class="item-seq ${i === aberto ? "aberto" : ""}" data-seq-item="${i}" title="${dica}">${etq(k, cor)}${d ? `<span class="dir" title="${esc(NOME_DIR[d])}">${DIRECOES[d]}</span>` : ""}</button>`;
+  };
+  let seletor = "";
+  if (aberto >= 0 && aberto < seq.length) {
+    const k = seq[aberto], atual = comDir ? dirs[aberto] : null;
+    const seta = d => `<button data-dir="${d}" class="${atual === d ? "ligado" : ""}" title="${esc(NOME_DIR[d])}">${DIRECOES[d]}</button>`;
+    seletor = `<div class="seletor-dir">
+      ${comDir && !SEM_DIRECAO.includes(k) ? `<span class="rosa">${seta("cima_esquerda")}${seta("cima")}${seta("cima_direita")}${seta("esquerda")}
+        <button data-dir="" class="${!atual ? "ligado" : ""}" title="Sem direção">·</button>${seta("direita")}${seta("baixo_esquerda")}${seta("baixo")}${seta("baixo_direita")}</span>
+        ${SEM_EIXO.includes(k) ? "" : `<span class="eixo">${seta("frente")}${seta("tras")}</span>`}` : ""}
+      <span class="eixo"><span class="vazio">${esc(nome(k))}</span><button data-seq-remover="${aberto}">remover</button><button data-seq-fechar="1">fechar</button></span>
+    </div>`;
+  }
+  return `<div class="seq" data-seq="${campo}">
+    <span class="titulo-seq">${titulo} — <i>modelo de visão disse: ${esc(doModelo)}</i></span>
+    <span class="alvo">${seq.length ? seq.map((k, i) => (i ? `<span class="seta-seq">→</span>` : "") + chip(k, i)).join("") : `<span class="vazio">igual ao modelo</span>`}</span>
+    ${seq.length ? `<button data-seq-limpar="${campo}" title="Voltar para 'igual ao modelo'">limpar</button>` : ""}
+    ${seletor}
+    <span class="opcoes">${opcoes.map(k => `<button data-seq-add="${k}" title="Acrescentar ${esc(nome(k))} à sequência">${esc(nome(k))}</button>`).join("")}</span>
+  </div>`;
+}
+
+// ── Filtros ──────────────────────────────────────────────────────────────────
+// Dentro de um grupo vale qualquer opção (OU); entre grupos, todas (E). Padrão de erro soma mais uma condição.
+const DESLOCAMENTO = ["travelling_lateral", "dolly_in", "dolly_out", "orbita"];
+const GRUPOS = [
+  { id: "mov", rotulo: "Movimento", dica: "o que o modelo disse", ops: MOVS, teste: (t, k) => t.vlm.movimento === k },
+  { id: "esc", rotulo: "Escala", dica: "do modelo, no começo ou no fim", ops: ESCALAS, teste: (t, k) => t.vlm.escala_inicio === k || t.vlm.escala_fim === k },
+  { id: "car", rotulo: "Características", dica: "as que o modelo deu", ops: [...SUPORTES, ...PROBLEMAS], teste: (t, k) => tracosModelo(t.vlm).includes(k) },
+  { id: "rev", rotulo: "Sua revisão", ops: ["pendente", "certo", "errado", "comentado", "esc_corr", "mov_corr", "car_corr", "com_direcao"],
+    nomes: { pendente: "não revisado", certo: "certo", errado: "errado", comentado: "com comentário", esc_corr: "escala corrigida",
+      mov_corr: "movimento corrigido", car_corr: "características mexidas", com_direcao: "com direção" },
+    teste: (t, k) => { const r = rev[t.chave] || {};
+      return { pendente: !r.veredito, certo: r.veredito === "certo", errado: r.veredito === "errado", comentado: !!r.nota,
+        esc_corr: comoSeq(r.escala_certa).length > 0, mov_corr: comoSeq(r.movimento_certo).length > 0,
+        car_corr: Array.isArray(r.caracteristicas), com_direcao: (r.movimento_dir || []).some(Boolean) }[k]; } },
+  { id: "sinal", rotulo: "Sinais", ops: ["esc_muda", "mudou", "dif_esc", "dif_mov", "mov_desconhecido"],
+    nomes: { esc_muda: "escala muda no trecho", mudou: "modelo viu mudança", dif_esc: "escala ≠ CLIP", dif_mov: "movimento ≠ fluxo óptico",
+      mov_desconhecido: "movimento que o fluxo não conhece" },
+    teste: (t, k) => ({ esc_muda: t.vlm.escala_inicio !== t.vlm.escala_fim, mudou: !!t.vlm.mudanca, dif_esc: t.difEsc, dif_mov: t.difMov,
+      mov_desconhecido: !["parado", "pan", "tilt", "caminhando", "na_mao", "chicote"].includes(t.vlm.movimento) }[k]) },
+  { id: "local", rotulo: "Movimento hoje", dica: "fluxo óptico do Talho", ops: ["parado", "pan", "tilt", "caminhando", "na_mao", "chicote"], teste: (t, k) => t.movLocal === k },
+];
+const nomeOp = (g, k) => (g.nomes && g.nomes[k]) || nome(k);
+
+// Padrões de erro fixos (o que já se viu nesta revisão) + aprendidos das suas correções
+const PADROES_FIXOS = [
+  { id: "deslocamento", titulo: "Travelling, dolly ou órbita", dica: "O modelo confunde pan com deslocamento: sem paralaxe em 4 quadros, ele chuta.",
+    teste: t => DESLOCAMENTO.includes(t.vlm.movimento) },
+  { id: "certo_deslocamento", titulo: "Marcados certos com deslocamento", dica: "Certos com travelling/dolly/órbita sem correção: reabrir se for pan ou zoom.",
+    teste: t => DESLOCAMENTO.includes(t.vlm.movimento) && (rev[t.chave] || {}).veredito === "certo" && !comoSeq((rev[t.chave] || {}).movimento_certo).length },
+  { id: "zoom_dolly", titulo: "Zoom ou dolly", dica: "Zoom (lente) × dolly (câmera anda): a diferença está na paralaxe, que o modelo não vê.",
+    teste: t => /^(zoom|dolly)_/.test(t.vlm.movimento) },
+  { id: "suporte_como_mov", titulo: "Suporte dado como movimento", dica: "O modelo disse \"na mão\" ou \"grua\" no lugar do movimento: o movimento real ficou sem registro.",
+    teste: t => SUPORTES.includes(t.vlm.movimento) },
+  { id: "tremida_sem_mao", titulo: "Tremida sem \"na mão\"", dica: "Imagem tremida mas o suporte não aparece: quase sempre é câmera na mão.",
+    teste: t => tracosModelo(t.vlm).includes("tremida") && !tracosModelo(t.vlm).includes("na_mao") },
+  { id: "sem_direcao", titulo: "Movimento sem direção", dica: "Pan, tilt, travelling… sem direção na sua correção (ou não corrigidos).",
+    teste: t => { const r = rev[t.chave] || {}, seq = comoSeq(r.movimento_certo);
+      return seq.length ? seq.some((k, i) => !SEM_DIRECAO.includes(k) && !(r.movimento_dir || [])[i]) : !SEM_DIRECAO.includes(t.vlm.movimento) && !TRACOS.includes(t.vlm.movimento); } },
+  { id: "inseguro", titulo: "Modelo menos seguro", dica: "Confiança 80% ou menos (a mais baixa que ele deu: neste teste só usou 80%, 90% e 100%, então ela pouco separa).",
+    teste: t => (t.vlm.confianca ?? 1) <= 0.8 },
+];
+// Aprendidos: pares "modelo disse X → você corrigiu para Y" que se repetem; o botão mostra os outros trechos com X ainda não revisados
+let _aprendidos = null;  // recalcula só quando uma revisão muda (salvar zera)
+const MIN_VEZES = 2;     // uma correção só não é padrão
+// Agrupa pelo que o modelo disse: "dolly out → você corrigiu 3× (para zoom in → tilt; pan → parado)".
+// O botão mostra os outros trechos com esse mesmo valor do modelo que ainda não foram revisados.
+function padroesAprendidos() {
+  if (_aprendidos) return _aprendidos;
+  const escDoModelo = t => [t.vlm.escala_inicio, t.vlm.escala_fim].filter((x, i, a) => a.indexOf(x) === i).join("→");
+  const grupos = {};
+  T.filter(t => t.vlm).forEach(t => {
+    const r = rev[t.chave] || {}, mov = comoSeq(r.movimento_certo), esc = comoSeq(r.escala_certa);
+    if (mov.length && mov.join("→") !== t.vlm.movimento) {
+      const g = grupos["mov|" + t.vlm.movimento] = grupos["mov|" + t.vlm.movimento] || { tipo: "mov", de: t.vlm.movimento, para: {} };
+      const k = mov.map(nome).join(" → "); g.para[k] = (g.para[k] || 0) + 1;
+    }
+    if (esc.length && esc.join("→") !== escDoModelo(t)) {
+      const de = escDoModelo(t), g = grupos["esc|" + de] = grupos["esc|" + de] || { tipo: "esc", de, para: {} };
+      const k = esc.map(nome).join(" → "); g.para[k] = (g.para[k] || 0) + 1;
+    }
+  });
+  const lista = Object.values(grupos).map(g => {
+    const vezes = Object.values(g.para).reduce((a, b) => a + b, 0);
+    const deNome = g.de.split("→").map(nome).join(" → ");
+    const destinos = Object.entries(g.para).sort((a, b) => b[1] - a[1]).map(([k, n]) => n > 1 ? `${k} (${n}×)` : k).join("; ");
+    const teste = g.tipo === "mov" ? t => t.vlm.movimento === g.de && !(rev[t.chave] || {}).veredito
+      : t => escDoModelo(t) === g.de && !(rev[t.chave] || {}).veredito;
+    return { id: `ap:${g.tipo}|${g.de}`, titulo: `${g.tipo === "mov" ? "Movimento" : "Escala"} "${deNome}" corrigido ${vezes}×`,
+      dica: `Você trocou por: ${destinos}. Mostra os outros trechos em que o modelo disse "${deNome}" e que ainda não foram revisados.`, vezes, teste };
+  }).filter(p => p.vezes >= MIN_VEZES).sort((a, b) => b.vezes - a.vezes);
+  return (_aprendidos = lista);
+}
+
+const OPCF = "plano-sequencia-filtros";
+let F = { mov: [], esc: [], car: [], rev: [], sinal: [], local: [], conf: 100, busca: "", padrao: null };
+try { F = { ...F, ...(JSON.parse(localStorage.getItem(OPCF) || "{}") || {}) }; } catch (e) {}
+const salvarF = () => { try { localStorage.setItem(OPCF, JSON.stringify(F)); } catch (e) {} };
+const todosPadroes = () => [...PADROES_FIXOS, ...padroesAprendidos()];
+const filtroAtivo = () => GRUPOS.some(g => F[g.id].length) || F.conf < 100 || F.busca.trim() || F.padrao;
+function passa(t, ignorar) {
+  if (!t.vlm) return !filtroAtivo();
+  for (const g of GRUPOS) if (g.id !== ignorar && F[g.id].length && !F[g.id].some(k => g.teste(t, k))) return false;
+  if (F.conf < 100 && (t.vlm.confianca ?? 1) * 100 > F.conf) return false;
+  const q = F.busca.trim().toLowerCase();
+  if (q) {
+    const r = rev[t.chave] || {};
+    const txt = [t.vlm.descricao, t.vlm.assunto, t.vlm.local, t.vlm.movimento_obs, r.nota].join(" ").toLowerCase();
+    if (!q.split(/\s+/).every(p => txt.includes(p))) return false;
+  }
+  if (F.padrao && ignorar !== "padrao") { const pd = todosPadroes().find(x => x.id === F.padrao); if (pd && !pd.teste(t)) return false; }
+  return true;
+}
+const daVez = () => T.filter(t => !$("#f-vid").value || String(t.vid) === $("#f-vid").value);
+
+function desenharPainel() {
+  const base = daVez();
+  $("#painel-filtros").innerHTML = GRUPOS.map(g => `<div class="grupo"><span>${g.rotulo}${g.dica ? `<small>${g.dica}</small>` : ""}</span><div class="ops">
+      ${g.ops.map(k => { const n = base.filter(t => t.vlm && passa(t, g.id) && g.teste(t, k)).length, on = F[g.id].includes(k);
+        return `<button data-f="${g.id}" data-k="${k}" class="${on ? "ligado" : ""}" ${!n && !on ? "disabled" : ""}>${esc(nomeOp(g, k))}<span class="n">${n}</span></button>`; }).join("")}
+    </div></div>`).join("") + `
+    <div class="grupo"><span>Confiança do modelo<small>até este valor</small></span><div class="ops">
+      <input type="range" id="f-conf" min="50" max="100" step="5" value="${F.conf}"><span id="f-conf-v">${F.conf < 100 ? "≤ " + F.conf + "%" : "qualquer"}</span></div></div>
+    <div class="grupo"><span>Texto<small>descrição, foco, local, observação, sua nota</small></span><div class="ops">
+      <input type="search" id="f-busca" placeholder="ex.: câmera se aproxima" value="${esc(F.busca)}"></div></div>
+    <div class="grupo"><span></span><div class="ops"><button data-limpar-f="1">limpar todos os filtros</button></div></div>`;
+}
+function desenharPadroes() {
+  const base = daVez().filter(t => t.vlm), conta = pd => base.filter(t => passa(t, "padrao") && pd.teste(t)).length;
+  const botao = pd => { const n = conta(pd), on = F.padrao === pd.id;
+    return `<button class="padrao ${on ? "ligado" : ""}" data-padrao="${esc(pd.id)}" ${!n && !on ? "disabled" : ""}><b>${esc(pd.titulo)}</b><span class="n">${n}</span><small>${esc(pd.dica)}</small></button>`; };
+  const ap = padroesAprendidos();
+  $("#painel-padroes").innerHTML = `<h4>Padrões já vistos nesta revisão</h4><div class="ops">${PADROES_FIXOS.map(botao).join("")}</div>
+    <h4 style="margin-top:12px">Aprendidos das suas correções</h4>
+    <div class="ops">${ap.length ? ap.map(botao).join("") : `<span class="vazio">Aparecem aqui quando você corrigir o mesmo valor do modelo em ${MIN_VEZES} trechos ou mais.</span>`}</div>`;
+}
+function desenharResumo() {
+  const partes = [];
+  GRUPOS.forEach(g => F[g.id].forEach(k => partes.push([`${g.rotulo.toLowerCase()}: ${nomeOp(g, k)}`, `${g.id}|${k}`])));
+  if (F.conf < 100) partes.push([`confiança ≤ ${F.conf}%`, "conf|"]);
+  if (F.busca.trim()) partes.push([`texto: "${F.busca.trim()}"`, "busca|"]);
+  if (F.padrao) { const pd = todosPadroes().find(x => x.id === F.padrao); partes.push([`padrão: ${pd ? pd.titulo : F.padrao}`, "padrao|"]); }
+  const n = T.filter(t => passa(t) && (!$("#f-vid").value || String(t.vid) === $("#f-vid").value)).length;
+  $("#resumo-filtro").classList.toggle("on", partes.length > 0);
+  $("#resumo-filtro").innerHTML = partes.length ? `<b>${n} trecho${n === 1 ? "" : "s"}</b> ·
+    ${partes.map(([txt, k]) => `<button class="chip-f" data-tirar="${esc(k)}" title="Tirar este filtro">${esc(txt)} ✕</button>`).join("")}
+    <button class="chip-f" data-limpar-f="1">limpar tudo</button>` : "";
+  $("#b-filtros").classList.toggle("ativo", GRUPOS.some(g => F[g.id].length) || F.conf < 100 || !!F.busca.trim());
+  $("#b-filtros").textContent = "Filtros" + (partes.filter(([, k]) => !k.startsWith("padrao")).length ? ` (${partes.filter(([, k]) => !k.startsWith("padrao")).length})` : "");
+  $("#b-padroes").classList.toggle("ativo", !!F.padrao);
+}
+
+function desenhar() {
+  const fv = $("#f-vid").value, ativo_ = filtroAtivo();
+  const vs = V.filter(v => !fv || String(v.id) === fv).filter(v => !ativo_ || v.trechos.some(t => passa(t)));
+  $("#lista").innerHTML = vs.map(v => cartao(v, t => passa(t))).join("")
+    || `<p class="vazio">Nenhum trecho com esses filtros.</p>`;
+  document.querySelectorAll(".clipe").forEach(desenharMarcas);
+  if (ativo) { const a = document.querySelector(`.clipe[data-id="${ativo}"]`); if (a) a.classList.add("ativo"); }
+  if (!$("#painel-filtros").hidden) desenharPainel();
+  if (!$("#painel-padroes").hidden) desenharPadroes();
+  desenharResumo();
+  contar();
+}
+const abrirPainel = (qual) => {
+  ["filtros", "padroes"].forEach(p => {
+    const el = $("#painel-" + p), abrir = p === qual ? el.hidden : false;
+    el.hidden = !abrir; $("#b-" + p).setAttribute("aria-expanded", abrir);
+  });
+  desenhar();
+};
+$("#b-filtros").onclick = () => abrirPainel("filtros");
+$("#b-padroes").onclick = () => abrirPainel("padroes");
+$(".ferramentas").addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return;
+  if (b.dataset.f) { const xs = F[b.dataset.f]; F[b.dataset.f] = xs.includes(b.dataset.k) ? xs.filter(x => x !== b.dataset.k) : [...xs, b.dataset.k]; }
+  else if (b.dataset.padrao) F.padrao = F.padrao === b.dataset.padrao ? null : b.dataset.padrao;
+  else if (b.dataset.limparF) F = { mov: [], esc: [], car: [], rev: [], sinal: [], local: [], conf: 100, busca: "", padrao: null };
+  else if (b.dataset.tirar) {
+    const [g, k] = b.dataset.tirar.split("|");
+    if (g === "conf") F.conf = 100; else if (g === "busca") F.busca = ""; else if (g === "padrao") F.padrao = null; else F[g] = F[g].filter(x => x !== k);
+  } else return;
+  salvarF(); desenhar();
+});
+$(".ferramentas").addEventListener("input", e => {
+  if (e.target.id === "f-conf") { F.conf = Number(e.target.value); $("#f-conf-v").textContent = F.conf < 100 ? "≤ " + F.conf + "%" : "qualquer"; }
+  else if (e.target.id === "f-busca") F.busca = e.target.value;
+  else return;
+  salvarF();
+  clearTimeout(window._tf); window._tf = setTimeout(() => {  // redesenha sem perder o foco da busca
+    const foco = document.activeElement && document.activeElement.id, pos = foco === "f-busca" ? e.target.selectionStart : null;
+    desenhar();
+    if (foco) { const el = document.getElementById(foco); if (el) { el.focus(); if (pos != null) el.setSelectionRange(pos, pos); } }
+  }, 250);
+});
+function contar() {
+  const rs = Object.values(rev);
+  const feitos = rs.filter(r => r.veredito).length, errados = rs.filter(r => r.veredito === "errado").length;
+  const notas = rs.filter(r => r.nota).length, nm = Object.values(marcas).reduce((a, xs) => a + xs.length, 0);
+  $("#contagem").textContent = `revisados ${feitos}/${ok.length}` + (feitos ? ` · ${errados} errado${errados === 1 ? "" : "s"}` : "")
+    + (notas ? ` · ${notas} comentário${notas === 1 ? "" : "s"}` : "") + (nm ? ` · ${nm} marca${nm === 1 ? "" : "s"}` : "");
+}
+
+// Se a mesa (vídeo + lista + faixas) estiver cortada pela tela, alinha o cartão logo abaixo da barra fixa
+function alinhar(art) {
+  const barra = $(".ferramentas").getBoundingClientRect().bottom;
+  const topo = art.querySelector(".cab").getBoundingClientRect().top, fundo = art.querySelector(".faixas").getBoundingClientRect().bottom;
+  if (topo < barra - 1 || fundo > innerHeight + 1) window.scrollBy(0, topo - barra - 4);
+}
+
+// ── Marcas no player ─────────────────────────────────────────────────────────
+let ativo = null;  // id do vídeo que recebe os atalhos
+function ativar(art) {
+  if (!art || String(ativo) === art.dataset.id) return;
+  document.querySelectorAll(".clipe.ativo").forEach(a => a.classList.remove("ativo"));
+  art.classList.add("ativo"); ativo = art.dataset.id;
+}
+const intervalo = (a, b) => b != null && b !== a ? `${tempoF(Math.min(a, b))}–${tempoF(Math.max(a, b))}` : tempoF(a);
+const tempoF = s => { const m = Math.floor(s / 60), x = s - m * 60; return m + ":" + x.toFixed(1).padStart(4, "0"); };
+function desenharMarcas(art) {
+  const vid = art.dataset.id, xs = (marcas[vid] || []).slice().sort((a, b) => a.inicio - b.inicio);
+  const dados = V.find(x => String(x.id) === vid), d = dados.duracao, io = art._io || {};
+  art.querySelector(".marcas ul").innerHTML = xs.map(m => `<li><button data-marca-ir="${m.inicio}" data-marca-fim="${m.fim ?? ""}">${intervalo(m.inicio, m.fim)}</button>
+    <span>${esc(m.texto)}</span><button data-marca-apagar="${xs.indexOf(m)}" title="Apagar esta marca">✕</button></li>`).join("")
+    || `<li style="border:0;grid-template-columns:1fr"><span class="vazio">Nenhuma marca ainda.</span></li>`;
+  const trilha = art.querySelector(".trilha-marcas");
+  trilha.querySelectorAll(".marca").forEach(e => e.remove());
+  xs.forEach(m => trilha.insertAdjacentHTML("afterbegin", `<i class="marca" style="left:${m.inicio / d * 100}%;width:${m.fim != null ? (m.fim - m.inicio) / d * 100 : 0}%" title="${esc(intervalo(m.inicio, m.fim) + " · " + m.texto)}"></i>`));
+  const sel = trilha.querySelector(".io-sel");
+  if (io.i != null) {
+    const a = io.o != null ? Math.min(io.i, io.o) : io.i, b = io.o != null ? Math.max(io.i, io.o) : io.i;
+    sel.style.display = "block"; sel.style.left = (a / d * 100) + "%"; sel.style.width = ((b - a) / d * 100) + "%";
+  } else sel.style.display = "none";
+  art.querySelector(".marcas .io").textContent = io.i != null || io.o != null
+    ? `entrada ${io.i != null ? tempoF(io.i) : "—"} · saída ${io.o != null ? tempoF(io.o) : "—"} · Esc limpa` : "";
+}
+function marcarIO(art, qual) {
+  const v = art.querySelector("video"); if (!v) return;
+  art._io = art._io || {}; art._io[qual] = v.currentTime; desenharMarcas(art);
+}
+function abrirComentario(art) {
+  const v = art.querySelector("video"); if (!v) return;
+  v.pause();
+  const io = art._io || {};
+  const ini = io.i != null ? (io.o != null ? Math.min(io.i, io.o) : io.i) : v.currentTime;
+  const fim = io.i != null && io.o != null && io.o !== io.i ? Math.max(io.i, io.o) : null;
+  const f = art.querySelector(".marcas form");
+  f._ponto = { inicio: +ini.toFixed(2), fim: fim != null ? +fim.toFixed(2) : null };
+  f.querySelector("input").placeholder = `Comentário em ${intervalo(f._ponto.inicio, f._ponto.fim)}… (Enter salva, Esc cancela)`;
+  f.classList.add("aberto"); f.querySelector("input").focus();
+}
+$("#lista").addEventListener("submit", e => {
+  e.preventDefault();
+  const f = e.target, art = f.closest(".clipe"), txt = f.querySelector("input").value.trim();
+  if (txt && f._ponto) { (marcas[art.dataset.id] = marcas[art.dataset.id] || []).push({ ...f._ponto, texto: txt }); salvarMarcas(); }
+  f.querySelector("input").value = ""; f.classList.remove("aberto"); art._io = {}; desenharMarcas(art);
+});
+// Atalhos: valem para o vídeo ativo; nunca enquanto se digita
+document.addEventListener("keydown", e => {
+  const alvo = e.target, tag = alvo.tagName;
+  if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") {
+    if (e.key === "Escape" && alvo.closest(".marcas form")) { alvo.value = ""; alvo.closest("form").classList.remove("aberto"); alvo.blur(); }
+    return;
+  }
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  const art = ativo && document.querySelector(`.clipe[data-id="${ativo}"]`); if (!art) return;
+  const v = art.querySelector("video"); if (!v) return;
+  const k = e.key.toLowerCase();
+  if (k === " " && tag !== "VIDEO" && tag !== "BUTTON") { e.preventDefault(); v.paused ? v.play() : v.pause(); }
+  else if (k === "i") marcarIO(art, "i");
+  else if (k === "o") marcarIO(art, "o");
+  else if (k === "c") { e.preventDefault(); abrirComentario(art); }
+  else if (k === "escape") { art._io = {}; desenharMarcas(art); }
+  else if (k === "arrowleft" || k === "arrowright") {
+    if (tag === "VIDEO") return;  // o próprio player já trata as setas quando tem foco
+    e.preventDefault(); v.currentTime = Math.max(0, v.currentTime + (k === "arrowright" ? 1 : -1) * (e.shiftKey ? 5 : 1));
+  }
+});
+$("#f-vid").addEventListener("input", desenhar);
+
+$("#lista").addEventListener("click", e => {
+  const art = e.target.closest(".clipe"); if (!art) return;
+  const video = art.querySelector("video");
+  const trilha = e.target.closest(".trilha");
+  if (trilha && video) {  // clique livre na faixa: sai do loop
+    const r = trilha.getBoundingClientRect();
+    definirLoop(video, null);
+    video.currentTime = (e.clientX - r.left) / r.width * Number(trilha.dataset.dur); video.play(); return;
+  }
+  const b = e.target.closest("button"); if (!b) return;
+  if (b.dataset.pular && video) {
+    const tr = b.closest(".tr");
+    alinhar(art);
+    definirLoop(video, $("#o-loop").checked
+      ? { ini: Number(b.dataset.pular), fim: Number(b.dataset.fim), chave: tr ? tr.dataset.chave : null } : null);
+    video.currentTime = Number(b.dataset.pular); video.play();
+  }
+  else if (b.dataset.vel && video) { video.playbackRate = Number(b.dataset.vel); }
+  else if (b.dataset.io) { if (b.dataset.io === "c") abrirComentario(art); else marcarIO(art, b.dataset.io); }
+  else if (b.dataset.marcaIr && video) {
+    const ini = Number(b.dataset.marcaIr), fim = b.dataset.marcaFim ? Number(b.dataset.marcaFim) : null;
+    definirLoop(video, fim != null && $("#o-loop").checked ? { ini, fim, chave: null } : null);
+    video.currentTime = Math.max(0, fim != null ? ini : ini - 1); video.play();  // ponto solto: começa 1 s antes
+  }
+  else if (b.dataset.marcaApagar) {
+    const xs = (marcas[art.dataset.id] || []).slice().sort((a, c) => a.inicio - c.inicio);
+    const alvo = xs[Number(b.dataset.marcaApagar)];
+    marcas[art.dataset.id] = (marcas[art.dataset.id] || []).filter(m => m !== alvo);
+    salvarMarcas(); desenharMarcas(art);
+  }
+  else if (b.dataset.nota) {
+    const tr = b.closest(".tr"); tr.classList.toggle("abrir-nota");
+    if (tr.classList.contains("abrir-nota")) tr.querySelector(".comentario textarea").focus();
+  }
+  else if (b.dataset.seqAdd || b.dataset.seqLimpar || b.dataset.traco || b.dataset.tracosLimpar
+           || b.dataset.seqItem || b.dataset.dir !== undefined || b.dataset.seqRemover || b.dataset.seqFechar) {
+    const tr = b.closest(".tr"), k = tr.dataset.chave, t = T.find(x => x.chave === k);
+    const r = rev[k] = rev[k] || { veredito: "errado" };
+    if (b.dataset.traco) {
+      const atuais = Array.isArray(r.caracteristicas) ? r.caracteristicas : tracosModelo(t.vlm);
+      r.caracteristicas = atuais.includes(b.dataset.traco) ? atuais.filter(x => x !== b.dataset.traco) : [...atuais, b.dataset.traco];
+    } else if (b.dataset.tracosLimpar) delete r.caracteristicas;
+    else {
+      const campo = b.closest(".seq").dataset.seq, mov = campo === "movimento_certo";
+      const seq = comoSeq(r[campo]), dirs = mov ? seq.map((_, i) => (r.movimento_dir || [])[i] ?? null) : null;
+      if (b.dataset.seqLimpar) { r[campo] = []; if (mov) r.movimento_dir = []; editandoItem = null; }
+      else if (b.dataset.seqAdd) {
+        r[campo] = [...seq, b.dataset.seqAdd];
+        if (mov) r.movimento_dir = [...dirs, null];
+        // movimento novo já abre a direção (o caso comum); parado e escala não
+        editandoItem = mov && !SEM_DIRECAO.includes(b.dataset.seqAdd) ? { chave: k, campo, i: r[campo].length - 1 } : null;
+      }
+      else if (b.dataset.seqItem) {
+        const i = Number(b.dataset.seqItem);
+        editandoItem = editandoItem && editandoItem.chave === k && editandoItem.campo === campo && editandoItem.i === i ? null : { chave: k, campo, i };
+      }
+      else if (b.dataset.seqRemover) {
+        const i = Number(b.dataset.seqRemover);
+        r[campo] = seq.filter((_, j) => j !== i); if (mov) r.movimento_dir = dirs.filter((_, j) => j !== i);
+        editandoItem = null;
+      }
+      else if (b.dataset.dir !== undefined && mov && editandoItem) {
+        dirs[editandoItem.i] = b.dataset.dir || null; r.movimento_dir = dirs; editandoItem = null;
+      }
+      else editandoItem = null;  // fechar
+    }
+    salvar();
+    tr.querySelector(".correcao").innerHTML = correcao(t, r);
+  }
+  else if (b.dataset.veredito) {
+    const tr = b.closest(".tr"), k = tr.dataset.chave;
+    const r = rev[k] = rev[k] || {};
+    r.veredito = r.veredito === b.dataset.veredito ? undefined : b.dataset.veredito;
+    if (!r.veredito && !r.nota && !comoSeq(r.escala_certa).length && !comoSeq(r.movimento_certo).length && !Array.isArray(r.caracteristicas)) delete rev[k];
+    salvar();
+    tr.classList.toggle("certo", r.veredito === "certo"); tr.classList.toggle("errado", r.veredito === "errado");
+    tr.querySelector(".v-certo").classList.toggle("ativo", r.veredito === "certo");
+    tr.querySelector(".v-errado").classList.toggle("ativo", r.veredito === "errado");
+  }
+});
+// Comentário não define veredito: dá para comentar trecho certo, errado ou ainda não revisado
+$("#lista").addEventListener("input", e => {
+  const campo = e.target.dataset.campo; if (!campo) return;
+  const tr = e.target.closest(".tr"), k = tr.dataset.chave;
+  const r = rev[k] = rev[k] || {};
+  r[campo] = e.target.value; salvar();
+  if (campo === "nota") { tr.classList.toggle("com-nota", !!r.nota); tr.querySelector(".v-nota").classList.toggle("ativo", !!r.nota); }
+});
+$("#lista").addEventListener("pointerdown", e => ativar(e.target.closest(".clipe")));
+document.addEventListener("play", e => { if (e.target.tagName === "VIDEO") ativar(e.target.closest(".clipe")); }, true);
+// Opções da barra (lembradas neste navegador). Loop ligado por padrão; a lista só rola se pedir.
+const OPC = "plano-sequencia-opcoes";
+let opc = { loop: true, rolar: false };
+try { opc = { ...opc, ...(JSON.parse(localStorage.getItem(OPC) || "{}") || {}) }; } catch (e) {}
+$("#o-loop").checked = opc.loop; $("#o-rolar").checked = opc.rolar;
+const salvarOpc = () => { opc = { loop: $("#o-loop").checked, rolar: $("#o-rolar").checked }; try { localStorage.setItem(OPC, JSON.stringify(opc)); } catch (e) {} };
+$("#o-rolar").addEventListener("input", salvarOpc);
+$("#o-loop").addEventListener("input", () => { salvarOpc(); if (!opc.loop) document.querySelectorAll("video").forEach(v => definirLoop(v, null)); });
+
+// Loop do trecho: o vídeo repete [ini, fim] (o trecho inteiro que o modelo viu, com a sobreposição)
+function definirLoop(video, loop) {
+  video._loop = loop;
+  const art = video.closest(".clipe"), dados = V.find(x => String(x.id) === art.dataset.id);
+  art.querySelectorAll(".trilha .loop").forEach(el => {
+    el.style.display = loop ? "block" : "none";
+    if (loop) { el.style.left = (loop.ini / dados.duracao * 100) + "%"; el.style.width = ((loop.fim - loop.ini) / dados.duracao * 100) + "%"; }
+  });
+  art.querySelectorAll(".tr").forEach(tr => tr.classList.toggle("em-loop", !!loop && tr.dataset.chave === loop.chave));
+}
+// timeupdate chega ~4×/s; para o loop ficar justo, confere a cada quadro enquanto toca
+function vigiarLoop(v) {
+  if (v.paused || !v._loop) return;
+  if (v.currentTime >= v._loop.fim - 0.04 || v.currentTime < v._loop.ini - 0.5) v.currentTime = v._loop.ini;
+  requestAnimationFrame(() => vigiarLoop(v));
+}
+document.addEventListener("play", e => { if (e.target.tagName === "VIDEO") vigiarLoop(e.target); }, true);
+document.addEventListener("ended", e => { const v = e.target; if (v.tagName === "VIDEO" && v._loop) { v.currentTime = v._loop.ini; v.play(); } }, true);
+document.addEventListener("seeked", e => { if (e.target.tagName === "VIDEO" && !e.target.paused) vigiarLoop(e.target); }, true);
+
+// Cursor nas faixas e trecho atual destacado na lista
+document.addEventListener("timeupdate", e => {
+  const v = e.target; if (v.tagName !== "VIDEO") return;
+  const art = v.closest(".clipe"), dados = V.find(x => String(x.id) === art.dataset.id);
+  art.querySelectorAll(".cursor").forEach(c => c.style.left = (v.currentTime / dados.duracao * 100) + "%");
+  // Em loop, o trecho atual é o do loop (os trechos se sobrepõem; sem isso o destaque pularia para o vizinho)
+  const atual = v._loop && v._loop.chave ? { chave: v._loop.chave }
+    : dados.trechos.find(t => v.currentTime >= t.inicio && v.currentTime < t.ate);
+  art.querySelectorAll(".tr").forEach(tr => {
+    const agora = !!atual && tr.dataset.chave === atual.chave;
+    if (agora && !tr.classList.contains("agora") && opc.rolar) {
+      const lista = tr.parentElement; lista.scrollTop = tr.offsetTop - lista.offsetTop - 40;
+    }
+    tr.classList.toggle("agora", agora);
+  });
+}, true);
+
+// Importar um JSON baixado antes (junta com o que já está neste navegador; o do arquivo vence)
+$("#importar").onclick = () => $("#arq-importar").click();
+$("#arq-importar").onchange = async e => {
+  const f = e.target.files[0]; if (!f) return;
+  try {
+    const j = JSON.parse(await f.text());
+    if (j.teste && j.teste !== DADOS.gerado_em && !confirm(`Este JSON é do teste ${j.teste}, não deste (${DADOS.gerado_em}). Importar mesmo assim?`)) return;
+    let n = 0, fora = 0;
+    (j.revisoes || []).forEach(x => {
+      const k = `${x.video_id}:${x.inicio}`;
+      if (!T.some(t => t.chave === k)) { fora++; return; }
+      // Formato novo traz *_corrigida; no antigo, só o "errado" tinha correção (um valor só)
+      const corr = (campo, flag) => x[flag] !== undefined ? (x[flag] ? comoSeq(x[campo]) : []) : (x.veredito === "errado" ? comoSeq(x[campo]) : []);
+      rev[k] = { ...(x.veredito ? { veredito: x.veredito } : {}), escala_certa: corr("escala_certa", "escala_corrigida"),
+        movimento_certo: corr("movimento_certo", "movimento_corrigido"), ...(x.nota ? { nota: x.nota } : {}),
+        ...(x.movimento_corrigido && x.movimento_direcoes ? { movimento_dir: x.movimento_direcoes } : {}),
+        ...(x.caracteristicas_corrigidas ? { caracteristicas: x.caracteristicas || [] } : {}) };
+      migrar(rev[k], k);
+      n++;
+    });
+    let nm = 0;
+    (j.marcas || []).forEach(x => {
+      const xs = marcas[x.video_id] = marcas[x.video_id] || [];
+      if (!xs.some(m => m.inicio === x.inicio && m.texto === x.texto)) { xs.push({ inicio: x.inicio, fim: x.fim ?? null, texto: x.texto }); nm++; }
+    });
+    salvar(); salvarMarcas(); desenhar();
+    alert(`${n} revisões importadas` + (nm ? ` · ${nm} marcas` : "") + (fora ? ` · ${fora} não batem com nenhum trecho deste teste` : ""));
+  } catch (err) { alert("Não consegui ler o arquivo: " + err.message); }
+  e.target.value = "";
+};
+document.addEventListener("play", e => document.querySelectorAll("video").forEach(v => { if (v !== e.target) v.pause(); }), true);
+
+$("#baixar").onclick = () => {
+  const linhas = T.filter(t => { const r = rev[t.chave] || {}; return r.veredito || r.nota || comoSeq(r.escala_certa).length || comoSeq(r.movimento_certo).length || Array.isArray(r.caracteristicas); }).map(t => {
+    const r = rev[t.chave], m = t.vlm || {};
+    const eSeq = comoSeq(r.escala_certa), mSeq = comoSeq(r.movimento_certo);
+    const doModeloE = m.escala_inicio === m.escala_fim ? [m.escala_inicio] : [m.escala_inicio, m.escala_fim];
+    return { video_id: t.vid, inicio: t.inicio, fim: t.fim, veredito: r.veredito || null,
+      escala_modelo: [m.escala_inicio, m.escala_fim], movimento_modelo: m.movimento,
+      escala_clip: [t.local.escala_inicio, t.local.escala_fim], movimento_fluxo: t.movLocal,
+      escala_certa: eSeq.length ? eSeq : doModeloE, escala_corrigida: eSeq.length > 0,
+      movimento_certo: mSeq.length ? mSeq : [m.movimento].filter(x => !TRACOS.includes(x)), movimento_corrigido: mSeq.length > 0,
+      movimento_direcoes: mSeq.length ? mSeq.map((_, i) => (r.movimento_dir || [])[i] ?? null) : [],
+      caracteristicas_modelo: tracosModelo(m), caracteristicas: Array.isArray(r.caracteristicas) ? r.caracteristicas : tracosModelo(m),
+      caracteristicas_corrigidas: Array.isArray(r.caracteristicas), nota: r.nota || "" };
+  });
+  const listaMarcas = Object.entries(marcas).flatMap(([vid, xs]) => xs.map(m => ({ video_id: Number(vid), ...m })))
+    .sort((a, b) => a.video_id - b.video_id || a.inicio - b.inicio);
+  const blob = new Blob([JSON.stringify({ teste: DADOS.gerado_em, modelo: DADOS.modelo, parametros: P, revisoes: linhas, marcas: listaMarcas }, null, 1)], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = `revisao_plano_sequencia_${DADOS.gerado_em.replace(/[:T]/g, "-")}.json`;
+  document.body.appendChild(a); a.click(); a.remove();
+};
+desenhar();
+</script>
+</body>
+</html>
