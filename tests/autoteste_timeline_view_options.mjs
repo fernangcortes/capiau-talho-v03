@@ -56,7 +56,7 @@ assert.ok(cssContent.includes("#timeline-view-options-dropdown"), "styles.css de
 assert.ok(cssContent.includes("position: fixed"), "Popover deve utilizar position: fixed para ancoragem na tela");
 assert.ok(cssContent.includes("#timeline-view-options-dropdown.visible"), "styles.css deve definir estado .visible");
 assert.ok(
-    cssContent.includes("body:has(#timeline-view-options-dropdown.visible) #global-tooltip"),
+    cssContent.includes("body:has(> #timeline-view-options-dropdown.visible) #global-tooltip"),
     "styles.css deve suprimir #global-tooltip quando o dropdown estiver visível"
 );
 console.log("  ✔ Regras de position: fixed, z-index, .visible e supressão de tooltip validadas com sucesso.");

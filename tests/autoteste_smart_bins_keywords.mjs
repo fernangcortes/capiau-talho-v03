@@ -301,8 +301,11 @@ console.log("✔ Teste 7 passou: Arquitetura multi-janela e popout do dropdown v
 
 // ── TESTE 8: PERSISTÊNCIA EM HOVER E SUPRESSÃO DE TOOLTIP NO CLIQUE ───
 console.log("8. Verificando persistência no hover e supressão de tooltip no clique...");
-assert(stylesCssContent.includes("body:has(#library-sort-dropdown.show) #global-tooltip"), "CSS deve suprimir global-tooltip quando dropdown de ordenação estiver aberto");
-assert(stylesCssContent.includes("body:has(#btn-library-sort.active) #global-tooltip"), "CSS deve suprimir global-tooltip quando botão de ordenação estiver ativo");
+// O dropdown é adotado como filho direto do body antes de ganhar .show (ensureDropdownInActiveWindow)
+assert(stylesCssContent.includes("body:has(> #library-sort-dropdown.show) #global-tooltip"), "CSS deve suprimir global-tooltip quando dropdown de ordenação estiver aberto");
+// O botão só fica .active enquanto o dropdown está .show: a regra do dropdown cobre os dois
+assert(/sortDropdown\.classList\.add\("show"\);\s*const btn = getTargetButton\(\);\s*if \(btn\) btn\.classList\.add\("active"\);/.test(libraryJsContent), "botão de ordenação deve ficar .active junto com o .show do dropdown");
+assert(/sortDropdown\.classList\.remove\("show"\);\s*const btn = getTargetButton\(\);\s*if \(btn\) btn\.classList\.remove\("active"\);/.test(libraryJsContent), "botão de ordenação deve perder .active junto com o .show do dropdown");
 assert(mainJsContent.includes('doc.body.addEventListener("pointerdown"'), "main.js deve suprimir tooltip global imediatamente ao clicar em qualquer botão");
 assert(libraryJsContent.includes("scheduleHide"), "library.js deve gerenciar fechamento por hover via scheduleHide");
 assert(libraryJsContent.includes("cancelHide"), "library.js deve cancelar fechamento no mouseenter da caixa");

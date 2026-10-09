@@ -1761,7 +1761,7 @@ button {
 .dock-stack-host.dock-stack-self-rail > :not(.dock-stack-guest):not(.dock-stack-splitter):not(.restore-line-h):not(.panel-rail) {
     display: none !important;
 }
-.dock-stack-host.dock-stack-self-rail:has(.dock-stack-guest) > .dock-stack-guest:not(.collapsed):not(.rail-mode) {
+.dock-stack-host.dock-stack-self-rail > .dock-stack-guest:not(.collapsed):not(.rail-mode) {
     flex: 1 1 0% !important;
 }
 .dock-stack-host > .dock-stack-splitter:has(+ .panel-rail-h + .rail-mode:not(.rail-open)) {
@@ -1789,7 +1789,8 @@ button {
 }
 #sidebar-left.rail-mode:not(.rail-open) ~ .splitter-sidebar-left,
 #inspector-panel.rail-mode:not(.rail-open) ~ .splitter-inspector,
-.workspace:has(#sidebar-right.rail-mode:not(.rail-open)) .splitter-sidebar-right {
+#sidebar-right.rail-mode:not(.rail-open) ~ .splitter-sidebar-right,
+.splitter-sidebar-right:has(~ #sidebar-right.rail-mode:not(.rail-open)) {
     display: none !important;
 }
 
@@ -6822,7 +6823,8 @@ mark.search-highlight {
 .player-panel.maximized {
     flex: 1 0 100% !important;
 }
-.monitors-container:has(.player-panel.maximized) .player-panel:not(.maximized) {
+.monitors-container > .player-panel.maximized ~ .player-panel:not(.maximized),
+.monitors-container > .player-panel:not(.maximized):has(~ .player-panel.maximized) {
     display: none !important;
 }
 
@@ -6884,48 +6886,30 @@ mark.search-highlight {
     box-shadow: 0 0 10px color-mix(in srgb, var(--t-accent, rgb(6, 182, 212)) 80%, transparent);
 }
 
-/* Ocultação de splitters quando os painéis estão colapsados ou maximizados */
-.workspace:has(#sidebar-left.collapsed) .splitter-sidebar-left,
-.workspace:has(#sidebar-left.collapsed) .splitter-studio-lib,
-.studio-top:has(#sidebar-left.collapsed) .splitter-sidebar-left,
-.studio-top:has(#sidebar-left.collapsed) .splitter-studio-lib,
-#sidebar-left.collapsed + .splitter-sidebar-left,
-#sidebar-left.collapsed + .splitter-studio-lib,
-#sidebar-left.collapsed ~ .splitter-sidebar-left,
-#sidebar-left.collapsed ~ .splitter-studio-lib { display: none !important; }
+/* Ocultação de splitters quando os painéis estão colapsados ou maximizados.
+   Todo divisor nasce irmão do painel que redimensiona (SplitterHelper.initSplitter faz
+   leftEl.after(splitter)): depois dele se o painel fica à esquerda do centro, antes se fica à
+   direita. Por isso só seletores de irmão, nos dois sentidos. O :has() de descendente que havia
+   aqui (.workspace:has(#painel.collapsed) .divisor) era reavaliado a cada mudança de texto em
+   qualquer ponto da página, inclusive o timecode a cada quadro: com a biblioteca cheia, vários
+   ms por quadro. .studio-top, .compound-stage, .splitter-studio-timeline e .splitter-players-v
+   não são mais criados pelo JS. */
+#sidebar-left.collapsed ~ :is(.splitter-sidebar-left, .splitter-studio-lib),
+:is(.splitter-sidebar-left, .splitter-studio-lib):has(~ #sidebar-left.collapsed) { display: none !important; }
 
-.workspace:has(#inspector-panel.collapsed) .splitter-inspector,
-.studio-top:has(#inspector-panel.collapsed) .splitter-inspector,
-#inspector-panel.collapsed + .splitter-inspector,
-#inspector-panel.collapsed ~ .splitter-inspector { display: none !important; }
+#inspector-panel.collapsed ~ .splitter-inspector,
+.splitter-inspector:has(~ #inspector-panel.collapsed) { display: none !important; }
 
-.workspace:has(#sidebar-right.collapsed) .splitter-sidebar-right,
-.workspace:has(#sidebar-right.collapsed) .splitter-studio-right,
-.studio-top:has(#sidebar-right.collapsed) .splitter-sidebar-right,
-.studio-top:has(#sidebar-right.collapsed) .splitter-studio-right,
-#sidebar-right.collapsed + .splitter-sidebar-right,
-#sidebar-right.collapsed + .splitter-studio-right,
-#sidebar-right.collapsed ~ .splitter-sidebar-right,
-#sidebar-right.collapsed ~ .splitter-studio-right { display: none !important; }
+#sidebar-right.collapsed ~ :is(.splitter-sidebar-right, .splitter-studio-right),
+:is(.splitter-sidebar-right, .splitter-studio-right):has(~ #sidebar-right.collapsed) { display: none !important; }
 
-.center-stage:has(#timeline-panel.collapsed) .splitter-timeline { display: none !important; }
-.workspace:has(#timeline-panel.collapsed) .splitter-studio-timeline,
-.compound-stage:has(#timeline-panel.collapsed) .splitter-studio-timeline,
-#timeline-panel.collapsed + .splitter-studio-timeline,
-#timeline-panel.collapsed ~ .splitter-studio-timeline { display: none !important; }
-.monitors-container:has(.player-panel.maximized) .splitter-players,
-.monitors-container:has(.player-panel.maximized) .splitter-studio-players,
-.monitors-container:has(.player-panel.maximized) .splitter-players-v,
-.monitors-container:has(.player-panel.popped-out-hidden) .splitter-players,
-.monitors-container:has(.player-panel.popped-out-hidden) .splitter-studio-players,
-.monitors-container:has(.player-panel.popped-out-hidden) .splitter-players-v,
-.monitors-container:has(.player-panel.collapsed) .splitter-players,
-.monitors-container:has(.player-panel.collapsed) .splitter-studio-players,
-.monitors-container:has(.player-panel.collapsed) .splitter-players-v,
-.monitors-container:has(.player-panel[style*="display: none"]) .splitter-players,
-.monitors-container:has(.player-panel[style*="display: none"]) .splitter-studio-players,
-.monitors-container:has(.player-panel[style*="display: none"]) .splitter-players-v { display: none !important; }
-.timeline-canvas-wrapper:has(#timeline-headers-sidebar.collapsed) .splitter-timeline-headers { display: none !important; }
+#timeline-panel.collapsed ~ .splitter-timeline,
+.splitter-timeline:has(~ #timeline-panel.collapsed) { display: none !important; }
+
+.monitors-container > .player-panel:is(.maximized, .popped-out-hidden, .collapsed, [style*="display: none"]) ~ :is(.splitter-players, .splitter-studio-players),
+.monitors-container > :is(.splitter-players, .splitter-studio-players):has(~ .player-panel:is(.maximized, .popped-out-hidden, .collapsed, [style*="display: none"])) { display: none !important; }
+
+#timeline-headers-sidebar.collapsed ~ .splitter-timeline-headers,
 .timeline-headers-sidebar.collapsed + .splitter-timeline-headers { display: none !important; }
 
 /* Prevenção de travamentos e transições lentas durante o arraste */
@@ -7089,16 +7073,6 @@ body.studio .studio-top,
     box-shadow: none !important;
     height: 100% !important;
 }
-
-.studio-top:has(#sidebar-left.collapsed) .splitter-studio-lib,
-.studio-top:has(#sidebar-left.collapsed) .splitter-sidebar-left { display: none !important; }
-.studio-top:has(#inspector-panel.collapsed) .splitter-inspector { display: none !important; }
-.studio-top:has(#sidebar-right.collapsed) .splitter-studio-right,
-.studio-top:has(#sidebar-right.collapsed) .splitter-sidebar-right { display: none !important; }
-.compound-stage:has(#timeline-panel.collapsed) .splitter-studio-timeline,
-.workspace:has(#timeline-panel.collapsed) .splitter-studio-timeline,
-body.layout-timeline-bottom .workspace:has(#timeline-panel.collapsed) .splitter-studio-timeline,
-body.studio .workspace:has(#timeline-panel.collapsed) .splitter-studio-timeline { display: none !important; }
 
 /* 2. Disposição dos Monitores: Empilhados (Source Acima, Program Abaixo) */
 body.layout-monitors-stacked .monitors-container,
@@ -12474,7 +12448,7 @@ input[type="number"] {
     border-color: var(--t-line-strong, rgba(168, 85, 247, 0.4));
     background: var(--t-tint-1, rgba(168, 85, 247, 0.05));
 }
-.similar-criteria-option:has(input:checked) {
+.similar-criteria-option:has(> input:checked) {
     border-color: rgba(168, 85, 247, 0.6);
     background: rgba(168, 85, 247, 0.12);
 }
@@ -13138,7 +13112,7 @@ input[type="number"] {
     background: var(--t-tint-1, rgba(16, 185, 129, 0.06));
     border-color: var(--t-line-strong, rgba(52, 211, 153, 0.35));
 }
-.ev-preset:has(input:checked) {
+.ev-preset:has(> input:checked) {
     background: rgba(16, 185, 129, 0.10);
     border-color: rgba(52, 211, 153, 0.65);
     box-shadow: 0 0 10px rgba(16, 185, 129, 0.18);
@@ -14516,9 +14490,8 @@ input[type="number"] {
     pointer-events: none;
 }
 
-.player-panel .player-controls.has-popover-open,
-.player-panel .player-controls:has(.popover-reverse-match-menu[style*="flex"]),
-.player-panel .player-controls:has(.popover-reverse-match-menu[style*="block"]) {
+/* .has-popover-open entra e sai junto com o popover (toggle/closeReverseMatchPopover no player.js). */
+.player-panel .player-controls.has-popover-open {
     z-index: 200 !important;
     opacity: 1 !important;
     pointer-events: auto !important;
@@ -15024,7 +14997,7 @@ body.dock-dragging * {
     border: none !important;
     box-shadow: none !important;
 }
-.dock-stack-host:has(.dock-stack-guest ~ .dock-stack-guest) > .dock-stack-guest {
+.dock-stack-host:has(> .dock-stack-guest ~ .dock-stack-guest) > .dock-stack-guest {
     flex-basis: var(--dock-guest-h, 33%) !important;
 }
 .dock-stack-guest [id^="btn-maximize"] {
@@ -15038,7 +15011,7 @@ body.dock-dragging * {
 .dock-stack-host.dock-stack-self-collapsed > :not(.dock-stack-guest):not(.dock-stack-splitter):not(.restore-line-h) {
     display: none !important;
 }
-.dock-stack-host.dock-stack-self-collapsed:has(.dock-stack-guest) > .dock-stack-guest:not(.collapsed) {
+.dock-stack-host.dock-stack-self-collapsed > .dock-stack-guest:not(.collapsed) {
     flex: 1 1 0% !important;
 }
 .left-restore-line.restore-line-h,
