@@ -75,42 +75,47 @@ export class RenderCacheManager {
         if (activeCuts.length > 1) return true;
 
         // 4. Clipes individuais com efeitos pesados (blur, transform, crop, grading)
-        for (const c of activeCuts) {
-            const effects = Array.isArray(c.effects) ? c.effects : [];
-            for (const eff of effects) {
-                if (!eff || eff.disabled) continue;
-                if (eff.type === "color") {
-                    if ((eff.blur && eff.blur > 0) ||
-                        (eff.brightness !== undefined && eff.brightness !== 0) ||
-                        (eff.contrast !== undefined && eff.contrast !== 0) ||
-                        (eff.saturation !== undefined && eff.saturation !== 100) ||
-                        (eff.hue && eff.hue !== 0) ||
-                        (eff.sepia && eff.sepia > 0) ||
-                        (eff.grayscale && eff.grayscale > 0)) {
-                        return true;
-                    }
-                } else if (eff.type === "crop") {
-                    if ((eff.top && eff.top > 0) || (eff.bottom && eff.bottom > 0) ||
-                        (eff.left && eff.left > 0) || (eff.right && eff.right > 0)) {
-                        return true;
-                    }
-                } else if (eff.type === "transform") {
-                    if ((eff.rotation && eff.rotation !== 0) ||
-                        (eff.scale !== undefined && eff.scale !== 1.0) ||
-                        (eff.opacity !== undefined && eff.opacity < 1.0) ||
-                        (eff.x && eff.x !== 0) || (eff.y && eff.y !== 0)) {
-                        return true;
-                    }
-                }
-            }
+        return activeCuts.some(c => this._isHeavyCut(c));
+    }
 
-            // Transform direto no clipe (propriedades de motion)
-            if (c.rotation || (c.scale !== undefined && c.scale !== 1) || (c.opacity !== undefined && c.opacity < 1)) {
-                return true;
+    /**
+     * Diz se um clipe, sozinho, carrega efeito pesado (blur, transform, crop, grading).
+     * Não depende do frame: efeitos aqui são estáticos por clipe.
+     *
+     * @param {Object} c - Corte da timeline
+     * @returns {boolean}
+     */
+    _isHeavyCut(c) {
+        const effects = Array.isArray(c.effects) ? c.effects : [];
+        for (const eff of effects) {
+            if (!eff || eff.disabled) continue;
+            if (eff.type === "color") {
+                if ((eff.blur && eff.blur > 0) ||
+                    (eff.brightness !== undefined && eff.brightness !== 0) ||
+                    (eff.contrast !== undefined && eff.contrast !== 0) ||
+                    (eff.saturation !== undefined && eff.saturation !== 100) ||
+                    (eff.hue && eff.hue !== 0) ||
+                    (eff.sepia && eff.sepia > 0) ||
+                    (eff.grayscale && eff.grayscale > 0)) {
+                    return true;
+                }
+            } else if (eff.type === "crop") {
+                if ((eff.top && eff.top > 0) || (eff.bottom && eff.bottom > 0) ||
+                    (eff.left && eff.left > 0) || (eff.right && eff.right > 0)) {
+                    return true;
+                }
+            } else if (eff.type === "transform") {
+                if ((eff.rotation && eff.rotation !== 0) ||
+                    (eff.scale !== undefined && eff.scale !== 1.0) ||
+                    (eff.opacity !== undefined && eff.opacity < 1.0) ||
+                    (eff.x && eff.x !== 0) || (eff.y && eff.y !== 0)) {
+                    return true;
+                }
             }
         }
 
-        return false;
+        // Transform direto no clipe (propriedades de motion)
+        return !!(c.rotation || (c.scale !== undefined && c.scale !== 1) || (c.opacity !== undefined && c.opacity < 1));
     }
 
     /**
@@ -166,18 +171,92 @@ export class RenderCacheManager {
             empty: null
         };
 
+        // Mesmo resultado de chamar getFrameStatus frame a frame, mas varrendo só as bordas
+        // onde o status pode mudar (início/fim de corte, transição ou trecho em cache).
+        // Frame a frame, o custo era frames visíveis × cortes a cada redesenho da régua:
+        // com zoom afastado (até 100 frames por pixel) isso travava a timeline inteira.
+        const cuts = (STATE && STATE.activeTimelineCuts) || [];
+        const fps = (TIMELINE_STATE && TIMELINE_STATE.fps) || 24;
+        const transitions = (TIMELINE_STATE && TIMELINE_STATE.transitions) || [];
+        const limit = eF + 1; // o intervalo pedido inclui eF
+
+        const marks = new Map(); // frame -> variação dos contadores naquele ponto
+        const mark = (frame, field, delta) => {
+            let m = marks.get(frame);
+            if (!m) {
+                m = { any: 0, media: 0, heavy: 0, adjustment: 0, transition: 0, cached: 0 };
+                marks.set(frame, m);
+            }
+            m[field] += delta;
+        };
+        // Frames inteiros f com start <= f < end formam [ceil(start), ceil(end))
+        const cover = (start, end, fields) => {
+            const a = Math.max(sF, Math.ceil(start));
+            const b = Math.min(limit, Math.ceil(end));
+            if (!(b > a)) return;
+            for (const field of fields) {
+                mark(a, field, 1);
+                mark(b, field, -1);
+            }
+        };
+        mark(sF, "any", 0);
+        mark(limit, "any", 0);
+
+        for (const c of cuts) {
+            if (!c || c.disabled) continue;
+            const start = c.timelineStartFrame !== undefined ? c.timelineStartFrame : Math.round((c.timeline_start || 0) * fps);
+            const dur = (c.outFrame !== undefined ? c.outFrame : 0) - (c.inFrame !== undefined ? c.inFrame : 0);
+            const fields = ["any"];
+            if (c.kind === "adjustment") {
+                fields.push("adjustment");
+            } else {
+                fields.push("media");
+                if (this._isHeavyCut(c)) fields.push("heavy");
+            }
+            cover(start, start + dur, fields);
+        }
+
+        for (const t of transitions) {
+            if (!t || t.disabled) continue;
+            const isVideo = t.kind === "video" || (t.type && (t.type.startsWith("video_") || t.type === "cross_dissolve"));
+            if (!isVideo) continue;
+            const halfA = t.halfAFrames !== undefined ? t.halfAFrames : Math.floor((t.durationFrames || 24) / 2);
+            const halfB = t.halfBFrames !== undefined ? t.halfBFrames : Math.ceil((t.durationFrames || 24) / 2);
+            cover(t.cutFrame - halfA, t.cutFrame + halfB, ["transition"]);
+        }
+
+        const cachedFrames = [];
+        for (const f of this._frames.keys()) {
+            if (Number.isInteger(f) && f >= sF && f < limit) cachedFrames.push(f);
+        }
+        cachedFrames.sort((a, b) => a - b);
+        for (let i = 0; i < cachedFrames.length;) {
+            let j = i;
+            while (j + 1 < cachedFrames.length && cachedFrames[j + 1] === cachedFrames[j] + 1) j++;
+            cover(cachedFrames[i], cachedFrames[j] + 1, ["cached"]);
+            i = j + 1;
+        }
+
+        const points = [...marks.keys()].sort((a, b) => a - b);
+        const active = { any: 0, media: 0, heavy: 0, adjustment: 0, transition: 0, cached: 0 };
         const segments = [];
         let currentSeg = null;
 
-        for (let f = sF; f <= eF; f++) {
-            const status = this.getFrameStatus(f);
-            if (!currentSeg) {
-                currentSeg = { startFrame: f, endFrame: f + 1, status, color: statusColors[status] };
-            } else if (currentSeg.status === status) {
-                currentSeg.endFrame = f + 1;
+        for (let i = 0; i < points.length - 1; i++) {
+            const m = marks.get(points[i]);
+            for (const field in m) active[field] += m[field];
+
+            let status;
+            if (active.cached > 0) status = "cached";
+            else if (active.any === 0) status = "empty";
+            else if (active.adjustment > 0 || active.transition > 0 || active.media > 1 || active.heavy > 0) status = "unrendered";
+            else status = "realtime";
+
+            if (currentSeg && currentSeg.status === status) {
+                currentSeg.endFrame = points[i + 1];
             } else {
-                segments.push(currentSeg);
-                currentSeg = { startFrame: f, endFrame: f + 1, status, color: statusColors[status] };
+                if (currentSeg) segments.push(currentSeg);
+                currentSeg = { startFrame: points[i], endFrame: points[i + 1], status, color: statusColors[status] };
             }
         }
 
