@@ -1070,14 +1070,18 @@ export function getAllMediaLists() {
 export function getMediaRichContent(item, kind = "video", currentTitle = "") {
     if (!item) return { descHtml: "", speakerHtml: "", tagsHtml: "" };
 
+    // Só gera o que o modo/preferência atual mostra (ver refreshRenderContext)
+    const wantTags = renderCtx.showTagChips !== false;
+    const wantDesc = renderCtx.showDesc !== false;
+
     // 1. Descrição / Sinopse
     const desc = (item.description || item.summary || item.caption || "").trim();
-    const showDesc = desc && desc !== currentTitle && !desc.startsWith(currentTitle);
+    const showDesc = wantDesc && desc && desc !== currentTitle && !desc.startsWith(currentTitle);
     const descHtml = showDesc ? `<div class="media-desc-text" title="${escapeHtml(desc)}">${escapeHtml(desc)}</div>` : "";
 
     // 2. Falante / Personagem (para vídeos)
     let speaker = "";
-    if (kind === "video") {
+    if (kind === "video" && wantTags) {
         if (item.summary) {
             const m = item.summary.match(/Entrevistado:\s*([^,\-\n\.]+)/i);
             if (m) speaker = m[1].trim();
@@ -1100,7 +1104,7 @@ export function getMediaRichContent(item, kind = "video", currentTitle = "") {
 
     // 3. Tags Chips
     let tagsHtml = "";
-    if (item.tags) {
+    if (wantTags && item.tags) {
         try {
             const parsed = typeof item.tags === "string" ? JSON.parse(item.tags) : item.tags;
             if (Array.isArray(parsed) && parsed.length > 0) {
@@ -3567,10 +3571,23 @@ function refreshRenderContext() {
     const searchInput = doc.getElementById("library-search-input") || document.getElementById("library-search-input");
     const query = searchInput ? searchInput.value.trim() : "";
     const sortSelect = doc.getElementById("library-sort-by") || document.getElementById("library-sort-by");
+    // O que o CSS esconde não precisa ser gerado: "mostrar tags" desligado (.hide-tags) esconde
+    // chips, falante e etiqueta de tipo; "mostrar status" desligado (.hide-status) esconde os
+    // selos; o modo grade esconde chips, falante e sinopse. Trocar qualquer um desses redesenha a
+    // lista. Na grade da biblioteca cheia eram ~14 mil chips pesando em todo recálculo de
+    // estilo/layout da página.
+    const chkTags = doc.getElementById("chk-show-tags") || document.getElementById("chk-show-tags");
+    const chkStatus = doc.getElementById("chk-show-status") || document.getElementById("chk-show-status");
+    const tagsOn = chkTags ? chkTags.checked : true;
+    const isGrid = localStorage.getItem("lib-pref-view-mode") === "grid";
     renderCtx = {
         query,
         ast: query ? getCachedQueryAST(query) : null,
-        sortBy: sortSelect?.value || localStorage.getItem("library_sort_by") || "keyword_asc"
+        sortBy: sortSelect?.value || localStorage.getItem("library_sort_by") || "keyword_asc",
+        showTagChips: tagsOn && !isGrid,
+        showTagBadge: tagsOn,
+        showStatusBadge: chkStatus ? chkStatus.checked : true,
+        showDesc: !isGrid
     };
     return renderCtx;
 }
@@ -4571,8 +4588,8 @@ function renderTreeNode(node, container, depth = 0) {
                 <div class="media-meta-row">
                     <span class="media-duration">${v.duration ? formatTimecode(v.duration).substring(3, 11) : "00:00:00"}</span>
                     ${statusGlow}
-                    ${statusBadge}
-                    ${subclipBadgeHtml}
+                    ${renderCtx.showStatusBadge !== false ? statusBadge : ""}
+                    ${(v.is_subclip ? renderCtx.showStatusBadge : renderCtx.showTagBadge) !== false ? subclipBadgeHtml : ""}
                     ${speakerHtml}
                     ${overrideBtnHtml}
                     ${actionBtn}
@@ -4979,8 +4996,8 @@ function renderTreeNode(node, container, depth = 0) {
                 </h4>
                 <div class="media-meta-row">
                     ${statusGlow}
-                    ${statusBadge}
-                    <span class="badge-tag tag-broll">${categoryLabel}</span>
+                    ${renderCtx.showStatusBadge !== false ? statusBadge : ""}
+                    ${renderCtx.showTagBadge !== false ? `<span class="badge-tag tag-broll">${categoryLabel}</span>` : ""}
                     <button class="btn-photo-add-timeline btn-card-action" data-tooltip="Adicionar à timeline (still)"><i class="fa-solid fa-plus"></i></button>
                     <button class="btn-photo-similar btn-card-action" data-tooltip="Encontrar similares"><i class="fa-solid fa-images"></i></button>
                 </div>
