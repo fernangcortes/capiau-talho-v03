@@ -1,0 +1,251 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 500" width="100%" height="100%">
+  <defs>
+    <!-- Gradiente de Fundo Dark Glassmorphism -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0d0d12"/>
+      <stop offset="100%" stop-color="#14141f"/>
+    </linearGradient>
+
+    <!-- Gradientes de Cards Internos -->
+    <linearGradient id="cardGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#181824"/>
+      <stop offset="100%" stop-color="#12121a"/>
+    </linearGradient>
+
+    <linearGradient id="timelineNodeGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#1e1b4b"/>
+      <stop offset="100%" stop-color="#312e81"/>
+    </linearGradient>
+
+    <linearGradient id="stackNodeGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#0e7490"/>
+      <stop offset="100%" stop-color="#155e75"/>
+    </linearGradient>
+
+    <!-- Gradientes de Tracks -->
+    <linearGradient id="trackVideoGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#1e3a8a"/>
+      <stop offset="100%" stop-color="#2563eb"/>
+    </linearGradient>
+
+    <linearGradient id="trackAudioGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#064e3b"/>
+      <stop offset="100%" stop-color="#059669"/>
+    </linearGradient>
+
+    <linearGradient id="otioHubGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3b82f6"/>
+      <stop offset="50%" stop-color="#8b5cf6"/>
+      <stop offset="100%" stop-color="#ec4899"/>
+    </linearGradient>
+
+    <!-- Marcadores de Flechas -->
+    <marker id="arrowTree" markerWidth="7" markerHeight="7" refX="5" refY="3.5" orient="auto">
+      <path d="M 0 0 L 7 3.5 L 0 7 Z" fill="#06b6d4"/>
+    </marker>
+    <marker id="arrowExport" markerWidth="7" markerHeight="7" refX="5" refY="3.5" orient="auto">
+      <path d="M 0 0 L 7 3.5 L 0 7 Z" fill="#a78bfa"/>
+    </marker>
+  </defs>
+
+  <!-- Fundo Principal -->
+  <rect width="880" height="500" rx="14" fill="url(#bgGrad)" stroke="#27273a" stroke-width="1.5"/>
+
+  <!-- Título Superior & Subtítulo -->
+  <g transform="translate(30, 20)">
+    <rect x="0" y="0" width="8" height="28" rx="3" fill="#f59e0b"/>
+    <text x="18" y="16" fill="#f8fafc" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="16" font-weight="700" letter-spacing="0.5">ARQUITETURA OPENTIMELINEIO (OTIO) • ÁRVORE &amp; INTEROPERABILIDADE</text>
+    <text x="18" y="31" fill="#94a3b8" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11">Composição hierárquica (Timeline → Stack → Tracks → Items) e exportação universal FCP7 XML / Resolve / Premiere / EDL</text>
+  </g>
+
+  <!-- ========================================================================= -->
+  <!-- LADO ESQUERDO: ÁRVORE HIERÁRQUICA DE COMPOSIÇÃO OTIO                      -->
+  <!-- ========================================================================= -->
+  <g transform="translate(25, 65)">
+    <!-- Moldura Glass da Árvore OTIO -->
+    <rect width="495" height="415" rx="10" fill="url(#cardGrad)" stroke="#27273a" stroke-width="1.2"/>
+
+    <!-- Cabeçalho do Card -->
+    <path d="M 1 11 Q 1 1 11 1 L 484 1 Q 494 1 494 11 L 494 28 L 1 28 Z" fill="#1e1e2d"/>
+    <line x1="0" y1="28" x2="495" y2="28" stroke="#2a2a3e" stroke-width="1"/>
+    <text x="16" y="19" fill="#f59e0b" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" font-weight="700" letter-spacing="0.5">ESQUEMA DE COMPOSIÇÃO OTIO (SCHEMA TREE)</text>
+
+    <!-- NÍVEL 1: TIMELINE (RAIZ) -->
+    <g transform="translate(20, 38)">
+      <rect x="0" y="0" width="455" height="44" rx="6" fill="url(#timelineNodeGrad)" stroke="#8b5cf6" stroke-width="1.2"/>
+      <circle cx="22" cy="22" r="10" fill="#4338ca"/>
+      <text x="22" y="26" fill="#ffffff" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" font-weight="700" text-anchor="middle">T</text>
+      <text x="40" y="20" fill="#f8fafc" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" font-weight="700">otio.schema.Timeline</text>
+      <text x="40" y="33" fill="#c4b5fd" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="9">name: "Corte_Master" • global_start_time: 00:00:00:00 • rate: 24.0 fps</text>
+    </g>
+
+    <!-- Linha Conectora Raiz -> Stack -->
+    <line x1="247" y1="82" x2="247" y2="96" stroke="#06b6d4" stroke-width="2" marker-end="url(#arrowTree)"/>
+
+    <!-- NÍVEL 2: STACK (EMPILHAMENTO) -->
+    <g transform="translate(45, 96)">
+      <rect x="0" y="0" width="405" height="38" rx="6" fill="url(#stackNodeGrad)" stroke="#06b6d4" stroke-width="1.2"/>
+      <circle cx="20" cy="19" r="9" fill="#0891b2"/>
+      <text x="20" y="23" fill="#ffffff" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="9" font-weight="700" text-anchor="middle">S</text>
+      <text x="36" y="17" fill="#f8fafc" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10.5" font-weight="700">otio.schema.Stack (Contêiner Sincronizado)</text>
+      <text x="36" y="30" fill="#a5f3fc" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="8.5">Empilha verticalmente todas as faixas paralelas compartilhando a régua de tempo</text>
+    </g>
+
+    <!-- Linhas Conectoras Stack -> Tracks -->
+    <line x1="247" y1="134" x2="247" y2="148" stroke="#06b6d4" stroke-width="1.5"/>
+    <line x1="55" y1="148" x2="440" y2="148" stroke="#06b6d4" stroke-width="1.5"/>
+    <line x1="55" y1="148" x2="55" y2="158" stroke="#06b6d4" stroke-width="1.5" marker-end="url(#arrowTree)"/>
+    <line x1="180" y1="148" x2="180" y2="158" stroke="#06b6d4" stroke-width="1.5" marker-end="url(#arrowTree)"/>
+    <line x1="310" y1="148" x2="310" y2="158" stroke="#06b6d4" stroke-width="1.5" marker-end="url(#arrowTree)"/>
+    <line x1="440" y1="148" x2="440" y2="158" stroke="#06b6d4" stroke-width="1.5" marker-end="url(#arrowTree)"/>
+
+    <!-- NÍVEL 3: TRACKS & ITEMS -->
+    <!-- Faixas em layout de timeline real (Y=160 a Y=360) -->
+    <g transform="translate(20, 160)">
+      <!-- TRACK V2 (Vídeo B-Roll / Overlays) -->
+      <g transform="translate(0, 0)">
+        <rect x="0" y="0" width="55" height="36" rx="4" fill="#1e1e2d" stroke="#3b82f6" stroke-width="1"/>
+        <text x="27" y="18" fill="#60a5fa" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" font-weight="700" text-anchor="middle">V2</text>
+        <text x="27" y="29" fill="#94a3b8" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="7" text-anchor="middle">Video</text>
+
+        <!-- Itens em V2: Gap + Clip -->
+        <!-- Gap (espaço vazio) -->
+        <rect x="60" y="0" width="130" height="36" rx="4" fill="#0f172a" stroke="#334155" stroke-width="0.8" stroke-dasharray="2,2"/>
+        <text x="125" y="22" fill="#64748b" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="9" text-anchor="middle">Gap (Vazio: 0s - 4s)</text>
+
+        <!-- Clip (B-roll) -->
+        <rect x="195" y="0" width="260" height="36" rx="4" fill="url(#trackVideoGrad)" stroke="#60a5fa" stroke-width="1"/>
+        <text x="210" y="17" fill="#ffffff" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="9.5" font-weight="700">Clip: "B_ROLL_DRONE.MOV"</text>
+        <text x="210" y="29" fill="#bfdbfe" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="8">source_range: [10s, 6s] • Opacidade: 100%</text>
+      </g>
+
+      <!-- TRACK V1 (Vídeo Primário + Transição) -->
+      <g transform="translate(0, 42)">
+        <rect x="0" y="0" width="55" height="42" rx="4" fill="#1e1e2d" stroke="#3b82f6" stroke-width="1"/>
+        <text x="27" y="21" fill="#60a5fa" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" font-weight="700" text-anchor="middle">V1</text>
+        <text x="27" y="33" fill="#94a3b8" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="7" text-anchor="middle">Video</text>
+
+        <!-- Clip 1 (Cena 01) -->
+        <rect x="60" y="0" width="170" height="42" rx="4" fill="url(#trackVideoGrad)" stroke="#3b82f6" stroke-width="1"/>
+        <text x="70" y="18" fill="#ffffff" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="9.5" font-weight="700">Clip: "CENA_01_CLOSE.MP4"</text>
+        <text x="70" y="31" fill="#bfdbfe" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="8">source_range: [0s, 5s]</text>
+
+        <!-- Transição OTIO (CrossDissolve na emenda) -->
+        <rect x="215" y="4" width="35" height="34" rx="3" fill="#4c1d95" stroke="#a78bfa" stroke-width="1.2"/>
+        <text x="232" y="24" fill="#f5d0fe" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="7.5" font-weight="700" text-anchor="middle">Cross</text>
+
+        <!-- Clip 2 (Cena 02) com Marcador -->
+        <rect x="235" y="0" width="220" height="42" rx="4" fill="url(#trackVideoGrad)" stroke="#3b82f6" stroke-width="1"/>
+        <text x="255" y="18" fill="#ffffff" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="9.5" font-weight="700">Clip: "CENA_02_MEDIO.MP4"</text>
+        <text x="255" y="31" fill="#bfdbfe" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="8">source_range: [5s, 8s]</text>
+
+        <!-- Marcador OTIO (Marker pin) -->
+        <g transform="translate(360, 2)">
+          <polygon points="0,0 8,0 4,8" fill="#f43f5e"/>
+          <text x="12" y="7" fill="#fca5a5" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="7.5" font-weight="700">Marker</text>
+        </g>
+      </g>
+
+      <!-- TRACK A1 (Áudio Diálogo) -->
+      <g transform="translate(0, 90)">
+        <rect x="0" y="0" width="55" height="36" rx="4" fill="#1e1e2d" stroke="#10b981" stroke-width="1"/>
+        <text x="27" y="18" fill="#34d399" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" font-weight="700" text-anchor="middle">A1</text>
+        <text x="27" y="29" fill="#94a3b8" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="7" text-anchor="middle">Audio</text>
+
+        <!-- Clip A1 -->
+        <rect x="60" y="0" width="395" height="36" rx="4" fill="url(#trackAudioGrad)" stroke="#10b981" stroke-width="1"/>
+        <text x="75" y="17" fill="#ffffff" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="9.5" font-weight="700">Clip: "VOZ_DIRETA_LAVALIER.WAV"</text>
+        <text x="75" y="29" fill="#a7f3d0" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="8">Track nativa de fala • -16.0 LUFS Integrado</text>
+      </g>
+
+      <!-- TRACK A2 (Áudio Trilha Sonora) -->
+      <g transform="translate(0, 132)">
+        <rect x="0" y="0" width="55" height="36" rx="4" fill="#1e1e2d" stroke="#10b981" stroke-width="1"/>
+        <text x="27" y="18" fill="#34d399" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" font-weight="700" text-anchor="middle">A2</text>
+        <text x="27" y="29" fill="#94a3b8" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="7" text-anchor="middle">Audio</text>
+
+        <!-- Clip A2 -->
+        <rect x="60" y="0" width="395" height="36" rx="4" fill="url(#trackAudioGrad)" stroke="#10b981" stroke-width="1"/>
+        <text x="75" y="17" fill="#ffffff" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="9.5" font-weight="700">Clip: "TRILHA_DOCUMENTARIO_BG.WAV"</text>
+        <text x="75" y="29" fill="#a7f3d0" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="8">Fade-in inicial • Ducking automático contra A1</text>
+      </g>
+    </g>
+
+    <!-- Rodapé explicativo -->
+    <text x="20" y="398" fill="#94a3b8" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="8.5">
+      Cada item carrega timecode de entrada (<tspan fill="#06b6d4">start_time</tspan>), duração (<tspan fill="#06b6d4">duration</tspan>) e referência física de arquivo (<tspan fill="#06b6d4">media_reference</tspan>).
+    </text>
+  </g>
+
+  <!-- ========================================================================= -->
+  <!-- LADO DIREITO: HUB DE INTEROPERABILIDADE & EXPORTADORES                    -->
+  <!-- ========================================================================= -->
+  <g transform="translate(540, 65)">
+    <!-- Moldura Glass do Hub de Interoperabilidade -->
+    <rect width="315" height="415" rx="10" fill="url(#cardGrad)" stroke="#27273a" stroke-width="1.2"/>
+
+    <!-- Cabeçalho -->
+    <path d="M 1 11 Q 1 1 11 1 L 304 1 Q 314 1 314 11 L 314 28 L 1 28 Z" fill="#1e1e2d"/>
+    <line x1="0" y1="28" x2="315" y2="28" stroke="#2a2a3e" stroke-width="1"/>
+    <text x="14" y="19" fill="#06b6d4" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11.5" font-weight="700" letter-spacing="0.5">HUB DE INTEROPERABILIDADE</text>
+
+    <!-- BANNER CENTRAL DO ADAPTADOR TALHO OTIO -->
+    <g transform="translate(15, 38)">
+      <rect x="0" y="0" width="285" height="52" rx="6" fill="#121324" stroke="url(#otioHubGrad)" stroke-width="1.5"/>
+      <circle cx="26" cy="26" r="14" fill="#1e1b4b" stroke="#8b5cf6" stroke-width="1"/>
+      <text x="26" y="31" fill="#c4b5fd" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="13" font-weight="700" text-anchor="middle">⇄</text>
+      <text x="48" y="22" fill="#ffffff" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" font-weight="700">CapIAu-Talho OTIO Core</text>
+      <text x="48" y="36" fill="#94a3b8" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="8.5">Conversão bidirecional sem perda temporal</text>
+    </g>
+
+    <!-- SETAS E CARDS DOS FORMATOS DE DESTINO -->
+    <!-- 1. FCP7 XML (Universal) -->
+    <g transform="translate(15, 102)">
+      <rect x="0" y="0" width="285" height="48" rx="5" fill="#181826" stroke="#f59e0b" stroke-width="1"/>
+      <rect x="8" y="8" width="48" height="32" rx="3" fill="#2d1c03"/>
+      <text x="32" y="27" fill="#f59e0b" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="9" font-weight="700" text-anchor="middle">.XML</text>
+
+      <text x="64" y="21" fill="#f8fafc" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" font-weight="700">Final Cut Pro 7 XML</text>
+      <text x="64" y="34" fill="#cbd5e1" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="8">Padrão universal DaVinci Resolve &amp; Premiere</text>
+    </g>
+
+    <!-- 2. DaVinci Resolve -->
+    <g transform="translate(15, 158)">
+      <rect x="0" y="0" width="285" height="48" rx="5" fill="#181826" stroke="#8b5cf6" stroke-width="1"/>
+      <rect x="8" y="8" width="48" height="32" rx="3" fill="#1e1b4b"/>
+      <text x="32" y="27" fill="#a78bfa" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="9" font-weight="700" text-anchor="middle">DVR</text>
+
+      <text x="64" y="21" fill="#f8fafc" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" font-weight="700">DaVinci Resolve Studio</text>
+      <text x="64" y="34" fill="#cbd5e1" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="8">Conformação de cor, grading e finishing RAW</text>
+    </g>
+
+    <!-- 3. Adobe Premiere Pro -->
+    <g transform="translate(15, 214)">
+      <rect x="0" y="0" width="285" height="48" rx="5" fill="#181826" stroke="#3b82f6" stroke-width="1"/>
+      <rect x="8" y="8" width="48" height="32" rx="3" fill="#0f172a"/>
+      <text x="32" y="27" fill="#60a5fa" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="9" font-weight="700" text-anchor="middle">PR</text>
+
+      <text x="64" y="21" fill="#f8fafc" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" font-weight="700">Adobe Premiere Pro</text>
+      <text x="64" y="34" fill="#cbd5e1" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="8">Finalização comercial e motion graphics</text>
+    </g>
+
+    <!-- 4. EDL CMX 3600 (Legado Industrial) -->
+    <g transform="translate(15, 270)">
+      <rect x="0" y="0" width="285" height="48" rx="5" fill="#181826" stroke="#10b981" stroke-width="1"/>
+      <rect x="8" y="8" width="48" height="32" rx="3" fill="#064e3b"/>
+      <text x="32" y="27" fill="#34d399" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="9" font-weight="700" text-anchor="middle">.EDL</text>
+
+      <text x="64" y="21" fill="#f8fafc" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" font-weight="700">CMX 3600 EDL</text>
+      <text x="64" y="34" fill="#cbd5e1" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="8">Lista de cortes simples com timecode clássico</text>
+    </g>
+
+    <!-- CARD INFORMATIVO DE SALVAGUARDA DE SINCRONISMO -->
+    <g transform="translate(15, 328)">
+      <rect x="0" y="0" width="285" height="74" rx="5" fill="#0b1320" stroke="#1d4ed8" stroke-width="1"/>
+      <text x="12" y="18" fill="#60a5fa" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="9.5" font-weight="700">🛡️ Garantia de Fidelidade:</text>
+      <text x="12" y="32" fill="#94a3b8" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="8">• Zero perda de taxas (23.976 / 24 / 29.97 / 60)</text>
+      <text x="12" y="45" fill="#94a3b8" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="8">• Preservação de Gaps e canais de áudio estéreo</text>
+      <text x="12" y="58" fill="#94a3b8" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="8">• Transições Cross Dissolve e Marcadores de cor</text>
+    </g>
+  </g>
+</svg>

@@ -50,6 +50,8 @@ Explore a documentação completa através dos módulos abaixo:
 | 🔌 **API** | [[15. Arquitetura Técnica e API REST\|15.-Arquitetura-Tecnica-e-API-REST]] | FastAPI, SQLite + ChromaDB, WebSockets, streaming de logs e endpoints REST. |
 | 🩺 **Suporte** | [[16. Solução de Problemas e FAQ\|16.-Solucao-de-Problemas-e-FAQ]] | Resolução de problemas comuns, diagnóstico de erros, logs e FAQ. |
 | 🗺️ **Futuro** | [[17. Roadmap e Guia de Contribuição\|17.-Roadmap-e-Guia-de-Contribuicao]] | Próximas versões, suíte de testes pytest e diretrizes para pull requests. |
+| 📖 **Glossário** | [[18. Glossário Visual e Terminologia\|18.-Glossario-Visual-e-Terminologia]] | Dicionário visual de termos NLE, IA, biometria facial, acústica e intercâmbio com mais de 70 verbetes didáticos e diagramas. |
+
 
 ---
 

@@ -41,3 +41,5 @@
 * [[15. Arquitetura Técnica e API REST|15.-Arquitetura-Tecnica-e-API-REST]]
 * [[16. Solução de Problemas e FAQ|16.-Solucao-de-Problemas-e-FAQ]]
 * [[17. Roadmap e Guia de Contribuição|17.-Roadmap-e-Guia-de-Contribuicao]]
+* [[18. Glossário Visual e Terminologia|18.-Glossario-Visual-e-Terminologia]]
+

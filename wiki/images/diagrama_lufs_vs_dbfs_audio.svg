@@ -1,0 +1,298 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 500" width="100%" height="100%">
+  <defs>
+    <!-- Gradiente de Fundo Dark Glassmorphism -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0d0d12"/>
+      <stop offset="100%" stop-color="#14141f"/>
+    </linearGradient>
+
+    <!-- Gradientes de Cards Internos -->
+    <linearGradient id="cardGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#181824"/>
+      <stop offset="100%" stop-color="#12121a"/>
+    </linearGradient>
+
+    <!-- Gradientes das Barras VU Meter -->
+    <linearGradient id="meterDbfsGrad" x1="0%" y1="100%" x2="0%" y2="0%">
+      <stop offset="0%" stop-color="#064e3b"/>
+      <stop offset="60%" stop-color="#10b981"/>
+      <stop offset="85%" stop-color="#f59e0b"/>
+      <stop offset="97%" stop-color="#f43f5e"/>
+      <stop offset="100%" stop-color="#ef4444"/>
+    </linearGradient>
+
+    <linearGradient id="meterLufsGrad" x1="0%" y1="100%" x2="0%" y2="0%">
+      <stop offset="0%" stop-color="#1e1b4b"/>
+      <stop offset="50%" stop-color="#047857"/>
+      <stop offset="75%" stop-color="#10b981"/>
+      <stop offset="88%" stop-color="#06b6d4"/>
+      <stop offset="96%" stop-color="#8b5cf6"/>
+      <stop offset="100%" stop-color="#f43f5e"/>
+    </linearGradient>
+
+    <linearGradient id="curveGlow" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#3b82f6"/>
+      <stop offset="50%" stop-color="#06b6d4"/>
+      <stop offset="100%" stop-color="#10b981"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Fundo Principal -->
+  <rect width="880" height="500" rx="14" fill="url(#bgGrad)" stroke="#27273a" stroke-width="1.5"/>
+
+  <!-- Título Superior & Subtítulo -->
+  <g transform="translate(30, 20)">
+    <rect x="0" y="0" width="8" height="28" rx="3" fill="#10b981"/>
+    <text x="18" y="16" fill="#f8fafc" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="16" font-weight="700" letter-spacing="0.5">PADRÕES DE MEDIÇÃO DE ÁUDIO • LUFS (PERCEPTIVO) vs dBFS / dBTP (ELÉTRICO)</text>
+    <text x="18" y="31" fill="#94a3b8" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11">Normatização EBU R128 &amp; ITU-R BS.1770: Ponderação K, alvo de diálogo no Talho (-16.0 LUFS) e teto de True Peak (-1.5 dBTP)</text>
+  </g>
+
+  <!-- ========================================================================= -->
+  <!-- COLUNA DA ESQUERDA: TERMÔMETROS COMPARATIVOS VERTICAIS                    -->
+  <!-- ========================================================================= -->
+  <g transform="translate(25, 65)">
+    <!-- Moldura Glass do Painel de Medidores -->
+    <rect width="400" height="415" rx="10" fill="url(#cardGrad)" stroke="#27273a" stroke-width="1.2"/>
+
+    <!-- Cabeçalho -->
+    <path d="M 1 11 Q 1 1 11 1 L 389 1 Q 399 1 399 11 L 399 28 L 1 28 Z" fill="#1e1e2d"/>
+    <line x1="0" y1="28" x2="400" y2="28" stroke="#2a2a3e" stroke-width="1"/>
+    <text x="16" y="19" fill="#10b981" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" font-weight="700" letter-spacing="0.5">ESCALA COMPARATIVA DE LOUDNESS &amp; PICOS</text>
+
+    <!-- Sub-títulos das duas colunas de medição -->
+    <text x="65" y="48" fill="#f43f5e" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" font-weight="700" text-anchor="middle">dBFS / dBTP (Pico)</text>
+    <text x="65" y="60" fill="#64748b" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="8" text-anchor="middle">Tensão Elétrica Instantânea</text>
+
+    <text x="175" y="48" fill="#06b6d4" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" font-weight="700" text-anchor="middle">LUFS / LKFS (Integrado)</text>
+    <text x="175" y="60" fill="#64748b" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="8" text-anchor="middle">Energia Sonora Percebida</text>
+
+    <!-- ÁREA DOS MEDIDORES VERTICAIS -->
+    <!-- Altura do display: Y = 70 (topo = +2 dB) até Y = 360 (base = -60 dB). Total = 290px -->
+    <!-- Mapeamento aproximado:
+         Y = 80  -> +0 dBFS / LUFS
+         Y = 95  -> -1.5 dBTP (Teto)
+         Y = 135 -> -6 dBFS
+         Y = 175 -> -14 LUFS (Spotify/YouTube)
+         Y = 195 -> -16 LUFS (ALVO TALHO)
+         Y = 245 -> -23 LUFS (TV Broadcast EBU R128)
+         Y = 310 -> -36 dB
+         Y = 350 -> -60 dB (Noise Floor)
+    -->
+
+    <!-- Régua Central de Decibéis (X=115 a X=125) -->
+    <g transform="translate(120, 0)">
+      <!-- Linhas e Rótulos -->
+      <line x1="-3" y1="80" x2="3" y2="80" stroke="#ef4444" stroke-width="1.5"/>
+      <text x="0" y="83" fill="#ef4444" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="9" font-weight="700" text-anchor="middle">0</text>
+
+      <line x1="-3" y1="95" x2="3" y2="95" stroke="#f59e0b" stroke-width="1"/>
+      <text x="0" y="98" fill="#f59e0b" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="8" font-weight="700" text-anchor="middle">-1.5</text>
+
+      <line x1="-3" y1="135" x2="3" y2="135" stroke="#64748b" stroke-width="1"/>
+      <text x="0" y="138" fill="#94a3b8" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="8" text-anchor="middle">-6</text>
+
+      <line x1="-3" y1="175" x2="3" y2="175" stroke="#64748b" stroke-width="1"/>
+      <text x="0" y="178" fill="#94a3b8" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="8" text-anchor="middle">-14</text>
+
+      <line x1="-3" y1="195" x2="3" y2="195" stroke="#10b981" stroke-width="1.5"/>
+      <text x="0" y="198" fill="#10b981" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="8" font-weight="700" text-anchor="middle">-16</text>
+
+      <line x1="-3" y1="245" x2="3" y2="245" stroke="#64748b" stroke-width="1"/>
+      <text x="0" y="248" fill="#94a3b8" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="8" text-anchor="middle">-23</text>
+
+      <line x1="-3" y1="300" x2="3" y2="300" stroke="#64748b" stroke-width="1"/>
+      <text x="0" y="303" fill="#64748b" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="8" text-anchor="middle">-36</text>
+
+      <line x1="-3" y1="350" x2="3" y2="350" stroke="#475569" stroke-width="1"/>
+      <text x="0" y="353" fill="#64748b" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="8" text-anchor="middle">-60</text>
+    </g>
+
+    <!-- Barra 1: dBFS / dBTP (X=50 a X=80, Largura 30px) -->
+    <!-- Canal de fundo escuro -->
+    <rect x="50" y="75" width="30" height="280" rx="3" fill="#0b0b10" stroke="#1f2937"/>
+    <!-- Preenchimento dinâmico subindo até -1.5 dBTP (Y=95 até Y=355, altura = 260px) -->
+    <rect x="52" y="95" width="26" height="258" rx="2" fill="url(#meterDbfsGrad)"/>
+    
+    <!-- Linha de Clipping em 0 dBFS -->
+    <line x1="45" y1="80" x2="85" y2="80" stroke="#ef4444" stroke-width="2"/>
+
+    <!-- Linha de Teto do Talho em -1.5 dBTP -->
+    <line x1="45" y1="95" x2="85" y2="95" stroke="#f59e0b" stroke-width="2.5"/>
+
+    <!-- Barra 2: LUFS / LKFS (X=160 a X=190, Largura 30px) -->
+    <!-- Canal de fundo escuro -->
+    <rect x="160" y="75" width="30" height="280" rx="3" fill="#0b0b10" stroke="#1f2937"/>
+    <!-- Preenchimento dinâmico subindo até -16 LUFS (Y=195 até Y=355, altura = 160px) -->
+    <rect x="162" y="195" width="26" height="158" rx="2" fill="url(#meterLufsGrad)"/>
+
+    <!-- Linha de Alvo do Talho em -16 LUFS -->
+    <line x1="155" y1="195" x2="195" y2="195" stroke="#10b981" stroke-width="2.5"/>
+
+    <!-- FAIXAS CONCEITUAIS E ANOTAÇÕES À DIREITA DO MEDIDOR (X=215 a X=385) -->
+    <!-- Zona de Clipping -->
+    <g transform="translate(210, 72)">
+      <rect x="0" y="0" width="175" height="20" rx="3" fill="#3f131f" stroke="#f43f5e" stroke-width="0.8"/>
+      <text x="8" y="14" fill="#fda4af" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="9" font-weight="700">🚨 &gt; 0 dBFS: CLIPPING / ONDA QUADRADA</text>
+    </g>
+
+    <!-- Zona True Peak Talho -->
+    <g transform="translate(210, 96)">
+      <rect x="0" y="0" width="175" height="28" rx="3" fill="#2d1c03" stroke="#f59e0b" stroke-width="0.8"/>
+      <text x="8" y="12" fill="#fde68a" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="9" font-weight="700">🛡️ -1.5 dBTP: TETO TALHO</text>
+      <text x="8" y="23" fill="#d97706" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="8">Evita clipping interamostral em codecs</text>
+    </g>
+
+    <!-- Zona de Alvo Talho (-16 LUFS) -->
+    <g transform="translate(210, 185)">
+      <rect x="0" y="0" width="175" height="36" rx="3" fill="#064e3b" stroke="#10b981" stroke-width="1.2"/>
+      <text x="8" y="14" fill="#a7f3d0" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" font-weight="700">🎯 -16.0 LUFS: ALVO TALHO</text>
+      <text x="8" y="27" fill="#6ee7b7" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="8">Diálogo de Documentário &amp; Internet</text>
+    </g>
+
+    <!-- Zona EBU R128 TV (-23 LUFS) -->
+    <g transform="translate(210, 235)">
+      <rect x="0" y="0" width="175" height="25" rx="3" fill="#1e1e2f" stroke="#8b5cf6" stroke-width="0.8"/>
+      <text x="8" y="12" fill="#c4b5fd" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="9" font-weight="600">📺 -23.0 LUFS: Padrão TV Broadcast</text>
+      <text x="8" y="21" fill="#94a3b8" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="7.5">Grande faixa dinâmica / Cinema</text>
+    </g>
+
+    <!-- Zona Piso de Ruído (-60 LUFS) -->
+    <g transform="translate(210, 338)">
+      <rect x="0" y="0" width="175" height="20" rx="3" fill="#0f172a" stroke="#334155" stroke-width="0.8"/>
+      <text x="8" y="13" fill="#94a3b8" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="8.5">🔇 &lt; -60 LUFS: Noise Floor (Silêncio)</text>
+    </g>
+
+    <!-- Rodapé explicativo do Painel -->
+    <g transform="translate(15, 370)">
+      <rect x="0" y="0" width="370" height="32" rx="4" fill="#13141f" stroke="#252538"/>
+      <text x="10" y="14" fill="#cbd5e1" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="9">
+        <tspan fill="#f59e0b" font-weight="700">Atenção:</tspan>
+        <tspan fill="#94a3b8"> O ouvido humano ignora picos elétricos rápidos de 1 milissegundo, mas percebe o volume contínuo integrado (LUFS).</tspan>
+      </text>
+      <text x="10" y="25" fill="#94a3b8" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="8">O medidor de dBFS mede volts; o medidor LUFS mede a percepção psicoacústica real.</text>
+    </g>
+  </g>
+
+  <!-- ========================================================================= -->
+  <!-- COLUNA DA DIREITA: CURVA K-WEIGHTING & TRUE PEAK INTERSAMPLE             -->
+  <!-- ========================================================================= -->
+
+  <!-- CARD SUPERIOR: A CURVA DE PONDERAÇÃO K (K-WEIGHTING) -->
+  <g transform="translate(445, 65)">
+    <rect width="410" height="200" rx="10" fill="url(#cardGrad)" stroke="#27273a" stroke-width="1.2"/>
+    <path d="M 1 11 Q 1 1 11 1 L 399 1 Q 409 1 409 11 L 409 26 L 1 26 Z" fill="#1e1e2d"/>
+    <line x1="0" y1="26" x2="410" y2="26" stroke="#2a2a3e" stroke-width="1"/>
+    
+    <text x="14" y="18" fill="#06b6d4" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" font-weight="700" letter-spacing="0.5">CURVA K-WEIGHTING (FILTRO BIOLÓGICO HUMANO)</text>
+
+    <!-- Gráfico de Resposta em Frequência (X=40 a X=380, Y=50 a Y=150) -->
+    <g transform="translate(20, 38)">
+      <!-- Eixos -->
+      <line x1="30" y1="100" x2="360" y2="100" stroke="#334155" stroke-width="1"/>
+      <line x1="30" y1="20" x2="30" y2="100" stroke="#334155" stroke-width="1"/>
+
+      <!-- Rótulos de dB no eixo Y -->
+      <text x="25" y="35" fill="#94a3b8" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="8" text-anchor="end">+4 dB</text>
+      <text x="25" y="65" fill="#94a3b8" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="8" text-anchor="end">0 dB</text>
+      <text x="25" y="95" fill="#94a3b8" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="8" text-anchor="end">-8 dB</text>
+
+      <!-- Linhas de grade sutis -->
+      <line x1="30" y1="65" x2="360" y2="65" stroke="#1f293d" stroke-width="0.8" stroke-dasharray="2,2"/>
+      <line x1="30" y1="35" x2="360" y2="35" stroke="#1f293d" stroke-width="0.8" stroke-dasharray="2,2"/>
+
+      <!-- Frequências no eixo X -->
+      <text x="45" y="112" fill="#64748b" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="8" text-anchor="middle">20 Hz</text>
+      <text x="110" y="112" fill="#64748b" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="8" text-anchor="middle">100 Hz</text>
+      <text x="200" y="112" fill="#64748b" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="8" text-anchor="middle">1 kHz</text>
+      <text x="280" y="112" fill="#64748b" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="8" text-anchor="middle">4 kHz</text>
+      <text x="345" y="112" fill="#64748b" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="8" text-anchor="middle">20 kHz</text>
+
+      <!-- Curva K propriamente dita:
+           Começa atenuada em graves (-8dB em 20Hz: y=95),
+           Passa por ~100Hz subindo (y=65),
+           Mantém flat até 1kHz (y=65),
+           Sobe em High-Shelf até +4dB em 3-4kHz (y=35),
+           Segue em +4dB até 20kHz (y=35)
+      -->
+      <path d="M 45 95 C 75 90, 100 70, 130 65 L 190 65 C 230 65, 250 35, 290 35 L 345 35"
+            fill="none" stroke="url(#curveGlow)" stroke-width="3"/>
+
+      <!-- Destaque 1: Atenuação de Graves (Filtro Passa-Altas) -->
+      <circle cx="85" cy="80" r="4" fill="#f43f5e"/>
+      <text x="85" y="25" fill="#f43f5e" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="8" font-weight="700" text-anchor="middle">1. Passa-Altas (&lt;100Hz)</text>
+      <text x="85" y="34" fill="#94a3b8" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="7" text-anchor="middle">Corta graves imperceptíveis</text>
+
+      <!-- Destaque 2: Reforço de Agudos (High-Shelf) -->
+      <circle cx="290" cy="35" r="4" fill="#10b981"/>
+      <text x="290" y="15" fill="#10b981" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="8" font-weight="700" text-anchor="middle">2. High-Shelf (+4 dB)</text>
+      <text x="290" y="24" fill="#94a3b8" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="7" text-anchor="middle">Simula ressonância da cabeça</text>
+    </g>
+
+    <!-- Resumo conceitual inferior -->
+    <text x="20" y="180" fill="#94a3b8" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="8.5">
+      <tspan fill="#06b6d4" font-weight="700">Por que o K-Weighting é revolucionário?</tspan>
+      <tspan> Porque impede que uma batida de bumbo infle o volume medido, focando na faixa vocal onde reside a inteligibilidade da fala humana.</tspan>
+    </text>
+  </g>
+
+  <!-- CARD INFERIOR: INTERSAMPLE CLIPPING & TRUE PEAK -->
+  <g transform="translate(445, 280)">
+    <rect width="410" height="200" rx="10" fill="url(#cardGrad)" stroke="#27273a" stroke-width="1.2"/>
+    <path d="M 1 11 Q 1 1 11 1 L 409 1 Q 409 1 409 11 L 409 26 L 1 26 Z" fill="#1e1e2d"/>
+    <line x1="0" y1="26" x2="410" y2="26" stroke="#2a2a3e" stroke-width="1"/>
+    
+    <text x="14" y="18" fill="#f59e0b" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" font-weight="700" letter-spacing="0.5">O PERIGO DOS PICOS ENTRE AMOSTRAS (TRUE PEAK dBTP)</text>
+
+    <!-- Ilustração de Reconstrução Analógica e Intersample Peak -->
+    <g transform="translate(20, 36)">
+      <!-- Linha vermelha de 0 dBFS (Teto Digital de Amostragem) -->
+      <line x1="20" y1="42" x2="350" y2="42" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="4,4"/>
+      <text x="355" y="45" fill="#ef4444" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="8" font-weight="700">0 dBFS (Limite Digital)</text>
+
+      <!-- Linha verde de Teto True Peak Talho (-1.5 dBTP) -->
+      <line x1="20" y1="58" x2="350" y2="58" stroke="#10b981" stroke-width="1.5"/>
+      <text x="355" y="61" fill="#10b981" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="8" font-weight="700">-1.5 dBTP (Margem Talho)</text>
+
+      <!-- Onda analógica contínua reconstruída (passa pelo topo e fura o teto de 0 dBFS!) -->
+      <path d="M 30 90 Q 75 10 120 70 T 210 25 T 300 80" fill="none" stroke="#f43f5e" stroke-width="2.5"/>
+
+      <!-- Pontos discretos de amostragem PCM (Amostras digitais) -->
+      <!-- Amostra 1 (segura): cx=55, cy=46 -->
+      <circle cx="55" cy="46" r="4" fill="#06b6d4" stroke="#ffffff" stroke-width="1"/>
+      <line x1="55" y1="46" x2="55" y2="105" stroke="#06b6d4" stroke-width="1" stroke-dasharray="2,2"/>
+
+      <!-- Amostra 2 (segura): cx=95, cy=46 -->
+      <circle cx="95" cy="46" r="4" fill="#06b6d4" stroke="#ffffff" stroke-width="1"/>
+      <line x1="95" y1="46" x2="95" y2="105" stroke="#06b6d4" stroke-width="1" stroke-dasharray="2,2"/>
+
+      <!-- O PICO ANALÓGICO QUE FURA O 0 dBFS (Intersample Peak) -->
+      <path d="M 75 25 L 75 12" stroke="#f43f5e" stroke-width="1.5"/>
+      <rect x="35" y="0" width="80" height="14" rx="2" fill="#450a0a" stroke="#f43f5e" stroke-width="0.8"/>
+      <text x="75" y="10" fill="#fca5a5" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="7.5" font-weight="700" text-anchor="middle">Pico Intersample!</text>
+
+      <!-- Amostra 3: cx=190, cy=38 -->
+      <circle cx="190" cy="38" r="4" fill="#06b6d4" stroke="#ffffff" stroke-width="1"/>
+
+      <!-- Amostra 4: cx=230, cy=38 -->
+      <circle cx="230" cy="38" r="4" fill="#06b6d4" stroke="#ffffff" stroke-width="1"/>
+
+      <!-- Explicação das bolinhas -->
+      <circle cx="30" cy="120" r="3" fill="#06b6d4"/>
+      <text x="38" y="123" fill="#94a3b8" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="8">Amostras Digitais (Sample Peaks: -0.2 dBFS aparente)</text>
+
+      <line x1="220" y1="120" x2="235" y2="120" stroke="#f43f5e" stroke-width="2"/>
+      <text x="240" y="123" fill="#fca5a5" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="8">Onda Analógica Real (+0.8 dBTP distorcido!)</text>
+    </g>
+
+    <!-- Resumo didático inferior -->
+    <g transform="translate(14, 150)">
+      <rect x="0" y="0" width="380" height="38" rx="4" fill="#13141f" stroke="#252538"/>
+      <text x="10" y="14" fill="#cbd5e1" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="8.5">
+        <tspan fill="#10b981" font-weight="700">Por que o Talho usa -1.5 dBTP no Limiter?</tspan>
+      </text>
+      <text x="10" y="27" fill="#94a3b8" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="8">
+        Ao codificar para MP3/AAC no YouTube/Instagram, a compressão reconstrói a onda e gera distorção áspera se não houver 1.5 dB de margem de segurança.
+      </text>
+    </g>
+  </g>
+</svg>
