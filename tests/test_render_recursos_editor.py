@@ -324,7 +324,11 @@ def test_camada_de_ajuste_propaga_efeitos_no_render():
 
 
 def test_blend_modes_color_matte_e_clipes():
-    """Valida mapeamento de blend modes para blend=all_mode=... no render FFmpeg."""
+    """Blend mode vira lut2 com a formula W3C, em RGB, sobre o que esta embaixo.
+
+    O filtro `blend` do ffmpeg ignora o alfa (fade e opacidade sumiam) e o
+    softlight dele nao e o do navegador: nao pode aparecer no grafo.
+    """
     base = _video("v1", 0.0, 0.0, 5.0, pista="V1")
     matte_mult = {
         "id": "matte_mult", "type": "color_matte", "kind": "color_matte",
@@ -335,9 +339,10 @@ def test_blend_modes_color_matte_e_clipes():
     }
     r = _render([base, matte_mult])
     fc = r["video"]["filter_complex"]
-    assert "blend=all_mode=multiply" in fc
+    assert "blend=all_mode=" not in fc
+    assert grafo_video._filtro_lut2_blend("multiply") in fc
 
-    # Teste de modo soft-light mapeado para softlight
+    # soft-light (nome CSS) e o apelido antigo "softlight" caem na mesma formula
     matte_soft = {
         "id": "matte_soft", "type": "color_matte", "kind": "color_matte",
         "color": "#0000FF", "color_name": "Azul",
@@ -347,7 +352,9 @@ def test_blend_modes_color_matte_e_clipes():
     }
     r2 = _render([base, matte_soft])
     fc2 = r2["video"]["filter_complex"]
-    assert "blend=all_mode=softlight" in fc2
+    assert "blend=all_mode=" not in fc2
+    assert grafo_video._filtro_lut2_blend("soft-light") in fc2
+    assert grafo_video.mapear_blend_mode("softlight") == "soft-light"
 
 
 def test_color_matte_nao_gera_aviso_sem_referencia_de_midia():

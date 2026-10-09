@@ -25,6 +25,12 @@ aparece), fotos, fade por clipe (o alfa compoe contra o que esta embaixo:
 dissolvencia com clipe embaixo, fade para preto sem) e a ordem das pistas
 (`pistas_video()` devolve topo->fundo; empilha com reversed()).
 
+Mesclagem (blend mode != normal) NAO passa pela camada da pista: o player
+mescla com tudo o que esta embaixo, entao o clipe e composto direto no
+acumulado, so na janela dele (`_compor_em_janela` + `_corpo_blend`): lut2 com
+a formula W3C em RGB e o alfa do clipe, para fade e opacidade continuarem
+valendo. Camada de ajuste com mesclagem usa o mesmo caminho.
+
 Decisoes e paridades registradas:
 
 - P4/P1: quem chama passa os clipes JA resolvidos por `seq.clipes_da_pista()`
@@ -56,30 +62,70 @@ Decisoes e paridades registradas:
   caminho de midia (isso e trabalho do `midia.py`): `caminho` sai None e o C
   preenche a partir dos ids. Relatado ao integrador.
 """
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
-from . import cor, fade, geometria
+from . import cor, fade, geometria, modelo
 
 _EPS_TEMPO = 1e-6
 
-BLEND_MODES_FFMPEG = {
-    "normal": "normal",
-    "multiply": "multiply",
-    "screen": "screen",
-    "overlay": "overlay",
-    "darken": "darken",
-    "lighten": "lighten",
-    "soft-light": "softlight",
-    "softlight": "softlight",
-    "difference": "difference",
+# Modos de mesclagem = formulas da W3C (Compositing and Blending Level 1), as
+# mesmas do mix-blend-mode do player e do globalCompositeOperation do
+# renderCache. Uma expressao por canal para o `lut2` em gbrap: x = fundo (Cb),
+# y = clipe (Cs), 8 bits. Nao usar o filtro `blend` do ffmpeg: ele ignora o
+# alfa (fade e opacidade sumiam), roda em YUV quando nao forcado e o softlight
+# dele e outra formula (medido no ffmpeg 5.1 em 09/10/2026: verde multiply
+# sobre vermelho dava (0,123,0) em vez de (0,38,0)).
+_SL_B = "(x/255)"
+_SL_S = "(y/255)"
+EXPR_BLEND = {
+    "multiply": "x*y/255",
+    "screen": "x+y-x*y/255",
+    # overlay e hard-light com os papeis trocados: overlay decide pelo FUNDO.
+    "overlay": "if(lte(x,127.5),2*x*y/255,255-2*(255-x)*(255-y)/255)",
+    "hard-light": "if(lte(y,127.5),2*x*y/255,255-2*(255-x)*(255-y)/255)",
+    "darken": "min(x,y)",
+    "lighten": "max(x,y)",
+    "difference": "abs(x-y)",
+    "exclusion": "x+y-2*x*y/255",
+    "soft-light": (
+        f"255*if(lte({_SL_S},0.5),"
+        f"{_SL_B}-(1-2*{_SL_S})*{_SL_B}*(1-{_SL_B}),"
+        f"{_SL_B}+(2*{_SL_S}-1)*(if(lte({_SL_B},0.25),"
+        f"((16*{_SL_B}-12)*{_SL_B}+4)*{_SL_B},sqrt({_SL_B}))-{_SL_B}))"
+    ),
+    "color-dodge": "if(eq(x,0),0,if(eq(y,255),255,min(255,255*x/(255-y))))",
+    "color-burn": "if(eq(x,255),255,if(eq(y,0),0,255-min(255,255*(255-x)/y)))",
+}
+_APELIDOS_BLEND = {
+    "softlight": "soft-light",
+    "hardlight": "hard-light",
+    "colordodge": "color-dodge",
+    "colorburn": "color-burn",
 }
 
 
 def mapear_blend_mode(modo: Optional[str]) -> str:
+    """Nome CSS do modo, ou "normal" quando o motor nao o reproduz.
+
+    Os modos nao separaveis do CSS (hue, saturation, color, luminosity) nao
+    cabem numa tabela por canal e caem em normal.
+    """
     if not modo:
         return "normal"
     modo_norm = str(modo).strip().lower()
-    return BLEND_MODES_FFMPEG.get(modo_norm, "normal")
+    modo_norm = _APELIDOS_BLEND.get(modo_norm, modo_norm)
+    return modo_norm if modo_norm in EXPR_BLEND else "normal"
+
+
+def _filtro_lut2_blend(modo: str) -> str:
+    """lut2 que entrega B(fundo, clipe) nas cores e o alfa do CLIPE.
+
+    O fundo e opaco (alfa 255), entao c3 = y devolve o alfa do clipe -- fade,
+    opacidade e areas transparentes -- para o overlay seguinte compor
+    (1 - a) * fundo + a * B(fundo, clipe), como o navegador.
+    """
+    e = f"clip(round({EXPR_BLEND[modo]}),0,255)"
+    return f"lut2=c0='{e}':c1='{e}':c2='{e}':c3='y'"
 
 
 def _n(valor: float) -> str:
@@ -87,6 +133,21 @@ def _n(valor: float) -> str:
     if texto in ("", "-", "-0"):
         return "0"
     return texto
+
+
+def _enable_janela(ini: float, fim: float, fps: float) -> str:
+    """`enable` do overlay para um clipe que ocupa [ini, fim) no render.
+
+    O player mostra o clipe em `frame >= inicio && frame < inicio + duracao`.
+    `between(t,ini,fim)` e fechado nas duas pontas e o overlay repete o ultimo
+    quadro do clipe depois do EOF (eof_action=repeat): o clipe ganhava um
+    quadro a mais no fim (medido em 09/10/2026: cor solida ainda na tela no
+    quadro em que ja tinha acabado). Meio quadro de folga nas duas pontas
+    inclui o primeiro quadro e exclui o seguinte ao ultimo, sem depender de
+    t cair exatamente no decimal.
+    """
+    meio = 0.5 / float(fps)
+    return f"enable='between(t,{_n(ini - meio)},{_n(fim - meio)})'"
 
 
 def _col(rotulo: str) -> str:
@@ -404,7 +465,10 @@ def cadeia_clipe(clipe, seq, escopo, rotulo_entrada, rotulo_saida,
             linear.extend(filtros_tf)
 
     if deslocamento_camada is not None and abs(float(deslocamento_camada)) > 0:
-        linear.append(f"setpts=PTS+{_n(deslocamento_camada)}/TB")
+        # round(): o setpts TRUNCA o resultado. Na cor solida o time base e
+        # 1/fps, e 1.033333333 s a 30 fps virava 30,99999 -> quadro 30, um
+        # quadro adiantado (fade e fim do clipe deslocados).
+        linear.append(f"setpts=PTS+round({_n(deslocamento_camada)}/TB)")
 
     # Sem filtro nenhum o rotulo de entrada encostaria no de saida ("[a][b]"),
     # que tambem e grafo invalido: `null` e a passagem explicita.
@@ -658,110 +722,318 @@ def camada_pista(pista, clipes, seq, escopo, inicio_s: float, fim_s: float,
 
     pares_com_trans = _transicoes_da_pista(clipes, escopo)
     for i, (c_orig, transicoes) in enumerate(pares_com_trans):
-        c, tpad_start_s, tpad_stop_s = _estender(c_orig, transicoes)
-        ini = max(c.inicio_s, inicio_s)
-        fim = min(c.fim_s, fim_s)
-        if fim - ini <= _EPS_TEMPO:
-            continue  # fora da faixa pedida
-        if c.e_ajuste:
+        if c_orig.e_ajuste:
             continue  # camadas de ajuste sao compostas no grafo_completo sobre o acumulado
-        usada = True
-        delta = ini - c.inicio_s          # pedaco aparado no comeco (regra P4 / render range)
-        loc = ini - inicio_s              # instante do clipe DENTRO da camada
-        dur_total = fim - ini
-
-        # Determina quanto de tpad é ativo dentro da janela de render
-        tpad_start_ativo = max(0.0, tpad_start_s - delta) if delta < tpad_start_s else 0.0
-        delta_midia = max(0.0, delta - tpad_start_s)
-        tpad_stop_ativo = max(0.0, tpad_stop_s - max(0.0, c.fim_s - fim))
-        dur_midia = max(0.0, dur_total - tpad_start_ativo - tpad_stop_ativo)
-
-        if c.e_color_matte:
-            cor_val = normalizar_cor_lavfi(c.cor)
-            rot_cor = f"{prefixo}c{i}_cor"
-            declaracoes.append(
-                f"color=c={cor_val}:s={w}x{h}:r={_n(seq.fps)}:d={_n(dur_total)}{_col(rot_cor)}"
-            )
-            sai = f"{prefixo}c{i}s"
-            cadeia, (ox, oy) = cadeia_clipe(
-                c, seq, escopo, _col(rot_cor), _col(sai),
-                delta_tempo=delta, duracao_stream=dur_total,
-                deslocamento_camada=loc,
-            )
-            declaracoes.append(cadeia)
-
-            depois = f"{prefixo}c{i}l"
-            modo_blend = mapear_blend_mode(getattr(c, "blend_mode", "normal"))
-            if modo_blend != "normal":
-                declaracoes.append(
-                    f"{_col(acumulado)}{_col(sai)}"
-                    f"blend=all_mode={modo_blend}:"
-                    f"enable='between(t,{_n(loc)},{_n(loc + dur_total)})'"
-                    f"{_col(depois)}"
-                )
-            else:
-                declaracoes.append(
-                    f"{_col(acumulado)}{_col(sai)}"
-                    f"overlay=x={_n(ox)}:y={_n(oy)}:"
-                    f"enable='between(t,{_n(loc)},{_n(loc + dur_total)})'"
-                    f"{_col(depois)}"
-                )
-            acumulado = depois
+        if mapear_blend_mode(c_orig.blend_mode) != "normal":
+            # Mesclagem age sobre TUDO o que esta embaixo, nao sobre esta camada
+            # transparente: grafo_completo compoe o clipe direto no acumulado.
             continue
-
-        # O rotulo de entrada e o INDICE REAL do input, nao um simbolo: o k-esimo
-        # item de `entradas` vira o k-esimo -i do lado do pacote C, e o grafo tem
-        # de apontar para ele como "[N:v]". Com rotulo simbolico o ffmpeg trata o
-        # pad como desconectado, inventa streams de saida soltos e o encode morre
-        # com "Could not open encoder before EOF" (medido em 24/08/2026).
-        ent = f"{indice_base + len(entradas)}:v"
-        sai = f"{prefixo}c{i}s"
-        cadeia, (ox, oy) = cadeia_clipe(
-            c, seq, escopo, _col(ent), _col(sai),
-            delta_tempo=delta, duracao_stream=dur_total,
-            deslocamento_camada=loc,
-            tpad_start_s=tpad_start_ativo,
-            tpad_stop_s=tpad_stop_ativo,
+        fonte = _fonte_do_clipe(
+            c_orig, transicoes, pista, seq, escopo, inicio_s, fim_s,
+            rotulo=f"{prefixo}c{i}", indice_entrada=indice_base + len(entradas),
         )
-        declaracoes.append(cadeia)
+        if fonte is None:
+            continue  # fora da faixa pedida
+        usada = True
+        declaracoes.extend(fonte["declaracoes"])
+        ox, oy = fonte["offset"]
+        loc, dur_total = fonte["loc"], fonte["dur"]
 
         depois = f"{prefixo}c{i}l"
-        modo_blend = mapear_blend_mode(getattr(c, "blend_mode", "normal"))
-        if modo_blend != "normal":
-            declaracoes.append(
-                f"{_col(acumulado)}{_col(sai)}"
-                f"blend=all_mode={modo_blend}:"
-                f"enable='between(t,{_n(loc)},{_n(loc + dur_total)})'"
-                f"{_col(depois)}"
-            )
-        else:
-            declaracoes.append(
-                f"{_col(acumulado)}{_col(sai)}"
-                f"overlay=x={_n(ox)}:y={_n(oy)}:"
-                f"enable='between(t,{_n(loc)},{_n(loc + dur_total)})'"
-                f"{_col(depois)}"
-            )
+        declaracoes.append(
+            f"{_col(acumulado)}{_col(fonte['rotulo'])}"
+            f"overlay=x={_n(ox)}:y={_n(oy)}:"
+            f"{_enable_janela(loc, loc + dur_total, seq.fps)}"
+            f"{_col(depois)}"
+        )
         acumulado = depois
-
-        # Trecho da FONTE que cobre a janela (velocidade e reverso inclusos).
-        if dur_midia > _EPS_TEMPO:
-            ss_fonte, t_fonte = c.trecho_fonte(delta_midia, dur_midia)
-        else:
-            ss_fonte, t_fonte = c.trecho_fonte(0.0, modelo.JANELA_QUADRO_CONGELADO_S)
-
-        entradas.append({
-            "tipo": "foto" if c.e_foto else "video",
-            "caminho": None,             # midia.py resolve; ver docstring
-            "ss": round(ss_fonte, 6),
-            "t": round(t_fonte, 6),
-            "loop": bool(c.e_foto),
-            "clipe_id": c.id,
-            "video_id": c.video_id,
-            "photo_id": c.photo_id,
-            "pista_id": pista.id,
-        })
+        if fonte["entrada"] is not None:
+            entradas.append(fonte["entrada"])
 
     return declaracoes, acumulado, entradas, usada
+
+
+def _fonte_do_clipe(c_orig, transicoes, pista, seq, escopo, inicio_s: float, fim_s: float,
+                    rotulo: str, indice_entrada: int,
+                    deslocamento: Optional[Callable[[float], float]] = None
+                    ) -> Optional[Dict[str, Any]]:
+    """Cadeia de um clipe de video, foto ou cor solida, pronta para compor.
+
+    Devolve None quando o clipe nao toca a faixa pedida; senao um dict com
+    `declaracoes`, `rotulo` (saida da cadeia), `offset` (x, y na moldura),
+    `loc`/`dur` (janela no tempo do render) e `entrada` (o -i que a cadeia
+    consome, ou None na cor solida, que nasce de um `color` no proprio grafo).
+
+    `deslocamento(loc)` diz onde o clipe comeca no stream de destino; o padrao
+    e `loc` (camada da pista, que tem a duracao inteira do render).
+    """
+    w, h = int(seq.largura), int(seq.altura)
+    c, tpad_start_s, tpad_stop_s = _estender(c_orig, transicoes)
+    ini = max(c.inicio_s, inicio_s)
+    fim = min(c.fim_s, fim_s)
+    if fim - ini <= _EPS_TEMPO:
+        return None
+    delta = ini - c.inicio_s          # pedaco aparado no comeco (regra P4 / render range)
+    loc = ini - inicio_s              # instante do clipe DENTRO da camada
+    dur_total = fim - ini
+    desloc = deslocamento(loc) if deslocamento else loc
+
+    # Determina quanto de tpad é ativo dentro da janela de render
+    tpad_start_ativo = max(0.0, tpad_start_s - delta) if delta < tpad_start_s else 0.0
+    delta_midia = max(0.0, delta - tpad_start_s)
+    tpad_stop_ativo = max(0.0, tpad_stop_s - max(0.0, c.fim_s - fim))
+    dur_midia = max(0.0, dur_total - tpad_start_ativo - tpad_stop_ativo)
+
+    declaracoes: List[str] = []
+    sai = f"{rotulo}s"
+    if c.e_color_matte:
+        rot_cor = f"{rotulo}_cor"
+        declaracoes.append(
+            f"color=c={normalizar_cor_lavfi(c.cor)}:s={w}x{h}:r={_n(seq.fps)}:"
+            f"d={_n(dur_total)}{_col(rot_cor)}"
+        )
+        cadeia, offset = cadeia_clipe(
+            c, seq, escopo, _col(rot_cor), _col(sai),
+            delta_tempo=delta, duracao_stream=dur_total,
+            deslocamento_camada=desloc,
+        )
+        declaracoes.append(cadeia)
+        return {"declaracoes": declaracoes, "rotulo": sai, "offset": offset,
+                "loc": loc, "dur": dur_total, "entrada": None}
+
+    # O rotulo de entrada e o INDICE REAL do input, nao um simbolo: o k-esimo
+    # item de `entradas` vira o k-esimo -i do lado do pacote C, e o grafo tem
+    # de apontar para ele como "[N:v]". Com rotulo simbolico o ffmpeg trata o
+    # pad como desconectado, inventa streams de saida soltos e o encode morre
+    # com "Could not open encoder before EOF" (medido em 24/08/2026).
+    ent = f"{indice_entrada}:v"
+    cadeia, offset = cadeia_clipe(
+        c, seq, escopo, _col(ent), _col(sai),
+        delta_tempo=delta, duracao_stream=dur_total,
+        deslocamento_camada=desloc,
+        tpad_start_s=tpad_start_ativo,
+        tpad_stop_s=tpad_stop_ativo,
+    )
+    declaracoes.append(cadeia)
+
+    # Trecho da FONTE que cobre a janela (velocidade e reverso inclusos).
+    if dur_midia > _EPS_TEMPO:
+        ss_fonte, t_fonte = c.trecho_fonte(delta_midia, dur_midia)
+    else:
+        ss_fonte, t_fonte = c.trecho_fonte(0.0, modelo.JANELA_QUADRO_CONGELADO_S)
+
+    entrada = {
+        "tipo": "foto" if c.e_foto else "video",
+        "caminho": None,             # midia.py resolve; ver docstring
+        "ss": round(ss_fonte, 6),
+        "t": round(t_fonte, 6),
+        "loop": bool(c.e_foto),
+        "clipe_id": c.id,
+        "video_id": c.video_id,
+        "photo_id": c.photo_id,
+        "pista_id": pista.id,
+    }
+    return {"declaracoes": declaracoes, "rotulo": sai, "offset": offset,
+            "loc": loc, "dur": dur_total, "entrada": entrada}
+
+
+# ---------------------------------------------------------------------------
+# Mesclagem (blend mode): composicao numa janela do acumulado
+# ---------------------------------------------------------------------------
+
+def _compor_em_janela(acumulado: str, loc: float, dur: float, dur_render: float,
+                      fps: float, pfx: str,
+                      corpo: Callable[[str, float, float], Tuple[List[str], str]]
+                      ) -> Tuple[List[str], str]:
+    """Reprocessa so a janela [loc, loc + dur] do acumulado e devolve o novo.
+
+    O acumulado e partido em cabeca | janela | cauda (trim) e remontado com
+    concat. So a janela passa pelo `corpo`; o resto segue intocado, sem
+    conversao de formato. Os pedacos andam juntos: o concat consome a cabeca
+    enquanto os outros trims descartam os mesmos quadros, entao nada se acumula
+    na memoria -- ao contrario de split + trim + overlay de volta, em que o
+    framesync do overlay segura todos os quadros ate o comeco da janela.
+
+    `corpo(rotulo_janela, inicio_relativo, duracao_clipe, duracao_janela)`
+    recebe a janela com o tempo zerado (0 = inicio da janela), devolve
+    (declaracoes, rotulo) e precisa entregar a MESMA quantidade de quadros.
+    `inicio_relativo` e onde o clipe comeca dentro da janela (0, salvo quando a
+    cabeca foi absorvida).
+
+    Pedaco de 1 quadro no concat estraga o relogio (ffmpeg 5.1 estima a
+    duracao do segmento pela media dos intervalos: com 1 quadro da zero, o
+    quadro seguinte repete o PTS e tudo depois atrasa um quadro). Por isso
+    cabeca curta demais entra na janela, e janela curta demais engole a cauda.
+    """
+    fps = float(fps)
+    q = lambda s: int(round(float(s) * fps))   # noqa: E731 -- quadro do grid do render
+    ws, we = float(loc), float(loc) + float(dur)
+    if q(ws) < 2:
+        ws = 0.0
+    tem_cauda = q(dur_render) - q(we) >= 1
+    if tem_cauda and q(we) - q(ws) < 2:
+        tem_cauda = False
+    if not tem_cauda:
+        we = float(dur_render)
+
+    declaracoes: List[str] = []
+    pecas: List[str] = []
+    rot_janela = f"{pfx}_jan"
+    if ws > 0.0 or tem_cauda:
+        saidas = ([f"{pfx}_p0"] if ws > 0.0 else []) + [f"{pfx}_p1"] + (
+            [f"{pfx}_p2"] if tem_cauda else [])
+        declaracoes.append(f"{_col(acumulado)}split={len(saidas)}" + "".join(_col(s) for s in saidas))
+        if ws > 0.0:
+            declaracoes.append(f"[{pfx}_p0]trim=end={_n(ws)},setpts=PTS-STARTPTS[{pfx}_q0]")
+            pecas.append(f"{pfx}_q0")
+        limites = []
+        if ws > 0.0:
+            limites.append(f"start={_n(ws)}")
+        if tem_cauda:
+            limites.append(f"end={_n(we)}")
+        declaracoes.append(
+            f"[{pfx}_p1]trim={':'.join(limites)},setpts=PTS-STARTPTS{_col(rot_janela)}")
+    else:
+        declaracoes.append(f"{_col(acumulado)}setpts=PTS-STARTPTS{_col(rot_janela)}")
+
+    linhas, rot_corpo = corpo(rot_janela, float(loc) - ws, float(dur), we - ws)
+    declaracoes.extend(linhas)
+    pecas.append(_sem_colchete(rot_corpo))
+
+    if tem_cauda:
+        declaracoes.append(f"[{pfx}_p2]trim=start={_n(we)},setpts=PTS-STARTPTS[{pfx}_q2]")
+        pecas.append(f"{pfx}_q2")
+
+    # O concat devolve o relogio em microssegundos; as camadas de cima compoem
+    # por PTS contra fontes em 1/fps, e um arredondamento de 1 us ali ja pegaria
+    # o quadro anterior. settb devolve o mesmo time base do `color` de fundo.
+    saida = f"{pfx}_out"
+    junta = (f"concat=n={len(pecas)}:v=1:a=0," if len(pecas) > 1 else "")
+    declaracoes.append(
+        "".join(_col(p) for p in pecas) + f"{junta}settb=expr=1/{_n(fps)}{_col(saida)}"
+    )
+    return declaracoes, saida
+
+
+def _corpo_blend(modo: str, pfx: str, fps: float, fonte_rgba, copia_do_fundo: bool = False):
+    """Corpo de janela que mescla a fonte sobre o fundo como o navegador.
+
+    fundo -> gbrap; fonte (tela cheia, com alfa) -> gbrap; lut2 com a formula
+    do modo nas cores e o alfa da fonte; overlay do resultado sobre o fundo:
+    (1 - a) * fundo + a * B(fundo, fonte). Tudo em RGB: em YUV o multiply
+    multiplica croma e a cor desanda.
+
+    `fonte_rgba(ini_rel, dur_clipe, dur_jan, rotulo_copia)` monta a fonte;
+    com `copia_do_fundo` ela recebe uma terceira copia da janela (camada de
+    ajuste, cuja fonte e o proprio fundo filtrado). O overlay final so vale na
+    duracao do clipe: quando a janela absorveu cabeca ou cauda, o resto passa.
+    """
+    def corpo(rot_janela: str, ini_rel: float, dur_clipe: float, dur_jan: float):
+        n = 3 if copia_do_fundo else 2
+        linhas = [f"{_col(rot_janela)}split={n}[{pfx}_w1][{pfx}_w2]"
+                  + (f"[{pfx}_w3]" if copia_do_fundo else ""),
+                  f"[{pfx}_w1]format=gbrap[{pfx}_bd]"]
+        fonte_linhas, rot_fonte = fonte_rgba(
+            ini_rel, dur_clipe, dur_jan, f"{pfx}_w3" if copia_do_fundo else None)
+        linhas.extend(fonte_linhas)
+        linhas.append(f"[{pfx}_bd]{_col(rot_fonte)}{_filtro_lut2_blend(modo)}[{pfx}_bl]")
+        linhas.append(
+            f"[{pfx}_w2][{pfx}_bl]overlay=x=0:y=0:eof_action=pass:"
+            f"{_enable_janela(ini_rel, ini_rel + dur_clipe, fps)},"
+            f"format=yuv420p[{pfx}_mix]")
+        return linhas, f"{pfx}_mix"
+    return corpo
+
+
+def compor_clipe_com_blend(c_orig, transicoes, pista, seq, escopo, acumulado: str,
+                           inicio_s: float, fim_s: float, pfx: str, indice_entrada: int
+                           ) -> Optional[Tuple[List[str], str, Optional[Dict[str, Any]]]]:
+    """Clipe com mix-blend-mode -> (declaracoes, novo_acumulado, entrada).
+
+    O fundo e tudo o que ja foi composto (pistas de baixo sobre o preto), o
+    mesmo backdrop do player. O clipe e posto numa tela transparente do
+    tamanho do quadro (transform/crop/fit inclusos) que cobre a janela inteira,
+    entao fora do clipe o alfa e zero e o fundo passa intacto.
+    """
+    w, h = int(seq.largura), int(seq.altura)
+    modo = mapear_blend_mode(c_orig.blend_mode)
+    dur_render = float(fim_s) - float(inicio_s)
+
+    # Sonda da janela: a cadeia de verdade so e montada dentro do corpo, quando
+    # ja se sabe quanto do comeco da janela a cabeca absorvida ocupa.
+    previa = _fonte_do_clipe(c_orig, transicoes, pista, seq, escopo, inicio_s, fim_s,
+                             rotulo=f"{pfx}c", indice_entrada=indice_entrada)
+    if previa is None:
+        return None
+    resultado: Dict[str, Any] = {}
+
+    def fonte_rgba(ini_rel: float, _dur_clipe: float, dur_jan: float, _copia):
+        fonte = _fonte_do_clipe(
+            c_orig, transicoes, pista, seq, escopo, inicio_s, fim_s,
+            rotulo=f"{pfx}c", indice_entrada=indice_entrada,
+            deslocamento=lambda _loc: ini_rel,
+        )
+        resultado["entrada"] = fonte["entrada"]
+        ox, oy = fonte["offset"]
+        linhas = list(fonte["declaracoes"])
+        # Tela um quadro mais longa que a janela: o lut2 nunca fica sem par.
+        linhas.append(
+            f"color=c=black@0:s={w}x{h}:r={_n(seq.fps)}:"
+            f"d={_n(dur_jan + 1.0 / float(seq.fps))}[{pfx}_tela]")
+        linhas.append(
+            f"[{pfx}_tela]{_col(fonte['rotulo'])}overlay=x={_n(ox)}:y={_n(oy)}:"
+            f"format=gbrp:eof_action=pass,format=gbrap[{pfx}_fonte]")
+        return linhas, f"{pfx}_fonte"
+
+    declaracoes, saida = _compor_em_janela(
+        acumulado, previa["loc"], previa["dur"], dur_render, float(seq.fps), pfx,
+        _corpo_blend(modo, pfx, float(seq.fps), fonte_rgba),
+    )
+    return declaracoes, saida, resultado.get("entrada")
+
+
+def _cadeia_ajuste(c, escopo, rot_entrada: str, rot_saida: str, delta: float,
+                   dur_stream: float, w: int, h: int, pfx: str) -> List[str]:
+    """Filtros da camada de ajuste sobre uma copia do fundo: cor, alfa, crop.
+
+    `delta` segue a convencao de `_montar_alfa` (segundos do clipe ja passados
+    no inicio do stream); negativo = o stream comeca ANTES do clipe.
+    """
+    bloco_cor = _bloco_ativo(c, "color") if escopo.efeito_ligado("color") else None
+    bloco_crop = _bloco_ativo(c, "crop") if escopo.efeito_ligado("crop") else None
+    bloco_tf = _bloco_ativo(c, "transform") if escopo.efeito_ligado("transform") else None
+
+    declaracoes: List[str] = []
+    filtros_adj = ["format=rgba"]
+    if bloco_cor:
+        filtros_adj.extend(cor.cadeia_cor(bloco_cor))
+
+    opacidade = _num(bloco_tf, "opacity", 1.0)
+    inline_alfa, grafico_alfa, saida_alfa = _montar_alfa(
+        c, escopo, delta, c.duracao_s, dur_stream, opacidade, rotulo_base=pfx
+    )
+    atual_adj = _col(rot_entrada)
+    if grafico_alfa:
+        if filtros_adj:
+            rot_pre = f"{pfx}_pre"
+            declaracoes.append(f"{atual_adj}{','.join(filtros_adj)}{_col(rot_pre)}")
+            atual_adj = _col(rot_pre)
+            filtros_adj = []
+        declaracoes.append(f"{atual_adj}{grafico_alfa[0]}")
+        declaracoes.extend(grafico_alfa[1:])
+        atual_adj = _col(saida_alfa)
+    else:
+        filtros_adj.extend(inline_alfa)
+
+    if bloco_crop:
+        filtros_adj.extend(geometria.filtros_crop(
+            _num(bloco_crop, "top", 0.0), _num(bloco_crop, "right", 0.0),
+            _num(bloco_crop, "bottom", 0.0), _num(bloco_crop, "left", 0.0), w, h,
+        ))
+
+    cauda_adj = ",".join(filtros_adj) if filtros_adj else "null"
+    declaracoes.append(f"{atual_adj}{cauda_adj}{_col(rot_saida)}")
+    return declaracoes
 
 
 def grafo_completo(seq, escopo, inicio_s: float, fim_s: float,
@@ -802,22 +1074,28 @@ def grafo_completo(seq, escopo, inicio_s: float, fim_s: float,
                 declaracoes.extend(linhas)
                 entradas.extend(ents)
                 depois = f"_apos_t{indice}"
-                clipes_com_blend = [c for c in clipes_camada if mapear_blend_mode(getattr(c, "blend_mode", "normal")) != "normal"]
-                if clipes_com_blend:
-                    modo_blend_pista = mapear_blend_mode(clipes_com_blend[0].blend_mode)
-                    enables = [
-                        f"between(t,{_n(max(c.inicio_s, inicio) - inicio)},{_n(min(c.fim_s, fim) - inicio)})"
-                        for c in clipes_com_blend
-                    ]
-                    enable_expr = "+".join(enables)
-                    declaracoes.append(
-                        f"{_col(acumulado)}{_col(rotulo)}blend=all_mode={modo_blend_pista}:enable='{enable_expr}'{_col(depois)}"
-                    )
-                else:
-                    declaracoes.append(
-                        f"{_col(acumulado)}{_col(rotulo)}overlay=x=0:y=0{_col(depois)}"
-                    )
+                declaracoes.append(
+                    f"{_col(acumulado)}{_col(rotulo)}overlay=x=0:y=0{_col(depois)}"
+                )
                 acumulado = depois
+
+            # Clipes com mix-blend-mode: cada um mescla com TUDO o que esta
+            # embaixo (pistas inferiores e o resto desta), como no player.
+            pares = _transicoes_da_pista(clipes_camada, escopo)
+            for bi, (c_orig, transicoes) in enumerate(pares):
+                if mapear_blend_mode(c_orig.blend_mode) == "normal":
+                    continue
+                composto = compor_clipe_com_blend(
+                    c_orig, transicoes, pista, seq, escopo, acumulado, inicio, fim,
+                    pfx=f"{prefixo}_bl{bi}",
+                    indice_entrada=indice_base + len(entradas),
+                )
+                if composto is None:
+                    continue  # fora da faixa pedida
+                linhas_bl, acumulado, entrada_bl = composto
+                declaracoes.extend(linhas_bl)
+                if entrada_bl is not None:
+                    entradas.append(entrada_bl)
 
         # 2. Camadas de ajuste (Adjustment Layer) propagam efeitos sobre o fluxo acumulado inferior
         clipes_ajuste = [c for c in clipes if c.e_ajuste]
@@ -829,57 +1107,42 @@ def grafo_completo(seq, escopo, inicio_s: float, fim_s: float,
             dur_adj = fim_c - ini
             loc = ini - inicio
             delta = ini - c.inicio_s
-
-            bloco_cor = _bloco_ativo(c, "color") if escopo.efeito_ligado("color") else None
-            bloco_crop = _bloco_ativo(c, "crop") if escopo.efeito_ligado("crop") else None
-            bloco_tf = _bloco_ativo(c, "transform") if escopo.efeito_ligado("transform") else None
-
             adj_pfx = f"{prefixo}_adj{ai}"
+
+            modo_blend = mapear_blend_mode(c.blend_mode)
+            if modo_blend != "normal":
+                # backdrop-filter + mix-blend-mode: a fonte e o proprio fundo
+                # filtrado, mesclado de volta sobre ele so na janela da camada.
+                def fonte_ajuste(ini_rel, _dur_clipe, dur_jan, rot_copia,
+                                 c=c, delta=delta, adj_pfx=adj_pfx):
+                    linhas_aj = _cadeia_ajuste(
+                        c, escopo, rot_copia, f"{adj_pfx}_out",
+                        delta - ini_rel, dur_jan, w, h, adj_pfx)
+                    linhas_aj.append(f"[{adj_pfx}_out]format=gbrap[{adj_pfx}_fonte]")
+                    return linhas_aj, f"{adj_pfx}_fonte"
+
+                linhas_aj, acumulado = _compor_em_janela(
+                    acumulado, loc, dur_adj, dur, float(seq.fps), adj_pfx,
+                    _corpo_blend(modo_blend, adj_pfx, float(seq.fps), fonte_ajuste,
+                                 copia_do_fundo=True),
+                )
+                declaracoes.extend(linhas_aj)
+                continue
+
             base_split = f"{adj_pfx}_base"
             in_split = f"{adj_pfx}_in"
             out_adj = f"{adj_pfx}_out"
             declaracoes.append(f"{_col(acumulado)}split{_col(base_split)}{_col(in_split)}")
-
-            filtros_adj = ["format=rgba"]
-            if bloco_cor:
-                filtros_adj.extend(cor.cadeia_cor(bloco_cor))
-
-            opacidade = _num(bloco_tf, "opacity", 1.0)
-            inline_alfa, grafico_alfa, saida_alfa = _montar_alfa(
-                c, escopo, delta, c.duracao_s, dur_adj, opacidade, rotulo_base=adj_pfx
-            )
-            atual_adj = _col(in_split)
-            if grafico_alfa:
-                if filtros_adj:
-                    rot_pre = f"{adj_pfx}_pre"
-                    declaracoes.append(f"{atual_adj}{','.join(filtros_adj)}{_col(rot_pre)}")
-                    atual_adj = _col(rot_pre)
-                    filtros_adj = []
-                declaracoes.append(f"{atual_adj}{grafico_alfa[0]}")
-                declaracoes.extend(grafico_alfa[1:])
-                atual_adj = _col(saida_alfa)
-            else:
-                filtros_adj.extend(inline_alfa)
-
-            if bloco_crop:
-                filtros_adj.extend(geometria.filtros_crop(
-                    _num(bloco_crop, "top", 0.0), _num(bloco_crop, "right", 0.0),
-                    _num(bloco_crop, "bottom", 0.0), _num(bloco_crop, "left", 0.0), w, h,
-                ))
-
-            cauda_adj = ",".join(filtros_adj) if filtros_adj else "null"
-            declaracoes.append(f"{atual_adj}{cauda_adj}{_col(out_adj)}")
+            # A copia tem a duracao INTEIRA do render (t=0 no inicio do render),
+            # entao o relogio do fade comeca `loc` segundos antes da camada.
+            declaracoes.extend(_cadeia_ajuste(
+                c, escopo, in_split, out_adj, delta - loc, dur, w, h, adj_pfx))
 
             depois_adj = f"_apos_{adj_pfx}"
-            modo_blend = mapear_blend_mode(getattr(c, "blend_mode", "normal"))
-            if modo_blend != "normal":
-                declaracoes.append(
-                    f"{_col(base_split)}{_col(out_adj)}blend=all_mode={modo_blend}:enable='between(t,{_n(loc)},{_n(loc + dur_adj)})'{_col(depois_adj)}"
-                )
-            else:
-                declaracoes.append(
-                    f"{_col(base_split)}{_col(out_adj)}overlay=x=0:y=0:enable='between(t,{_n(loc)},{_n(loc + dur_adj)})'{_col(depois_adj)}"
-                )
+            declaracoes.append(
+                f"{_col(base_split)}{_col(out_adj)}overlay=x=0:y=0:"
+                f"{_enable_janela(loc, loc + dur_adj, seq.fps)}{_col(depois_adj)}"
+            )
             acumulado = depois_adj
 
     declaracoes.append(f"{_col(acumulado)}null[vout]")

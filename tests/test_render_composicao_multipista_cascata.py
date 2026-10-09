@@ -24,6 +24,11 @@ def _seq(clipes, tracks=None, fps=24, w=1920, h=1080):
     })
 
 
+def _janela(ini, fim, fps=24):
+    """enable do overlay de um clipe em [ini, fim): meio quadro de folga (ver grafo_video)."""
+    return grafo_video._enable_janela(ini, fim, fps)
+
+
 def _cf(lado, dur, tid="tr_cascata_1", tipo="video_cross_dissolve", curva="linear"):
     return {
         "type": "crossfade",
@@ -95,8 +100,8 @@ def test_composicao_multipista_cascata_padrao():
     assert ent["clip_b"]["t"] == pytest.approx(5.5)
 
     # 2. Pista V1: Clipe A permanece ativo até 5.5s e Clipe B sobrepõe a partir de 4.5s
-    assert "between(t,0,5.5)" in fc
-    assert "between(t,4.5,10)" in fc
+    assert _janela(0, 5.5) in fc
+    assert _janela(4.5, 10) in fc
     assert "fade=t=in:st=0:d=1:alpha=1" in fc
 
     # 3. Pista V2: Camada de Ajuste divide fluxo acumulado com split
@@ -105,8 +110,13 @@ def test_composicao_multipista_cascata_padrao():
     # 4. Pista V2: Gradação de cor aplicada na cadeia da camada de ajuste
     assert "colorchannelmixer" in fc or "eq=" in fc
 
-    # 5. Pista V2: Modo de mesclagem softlight mapeado e habilitado na janela [3, 7]
-    assert "blend=all_mode=softlight:enable='between(t,3,7)'" in fc
+    # 5. Pista V2: soft-light W3C (lut2 em RGB) so na janela [3, 7] do acumulado
+    assert "blend=all_mode=" not in fc
+    assert grafo_video._filtro_lut2_blend("soft-light") in fc
+    assert "trim=end=3,setpts=PTS-STARTPTS" in fc
+    assert "trim=start=3:end=7,setpts=PTS-STARTPTS" in fc
+    assert "trim=start=7,setpts=PTS-STARTPTS" in fc
+    assert "concat=n=3:v=1:a=0,settb=expr=1/24" in fc
 
     # 6. Ausência de tempos negativos st < 0
     assert "st=-" not in fc
@@ -159,8 +169,10 @@ def test_composicao_multipista_com_hard_boundaries_e_tpad():
     # Clipe B congela primeiro quadro
     assert "tpad=start_mode=clone:start_duration=0.5" in fc
 
-    # Camada de Ajuste aplica overlay blend mode na janela [2, 8]
-    assert "blend=all_mode=overlay:enable='between(t,2,8)'" in fc
+    # Camada de Ajuste aplica overlay (W3C, lut2) so na janela [2, 8]
+    assert "blend=all_mode=" not in fc
+    assert grafo_video._filtro_lut2_blend("overlay") in fc
+    assert "trim=start=2:end=8,setpts=PTS-STARTPTS" in fc
 
 
 def test_composicao_multipista_camada_ajuste_com_overlay_normal():
@@ -205,7 +217,7 @@ def test_composicao_multipista_camada_ajuste_com_overlay_normal():
 
     # Não deve usar blend=all_mode, e sim overlay habilitado
     assert "blend=all_mode=" not in fc
-    assert "overlay=x=0:y=0:enable='between(t,2,8)'" in fc
+    assert f"overlay=x=0:y=0:{_janela(2, 8)}" in fc
 
 
 def test_composicao_multipista_bypass_camada_ajuste():
@@ -254,8 +266,8 @@ def test_composicao_multipista_bypass_camada_ajuste():
     assert "blend=all_mode=" not in fc
 
     # Transição inferior intacta
-    assert "between(t,0,5.5)" in fc
-    assert "between(t,4.5,10)" in fc
+    assert _janela(0, 5.5) in fc
+    assert _janela(4.5, 10) in fc
     assert "fade=t=in:st=0:d=1:alpha=1" in fc
 
 

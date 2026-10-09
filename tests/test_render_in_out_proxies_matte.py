@@ -134,7 +134,8 @@ def test_in_out_com_color_matte_e_proxies_montagem_completa():
         assert "st=-" not in fc
         assert "fade=t=in:st=-" not in fc
         assert "color=c=0x0047bb" in fc.lower()
-        assert "blend=all_mode=multiply" in fc
+        assert "blend=all_mode=" not in fc
+        assert grafo_video._filtro_lut2_blend("multiply") in fc
 
 
 def test_api_ultimo_render_timeline_estrutura_retorno(tmp_path, monkeypatch):

@@ -12,6 +12,11 @@ def _seq(clipes, fps=30, w=1920, h=1080):
     })
 
 
+def _janela(ini, fim, fps=30):
+    """enable do overlay de um clipe em [ini, fim): meio quadro de folga (ver grafo_video)."""
+    return grafo_video._enable_janela(ini, fim, fps)
+
+
 def _cf(lado, dur, tid="tr1", tipo="video_cross_dissolve"):
     return {
         "type": "crossfade",
@@ -48,10 +53,10 @@ def test_video_cross_dissolve_com_folga_estende_fontes_sem_tpad():
     assert "tpad" not in fc
 
     # Clip A permanece visível na camada até 10.5s
-    assert "between(t,0,10.5)" in fc
+    assert _janela(0, 10.5) in fc
 
     # Clip B começa em 9.0s e sobrepõe até 20.0s
-    assert "between(t,9,20)" in fc
+    assert _janela(9, 20) in fc
 
     # Clip B tem fade de entrada cobrindo a janela inteira da transição (span = 1.5s)
     assert "fade=t=in:st=0:d=1.5:alpha=1" in fc
@@ -81,8 +86,8 @@ def test_video_cross_dissolve_hard_boundaries_usa_tpad_clone():
     assert "tpad=start_mode=clone:start_duration=1" in fc
 
     # Transição é contínua: enable de A até 10.5s e B com fade de 1.5s a partir de 9.0s
-    assert "between(t,0,10.5)" in fc
-    assert "between(t,9,20)" in fc
+    assert _janela(0, 10.5) in fc
+    assert _janela(9, 20) in fc
     assert "fade=t=in:st=0:d=1.5:alpha=1" in fc
 
 
@@ -270,7 +275,11 @@ def test_composicao_color_matte_com_video_e_in_out_range():
     g = grafo_video.grafo_completo(seq, modelo.Escopo(), 8.0, 14.0)
     fc = g["filter_complex"]
     assert "color=c=0x0047bb" in fc.lower()
-    assert "blend=all_mode=multiply" in fc
+    # Multiply W3C em RGB (lut2) so na janela do matte: render comeca em 8, matte em 10
+    assert "blend=all_mode=" not in fc
+    assert grafo_video._filtro_lut2_blend("multiply") in fc
+    assert "trim=end=2,setpts=PTS-STARTPTS" in fc
+    assert "trim=start=2,setpts=PTS-STARTPTS" in fc
     # Vídeo em V1: delta=8s > d=2s, fade-in já terminou, não deve ter st=-
     assert "st=-" not in fc
 
