@@ -7822,6 +7822,14 @@ export class LibraryManager {
         const btnViewModeGrid = document.getElementById("btn-view-mode-grid");
         const btnViewModeList = document.getElementById("btn-view-mode-list");
         
+        // Com a galeria agrupada ativa, clicar de novo no botão abre o menu de agrupamento.
+        function updateScenesButtonTooltip(btnScn) {
+            const title = btnScn.dataset.groupingTitle || "Agrupamento";
+            const tip = btnScn.classList.contains("active") ? `${title} — clique para trocar o agrupamento` : title;
+            btnScn.title = tip;
+            btnScn.setAttribute("data-tooltip", tip);
+        }
+
         function syncActiveGroupingUI(groupingKey) {
             const GROUP_CONFIG = {
                 "color_scenes": { icon: "fa-palette", color: "#06b6d4", title: "Cenas por Cor (Decupagem Cromática)", label: "Cenas" },
@@ -7839,8 +7847,8 @@ export class LibraryManager {
             getAllLibraryDocuments().forEach(doc => {
                 const btnScn = doc.getElementById("btn-view-mode-scenes");
                 if (btnScn) {
-                    btnScn.title = conf.title;
-                    btnScn.setAttribute("data-tooltip", conf.title);
+                    btnScn.dataset.groupingTitle = conf.title;
+                    updateScenesButtonTooltip(btnScn);
                     btnScn.innerHTML = `<i class="fa-solid ${conf.icon}" style="color: ${conf.color};"></i>`;
                 }
                 const modeIcon = doc.getElementById("decoupage-mode-icon");
@@ -7910,6 +7918,7 @@ export class LibraryManager {
                     } else if (validMode === "list") {
                         btnLst?.classList.add("active");
                     }
+                    if (btnScn) updateScenesButtonTooltip(btnScn);
                 } catch (e) {}
             });
 
@@ -7930,8 +7939,56 @@ export class LibraryManager {
                 setViewMode("gallery");
             });
         }
+        // Menu de agrupamento preso ao botão: mesmas opções do menu da régua de decupagem
+        // (copiadas dele), para trocar o agrupamento mesmo com a régua recolhida.
+        function toggleGroupingMenu(btn) {
+            const doc = btn.ownerDocument || document;
+            const win = doc.defaultView || window;
+            let menu = doc.getElementById("grouping-toolbar-menu");
+            if (!menu) {
+                const source = doc.getElementById("decoupage-mode-dropdown") || document.getElementById("decoupage-mode-dropdown");
+                if (!source) return;
+                menu = doc.createElement("div");
+                menu.id = "grouping-toolbar-menu";
+                menu.className = "decoupage-mode-dropdown-menu glassmorphism";
+                menu.innerHTML = source.innerHTML;
+                menu.querySelectorAll(".decoupage-mode-option").forEach(opt => {
+                    opt.addEventListener("click", (e) => {
+                        e.stopPropagation();
+                        menu.classList.remove("show");
+                        window.libraryInstance?.applyGroupingMode(opt.dataset.grouping);
+                    });
+                });
+                doc.body.appendChild(menu);
+                doc.addEventListener("click", (e) => {
+                    if (!menu.contains(e.target) && !e.target.closest?.("#btn-view-mode-scenes")) menu.classList.remove("show");
+                });
+                // Captura na janela: outros atalhos de Esc no document param a propagação antes
+                win.addEventListener("keydown", (e) => {
+                    if (e.key === "Escape") menu.classList.remove("show");
+                }, true);
+            }
+            if (menu.classList.contains("show")) {
+                menu.classList.remove("show");
+                return;
+            }
+            const current = localStorage.getItem("gallery-pref-grouping") || "date";
+            menu.querySelectorAll(".decoupage-mode-option").forEach(opt => {
+                opt.classList.toggle("active", opt.dataset.grouping === current);
+            });
+            const r = btn.getBoundingClientRect();
+            menu.classList.add("show");
+            const left = Math.min(r.left, win.innerWidth - menu.offsetWidth - 8);
+            menu.style.left = `${Math.max(8, Math.round(left))}px`;
+            menu.style.top = `${Math.round(r.bottom + 4)}px`;
+        }
+
         if (btnViewModeScenes) {
             btnViewModeScenes.addEventListener("click", () => {
+                if (btnViewModeScenes.classList.contains("active")) {
+                    toggleGroupingMenu(btnViewModeScenes);
+                    return;
+                }
                 let curGroup = localStorage.getItem("gallery-pref-grouping") || "color_scenes";
                 if (curGroup === "none") {
                     curGroup = "color_scenes";
@@ -10011,6 +10068,28 @@ export class LibraryManager {
     /**
      * Renderiza e sincroniza a Barra Superior de Decupagem Visual (Chips de Cenas, Escalas ou Falantes).
      */
+    /**
+     * Troca o agrupamento da galeria (Datas, Cenas, Falantes...). Usado pelo menu da régua de
+     * decupagem e pelo menu do botão da barra de visualização (que funciona com a régua recolhida).
+     */
+    applyGroupingMode(targetGrouping) {
+        if (!targetGrouping) return;
+        localStorage.setItem("gallery-pref-grouping", targetGrouping);
+        if (typeof window.syncActiveGroupingUI === "function") {
+            window.syncActiveGroupingUI(targetGrouping);
+        }
+        getAllLibraryDocuments().forEach(d => {
+            const sel = d.getElementById("sel-gallery-grouping");
+            if (sel) sel.value = targetGrouping;
+        });
+        this.clearDecoupageFilter();
+        if (typeof window._setViewMode === "function") {
+            window._setViewMode("scenes");
+        } else {
+            this.scheduleRenderMedia({ preserveScroll: false });
+        }
+    }
+
     renderDecoupageStrip(groups, groupingMode) {
         const savedViewMode = localStorage.getItem("lib-pref-view-mode") || "gallery";
 
@@ -10077,22 +10156,7 @@ export class LibraryManager {
                     opt.addEventListener("click", (e) => {
                         e.stopPropagation();
                         dropdown.classList.remove("show");
-                        const targetGrouping = opt.dataset.grouping;
-                        if (!targetGrouping) return;
-                        localStorage.setItem("gallery-pref-grouping", targetGrouping);
-                        if (typeof window.syncActiveGroupingUI === "function") {
-                            window.syncActiveGroupingUI(targetGrouping);
-                        }
-                        getAllLibraryDocuments().forEach(d => {
-                            const sel = d.getElementById("sel-gallery-grouping");
-                            if (sel) sel.value = targetGrouping;
-                        });
-                        this.clearDecoupageFilter();
-                        if (typeof window._setViewMode === "function") {
-                            window._setViewMode("scenes");
-                        } else {
-                            this.scheduleRenderMedia({ preserveScroll: false });
-                        }
+                        this.applyGroupingMode(opt.dataset.grouping);
                     });
                 });
             }

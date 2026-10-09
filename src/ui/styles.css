@@ -11058,6 +11058,15 @@ input[type="number"] {
     display: flex;
 }
 
+/* Mesmo menu, aberto pelo botão de agrupamento da barra de visualização (filho do body,
+   posicionado pelo JS sob o botão). */
+#grouping-toolbar-menu {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 999999;
+}
+
 .decoupage-mode-option {
     padding: var(--sp-6) var(--sp-10);
     display: flex;
