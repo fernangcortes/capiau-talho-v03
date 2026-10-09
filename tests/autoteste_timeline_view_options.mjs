@@ -34,6 +34,8 @@ const expectedControls = [
     "slider-timeline-smooth-anchor",
     "chk-timeline-hover-preview",
     "chk-timeline-mute-hidden",
+    "chk-auto-transform-overlay",
+    "chk-timeline-show-inout-badge",
     "chk-timeline-toolbar-top",
     "chk-timeline-expand-left",
     "chk-timeline-expand-right",

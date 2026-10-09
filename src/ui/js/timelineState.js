@@ -428,6 +428,8 @@ export class CapiauTimelineState {
         this.inFrame = null; // Ponto IN marcado na timeline (em frames)
         this.outFrame = null; // Ponto OUT marcado na timeline (em frames)
         this.isLooping = false; // Modo de reprodução em loop contínuo entre In e Out (ou timeline)
+        this.isAdjustingInOut = false; // Flag dinâmica ativa durante arraste/ajuste das alças do IO
+        this.showInOutRulerBadge = this.loadShowInOutRulerBadge(); // Opção permanente de visualização (padrão: false)
 
         // Manipulador de Fade ativo no hover ({ clipId, side: "in"|"out", type: "duration"|"curve" })
         this.hoveredFadeHandle = null;
@@ -1534,6 +1536,26 @@ export class CapiauTimelineState {
     setMuteHiddenTracksPlayback(enabled) {
         this.muteHiddenTracksPlayback = !!enabled;
         STATE.emit("timelineCutsUpdated", STATE.activeTimelineCuts);
+    }
+
+    loadShowInOutRulerBadge() {
+        try {
+            return typeof localStorage !== "undefined" && localStorage.getItem("capiau_timeline_show_in_out_badge") === "1";
+        } catch (_) {
+            return false;
+        }
+    }
+
+    toggleShowInOutRulerBadge(enabled) {
+        this.showInOutRulerBadge = enabled !== undefined ? !!enabled : !this.showInOutRulerBadge;
+        try {
+            if (typeof localStorage !== "undefined") {
+                localStorage.setItem("capiau_timeline_show_in_out_badge", this.showInOutRulerBadge ? "1" : "0");
+            }
+        } catch (_) {}
+        STATE.emit("timelineShowInOutRulerBadgeChanged", this.showInOutRulerBadge);
+        STATE.emit("timelineStateChanged");
+        return this.showInOutRulerBadge;
     }
 
     toggleTrackSyncLock(trackId) {

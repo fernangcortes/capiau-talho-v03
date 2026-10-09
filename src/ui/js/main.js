@@ -2490,6 +2490,26 @@ window.addEventListener("DOMContentLoaded", () => {
             if (chkAutoTransform) chkAutoTransform.checked = !!enabled;
         });
 
+        const chkShowInOutBadge = document.getElementById("chk-timeline-show-inout-badge");
+        if (chkShowInOutBadge) {
+            chkShowInOutBadge.checked = !!TIMELINE_STATE.showInOutRulerBadge;
+            chkShowInOutBadge.addEventListener("change", (e) => {
+                TIMELINE_STATE.toggleShowInOutRulerBadge(e.target.checked);
+                if (window.showToast) {
+                    window.showToast(
+                        e.target.checked
+                            ? "Badge IN/OUT: Sempre visível na régua"
+                            : "Badge IN/OUT: Apenas durante ajuste (puxar colchetes)",
+                        "info"
+                    );
+                }
+            });
+        }
+        STATE.on("timelineShowInOutRulerBadgeChanged", (enabled) => {
+            if (chkShowInOutBadge) chkShowInOutBadge.checked = !!enabled;
+            if (window.timelineRenderer) window.timelineRenderer.requestRedraw();
+        });
+
         const selectDensity = document.getElementById("select-timeline-thumbs-density");
         if (selectDensity) {
             selectDensity.value = TIMELINE_STATE.thumbnailMode || (TIMELINE_STATE.globalThumbnailsInterval === 0 ? "none" : "continuous");

@@ -1149,28 +1149,34 @@ export class CapiauTimelineInteraction {
             // Prioridade 2: Arraste do ponto IN na régua (se clicou no colchete IN)
             if (this.checkHitMarkIn(x, y, e.altKey)) {
                 this.dragState = "drag-in-point";
+                TIMELINE_STATE.isAdjustingInOut = true;
                 if (this.canvas) this.canvas.style.cursor = CURSOR_MARK_IN;
                 this.dragStartMouseX = e.clientX;
                 this.dragStartFrame = inF;
+                if (this.renderer) this.renderer.requestRedraw();
                 return;
             }
 
             // Prioridade 3: Arraste do ponto OUT na régua (se clicou no colchete OUT)
             if (this.checkHitMarkOut(x, y, e.altKey)) {
                 this.dragState = "drag-out-point";
+                TIMELINE_STATE.isAdjustingInOut = true;
                 if (this.canvas) this.canvas.style.cursor = CURSOR_MARK_OUT;
                 this.dragStartMouseX = e.clientX;
                 this.dragStartFrame = outF;
+                if (this.renderer) this.renderer.requestRedraw();
                 return;
             }
 
             // Prioridade 4: Arraste / Deslizamento da faixa IN-OUT inteira com Alt ou Shift (mantém duração constante)
             if (inX !== null && outX !== null && x > inX && x < outX && (e.altKey || e.shiftKey)) {
                 this.dragState = "drag-in-out-span";
+                TIMELINE_STATE.isAdjustingInOut = true;
                 if (this.canvas) this.canvas.style.cursor = CURSOR_IN_OUT_SPAN;
                 this.dragStartMouseX = e.clientX;
                 this.dragStartInFrame = inF;
                 this.dragStartOutFrame = outF;
+                if (this.renderer) this.renderer.requestRedraw();
                 return;
             }
 
@@ -2070,6 +2076,34 @@ export class CapiauTimelineInteraction {
                 this.hideHoverPreview();
                 if (TIMELINE_STATE.hoveredMarkerId !== hoverRulerMarker.id) {
                     TIMELINE_STATE.hoveredMarkerId = hoverRulerMarker.id;
+                    if (this.renderer) this.renderer.requestRedraw();
+                }
+                return;
+            }
+
+            // Prioridade 6: Intervalo IN-OUT na régua (sem Alt/Shift): Tooltip informativo de metadados
+            if (inX !== null && outX !== null && x > inX && x < outX) {
+                const durFrames = Math.max(0, outF - inF);
+                const fps = TIMELINE_STATE.fps || 24;
+                const durSec = durFrames / fps;
+                const inTc = framesToTimecode(inF, fps);
+                const outTc = framesToTimecode(outF, fps);
+                const durTc = framesToTimecode(durFrames, fps);
+                const durStr = durSec < 60 ? `${durSec.toFixed(2)}s` : `${Math.floor(durSec / 60)}m ${Math.round(durSec % 60)}s`;
+
+                this.canvas.style.cursor = "default";
+                this.canvas.setAttribute(
+                    "data-tooltip",
+                    `Intervalo IN–OUT: ${inTc} → ${outTc} (${durTc} · ${durStr} · ${durFrames} frames) [Alt+Arraste para mover]`
+                );
+                this.hideMarkerTooltip();
+                this.hideHoverPreview();
+                if (TIMELINE_STATE.hoveredMarkerId !== null) {
+                    TIMELINE_STATE.hoveredMarkerId = null;
+                    if (this.renderer) this.renderer.requestRedraw();
+                }
+                if (TIMELINE_STATE.hoveredPlayhead) {
+                    TIMELINE_STATE.hoveredPlayhead = false;
                     if (this.renderer) this.renderer.requestRedraw();
                 }
                 return;
@@ -3192,6 +3226,7 @@ export class CapiauTimelineInteraction {
         }
         if (this.dragState === "drag-in-point" || this.dragState === "drag-out-point" || this.dragState === "drag-in-out-span") {
             this.dragState = null;
+            TIMELINE_STATE.isAdjustingInOut = false;
             if (this.canvas) this.canvas.style.cursor = "default";
             if (window.triggerAutosave) window.triggerAutosave();
             if (this.renderer) this.renderer.requestRedraw();

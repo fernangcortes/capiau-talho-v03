@@ -12,6 +12,7 @@ const raiz = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const stateEvents = {};
 const mockState = {
     activeTimelineCuts: [],
+    allVideos: [],
     emit(event, data) {
         if (stateEvents[event]) {
             stateEvents[event].forEach(fn => fn(data));
@@ -34,8 +35,13 @@ const context = vm.createContext({
     Number,
     String,
     Boolean,
+    requestAnimationFrame: () => {},
+    cancelAnimationFrame: () => {},
     window: {
-        timelineInteraction: null
+        timelineInteraction: null,
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        dispatchEvent: () => {}
     },
     STATE: mockState,
     localStorage: {
@@ -45,8 +51,15 @@ const context = vm.createContext({
     },
     document: {
         getElementById: () => null,
+        querySelector: () => null,
+        querySelectorAll: () => [],
         addEventListener: () => {},
         removeEventListener: () => {}
+    },
+    ResizeObserver: class {
+        observe() {}
+        unobserve() {}
+        disconnect() {}
     }
 });
 
@@ -252,7 +265,8 @@ const mockRenderer = {
     rulerHeight: 30,
     width: 1000,
     height: 300,
-    requestRedraw: () => {}
+    requestRedraw: () => {},
+    getTrackAtY: () => null
 };
 
 // Carrega timelineInteraction.js para teste isolado de métodos de colisão
@@ -264,10 +278,26 @@ const cleanedInteractionCode = codeInteraction
     .replace(/export default /g, "var defaultInteraction = ");
 
 context.mockRenderer = mockRenderer;
+const mockCanvasCtx = new Proxy({
+    measureText: (text) => ({ width: (text || "").length * 6.5 }),
+    createLinearGradient: () => ({ addColorStop: () => {} })
+}, {
+    get(target, prop) {
+        if (prop in target) return target[prop];
+        return () => {};
+    },
+    set() { return true; }
+});
 context.document.getElementById = () => ({
     classList: { contains: () => false },
     addEventListener: () => {},
-    style: {}
+    style: {},
+    getContext: () => mockCanvasCtx,
+    setAttribute: () => {},
+    getAttribute: () => null,
+    removeAttribute: () => {},
+    ownerDocument: { defaultView: context.window },
+    parentElement: { clientWidth: 1000, clientHeight: 300, addEventListener: () => {} }
 });
 context.document.querySelectorAll = () => [];
 
@@ -330,6 +360,152 @@ try {
     assert.equal(TIMELINE_STATE.outFrame - TIMELINE_STATE.inFrame, initialDur, "Duração do intervalo IN-OUT deve ser preservada ao mover com Alt/Shift");
 
     console.log("  ✔ Prioridades de clique/arraste Playhead vs IN/OUT e integridade do span aprovadas.");
+
+    // ── TESTE 8: Box de In/Out na Régua (Anti-colisão, Anti-truncamento e Níveis Adaptativos) ──
+    console.log("\n8. Testando Box/Badge de In/Out na régua (Anti-colisão, Anti-truncamento e Níveis Adaptativos)...");
+
+    // Prepara contexto para carregar CapiauTimelineRenderer
+    context.WaveformManager = { addListener: () => {} };
+    context.RENDER_CACHE_MANAGER = { getSegments: () => [] };
+    context.themeColor = (token, fallback) => fallback;
+    context.THEME_CHANGED_EVENT = "themeChanged";
+    context.applyTrackMode = (style) => style;
+    context.getAllKeyframeTimelineFrames = () => [];
+
+    const codeRenderer = readFileSync(path.join(raiz, "src", "ui", "js", "timelineRenderer.js"), "utf8");
+    const cleanedRendererCode = codeRenderer
+        .replace(/import\s+[\s\S]*?from\s+['"][^'"]+['"];?/g, "")
+        .replace(/export class CapiauTimelineRenderer/g, "class CapiauTimelineRenderer")
+        .replace(/export const /g, "const ")
+        .replace(/export function /g, "function ")
+        .replace(/export default /g, "var defaultRenderer = ");
+
+    vm.runInContext(cleanedRendererCode + "; var rendererInstance = new CapiauTimelineRenderer();", context);
+    const renderer = context.rendererInstance;
+    renderer.width = 1000;
+    renderer.height = 300;
+    renderer.rulerHeight = 30;
+
+    // Cenário A: Sem pontos In/Out definidos ou com In >= Out
+    TIMELINE_STATE.clearInOut();
+    assert.equal(renderer.getInOutBadgeInfo(), null, "getInOutBadgeInfo() deve retornar null quando não há pontos IN/OUT");
+
+    TIMELINE_STATE.inFrame = 100;
+    TIMELINE_STATE.outFrame = 100;
+    assert.equal(renderer.getInOutBadgeInfo(), null, "getInOutBadgeInfo() deve retornar null quando inFrame === outFrame");
+
+    // Cenário A2: Em repouso (sem ajuste ativo e opção desativada), régua deve permanecer 100% limpa (badge === null)
+    TIMELINE_STATE.inFrame = 100;
+    TIMELINE_STATE.outFrame = 250;
+    TIMELINE_STATE.isAdjustingInOut = false;
+    TIMELINE_STATE.showInOutRulerBadge = false;
+    assert.equal(renderer.getInOutBadgeInfo(), null, "getInOutBadgeInfo() deve retornar null em repouso para não tapar informações de tempo da régua");
+
+    // Ativa modo de ajuste para validar a renderização adaptativa durante arraste das alças do IO
+    TIMELINE_STATE.isAdjustingInOut = true;
+
+    // Cenário B: Intervalo muito estreito (< 44px entre colchetes)
+    TIMELINE_STATE.zoom = 1;
+    TIMELINE_STATE.scrollLeftFrame = 0;
+    TIMELINE_STATE.inFrame = 100;
+    TIMELINE_STATE.outFrame = 130; // 30px -> safeW = 30 - 26 = 4px < 44px
+    assert.equal(renderer.getInOutBadgeInfo(), null, "Deve retornar null para intervalo muito curto para evitar encavalamento de badges");
+
+    // Cenário C: Intervalo amplo (zoom 2, dur 150 frames = 300px) -> Deve escolher Tier 1 (Completo)
+    TIMELINE_STATE.zoom = 2;
+    TIMELINE_STATE.inFrame = 100;
+    TIMELINE_STATE.outFrame = 250;
+    // inX = 200, outX = 500, intervalW = (500 - 13) - (200 + 13) = 487 - 213 = 274px
+    const badgeTier1 = renderer.getInOutBadgeInfo();
+    assert.ok(badgeTier1, "Deve gerar badge para intervalo amplo");
+    assert.equal(badgeTier1.tier, 1, "Intervalo amplo (>= 240px) deve selecionar Tier 1 (completo)");
+    assert.ok(badgeTier1.left >= 200 + 13, "Badge não pode sobrepor colchete IN");
+    assert.ok(badgeTier1.right <= 500 - 13, "Badge não pode sobrepor colchete OUT");
+    assert.ok(badgeTier1.text.includes("IN ") && badgeTier1.text.includes("OUT "), "Texto do Tier 1 deve conter IN e OUT");
+
+    // Cenário D: Intervalo médio amplo (220px entre IN e OUT) -> Seleciona Tier 2 adaptativo compacto
+    TIMELINE_STATE.zoom = 1;
+    TIMELINE_STATE.inFrame = 100;
+    TIMELINE_STATE.outFrame = 320; // 220px -> safeW = 220 - 26 = 194px
+    const badgeTier2 = renderer.getInOutBadgeInfo();
+    assert.ok(badgeTier2, "Deve gerar badge para intervalo médio amplo");
+    assert.equal(badgeTier2.tier, 2, "Intervalo de 220px deve selecionar Tier 2 adaptativo compacto");
+    assert.ok(badgeTier2.left >= 100 + 13, "Badge Tier 2 não pode sobrepor o colchete IN");
+    assert.ok(badgeTier2.right <= 320 - 13, "Badge Tier 2 não pode sobrepor o colchete OUT");
+    assert.ok(badgeTier2.width <= 194, "Largura do badge deve ser menor ou igual ao espaço seguro");
+
+    // Cenário D2: Intervalo médio mais contido (170px entre IN e OUT) -> Degrada graciosamente para Tier 3 (Duração)
+    TIMELINE_STATE.outFrame = 270; // 170px -> safeW = 170 - 26 = 144px
+    const badgeTier3 = renderer.getInOutBadgeInfo();
+    assert.ok(badgeTier3, "Deve gerar badge para intervalo de 170px");
+    assert.equal(badgeTier3.tier, 3, "Intervalo de 170px deve selecionar Tier 3 para evitar qualquer truncamento");
+    assert.ok(badgeTier3.left >= 100 + 13, "Badge Tier 3 não pode sobrepor o colchete IN");
+    assert.ok(badgeTier3.right <= 270 - 13, "Badge Tier 3 não pode sobrepor o colchete OUT");
+    assert.ok(badgeTier3.width <= 144, "Largura do badge deve ser menor ou igual ao espaço seguro");
+
+    // Cenário E: Intervalo compacto (90px) -> Deve selecionar Tier 3 ou Tier 4
+    TIMELINE_STATE.inFrame = 100;
+    TIMELINE_STATE.outFrame = 190; // 90px -> safeW = 90 - 26 = 64px
+    const badgeCompact = renderer.getInOutBadgeInfo();
+    assert.ok(badgeCompact, "Deve gerar badge para intervalo compacto");
+    assert.ok(badgeCompact.tier === 3 || badgeCompact.tier === 4, "Deve selecionar formato conciso para espaço reduzido");
+    assert.ok(badgeCompact.left >= 100 + 13, "Badge compacto não pode sobrepor colchete IN");
+    assert.ok(badgeCompact.right <= 190 - 13, "Badge compacto não pode sobrepor colchete OUT");
+
+    // Cenário F: Intervalo parcialmente fora da tela (scrollLeft avançado)
+    TIMELINE_STATE.scrollLeftFrame = 200; // inFrame 100 está em -100px (à esquerda do canvas)
+    TIMELINE_STATE.inFrame = 100;
+    TIMELINE_STATE.outFrame = 500; // outFrame 500 está em 300px
+    const badgeScrolled = renderer.getInOutBadgeInfo();
+    assert.ok(badgeScrolled, "Deve gerar badge mesmo quando IN está fora da tela à esquerda");
+    assert.ok(badgeScrolled.left >= 0, "Badge deve permanecer visível dentro do canvas (left >= 0)");
+    assert.ok(badgeScrolled.right <= 300 - 13, "Badge não pode passar do colchete OUT");
+
+    // Cenário G: Opção permanente ligada (showInOutRulerBadge === true) mesmo com isAdjustingInOut = false
+    TIMELINE_STATE.isAdjustingInOut = false;
+    TIMELINE_STATE.toggleShowInOutRulerBadge(true);
+    assert.equal(TIMELINE_STATE.showInOutRulerBadge, true, "showInOutRulerBadge deve estar true");
+    const badgeAlwaysOn = renderer.getInOutBadgeInfo();
+    assert.ok(badgeAlwaysOn, "Badge deve ser gerado quando showInOutRulerBadge estiver ativo mesmo sem arraste");
+    TIMELINE_STATE.toggleShowInOutRulerBadge(false);
+    assert.equal(renderer.getInOutBadgeInfo(), null, "Badge volta a ser null quando showInOutRulerBadge é desligado e sem ajuste ativo");
+
+    console.log("  ✔ Níveis adaptativos, ativação dinâmica em ajuste e opção permanente do Box In/Out aprovados.");
+
+    // ── TESTE 9: Hover Tooltip no Intervalo IN-OUT na Régua ──
+    console.log("\n9. Testando exibição de tooltip informativo ao pairar sobre a régua...");
+
+    TIMELINE_STATE.scrollLeftFrame = 0;
+    TIMELINE_STATE.inFrame = 50;
+    TIMELINE_STATE.outFrame = 150;
+    TIMELINE_STATE.fps = 24;
+
+    const mockCanvas = {
+        attributes: {},
+        style: {},
+        setAttribute(k, v) { this.attributes[k] = v; },
+        getAttribute(k) { return this.attributes[k]; },
+        removeAttribute(k) { delete this.attributes[k]; },
+        getBoundingClientRect: () => ({ left: 0, top: 0, width: 1000, height: 300 }),
+        ownerDocument: context.document
+    };
+    interaction.canvas = mockCanvas;
+
+    // Hover fora do intervalo (x = 20, régua y = 10)
+    interaction.onMouseMove({ clientX: 20, clientY: 10, altKey: false, shiftKey: false });
+    assert.equal(mockCanvas.getAttribute("data-tooltip"), undefined, "Fora do intervalo não deve ter tooltip de IN-OUT");
+
+    // Hover dentro do intervalo (x = 80, régua y = 10) sem Alt
+    interaction.onMouseMove({ clientX: 80, clientY: 10, altKey: false, shiftKey: false });
+    const tooltipText = mockCanvas.getAttribute("data-tooltip");
+    assert.ok(tooltipText && tooltipText.includes("Intervalo IN–OUT:"), "Deve exibir tooltip informativo sobre o intervalo");
+    assert.ok(tooltipText.includes("100 frames"), "Tooltip deve conter total de frames");
+
+    // Hover dentro do intervalo COM Alt -> Deve mudar cursor para mover intervalo
+    interaction.onMouseMove({ clientX: 80, clientY: 10, altKey: true, shiftKey: false });
+    assert.equal(mockCanvas.getAttribute("data-tooltip"), "Mover Intervalo IN/OUT (mantendo duração)");
+
+    console.log("  ✔ Hover tooltip informativo na régua aprovado.");
 } catch (err) {
     console.error("Erro ao testar interação:", err);
     throw err;

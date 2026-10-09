@@ -263,6 +263,7 @@ export class CapiauTimelineRenderer {
         STATE.on("activeVideoChanged", () => this.requestRedraw());
         STATE.on("waveformLoaded", () => this.requestRedraw());
         STATE.on("timelineInOutChanged", () => this.requestRedraw());
+        STATE.on("timelineShowInOutRulerBadgeChanged", () => this.requestRedraw());
         STATE.on("timelineLoopChanged", () => this.requestRedraw());
         WaveformManager.addListener(() => this.requestRedraw());
 
@@ -370,6 +371,9 @@ export class CapiauTimelineRenderer {
 
         // Desenha guias de snapping e indicador de inserção/drop
         this.drawDropAndSnapGuides();
+
+        // Pré-computa métricas do badge In/Out para sincronizar régua e caixa anti-colisão
+        this._currentInOutBadge = this.getInOutBadgeInfo();
 
         // Desenha a grade e a régua de tempo (por cima das pistas roladas)
         this.drawRuler();
@@ -896,6 +900,7 @@ export class CapiauTimelineRenderer {
 
         const firstTickFrame = Math.floor(startFrame / subTickInterval) * subTickInterval;
         let lastDrawnTextRight = -9999; // Guarda física de colisão contra sobreposição de números
+        const ioBadge = this._currentInOutBadge || this.getInOutBadgeInfo();
 
         for (let f = firstTickFrame; f <= endFrame; f += subTickInterval) {
             const x = (f - startFrame) * zoom;
@@ -929,14 +934,16 @@ export class CapiauTimelineRenderer {
                 lineWidth = 1;
             }
 
-            // Desenha tick
-            ctx.strokeStyle = strokeColor;
-            ctx.lineWidth = lineWidth;
-            ctx.beginPath();
+            // Desenha tick (suprime se estiver sob o box do In/Out para manter o fundo limpo)
             const tickX = Math.round(x) + 0.5;
-            ctx.moveTo(tickX, this.rulerHeight - tickSize);
-            ctx.lineTo(tickX, this.rulerHeight);
-            ctx.stroke();
+            if (!(ioBadge && tickX >= ioBadge.left - 1 && tickX <= ioBadge.right + 1)) {
+                ctx.strokeStyle = strokeColor;
+                ctx.lineWidth = lineWidth;
+                ctx.beginPath();
+                ctx.moveTo(tickX, this.rulerHeight - tickSize);
+                ctx.lineTo(tickX, this.rulerHeight);
+                ctx.stroke();
+            }
 
             // Desenha texto do timecode/frame
             if (isTextTick) {
@@ -964,6 +971,13 @@ export class CapiauTimelineRenderer {
 
                 const textWidth = ctx.measureText(label).width;
                 const textLeft = Math.round(x) + 4;
+                const textRight = textLeft + textWidth;
+
+                // Guarda anti-colisão: nenhum rótulo da régua pode colidir ou ficar sob o Box de In/Out
+                if (ioBadge && textRight >= ioBadge.left - 6 && textLeft <= ioBadge.right + 6) {
+                    lastDrawnTextRight = Math.max(lastDrawnTextRight, ioBadge.right);
+                    continue;
+                }
 
                 // Proteção contra amontoamento: garante pelo menos 14px de respiro entre rótulos consecutivos
                 if (textLeft >= lastDrawnTextRight + 14) {
@@ -1017,23 +1031,10 @@ export class CapiauTimelineRenderer {
                 ctx.lineTo(rectRight, this.rulerHeight - 1);
                 ctx.stroke();
 
-                // Resumo de duração do intervalo no centro do trecho da régua se houver espaço
-                if (inX !== null && outX !== null && (outX - inX) >= 120) {
-                    const durFrames = Math.max(0, outF - inF);
-                    const durSec = durFrames / fps;
-                    const inTc = framesToTimecode(inF, fps).substring(3, 11);
-                    const outTc = framesToTimecode(outF, fps).substring(3, 11);
-                    const text = `IN ${inTc} → OUT ${outTc} (${durSec.toFixed(1)}s)`;
-
-                    ctx.font = "bold 9px 'Outfit', 'Inter', monospace";
-                    ctx.textAlign = "center";
-                    ctx.textBaseline = "middle";
-                    ctx.fillStyle = "#e2e8f0";
-
-                    const midX = (inX + outX) / 2;
-                    if (midX >= 40 && midX <= this.width - 40) {
-                        ctx.fillText(text, midX, this.rulerHeight / 2 - 1);
-                    }
+                // Box / Badge de resumo adaptativo do intervalo In/Out (Anti-colisão & Anti-truncamento)
+                const ioBadge = this._currentInOutBadge || this.getInOutBadgeInfo();
+                if (ioBadge) {
+                    this.drawInOutBadge(ioBadge);
                 }
             }
             ctx.restore();
@@ -1130,6 +1131,271 @@ export class CapiauTimelineRenderer {
 
             ctx.restore();
         }
+    }
+
+    getInOutBadgeInfo() {
+        const inF = TIMELINE_STATE.inFrame;
+        const outF = TIMELINE_STATE.outFrame;
+        if (inF === null || outF === null || outF <= inF) return null;
+
+        // O badge na régua só é exibido se:
+        // 1. O usuário ativou a exibição permanente nas Opções de Visualização (showInOutRulerBadge === true)
+        // OU
+        // 2. O usuário está ativamente ajustando as marcações do IO (puxando para a esquerda/direita ou movendo o intervalo)
+        const isAdjusting = !!TIMELINE_STATE.isAdjustingInOut;
+        const isAlwaysOn = !!TIMELINE_STATE.showInOutRulerBadge;
+        if (!isAdjusting && !isAlwaysOn) return null;
+
+        const zoom = TIMELINE_STATE.zoom || 1;
+        const scrollLeft = TIMELINE_STATE.scrollLeftFrame || 0;
+        const inX = (inF - scrollLeft) * zoom;
+        const outX = (outF - scrollLeft) * zoom;
+
+        // Limites seguros do intervalo (afastados dos colchetes e puxadores IN e OUT)
+        const safeLeft = inX + 13;
+        const safeRight = outX - 13;
+        const intervalW = safeRight - safeLeft;
+        if (intervalW < 44) return null;
+
+        const canvasWidth = this.width || 1000;
+        // Porção visível no viewport da régua
+        const visibleLeft = Math.max(0, safeLeft);
+        const visibleRight = Math.min(canvasWidth, safeRight);
+        const visibleW = visibleRight - visibleLeft;
+        if (visibleW < 44) return null;
+
+        const maxAllowedW = Math.min(intervalW, visibleW);
+
+        const fps = Number(TIMELINE_STATE.fps) > 0 ? Number(TIMELINE_STATE.fps) : 24;
+        const durFrames = outF - inF;
+        const durSec = durFrames / fps;
+        const forceHours = (inF >= 3600 * fps || outF >= 3600 * fps);
+
+        const inTcFull = formatRulerTimecode(inF, fps, true, forceHours);
+        const outTcFull = formatRulerTimecode(outF, fps, true, forceHours);
+        const inTcCompact = formatRulerTimecode(inF, fps, false, forceHours);
+        const outTcCompact = formatRulerTimecode(outF, fps, false, forceHours);
+        const durTc = formatRulerTimecode(durFrames, fps, true, durFrames >= 3600 * fps);
+        const durSecFormatted = durSec >= 60
+            ? `${Math.floor(durSec / 60)}m${String(Math.round(durSec % 60)).padStart(2, '0')}s`
+            : (durSec < 0.2 ? `${durFrames}f` : `${durSec.toFixed(1)}s`);
+
+        // Candidatos em ordem decrescente de largura (Progressive Collapse Standard)
+        const candidates = [
+            // Tier 1: Intervalo completo com frames + duração (ex: IN 01:18:00 → OUT 01:24:05 (6.2s))
+            {
+                tier: 1,
+                text: `IN ${inTcFull} → OUT ${outTcFull} (${durSecFormatted})`,
+                segments: [
+                    { text: "IN ", color: "#38bdf8", font: "bold 8px 'Outfit', 'Inter', sans-serif" },
+                    { text: inTcFull, color: "#f8fafc", font: "600 9px 'Outfit', 'Inter', monospace" },
+                    { text: " → ", color: "rgba(255, 255, 255, 0.45)", font: "9px 'Outfit', 'Inter', sans-serif" },
+                    { text: "OUT ", color: "#fb7185", font: "bold 8px 'Outfit', 'Inter', sans-serif" },
+                    { text: outTcFull, color: "#f8fafc", font: "600 9px 'Outfit', 'Inter', monospace" },
+                    { text: ` (${durSecFormatted})`, color: "#38bdf8", font: "600 9px 'Outfit', 'Inter', monospace" }
+                ]
+            },
+            // Tier 2: Intervalo compacto (MM:SS) + duração (ex: IN 01:18 → OUT 01:24 (6.2s))
+            {
+                tier: 2,
+                text: `IN ${inTcCompact} → OUT ${outTcCompact} (${durSecFormatted})`,
+                segments: [
+                    { text: "IN ", color: "#38bdf8", font: "bold 8px 'Outfit', 'Inter', sans-serif" },
+                    { text: inTcCompact, color: "#f8fafc", font: "600 9px 'Outfit', 'Inter', monospace" },
+                    { text: " → ", color: "rgba(255, 255, 255, 0.45)", font: "9px 'Outfit', 'Inter', sans-serif" },
+                    { text: "OUT ", color: "#fb7185", font: "bold 8px 'Outfit', 'Inter', sans-serif" },
+                    { text: outTcCompact, color: "#f8fafc", font: "600 9px 'Outfit', 'Inter', monospace" },
+                    { text: ` (${durSecFormatted})`, color: "#38bdf8", font: "600 9px 'Outfit', 'Inter', monospace" }
+                ]
+            },
+            // Tier 3: Apenas Duração com Timecode e segundos (ex: DUR 00:06:05 (6.2s))
+            {
+                tier: 3,
+                text: `DUR ${durTc} (${durSecFormatted})`,
+                segments: [
+                    { text: "DUR ", color: "rgba(255, 255, 255, 0.5)", font: "bold 8px 'Outfit', 'Inter', sans-serif" },
+                    { text: durTc, color: "#f8fafc", font: "600 9px 'Outfit', 'Inter', monospace" },
+                    { text: ` (${durSecFormatted})`, color: "#38bdf8", font: "600 9px 'Outfit', 'Inter', monospace" }
+                ]
+            },
+            // Tier 3b: Duração Timecode curta
+            {
+                tier: 3,
+                text: `DUR ${durTc}`,
+                segments: [
+                    { text: "DUR ", color: "rgba(255, 255, 255, 0.5)", font: "bold 8px 'Outfit', 'Inter', sans-serif" },
+                    { text: durTc, color: "#f8fafc", font: "600 9px 'Outfit', 'Inter', monospace" }
+                ]
+            },
+            // Tier 4: Micro Duração (ex: 6.2s ou 149f)
+            {
+                tier: 4,
+                text: durSecFormatted,
+                segments: [
+                    { text: durSecFormatted, color: "#38bdf8", font: "bold 9px 'Outfit', 'Inter', monospace" }
+                ]
+            }
+        ];
+
+        const ctx = this.ctx;
+        const paddingX = 14; // 7px de cada lado
+        let chosenCandidate = null;
+        let chosenWidth = 0;
+
+        if (ctx) {
+            ctx.save();
+            for (const cand of candidates) {
+                let totalSegW = 0;
+                for (const seg of cand.segments) {
+                    if (ctx.font !== seg.font) ctx.font = seg.font;
+                    totalSegW += (ctx.measureText ? (ctx.measureText(seg.text)?.width || seg.text.length * 6) : seg.text.length * 6);
+                }
+                const candidateBadgeW = Math.round(totalSegW + paddingX);
+                if (candidateBadgeW <= maxAllowedW) {
+                    chosenCandidate = cand;
+                    chosenWidth = candidateBadgeW;
+                    break;
+                }
+            }
+            ctx.restore();
+        } else {
+            // Estimativa para ambientes sem ctx (testes em Node)
+            for (const cand of candidates) {
+                const totalSegW = cand.text.length * 6.5;
+                const candidateBadgeW = Math.round(totalSegW + paddingX);
+                if (candidateBadgeW <= maxAllowedW) {
+                    chosenCandidate = cand;
+                    chosenWidth = candidateBadgeW;
+                    break;
+                }
+            }
+        }
+
+        if (!chosenCandidate) return null;
+
+        // Centralização do badge na porção visível do intervalo
+        const center = (visibleLeft + visibleRight) / 2;
+        let left = Math.round(center - chosenWidth / 2);
+        let right = left + chosenWidth;
+
+        // Garante que o badge não ultrapasse nem a margem esquerda nem a direita
+        const minLeft = Math.max(safeLeft, visibleLeft);
+        if (left < minLeft) {
+            left = minLeft;
+            right = left + chosenWidth;
+        }
+
+        const maxRight = Math.min(safeRight, visibleRight);
+        if (right > maxRight) {
+            right = maxRight;
+            left = right - chosenWidth;
+        }
+
+        const badgeH = 18;
+        const rulerH = this.rulerHeight || 30;
+        const top = Math.round((rulerH - badgeH) / 2);
+
+        return {
+            left,
+            right,
+            top,
+            bottom: top + badgeH,
+            width: chosenWidth,
+            height: badgeH,
+            candidate: chosenCandidate,
+            text: chosenCandidate.text,
+            tier: chosenCandidate.tier,
+            inF,
+            outF,
+            durFrames,
+            durSec
+        };
+    }
+
+    /**
+     * Desenha o Box / Badge em estilo Glassmorphism NLE para o intervalo In/Out na régua.
+     * Possui fundo escuro com alta opacidade (anti-mistura), borda gradiente ciano-rosa e tipografia proporcional.
+     * @param {Object} ioBadge - Dados calculados por getInOutBadgeInfo()
+     */
+    drawInOutBadge(ioBadge) {
+        if (!ioBadge || !ioBadge.candidate || !this.ctx) return;
+        const ctx = this.ctx;
+        ctx.save();
+
+        const bx = ioBadge.left;
+        const by = ioBadge.top;
+        const bw = ioBadge.width;
+        const bh = ioBadge.height;
+        const radius = 4;
+
+        // 1. Sombra suave para destacar da régua
+        ctx.shadowColor = "rgba(0, 0, 0, 0.7)";
+        ctx.shadowBlur = 6;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 1;
+
+        // 2. Fundo escuro de alta opacidade (elimina mistura com qualquer elemento da régua)
+        ctx.fillStyle = "rgba(12, 14, 20, 0.94)";
+        if (typeof ctx.roundRect === "function") {
+            ctx.beginPath();
+            ctx.roundRect(bx, by, bw, bh, radius);
+            ctx.fill();
+        } else {
+            ctx.beginPath();
+            ctx.moveTo(bx + radius, by);
+            ctx.lineTo(bx + bw - radius, by);
+            ctx.quadraticCurveTo(bx + bw, by, bx + bw, by + radius);
+            ctx.lineTo(bx + bw, by + bh - radius);
+            ctx.quadraticCurveTo(bx + bw, by + bh, bx + bw - radius, by + bh);
+            ctx.lineTo(bx + radius, by + bh);
+            ctx.quadraticCurveTo(bx, by + bh, bx, by + bh - radius);
+            ctx.lineTo(bx, by + radius);
+            ctx.quadraticCurveTo(bx, by, bx + radius, by);
+            ctx.closePath();
+            ctx.fill();
+        }
+
+        // Reseta shadow antes da borda e texto para nitidez absoluta
+        ctx.shadowColor = "transparent";
+        ctx.shadowBlur = 0;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 0;
+
+        // 3. Borda com gradiente suave Ciano (IN) -> Rosa (OUT)
+        let borderStroke = "rgba(6, 182, 212, 0.65)";
+        if (typeof ctx.createLinearGradient === "function") {
+            const borderGrad = ctx.createLinearGradient(bx, 0, bx + bw, 0);
+            borderGrad.addColorStop(0, "rgba(6, 182, 212, 0.75)");
+            borderGrad.addColorStop(0.5, "rgba(56, 189, 248, 0.5)");
+            borderGrad.addColorStop(1, "rgba(244, 63, 94, 0.75)");
+            borderStroke = borderGrad;
+        }
+        ctx.strokeStyle = borderStroke;
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        // 4. Renderização dos segmentos de texto perfeitamente centralizados
+        let totalSegW = 0;
+        for (const seg of ioBadge.candidate.segments) {
+            ctx.font = seg.font;
+            totalSegW += ctx.measureText ? (ctx.measureText(seg.text)?.width || 0) : 0;
+        }
+
+        let curX = Math.round(bx + (bw - totalSegW) / 2);
+        const textY = Math.round(by + bh / 2);
+        ctx.textAlign = "left";
+        ctx.textBaseline = "middle";
+
+        for (const seg of ioBadge.candidate.segments) {
+            ctx.font = seg.font;
+            ctx.fillStyle = seg.color;
+            if (typeof ctx.fillText === "function") {
+                ctx.fillText(seg.text, curX, textY);
+            }
+            curX += ctx.measureText ? (ctx.measureText(seg.text)?.width || 0) : 0;
+        }
+
+        ctx.restore();
     }
 
     /**
