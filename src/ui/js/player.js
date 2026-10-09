@@ -28,6 +28,14 @@ export function formatTimecode(secs, fps = null) {
 }
 
 /**
+ * Troca o texto só quando muda. Regravar o mesmo texto ainda substitui o nó e obriga o
+ * navegador a reavaliar estilo/layout da página inteira — a cada quadro, nos contadores.
+ */
+function setTextIfChanged(el, text) {
+    if (el && el.textContent !== text) el.textContent = text;
+}
+
+/**
  * Interpolação Matemática dos 3 subtipos de transição de vídeo:
  * - video_cross_dissolve: dissolvência cruzada linear (sem escurecimento/dip para preto)
  * - video_dip_black: mergulho no preto (ponto nulo em t=0.5)
@@ -2723,8 +2731,8 @@ export class ProgramPlayer {
             const curTimelineEl = getActiveElement("timeline-current-time");
             const fpsVal = TIMELINE_STATE?.fps || 24;
             const formattedTc = formatTimecode(frame / fpsVal, fpsVal);
-            if (curProgramEl && !curProgramEl._timecodeInputActive) curProgramEl.textContent = formattedTc;
-            if (curTimelineEl && !curTimelineEl._timecodeInputActive) curTimelineEl.textContent = formattedTc;
+            if (curProgramEl && !curProgramEl._timecodeInputActive) setTextIfChanged(curProgramEl, formattedTc);
+            if (curTimelineEl && !curTimelineEl._timecodeInputActive) setTextIfChanged(curTimelineEl, formattedTc);
         });
 
         // Foco visual do teclado
@@ -3529,11 +3537,11 @@ export class ProgramPlayer {
         const timelineTcEl = getActiveElement("timeline-current-time");
         const fpsVal = TIMELINE_STATE?.fps || 24;
         const formattedTc = formatTimecode(currentFrame / fpsVal, fpsVal);
-        if (curTimeEl && !curTimeEl._timecodeInputActive) curTimeEl.textContent = formattedTc;
-        if (timelineTcEl && !timelineTcEl._timecodeInputActive) timelineTcEl.textContent = formattedTc;
+        if (curTimeEl && !curTimeEl._timecodeInputActive) setTextIfChanged(curTimeEl, formattedTc);
+        if (timelineTcEl && !timelineTcEl._timecodeInputActive) setTextIfChanged(timelineTcEl, formattedTc);
 
         const durTimeEl = this.el("program-duration-time");
-        if (durTimeEl) durTimeEl.textContent = formatTimecode(durationFrames / fpsVal, fpsVal);
+        setTextIfChanged(durTimeEl, formatTimecode(durationFrames / fpsVal, fpsVal));
 
         const fill = this.el("program-scrubber-progress-fill");
         const handle = this.el("program-scrubber-progress-handle");

@@ -9240,15 +9240,16 @@ select option, .nle-select option {
     font-weight: 500;
 }
 
-/* Previne que tooltips ou índice de rolagem apareçam quando o menu de contexto, opções ou ordenação estão abertos */
-body:has(.custom-context-menu) #library-scroll-index-tooltip,
-body:has(.custom-context-menu) #global-tooltip,
-body:has(#timeline-view-options-dropdown.visible) #global-tooltip,
-body:has(#timeline-view-options-dropdown.visible) #library-scroll-index-tooltip,
-body:has(#library-sort-dropdown.show) #global-tooltip,
-body:has(#library-sort-dropdown.show) #library-scroll-index-tooltip,
-body:has(#btn-library-sort.active) #global-tooltip,
-body:has(#btn-library-sort.active) #library-scroll-index-tooltip {
+/* Previne que tooltips ou índice de rolagem apareçam quando o menu de contexto, opções ou ordenação estão abertos.
+   Menus e dropdowns são filhos diretos do body: o ">" faz o navegador olhar só os filhos do body,
+   em vez de reavaliar a regra a cada mudança em qualquer ponto da página (custava ms por quadro
+   com a biblioteca cheia). O #btn-library-sort.active acompanha o #library-sort-dropdown.show. */
+body:has(> .custom-context-menu) #library-scroll-index-tooltip,
+body:has(> .custom-context-menu) #global-tooltip,
+body:has(> #timeline-view-options-dropdown.visible) #global-tooltip,
+body:has(> #timeline-view-options-dropdown.visible) #library-scroll-index-tooltip,
+body:has(> #library-sort-dropdown.show) #global-tooltip,
+body:has(> #library-sort-dropdown.show) #library-scroll-index-tooltip {
     display: none !important;
     opacity: 0 !important;
     pointer-events: none !important;
@@ -13142,8 +13143,10 @@ input[type="number"] {
     border-color: rgba(52, 211, 153, 0.65);
     box-shadow: 0 0 10px rgba(16, 185, 129, 0.18);
 }
-.ev-preset:has(input:checked) i,
-.ev-preset:has(input:checked) span {
+/* Irmão em vez de :has(): com :has() o alvo era todo <i>/<span> da página (milhares na
+   biblioteca), reavaliados a cada mudança de texto — inclusive o timecode, a cada quadro. */
+.ev-preset input:checked ~ i,
+.ev-preset input:checked ~ span {
     color: #34d399;
 }
 
