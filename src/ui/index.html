@@ -1099,8 +1099,8 @@
                                     <div id="program-player-matte" style="display: none; position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none;"></div>
                                     <div id="program-player-matte-b" style="display: none; position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none;"></div>
 
-                                    <!-- Camada de ajuste cumulativa (backdrop-filter) -->
-                                    <div id="program-player-adjustment" style="display: none; position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none;"></div>
+                                    <!-- Camada de ajuste (backdrop-filter); com mais de uma ativa, o player cria irmãos -2, -3... -->
+                                    <div id="program-player-adjustment" class="monitor-camada-ajuste" style="display: none; position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none;"></div>
 
                                     <!-- Canvas de Render Cache do NLE (Fast-Path de Efeitos e Ajustes) -->
                                     <canvas id="program-player-render-cache" style="display: none; position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 45;"></canvas>

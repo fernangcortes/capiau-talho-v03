@@ -666,14 +666,15 @@ await runBattery("Renderização no Canvas da Timeline: badge fx [Ajuste] e faix
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Bateria 9: Composição Direta no Player (applyMediaEffects & applyMatteSlot)
+// Bateria 9: Clipes sob a camada de ajuste ficam intactos; o efeito vai no backdrop
 // ─────────────────────────────────────────────────────────────────────────────
-await runBattery("Aplicação Direta de Filtros CSS Cumulativos no Elemento de Mídia (V2 sobre V1)", async () => {
+await runBattery("Clipes sob a camada de ajuste ficam intactos e o efeito vai no backdrop (igual ao export)", async () => {
     const { CapiauPlayer } = await import("../src/ui/js/player.js");
     const player = new CapiauPlayer();
 
     // Cenário: Clipe de vídeo em V1 (frame 0 a 100)
-    // Camada de Ajuste em V2 (frame 0 a 100) com Brilho -41%, Saturação 0%, Matiz -92%
+    // Camada de Ajuste em V2 (frame 0 a 100) com Brilho -41%, Saturação 0%, Matiz -92%,
+    // opacidade 0.5 e crop de 20% no topo
     const mediaCut = {
         id: "clip_v1_grading",
         type: "video",
@@ -695,7 +696,9 @@ await runBattery("Aplicação Direta de Filtros CSS Cumulativos no Elemento de M
         outFrame: 100,
         disabled: false,
         effects: [
-            { type: "color", brightness: -41, saturation: 0, hue: -92, disabled: false }
+            { type: "color", brightness: -41, saturation: 0, hue: -92, disabled: false },
+            { type: "crop", top: 20, bottom: 0, left: 0, right: 0, disabled: false },
+            { type: "transform", opacity: 0.5, disabled: false }
         ]
     };
 
@@ -704,22 +707,15 @@ await runBattery("Aplicação Direta de Filtros CSS Cumulativos no Elemento de M
     const mockVideoEl = makeEl("program-video-a");
     mockVideoEl.parentElement = { clientWidth: 1920, clientHeight: 1080 };
 
-    // Executa applyMediaEffects no frame 50
+    // O clipe não recebe filtro, opacidade nem crop da camada de ajuste
     player.applyMediaEffects(mockVideoEl, mediaCut, 50);
-
     const filterVal = mockVideoEl.style.filter;
-    assert.ok(filterVal.includes("brightness(0.59)"), `Filtro de vídeo deve conter brightness(0.59): ${filterVal}`);
-    assert.ok(filterVal.includes("saturate(0.00)") || filterVal.includes("saturate(0)"), `Filtro de vídeo deve conter saturate(0.00): ${filterVal}`);
-    assert.ok(filterVal.includes("hue-rotate(-92deg)"), `Filtro de vídeo deve conter hue-rotate(-92deg): ${filterVal}`);
+    assert.ok(!filterVal.includes("brightness(0.59)") && !filterVal.includes("hue-rotate(-92deg)"),
+        `Filtro do vídeo não deve conter a camada de ajuste: ${filterVal}`);
+    assert.strictEqual(mockVideoEl.style.opacity, "1", "A opacidade da camada de ajuste não deixa o clipe transparente");
+    assert.strictEqual(mockVideoEl.style.clipPath, "", "O crop da camada de ajuste não recorta o clipe");
 
-    // Quando a camada de ajuste é desativada (bypass / disabled: true)
-    STATE.activeTimelineCuts.find(c => c.id === "adj_v2_color").disabled = true;
-    player.applyMediaEffects(mockVideoEl, mediaCut, 50);
-    const filterBypassed = mockVideoEl.style.filter;
-    assert.ok(!filterBypassed.includes("hue-rotate(-92deg)"), "Filtro não deve conter efeitos de camada de ajuste desativada");
-
-    // Testa também sobre cor sólida (applyMatteSlot)
-    STATE.activeTimelineCuts.find(c => c.id === "adj_v2_color").disabled = false;
+    // Cor sólida também fica intacta
     const matteCut = {
         id: "matte_v1_grading",
         type: "video",
@@ -733,9 +729,24 @@ await runBattery("Aplicação Direta de Filtros CSS Cumulativos no Elemento de M
     };
     const mockMatteEl = makeEl("program-player-matte");
     player.applyMatteSlot(mockMatteEl, matteCut, 50);
-    const matteFilter = mockMatteEl.style.filter;
-    assert.ok(matteFilter.includes("brightness(0.59)"), `Matte deve receber brightness(0.59): ${matteFilter}`);
-    assert.ok(matteFilter.includes("hue-rotate(-92deg)"), `Matte deve receber hue-rotate(-92deg): ${matteFilter}`);
+    assert.strictEqual(mockMatteEl.style.filter, "", `Matte não deve receber a camada de ajuste: ${mockMatteEl.style.filter}`);
+    assert.strictEqual(mockMatteEl.style.opacity, "1", "Matte não fica transparente pela camada de ajuste");
+    assert.strictEqual(mockMatteEl.style.clipPath, "", "Matte não é recortado pela camada de ajuste");
+
+    // A camada vira backdrop-filter com a força cheia; opacidade = alfa do efeito; crop = região do efeito
+    const adjEl = makeEl("program-player-adjustment");
+    player.applyAdjustmentLayer(adjEl, STATE.activeTimelineCuts, 50, { base: "V1", overlay: null });
+    const bf = adjEl.style.backdropFilter;
+    assert.ok(bf.includes("brightness(0.59)") && bf.includes("saturate(0.00)") && bf.includes("hue-rotate(-92deg)"),
+        `backdrop-filter deve ter o efeito com a força cheia: ${bf}`);
+    assert.strictEqual(adjEl.style.display, "block");
+    assert.strictEqual(adjEl.style.opacity, "0.5", "Opacidade da camada = mistura do efeito com o original");
+    assert.strictEqual(adjEl.style.clipPath, "inset(20% 0% 0% 0%)", "Crop limita a região do efeito");
+
+    // Bypass: camada desativada some
+    STATE.activeTimelineCuts.find(c => c.id === "adj_v2_color").disabled = true;
+    player.applyAdjustmentLayer(adjEl, STATE.activeTimelineCuts, 50, { base: "V1", overlay: null });
+    assert.strictEqual(adjEl.style.display, "none", "Camada de ajuste desativada não aparece");
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

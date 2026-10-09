@@ -44,8 +44,10 @@
     --shadow-premium: 0 8px 24px rgba(0, 0, 0, 0.6);
 }
 
-/* Chapado: com fundos opacos o desfoque não aparece e só custa GPU. */
-:root[data-theme="neutro"] * {
+/* Chapado: com fundos opacos o desfoque não aparece e só custa GPU.
+   Fora a camada de ajuste do monitor: nela o backdrop-filter é o próprio efeito (player.js,
+   applyAdjustmentLayer). O :where() mantém a especificidade da regra. */
+:root[data-theme="neutro"] *:not(:where(.monitor-camada-ajuste)) {
     -webkit-backdrop-filter: none !important;
     backdrop-filter: none !important;
 }
@@ -53,7 +55,7 @@
 /* ── PERSONALIZADO ───────────────────────────────────────────────────────────
    Os valores dos tokens são calculados em js/themeManager.js a partir das Configurações → Aparência
    e aplicados como estilo inline no <html> (por js/themeBoot.js). Aqui só o que não é valor. */
-:root[data-theme="custom"] * {
+:root[data-theme="custom"] *:not(:where(.monitor-camada-ajuste)) {
     -webkit-backdrop-filter: none !important;
     backdrop-filter: none !important;
 }

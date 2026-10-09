@@ -369,11 +369,22 @@ assert.equal(adjEl.style.opacity, "1", "Opacidade deve ser 1.0 no pico do ajuste
 assert(adjEl.style.backdropFilter.includes("saturate(1.50)"), "backdropFilter deve conter saturate(1.50)");
 assert(adjEl.style.backdropFilter.includes("brightness(0.90)"), "backdropFilter deve conter brightness(0.90)");
 
-// Executa renderização no frame 60 (meio do fade in Bézier)
+// Executa renderização no frame 60 (meio do fade in Bézier). Como no export (cópia filtrada
+// sobreposta com alfa = opacidade × fade), o fade vira a opacidade da camada e o filtro
+// fica com a força cheia.
 playerManager.applyAdjustmentLayer(adjEl, STATE.activeTimelineCuts, 60);
 assert.equal(adjEl.style.display, "block", "Overlay deve estar visível no frame 60");
 assert.equal(adjEl.style.mixBlendMode, "soft-light", "mixBlendMode deve se manter 'soft-light'");
-assert(adjEl.style.backdropFilter.includes("saturate(1.25)"), "backdropFilter deve modular para saturate(1.25)");
+assert(adjEl.style.backdropFilter.includes("saturate(1.50)"), "o fade não reduz a força do filtro: saturate(1.50)");
+assert.equal(Math.round(parseFloat(adjEl.style.opacity) * 100) / 100, 0.5, "o fade vira a opacidade da camada (0.5)");
+
+// Empilhamento: a camada em V2 fica acima da base (V1, z 1/2) e abaixo de um clipe em V3 (z 10/11)
+playerManager.applyAdjustmentLayer(adjEl, STATE.activeTimelineCuts, 96, { base: "V1", overlay: "V3" });
+assert.equal(adjEl.style.zIndex, "5", "camada em V2 entre a base V1 e a sobreposição V3");
+playerManager.applyAdjustmentLayer(adjEl, STATE.activeTimelineCuts, 96, { base: "V1", overlay: null });
+assert.equal(adjEl.style.zIndex, "5", "camada em V2 acima da base V1");
+playerManager.applyAdjustmentLayer(adjEl, STATE.activeTimelineCuts, 96, { base: null, overlay: null });
+assert.equal(adjEl.style.zIndex, "0", "sem clipe no ar a camada só filtra o fundo preto");
 
 // Sépia e cinzas são gravados em % (slider 0-100, igual ao export): o CSS precisa
 // da fração, senão grayscale(24) grampeia em 1 e a imagem fica toda cinza.

@@ -3608,7 +3608,7 @@ export class ProgramPlayer {
             if (matteA) matteA.style.display = "none";
             if (matteB) matteB.style.display = "none";
             const adjEl = this.el("program-player-adjustment");
-            if (adjEl) adjEl.style.display = "none";
+            if (adjEl) this._adjustmentEls(adjEl, 0).forEach(el => { el.style.display = "none"; });
             const dipWhiteOverlay = document.getElementById("program-player-dip-white-overlay");
             if (dipWhiteOverlay) dipWhiteOverlay.style.display = "none";
 
@@ -3914,7 +3914,10 @@ export class ProgramPlayer {
 
         // ────────── CAMADA DE AJUSTE CUMULATIVA (ADJUSTMENT LAYER) ──────────
         const adjEl = this.el("program-player-adjustment");
-        this.applyAdjustmentLayer(adjEl, cuts, currentFrame);
+        this.applyAdjustmentLayer(adjEl, cuts, currentFrame, {
+            base: baseTrack ? baseTrack.id : null,
+            overlay: overlayTrack ? overlayTrack.id : null
+        });
 
         // Cada pista de áudio tem seu próprio elemento <audio> tocando o clipe sob o playhead
         this.syncAudioTracks(cuts, currentFrame);
@@ -4396,52 +4399,9 @@ export class ProgramPlayer {
         const blendMode = (cut.blend_mode || cut.blendMode || tf.blend_mode || tf.blendMode || "normal").toLowerCase();
         matteEl.style.mixBlendMode = blendMode;
 
-        // Aplica efeitos cumulativos de camadas de ajuste ativas acima desta pista
-        const adjEffects = (window.TIMELINE_STATE && typeof window.TIMELINE_STATE.getCumulativeAdjustmentEffects === "function")
-            ? window.TIMELINE_STATE.getCumulativeAdjustmentEffects(cut.track, currentFrame)
-            : [];
-        let adjFilterStr = "";
-        let adjOpacity = 1.0;
-        let adjCrop = null;
+        // Camadas de ajuste acima desta pista NÃO entram aqui: applyAdjustmentLayer as compõe
+        // por cima com backdrop-filter, como o export.
 
-        if (adjEffects && adjEffects.length > 0) {
-            const adjParts = [];
-            adjEffects.forEach(eff => {
-                if (!eff || eff.disabled) return;
-                if (eff.type === "color") {
-                    if (typeof eff.brightness === "number" && eff.brightness !== 0) {
-                        adjParts.push(`brightness(${((eff.brightness + 100) / 100).toFixed(2)})`);
-                    }
-                    if (typeof eff.contrast === "number" && eff.contrast !== 0) {
-                        adjParts.push(`contrast(${((eff.contrast + 100) / 100).toFixed(2)})`);
-                    }
-                    if (typeof eff.saturation === "number" && eff.saturation !== 100) {
-                        adjParts.push(`saturate(${(eff.saturation / 100).toFixed(2)})`);
-                    }
-                    if (typeof eff.hue === "number" && eff.hue !== 0) {
-                        adjParts.push(`hue-rotate(${eff.hue}deg)`);
-                    }
-                    if (typeof eff.sepia === "number" && eff.sepia > 0) {
-                        adjParts.push(`sepia(${(eff.sepia / 100).toFixed(2)})`);
-                    }
-                    if (typeof eff.grayscale === "number" && eff.grayscale > 0) {
-                        adjParts.push(`grayscale(${(eff.grayscale / 100).toFixed(2)})`);
-                    }
-                    if (typeof eff.blur === "number" && eff.blur > 0) {
-                        adjParts.push(`blur(${eff.blur}px)`);
-                    }
-                } else if (eff.type === "transform") {
-                    if (typeof eff.opacity === "number") {
-                        adjOpacity *= eff.opacity;
-                    }
-                } else if (eff.type === "crop") {
-                    adjCrop = eff;
-                }
-            });
-            if (adjParts.length > 0) {
-                adjFilterStr = adjParts.join(" ");
-            }
-        }
         // Aplica efeitos de cor do próprio clipe de cor sólida (se houver)
         const col = effects.find(e => e.type === "color" && !e.disabled) || {};
         const colParts = [];
@@ -4468,8 +4428,7 @@ export class ProgramPlayer {
                 colParts.push(`blur(${col.blur}px)`);
             }
         }
-        const fullFilter = [...colParts, ...(adjFilterStr ? [adjFilterStr] : [])].join(" ");
-        matteEl.style.filter = fullFilter;
+        matteEl.style.filter = colParts.join(" ");
 
         // Modulação de Fade In / Fade Out em Cor Sólida (Task: /boost fade in / fade out deve modular cor solida)
         const fps = (window.TIMELINE_STATE && window.TIMELINE_STATE.fps) || 24;
@@ -4510,7 +4469,7 @@ export class ProgramPlayer {
         const tfOp = (typeof tf.opacity === "number")
             ? Math.max(0, Math.min(1, tf.opacity))
             : ((typeof cut.opacity === "number") ? Math.max(0, Math.min(1, cut.opacity)) : 1.0);
-        const op = tfOp * fadeOpacity * adjOpacity;
+        const op = tfOp * fadeOpacity;
         matteEl.style.opacity = String((typeof op === "number" && Number.isFinite(op)) ? Math.max(0, Math.min(1, op)) : 1.0);
 
         const scale = (typeof tf.scale === "number") ? tf.scale : 1.0;
@@ -4524,16 +4483,10 @@ export class ProgramPlayer {
         if (rot !== 0) tfParts.push(`rotate(${rot}deg)`);
         matteEl.style.transform = tfParts.length > 0 ? tfParts.join(" ") : "";
 
-        let cropTop = crop ? (crop.top || 0) : 0;
-        let cropRight = crop ? (crop.right || 0) : 0;
-        let cropBottom = crop ? (crop.bottom || 0) : 0;
-        let cropLeft = crop ? (crop.left || 0) : 0;
-        if (adjCrop && !adjCrop.disabled) {
-            cropTop = Math.max(cropTop, adjCrop.top || 0);
-            cropRight = Math.max(cropRight, adjCrop.right || 0);
-            cropBottom = Math.max(cropBottom, adjCrop.bottom || 0);
-            cropLeft = Math.max(cropLeft, adjCrop.left || 0);
-        }
+        const cropTop = crop ? (crop.top || 0) : 0;
+        const cropRight = crop ? (crop.right || 0) : 0;
+        const cropBottom = crop ? (crop.bottom || 0) : 0;
+        const cropLeft = crop ? (crop.left || 0) : 0;
 
         if (cropTop > 0 || cropRight > 0 || cropBottom > 0 || cropLeft > 0) {
             matteEl.style.clipPath = `inset(${cropTop}% ${cropRight}% ${cropBottom}% ${cropLeft}%)`;
@@ -4543,9 +4496,16 @@ export class ProgramPlayer {
     }
 
     /**
-     * Aplica o efeito cumulativo de camadas de ajuste ativas sobre o viewport via CSS backdrop-filter.
+     * Compõe as camadas de ajuste ativas no playhead com CSS backdrop-filter, como o export
+     * (grafo_video.py, _cadeia_ajuste): tudo o que está ABAIXO da pista da camada recebe por
+     * cima uma cópia filtrada com a força cheia, com alfa = opacidade × fade, só dentro do
+     * crop e com o modo de mesclagem da camada. Os clipes não recebem nada da camada.
+     *
+     * Cada camada ativa tem o seu elemento, empilhado entre as camadas do monitor que ficam
+     * abaixo e acima da pista dela. `camadas` = { base, overlay }: pistas dos clipes no ar
+     * (z-index 1/2 e 10/11). Sem elas, as camadas ficam acima de tudo.
      */
-    applyAdjustmentLayer(adjEl, cuts, currentFrame) {
+    applyAdjustmentLayer(adjEl, cuts, currentFrame, camadas = null) {
         if (!adjEl) return;
 
         // Identifica camadas de ajuste ativas no playhead
@@ -4556,17 +4516,7 @@ export class ProgramPlayer {
             return currentFrame >= start && currentFrame < start + dur;
         });
 
-        if (activeAdjustments.length === 0) {
-            adjEl.style.display = "none";
-            adjEl.style.backdropFilter = "none";
-            adjEl.style.webkitBackdropFilter = "none";
-            adjEl.style.clipPath = "";
-            adjEl.style.mixBlendMode = "normal";
-            adjEl.dataset.activeClipId = "";
-            return;
-        }
-
-        // Ordena da pista mais baixa para a mais alta (V2 depois V3)
+        // Da pista mais baixa para a mais alta: a de cima filtra o resultado da de baixo
         const getTrackLevel = (trackId) => {
             if (window.TIMELINE_STATE?.getTrackLevel) return window.TIMELINE_STATE.getTrackLevel(trackId);
             const m = String(trackId || "").match(/^V(\d+)$/i);
@@ -4574,84 +4524,96 @@ export class ProgramPlayer {
         };
         activeAdjustments.sort((a, b) => getTrackLevel(a.track) - getTrackLevel(b.track));
 
-        const aggregatedEffects = [];
-        let combinedCrop = null;
-        let lastOpacity = 1.0;
-        let activeBlendMode = "normal";
+        const els = this._adjustmentEls(adjEl, activeAdjustments.length);
+        els.slice(activeAdjustments.length).forEach(el => this._hideAdjustmentEl(el));
 
+        const nivelBase = camadas && camadas.base ? getTrackLevel(camadas.base) : null;
+        const nivelSobre = camadas && camadas.overlay ? getTrackLevel(camadas.overlay) : null;
         const fps = window.TIMELINE_STATE?.fps || 24;
-        activeAdjustments.forEach(adj => {
-            const bMode = (adj.blend_mode || adj.blendMode || adj.effects?.find(e => e.type === "transform")?.blend_mode || adj.effects?.find(e => e.type === "transform")?.blendMode || "normal").toLowerCase();
-            if (bMode && bMode !== "normal") {
-                activeBlendMode = bMode;
-            }
+
+        activeAdjustments.forEach((adj, i) => {
+            const el = els[i];
+            if (!el) return; // sem DOM para criar outro elemento
+
+            // Primeiro bloco de cada tipo; desligado = ausente (igual a _bloco_ativo do export)
+            const effects = Array.isArray(adj.effects) ? adj.effects : [];
+            const bloco = (tipo) => {
+                const b = effects.find(e => e && e.type === tipo);
+                return (b && !b.disabled) ? b : null;
+            };
+            const cor = bloco("color");
+            const crop = bloco("crop");
+            const tf = bloco("transform");
+            const tfBruto = effects.find(e => e && e.type === "transform");
+
             const fadeFactor = (typeof computeAdjustmentFadeFactor === "function")
                 ? computeAdjustmentFadeFactor(adj, currentFrame, fps)
                 : 1.0;
-            (adj.effects || []).forEach(eff => {
-                if (eff && !eff.disabled) {
-                    if (eff.type === "color") {
-                        const rawB = typeof eff.brightness === "number" ? eff.brightness : 0;
-                        const rawC = typeof eff.contrast === "number" ? eff.contrast : 0;
-                        const rawS = typeof eff.saturation === "number" ? eff.saturation : 100;
-                        const rawH = typeof eff.hue === "number" ? eff.hue : 0;
-                        const rawSep = typeof eff.sepia === "number" ? eff.sepia : 0;
-                        const rawGray = typeof eff.grayscale === "number" ? eff.grayscale : 0;
-                        const rawBlur = typeof eff.blur === "number" ? eff.blur : 0;
+            const opTf = (tf && typeof tf.opacity === "number") ? tf.opacity : 1.0;
+            const op = opTf * fadeFactor;
 
-                        aggregatedEffects.push({
-                            ...eff,
-                            brightness: rawB * fadeFactor,
-                            contrast: rawC * fadeFactor,
-                            saturation: 100 + (rawS - 100) * fadeFactor,
-                            hue: rawH * fadeFactor,
-                            sepia: rawSep * fadeFactor,
-                            grayscale: rawGray * fadeFactor,
-                            blur: rawBlur * fadeFactor
-                        });
-                    } else if (eff.type === "crop") {
-                        combinedCrop = {
-                            ...eff,
-                            top: (eff.top || 0) * fadeFactor,
-                            right: (eff.right || 0) * fadeFactor,
-                            bottom: (eff.bottom || 0) * fadeFactor,
-                            left: (eff.left || 0) * fadeFactor
-                        };
-                    } else if (eff.type === "transform") {
-                        if (typeof eff.opacity === "number") {
-                            const modOp = 1.0 - (1.0 - eff.opacity) * fadeFactor;
-                            lastOpacity *= modOp;
-                        }
-                    }
-                }
-            });
-            lastOpacity *= fadeFactor;
-        });
-
-        const filterStr = buildCssBackdropFilter(aggregatedEffects);
-        adjEl.style.display = "block";
-        adjEl.style.position = "absolute";
-        adjEl.style.inset = "0";
-        adjEl.style.pointerEvents = "none";
-        adjEl.style.zIndex = "25";
-        adjEl.style.backdropFilter = filterStr;
-        adjEl.style.webkitBackdropFilter = filterStr;
-        adjEl.style.opacity = String(lastOpacity);
-        adjEl.style.mixBlendMode = activeBlendMode;
-
-        if (combinedCrop) {
-            const top = combinedCrop.top || 0;
-            const right = combinedCrop.right || 0;
-            const bottom = combinedCrop.bottom || 0;
-            const left = combinedCrop.left || 0;
-            if (top > 0 || right > 0 || bottom > 0 || left > 0) {
-                adjEl.style.clipPath = `inset(${top}% ${right}% ${bottom}% ${left}%)`;
+            let z;
+            const nivel = getTrackLevel(adj.track);
+            if (!camadas) {
+                z = 25 + i;
+            } else if (nivelSobre !== null && nivel > nivelSobre) {
+                z = 20 + i; // acima da sobreposição
+            } else if (nivelBase !== null && nivel > nivelBase) {
+                z = 5 + i;  // entre a base e a sobreposição
             } else {
-                adjEl.style.clipPath = "";
+                z = 0;      // abaixo dos clipes no ar: só filtra o fundo preto
             }
-        } else {
-            adjEl.style.clipPath = "";
+
+            const filterStr = cor ? buildCssBackdropFilter([cor]) : "none";
+            el.style.display = "block";
+            el.style.position = "absolute";
+            el.style.inset = "0";
+            el.style.pointerEvents = "none";
+            el.style.zIndex = String(z);
+            el.style.backdropFilter = filterStr;
+            el.style.webkitBackdropFilter = filterStr;
+            el.style.opacity = String(Number.isFinite(op) ? Math.max(0, Math.min(1, op)) : 1.0);
+            el.style.mixBlendMode = (adj.blend_mode || adj.blendMode || tfBruto?.blend_mode || tfBruto?.blendMode || "normal").toLowerCase();
+
+            const top = crop ? (crop.top || 0) : 0;
+            const right = crop ? (crop.right || 0) : 0;
+            const bottom = crop ? (crop.bottom || 0) : 0;
+            const left = crop ? (crop.left || 0) : 0;
+            el.style.clipPath = (top > 0 || right > 0 || bottom > 0 || left > 0)
+                ? `inset(${top}% ${right}% ${bottom}% ${left}%)`
+                : "";
+        });
+    }
+
+    /** Elemento da camada de ajuste do HTML mais os irmãos extras (-2, -3...), criados sob
+     *  demanda logo depois dele quando há mais de uma camada ativa ao mesmo tempo. Devolve
+     *  também os extras já criados que sobram, para quem chama poder escondê-los. */
+    _adjustmentEls(adjEl, quantas) {
+        const els = [adjEl];
+        const total = Math.max(quantas, this._adjustmentElsCriados || 1);
+        for (let n = 2; n <= total; n++) {
+            const id = `program-player-adjustment-${n}`;
+            let el = this.el(id);
+            if (!el) {
+                const anterior = els[els.length - 1];
+                if (typeof adjEl.cloneNode !== "function" || !anterior.parentNode) break;
+                el = adjEl.cloneNode(false);
+                el.id = id;
+                anterior.parentNode.insertBefore(el, anterior.nextSibling);
+            }
+            els.push(el);
         }
+        this._adjustmentElsCriados = Math.max(this._adjustmentElsCriados || 1, els.length);
+        return els;
+    }
+
+    _hideAdjustmentEl(el) {
+        el.style.display = "none";
+        el.style.backdropFilter = "none";
+        el.style.webkitBackdropFilter = "none";
+        el.style.clipPath = "";
+        el.style.mixBlendMode = "normal";
+        el.dataset.activeClipId = "";
     }
 
     /**
@@ -4783,54 +4745,9 @@ export class ProgramPlayer {
             blur(${blur}px)
         `.trim().replace(/\s+/g, ' ');
 
-        // Aplica efeitos cumulativos de camadas de ajuste ativas acima desta pista
-        const adjEffects = (window.TIMELINE_STATE && typeof window.TIMELINE_STATE.getCumulativeAdjustmentEffects === "function")
-            ? window.TIMELINE_STATE.getCumulativeAdjustmentEffects(cut.track, currentFrame)
-            : [];
-        let adjFilterStr = "";
-        let adjOpacity = 1.0;
-        let adjCrop = null;
-
-        if (adjEffects && adjEffects.length > 0) {
-            const adjParts = [];
-            adjEffects.forEach(eff => {
-                if (!eff || eff.disabled) return;
-                if (eff.type === "color") {
-                    if (typeof eff.brightness === "number" && eff.brightness !== 0) {
-                        adjParts.push(`brightness(${((eff.brightness + 100) / 100).toFixed(2)})`);
-                    }
-                    if (typeof eff.contrast === "number" && eff.contrast !== 0) {
-                        adjParts.push(`contrast(${((eff.contrast + 100) / 100).toFixed(2)})`);
-                    }
-                    if (typeof eff.saturation === "number" && eff.saturation !== 100) {
-                        adjParts.push(`saturate(${(eff.saturation / 100).toFixed(2)})`);
-                    }
-                    if (typeof eff.hue === "number" && eff.hue !== 0) {
-                        adjParts.push(`hue-rotate(${eff.hue}deg)`);
-                    }
-                    if (typeof eff.sepia === "number" && eff.sepia > 0) {
-                        adjParts.push(`sepia(${(eff.sepia / 100).toFixed(2)})`);
-                    }
-                    if (typeof eff.grayscale === "number" && eff.grayscale > 0) {
-                        adjParts.push(`grayscale(${(eff.grayscale / 100).toFixed(2)})`);
-                    }
-                    if (typeof eff.blur === "number" && eff.blur > 0) {
-                        adjParts.push(`blur(${eff.blur}px)`);
-                    }
-                } else if (eff.type === "transform") {
-                    if (typeof eff.opacity === "number") {
-                        adjOpacity *= eff.opacity;
-                    }
-                } else if (eff.type === "crop") {
-                    adjCrop = eff;
-                }
-            });
-            if (adjParts.length > 0) {
-                adjFilterStr = " " + adjParts.join(" ");
-            }
-        }
-
-        el.style.filter = (cssFilter + adjFilterStr).trim();
+        // Camadas de ajuste acima desta pista NÃO entram aqui: applyAdjustmentLayer as compõe
+        // por cima com backdrop-filter, como o export.
+        el.style.filter = cssFilter;
 
         // 4. Fades (dissolve) de entrada/saída por opacidade
         let fadeOpacity = 1.0;
@@ -4855,7 +4772,7 @@ export class ProgramPlayer {
             });
         }
         
-        const rawFinalOpacity = baseOpacity * fadeOpacity * adjOpacity;
+        const rawFinalOpacity = baseOpacity * fadeOpacity;
         el.style.opacity = String((typeof rawFinalOpacity === "number" && Number.isFinite(rawFinalOpacity)) ? Math.max(0, Math.min(1, rawFinalOpacity)) : 1.0);
 
         const blendMode = (cut.blend_mode || cut.blendMode || tf.blend_mode || tf.blendMode || "normal").toLowerCase();
@@ -4870,13 +4787,6 @@ export class ProgramPlayer {
             cropRight = cropEffect.right !== undefined ? cropEffect.right : 0;
             cropBottom = cropEffect.bottom !== undefined ? cropEffect.bottom : 0;
             cropLeft = cropEffect.left !== undefined ? cropEffect.left : 0;
-        }
-
-        if (adjCrop && !adjCrop.disabled) {
-            cropTop = Math.max(cropTop, adjCrop.top || 0);
-            cropRight = Math.max(cropRight, adjCrop.right || 0);
-            cropBottom = Math.max(cropBottom, adjCrop.bottom || 0);
-            cropLeft = Math.max(cropLeft, adjCrop.left || 0);
         }
 
         if (cropTop > 0 || cropRight > 0 || cropBottom > 0 || cropLeft > 0) {
