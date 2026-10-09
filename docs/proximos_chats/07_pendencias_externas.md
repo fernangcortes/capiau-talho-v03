@@ -47,6 +47,16 @@ no código antes de afirmar.
   (~300 MB), e o `faster-whisper-base` (145 MB, baixado por outro código?). Liste com tamanho e
   origem; só apague o que eu aprovar.
 
+## 6. NVIDIA VSS (sugestão, adiado em 07/10/2026)
+
+- Blueprint Video Search and Summarization (github.com/NVIDIA-AI-Blueprints/video-search-and-summarization,
+  Apache-2.0): VLM Cosmos + LLM Nemotron, descreve o vídeo em trechos com `start_time`/`end_time`.
+- Não roda nesta máquina: pede Ubuntu 24.04, 128 GB de RAM, 18 núcleos e GPU H100/RTX PRO 6000/L40S
+  (perfil base cabe em 1 GPU). Launchable no Brev: relato de ~US$ 8,35/h; cobra desde o Deploy.
+- Não traz tipo de plano nem movimento de câmera; dá para pedir via `override_vlm_prompt`.
+- Decisão: testar antes o **método** localmente (trechos de 5–10 s com sobreposição + VLM) sobre
+  planos-sequência longos. Só voltar ao VSS se o método provar valor e faltar capacidade local.
+
 ## Regras deste repositório
 
 - Leia o `CLAUDE.md` da pasta `dev`. Outra sessão mexe na interface: commit só dos seus trechos,

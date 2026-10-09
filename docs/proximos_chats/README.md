@@ -34,6 +34,7 @@ Feito e commitado na main (sem push):
 | 05 | [Continuidade com o roteiro (C)](05_continuidade_C.md) | 03, 04 | médio |
 | 06 | [Gabaritos humanos e avaliação honesta](06_gabaritos_avaliacao.md) | — (pode ir em paralelo) | médio |
 | 07 | [Pendências externas](07_pendencias_externas.md) | chaves/decisões do Fernando | pequeno |
+| 08 | [Planos-sequência: do teste ao Talho](08_plano_sequencia.md) (07/10) | revisão do Fernando | grande |
 
 01, 02 e 06 podem rodar em paralelo (arquivos diferentes). 03 → 04 → 05 em sequência.
 
