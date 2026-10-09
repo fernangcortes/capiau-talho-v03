@@ -216,6 +216,15 @@ Este guia orienta futuros agentes de IA e desenvolvedores a manterem e expandire
     ```
   * **Padrão Visual:** Renderizar o valor numérico em texto flat ciano sem caixa (`background: transparent; border: none`), seguido da unidade (ex: `s`, `%`, `px`), e acompanhado de traços minimalistas de incremento/decremento (`.btn-fade-step` com ícones `fa-chevron-up`/`down` translúcidos) posicionados **após a unidade**.
 
+### 10b. Caixas de Entrada Sutis e Renomeação em Linha (Inline Inputs & Rename)
+* **Objetivo:** Permitir renomeação rápida e edição de textos in-place (como nomes de pistas na timeline, marcadores, nomes de clipes ou versões) diretamente no elemento clicado, sem abrir caixas modais intrusivas do navegador (`prompt()`).
+* **Diretrizes:**
+  * **Visual Flat Estilo Busca:** Fundo escuro sutil translúcido (`var(--t-surface-0, rgba(0, 0, 0, 0.45))`), sem poluição informativa, sem placeholders ou rótulos extras.
+  * **Borda com Cor de Interação:** A borda da caixinha em edição ativa DEVE refletir a cor de interação do sistema (`border: 1px solid var(--accent, var(--t-accent, #06b6d4));`), com glow sutil (`box-shadow: 0 0 0 1px var(--accent)`) quando em foco.
+  * **Cursor Piscante (`caret-color`):** O cursor de texto `|` deve piscar na cor de interação (`caret-color: var(--accent, var(--t-accent, #06b6d4));`), pronto para digitação imediata.
+  * **Ciclo de Edição:** Foco e seleção imediata do texto ao abrir via `requestAnimationFrame`; confirmação por tecla `Enter` ou ao clicar fora (`blur`); cancelamento sem alterações por `Escape`.
+  * **Isolamento de Eventos:** Interromper rigorosamente a propagação de eventos (`stopPropagation`) de teclado e mouse no input para evitar que teclas como Espaço, C ou Delete disparem ações indesejadas no editor NLE.
+
 ---
 
 ## IV. Reprodutor de Vídeo (Video Player)
@@ -536,4 +545,25 @@ Vale para colunas do editor, pilhas de coluna, faixas, janelas destacadas simple
   * `.chip-standard`: $16\text{px}$ de altura, min-width $38\text{px}$, máx $85\text{px}$.
 * **Preservação de Detalhes em Tooltips Globais:**
   * Mesmo nos chips mais compactos ou swatches puros, o atributo `data-tooltip` carrega a descrição completa: nome da família de cor / categoria, minutagem total (`00:00:00`), contagem exata de mídias e instruções claras dos atalhos de clique (`Clique: Rolar | Alt+Clique: Filtrar`).
+
+---
+
+## XI. Sistema de Cores de Interação e Protocolo Obrigatório de Alinhamento da IA (Interaction Colors & AI Inquiry Protocol)
+
+### 20. Padrão Mandatório de Cores de Interação e Consulta Proativa pela IA
+* **Princípio Fundamental:** O CapIAu possui uma paleta dinâmica onde a experiência interativa é guiada pela **Cor de Interação** (`var(--accent)` no CSS e `--t-accent` no canvas/tokens), customizável pelo usuário nas preferências de Aparência (`ui.accent`: Ciano `#25d1f4`, Azul `#5b9bff`, Verde-água `#2dd4bf`, Lima `#a3e635`, Laranja `#fb7a3c`, Gelo `#e6e6ea`, ou Padrão).
+* **Hierarquia e Distinção das Cores:**
+  1. **Cor de Interação (`var(--accent)` / `var(--t-accent)`):** Representa o foco ativo do usuário, elementos em estado de edição (como bordas de inputs inline e cursores de texto `|`), seleção atual, agulha de reprodução (playhead) e botões primários de ação.
+  2. **Cores Temáticas Funcionais (Painéis/Barras):** Violeta para barras de ferramentas/toolbars, Ciano para cabeçalhos de pistas e abas de navegação, Rose para áreas destrutivas/configuração e Esmeralda para mídia/saída.
+  3. **Cores Semânticas:** Verde esmeralda (sucesso/OK), Vermelho rose (erro/alerta/gravação), Amarelo âmbar (aviso).
+* **PROIBIÇÃO ESTRITA DE HARDCODING:**
+  * É terminantemente proibido chumbar cores fixas ou hexadecimais estáticos (como `#06b6d4`, `#8b5cf6`, `#22c55e`) em propriedades que representam foco, seleção ativa, cursores de digitação ou bordas de componentes interativos. Deve-se sempre consumir o token dinâmico `var(--accent, var(--t-accent, #06b6d4))`.
+* **PROTOCOLO OBRIGATÓRIO PARA MODELOS DE IA (Pergunta Proativa ao Usuário):**
+  * Sempre que o modelo ou agente de IA for implementar, estilizar ou refatorar qualquer componente visual com estados que **possam ser de interação** (ex.: bordas de campos em edição, anéis de foco, realce de botões ativos, barras de progresso, cursores de digitação ou seletores contextuais):
+  * **A IA NUNCA deve tomar decisões cromáticas arbitrárias sem alinhamento.**
+  * **A IA DEVE PERGUNTAR PROATIVAMENTE AO USUÁRIO** (via `ask_question` ou pergunta direta no chat) para que ele decida sobre a cor de interação pretendida, esclarecendo opções como:
+    1. Se o elemento deve adotar a **Cor de Interação Global** (`var(--accent)`) definida pelo usuário nas configurações do sistema;
+    2. Se deve adotar a **Cor Temática Funcional do Painel** (ex.: ciano para pistas/cabeçalhos, violeta para a barra de ferramentas);
+    3. Se deve adotar a **Cor Semântica ou de Tipo** (ex.: cor específica da trilha de vídeo, áudio, texto ou IA);
+    4. Se o realce da cor de interação deve permanecer contínuo enquanto o elemento estiver ativo/aberto (como em caixas de renomeação inline) ou se deve manifestar-se estritamente no `:hover` ou `:focus`.
 

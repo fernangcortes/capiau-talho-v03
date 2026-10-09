@@ -3354,6 +3354,7 @@ export class PanelsManager {
             tracks.forEach((track, i) => {
                 const row = existingRows[i];
                 if (track.hidden) return;
+                if (this.editingTrackId && String(this.editingTrackId) === String(track.id)) return;
                 const h = TIMELINE_STATE.trackHeight(track);
                 const currentH = parseInt(row.style.height, 10);
                 if (currentH !== h) {
@@ -3490,10 +3491,11 @@ export class PanelsManager {
         const existingHandle = row.querySelector(".track-resize-handle");
 
         if (track.kind === "ai") {
+            const aiName = this.escapeHtml(track.name || "IA — Sugestões");
             if (h >= 40) {
                 row.innerHTML = `
                     <div style="display: flex; align-items: center; justify-content: space-between; width: 100%; gap: var(--sp-4);">
-                        <span style="color: #22c55e; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0;" title="${track.name}"><i class="fa-solid fa-robot" style="font-size: var(--fs-9);"></i> ${track.name}</span>
+                        <span class="track-name-label" style="color: #22c55e; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0;" title="Clique duplo para renomear: ${aiName}"><i class="fa-solid fa-robot" style="font-size: var(--fs-9);"></i> ${aiName}</span>
                         <div style="display: flex; align-items: center; gap: var(--sp-4); flex-shrink: 0;">
                             <button class="btn-track-visibility btn-track-action" title="Ocultar pista" style="color: var(--text-secondary); font-size: var(--fs-9);"><i class="fa-solid fa-eye"></i></button>
                         </div>
@@ -3505,7 +3507,7 @@ export class PanelsManager {
             } else {
                 row.innerHTML = `
                     <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; gap: var(--sp-4);">
-                        <span style="color: #22c55e; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0;" title="${track.name}"><i class="fa-solid fa-robot" style="font-size: var(--fs-9);"></i> ${track.name}</span>
+                        <span class="track-name-label" style="color: #22c55e; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0;" title="Clique duplo para renomear: ${aiName}"><i class="fa-solid fa-robot" style="font-size: var(--fs-9);"></i> ${aiName}</span>
                         <div style="display: flex; gap: var(--sp-4); align-items: center; flex-shrink: 0;">
                             <button class="btn-track-visibility btn-track-action" title="Ocultar pista" style="color: var(--text-secondary); font-size: var(--fs-9);"><i class="fa-solid fa-eye"></i></button>
                             <button class="btn-track-ai-run" title="✨ Analisar corte atual com a persona selecionada" style="border: 1px solid var(--t-line-strong, rgba(34,197,94,0.35)); background: var(--t-tint-2, rgba(34,197,94,0.08)); color: #22c55e; cursor: pointer; padding: var(--sp-1) var(--sp-6); font-size: var(--fs-9); border-radius: 4px;"><i class="fa-solid fa-wand-magic-sparkles"></i></button>
@@ -3519,6 +3521,7 @@ export class PanelsManager {
                 const persona = selector && selector.value !== "none" ? selector.value : "diretora";
                 this.runAiTimelineAnalysis(persona);
             });
+            this.setupTrackRenameInline(row, track, h);
         } else {
             const isAudio = track.kind === "audio";
             const isText = track.kind === "text";
@@ -3553,10 +3556,12 @@ export class PanelsManager {
             const volumeSlider = isAudio ? `<input type="range" class="slider-track-volume" min="0" max="1" step="0.01" value="${trackVol}" data-tooltip="Volume: ${volPct}%" title="Volume: ${volPct}%" style="flex: 1; min-width: 30px;">` : "";
             const thumbBtn = (isAudio || isText) ? "" : `<button class="btn-track-thumbnails btn-track-action" title="${track.thumbnailsEnabled ? 'Desativar miniaturas na pista' : 'Ativar miniaturas na pista'}" style="font-size: var(--fs-9);">${thumbIcon}</button>`;
 
+            const escapedTrackName = this.escapeHtml(track.name || "");
+
             if (h >= 40) {
                 row.innerHTML = `
                     <div style="display: flex; align-items: center; justify-content: space-between; width: 100%; gap: var(--sp-4);">
-                        <span class="track-name-label" title="Clique duplo para renomear: ${track.name}" style="cursor: text; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0;">${kindIcon}${track.id} ${track.name}</span>
+                        <span class="track-name-label" title="Clique duplo para renomear: ${escapedTrackName}" style="cursor: text; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0;">${kindIcon}${track.id} ${escapedTrackName}</span>
                         <div style="display: flex; align-items: center; gap: var(--sp-4); flex-shrink: 0;">
                             <button class="btn-track-visibility btn-track-action" title="Ocultar pista" style="color: var(--text-secondary); font-size: var(--fs-9);">${visibilityIcon}</button>
                             <button class="btn-track-remove btn-track-action" title="Remover pista (clipes vão para outra pista do mesmo tipo)" style="color: var(--text-muted); font-size: var(--fs-9);"><i class="fa-solid fa-xmark"></i></button>
@@ -3575,7 +3580,7 @@ export class PanelsManager {
             } else {
                 row.innerHTML = `
                     <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; gap: var(--sp-4);">
-                        <span class="track-name-label" title="Clique duplo para renomear: ${track.name}" style="cursor: text; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0;">${kindIcon}${track.id}</span>
+                        <span class="track-name-label" title="Clique duplo para renomear: ${escapedTrackName}" style="cursor: text; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0;">${kindIcon}${track.id} ${escapedTrackName}</span>
                         <div style="display: flex; gap: var(--sp-4); flex-shrink: 0; align-items: center;">
                             ${thumbBtn}
                             <button class="btn-track-visibility btn-track-action" title="Ocultar pista" style="color: var(--text-secondary); font-size: var(--fs-9);">${visibilityIcon}</button>
@@ -3656,18 +3661,110 @@ export class PanelsManager {
                 });
             }
             
-            row.querySelector(".track-name-label").addEventListener("dblclick", () => {
-                const newName = prompt("Novo nome da pista:", track.name);
-                if (newName !== null && newName.trim()) {
-                    TIMELINE_STATE.renameTrack(track.id, newName);
-                }
-            });
+            this.setupTrackRenameInline(row, track, h);
         }
 
         // Restaura a alça de redimensionamento caso tenha sido recriada
         if (existingHandle && !row.querySelector(".track-resize-handle")) {
             row.appendChild(existingHandle);
         }
+    }
+
+    /**
+     * Configura a renomeação inline de pista ao dar duplo clique no nome da pista.
+     * Abre uma caixinha de texto sutil diretamente no lugar do nome, sem popups do navegador,
+     * com a barra de digitação piscando e confirmação via Enter ou clique fora (blur).
+     */
+    setupTrackRenameInline(row, track, h) {
+        const nameLabel = row.querySelector(".track-name-label");
+        if (!nameLabel) return;
+
+        nameLabel.addEventListener("dblclick", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+
+            // Limpa seleções residuais de texto no navegador
+            const sel = window.getSelection();
+            if (sel && sel.rangeCount > 0) sel.removeAllRanges();
+
+            // Evita abrir múltiplos campos no mesmo label
+            if (nameLabel.querySelector(".track-name-input")) return;
+
+            // Oculta e limpa tooltips globais abertos sobre o elemento
+            const globalTip = row.ownerDocument?.getElementById("global-tooltip");
+            if (globalTip) globalTip.classList.remove("visible");
+
+            nameLabel.removeAttribute("data-tooltip");
+            nameLabel.removeAttribute("title");
+
+            let kindIcon = "";
+            if (track.kind === "audio") {
+                kindIcon = `<i class="fa-solid fa-music" style="font-size: var(--fs-8); color: var(--color-emerald, #10b981);"></i> `;
+            } else if (track.kind === "text") {
+                kindIcon = `<i class="fa-solid fa-font" style="font-size: var(--fs-8); color: #f59e0b;"></i> `;
+            } else if (track.kind === "ai") {
+                kindIcon = `<i class="fa-solid fa-robot" style="font-size: var(--fs-9); color: #22c55e;"></i> `;
+            }
+
+            const currentName = track.name || "";
+            this.editingTrackId = track.id;
+
+            nameLabel.style.display = "inline-flex";
+            nameLabel.style.alignItems = "center";
+            nameLabel.style.gap = "4px";
+            nameLabel.style.overflow = "visible";
+
+            nameLabel.innerHTML = `
+                <span class="track-id-prefix" style="user-select: none; flex-shrink: 0; opacity: 0.85; font-size: var(--fs-10); font-weight: 700; pointer-events: none;">${kindIcon}${track.id}</span>
+                <input type="text" class="track-name-input" value="${this.escapeHtml(currentName)}" spellcheck="false" autocomplete="off" />
+            `;
+
+            const input = nameLabel.querySelector(".track-name-input");
+            if (!input) return;
+
+            let isFinalized = false;
+
+            const finishRename = (shouldSave) => {
+                if (isFinalized) return;
+                isFinalized = true;
+                this.editingTrackId = null;
+
+                const trimmed = input.value.trim();
+                if (shouldSave && trimmed && trimmed !== currentName) {
+                    TIMELINE_STATE.renameTrack(track.id, trimmed);
+                } else {
+                    this.renderTrackRowContent(row, track, h);
+                }
+            };
+
+            input.addEventListener("keydown", (ev) => {
+                ev.stopPropagation();
+                if (ev.key === "Enter") {
+                    ev.preventDefault();
+                    finishRename(true);
+                } else if (ev.key === "Escape") {
+                    ev.preventDefault();
+                    finishRename(false);
+                }
+            });
+
+            input.addEventListener("keyup", (ev) => ev.stopPropagation());
+            input.addEventListener("keypress", (ev) => ev.stopPropagation());
+            input.addEventListener("mousedown", (ev) => ev.stopPropagation());
+            input.addEventListener("mouseup", (ev) => ev.stopPropagation());
+            input.addEventListener("click", (ev) => ev.stopPropagation());
+            input.addEventListener("dblclick", (ev) => ev.stopPropagation());
+            input.addEventListener("contextmenu", (ev) => ev.stopPropagation());
+
+            input.addEventListener("blur", () => {
+                finishRename(true);
+            });
+
+            requestAnimationFrame(() => {
+                input.focus();
+                input.select();
+            });
+        });
     }
 
     /** Sincroniza o scroll vertical dos cabeçalhos com o canvas. */
