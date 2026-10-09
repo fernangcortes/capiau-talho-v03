@@ -420,8 +420,8 @@ def casar_entradas(entradas: List[Dict[str, Any]], seq, rel_midia) -> Tuple[List
 
     for i, ent in enumerate(entradas or []):
         tipo = str(ent.get("tipo") or "video").lower()
-        if tipo == "titulo":
-            # Imagens geradas pelo proprio render: nao ha midia do projeto a casar.
+        if tipo in ("titulo", "cor", "color", "color_matte", "lavfi"):
+            # Imagens geradas pelo proprio render ou lavfi: nao ha midia do projeto a casar.
             caminhos.append(str(ent.get("caminho") or ""))
             continue
         ss = float(ent.get("ss") or 0.0)
@@ -670,7 +670,7 @@ def montar_comando(seq, pedido, destino, *, rel_midia=None,
     for i, ent in enumerate(entradas_total):
         tipo = str(ent.get("tipo") or "video").lower()
         caminho = caminhos[i]
-        if tipo == "cor":
+        if tipo in ("cor", "color", "color_matte", "lavfi"):
             # Fonte lavfi (base preta etc.): o "caminho" e a propria expressao.
             cmd += ["-f", "lavfi", "-i", str(ent.get("caminho") or "color=c=black")]
             continue

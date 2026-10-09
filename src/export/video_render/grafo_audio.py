@@ -327,7 +327,8 @@ def _expressoes_transicao(transicoes: List[Dict[str, Any]], t0_s: float) -> List
 
 def _estagio_volume(clipe: modelo.Clipe, pista: modelo.Pista, escopo: modelo.Escopo,
                     offset_ini_s: float, offset_fim_s: float,
-                    extras: Optional[List[str]] = None) -> List[str]:
+                    extras: Optional[List[str]] = None,
+                    dur_stream: Optional[float] = None) -> List[str]:
     """O ganho de ENTRADA do grafo: pista x clipe x fade, com o clamp da tela.
 
     A tela calcula `el.volume = Math.max(0, Math.min(1.0, vol*clipVol*fadeVol))`
@@ -346,7 +347,21 @@ def _estagio_volume(clipe: modelo.Clipe, pista: modelo.Pista, escopo: modelo.Esc
     vol_pista = _numero(pista.volume, 1.0)
     produto = vol_pista * vol_clipe
 
-    fades = _fades_ativos(clipe)
+    todos_fades = _fades_ativos(clipe)
+    fades: List[Dict[str, Any]] = []
+    for f in todos_fades:
+        d = fade.normalizar_duracao(f.get("duration_s"))
+        lado = str(f.get("side") or "").lower()
+        if lado == "in":
+            if offset_ini_s + d <= 1e-9:
+                continue  # fade-in ja terminou antes do inicio do stream
+        elif lado == "out":
+            if dur_stream is not None and (offset_fim_s - d) >= dur_stream - 1e-9:
+                continue  # fade-out so comeca apos o fim do stream
+            if offset_fim_s <= 1e-9:
+                continue  # clipe ja terminou antes do inicio do stream
+        fades.append(f)
+
     extras = list(extras or [])
     if not fades and not extras:
         if produto == 1.0:
@@ -541,7 +556,8 @@ def cadeia_clipe_audio(clipe: modelo.Clipe, pista: modelo.Pista, seq: modelo.Seq
     partes += _estagio_volume(clipe, pista, escopo,
                               borda_ini - t0,
                               borda_fim - t0,
-                              _expressoes_transicao(transicoes or [], t0))
+                              _expressoes_transicao(transicoes or [], t0),
+                              dur_stream=duracao)
     partes += _filtros_eq(params)
     partes += _filtros_dinamica(params)
 
@@ -701,8 +717,8 @@ def _transicoes_da_pista(pares, escopo: modelo.Escopo,
         if ia == ib or abs(a.fim_s - b.inicio_s) > _TOLERANCIA_CORTE_S:
             continue
         corte = b.inicio_s
-        half_a = min(max(0.0, _numero(ef_a.get("duration_s"), 0.0)), b.duracao_s)
-        half_b = min(max(0.0, _numero(ef_b.get("duration_s"), 0.0)), a.duracao_s)
+        half_a = min(max(0.0, _numero(ef_a.get("duration_s"), 0.0)), a.duracao_s, b.duracao_s)
+        half_b = min(max(0.0, _numero(ef_b.get("duration_s"), 0.0)), b.duracao_s, a.duracao_s)
         if half_a + half_b <= _EPS_TEMPO:
             continue
         # B so pode comecar antes do IN se a fonte TEM esse trecho: midia
@@ -773,7 +789,14 @@ def camada_pista_audio(pista: modelo.Pista, seq: modelo.Sequencia,
 
     # Freeze frame e quadro parado: o player nao toca som nele (nasce sem
     # parceiro de audio), e ler o trecho da fonte aqui daria som onde nao ha.
-    pares = [(r, b) for (r, b) in _recortes_da_pista(seq, pista) if not r.congelado]
+    # Geradores sinteticos (color_matte, ajuste, texto) tambem nao tem audio.
+    pares = [(r, b) for (r, b) in _recortes_da_pista(seq, pista)
+             if not r.congelado
+             and not getattr(r, 'e_color_matte', False)
+             and not getattr(r, 'e_ajuste', False)
+             and getattr(r, 'tipo', '') != 'text'
+             and getattr(r, 'kind', '') not in ('color_matte', 'adjustment', 'text')
+             and not str(getattr(r, 'id', '')).startswith(('cut_matte_', 'matte_', 'cut_adj_', 'adj_'))]
     for (recorte, bruto, transicoes) in _transicoes_da_pista(pares, escopo, resolver_tratado):
         bordas = (recorte.inicio_s, recorte.fim_s)
         tocado = _estender(recorte, transicoes)

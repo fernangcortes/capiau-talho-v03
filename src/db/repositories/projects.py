@@ -249,9 +249,9 @@ class ProjectRepository:
             # para trocar a referencia de midia); link_id e o que amarra o clipe de
             # audio ao de video. Sem estas duas linhas, uma timeline v1 perde os
             # dois na primeira leitura.
-            for chave in ("effects", "link_id", "id", "name"):
-                if cut.get(chave) is not None:
-                    novo[chave] = cut[chave]
+            for chave, val in cut.items():
+                if chave not in novo and val is not None:
+                    novo[chave] = val
             clips.append(novo)
             track_cursor[track] = start + (out_s - in_s)
 

@@ -616,6 +616,7 @@ function _voltarAoIdle() {
     _marcarPolling("ocioso");
     _trocarFooter("idle");
     _reavaliarBotoes();
+    _restaurarUltimoRenderSeHouver();
 }
 
 async function _carregarTimelines() {
@@ -929,11 +930,28 @@ async function _restaurarUltimoRenderSeHouver() {
 
     const r = await _pedir(ROTAS.ultimo(_estado.timelineId));
     if (!r.ok || !r.data) return;
-    const caminho = r.data.arquivo || r.data.output_path || (r.data.saida && r.data.saida.caminho);
+    let caminho = "";
+    if (typeof r.data.arquivo === "string") {
+        caminho = r.data.arquivo;
+    } else if (r.data.arquivo && typeof r.data.arquivo.path === "string") {
+        caminho = r.data.arquivo.path;
+    } else if (typeof r.data.output_path === "string") {
+        caminho = r.data.output_path;
+    } else if (r.data.saida && typeof r.data.saida.caminho === "string") {
+        caminho = r.data.saida.caminho;
+    } else if (r.data.registro && typeof r.data.registro.saida_prevista === "string") {
+        caminho = r.data.registro.saida_prevista;
+    }
     if (!caminho) return;
+
+    let tamanhoMb = r.data.tamanho_mb;
+    if (!tamanhoMb && r.data.arquivo && r.data.arquivo.tamanho_bytes) {
+        tamanhoMb = (r.data.arquivo.tamanho_bytes / (1024 * 1024)).toFixed(1);
+    }
+
     _el.ultimoHint.innerHTML =
         `<i class="fa-solid fa-clock-rotate-left"></i> Último render desta timeline: ${_esc(caminho)}` +
-        (r.data.tamanho_mb ? ` · ${_esc(r.data.tamanho_mb)} MB` : "");
+        (tamanhoMb ? ` · ${_esc(String(tamanhoMb))} MB` : "");
     _el.ultimoHint.style.display = "";
 }
 
@@ -1267,6 +1285,7 @@ function _aplicarProgresso(tarefa) {
         if (_el.progEtapa) _el.progEtapa.textContent = "Concluído — arquivo gravado no destino.";
         _toast("Render de vídeo concluído!", "success");
         _executarPosConclusao();   // abre pasta / copia caminho conforme os checkboxes
+        _restaurarUltimoRenderSeHouver();
     } else if (_estado.faseJob === "cancelado") {
         if (_el.progEtapa) _el.progEtapa.textContent = "Cancelado — parcial descartado.";
         _toast("Render cancelado.", "info");

@@ -253,12 +253,33 @@ def relatorio(seq, pedido, relatorio_midia) -> Dict[str, Any]:
     # (player.js:_videoSrcForCut devolve null), entao e PARIDADE, nao falha --
     # porem merece banner porque provavelmente e dado quebrado na timeline.
     if getattr(relatorio_midia, "sem_referencia", None):
-        avisos.append(_aviso(
-            "warn", "CLIPE_SEM_REFERENCIA_DE_MIDIA",
-            "Clipe sem video_id/photo_id",
-            "Estes clipes nao apontam para midia nenhuma e saem pretos no arquivo "
-            "-- igual aparecem na tela. Provavelmente dado quebrado na timeline.",
-            sorted(set(relatorio_midia.sem_referencia))))
+        sem_ref = []
+        for cid in relatorio_midia.sem_referencia:
+            cid_str = str(cid)
+            cid_base = cid_str.split("__", 1)[0]
+            if cid_base.startswith(("cut_matte_", "matte_", "cut_adj_", "adj_")):
+                continue
+            eh_gerador = any(
+                (c.id == cid or str(c.id).split("__", 1)[0] == cid_base) and (
+                    getattr(c, "e_color_matte", False)
+                    or getattr(c, "e_ajuste", False)
+                    or getattr(c, "tipo", "") == "text"
+                    or getattr(c, "kind", "") in ("color_matte", "adjustment", "text")
+                    or getattr(c, "tipo", "") in ("color_matte", "adjustment", "cor")
+                    or bool(getattr(c, "cor", None))
+                    or str(c.id).startswith(("cut_matte_", "matte_", "cut_adj_", "adj_"))
+                )
+                for c in seq.clipes
+            )
+            if not eh_gerador:
+                sem_ref.append(cid)
+        if sem_ref:
+            avisos.append(_aviso(
+                "warn", "CLIPE_SEM_REFERENCIA_DE_MIDIA",
+                "Clipe sem video_id/photo_id",
+                "Estes clipes nao apontam para midia nenhuma e saem pretos no arquivo "
+                "-- igual aparecem na tela. Provavelmente dado quebrado na timeline.",
+                sorted(set(sem_ref))))
 
     # Bloco audio_render declarado ready mas o WAV sumiu do disco: fonte voltou
     # ao original (mesma decisao do export OTIO). O render segue CORRETO, porem

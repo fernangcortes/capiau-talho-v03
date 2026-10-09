@@ -62,7 +62,7 @@ CATEGORIAS = (CATEGORIA_COR, CATEGORIA_TRANSICOES, CATEGORIA_MOVIMENTO, CATEGORI
 # para limitacao do motor -- ver fidelidade.py).
 EFEITOS_POR_CATEGORIA = {
     CATEGORIA_COR:        ("color",),
-    CATEGORIA_TRANSICOES: ("crossfade",),
+    CATEGORIA_TRANSICOES: ("crossfade", "video_cross_dissolve", "video_dip_black", "video_dip_white"),
     CATEGORIA_MOVIMENTO:  ("fit", "transform", "crop", "ken_burns"),
     CATEGORIA_AUDIO_FX:   ("audio_eq", "audio_dynamics", "volume"),
 }
@@ -133,10 +133,20 @@ class Clipe:
     # Titulo (type "text"): o clipe como veio do banco -- texto, estilo e keyframes.
     # titulos.py o entrega intacto ao MESMO codigo que desenha o preview.
     bruto: Optional[Dict[str, Any]] = None
+    # Camada de Ajuste (Task 17) e Color Matte (Task 18)
+    kind: str = "media"              # "media" | "adjustment" | "color_matte"
+    cor: Optional[str] = None        # Hexadecimal para color_matte (ex: "#00ff00")
+    cor_nome: Optional[str] = None
+    blend_mode: str = "normal"       # Modo de mesclagem (normal, multiply, screen, overlay, darken, lighten, soft-light, difference)
+    hard_boundaries: bool = False
+    duracao_midia_s: Optional[float] = None
+    duracao_timeline_s: Optional[float] = None
 
     @property
     def duracao_s(self) -> float:
         """Duracao ocupada na TIMELINE (trecho da fonte dividido pela velocidade)."""
+        if self.duracao_timeline_s is not None:
+            return max(0.0, float(self.duracao_timeline_s))
         return max(0.0, self.out_s - self.in_s) / self.velocidade
 
     @property
@@ -170,6 +180,23 @@ class Clipe:
     @property
     def e_foto(self) -> bool:
         return self.tipo == "photo"
+
+    @property
+    def e_ajuste(self) -> bool:
+        return (
+            self.kind == "adjustment"
+            or self.tipo == "adjustment"
+            or str(self.id).startswith(("cut_adj_", "adj_"))
+        )
+
+    @property
+    def e_color_matte(self) -> bool:
+        return self.tipo != "text" and (
+            self.kind == "color_matte"
+            or self.tipo in ("color_matte", "cor")
+            or bool(self.cor)
+            or str(self.id).startswith(("cut_matte_", "matte_"))
+        )
 
     def efeito(self, tipo: str, incluir_bypass: bool = False) -> Optional[Dict[str, Any]]:
         """Primeiro efeito do tipo pedido, ou None.
@@ -272,7 +299,7 @@ def normalizar(sequencia, *, nome: str = "", timeline_id: Optional[int] = None) 
 
     clipes: List[Clipe] = []
     for indice, c in enumerate(bruto.get("clips") or []):
-        clipe = _clipe(c, indice)
+        clipe = _clipe(c, indice, fps=fps)
         if clipe is not None:
             clipes.append(clipe)
 
@@ -281,7 +308,7 @@ def normalizar(sequencia, *, nome: str = "", timeline_id: Optional[int] = None) 
                      nome=str(nome or ""), timeline_id=timeline_id)
 
 
-def _clipe(c, indice: int) -> Optional[Clipe]:
+def _clipe(c, indice: int, fps: float = FPS_PADRAO) -> Optional[Clipe]:
     """Um item de `clips` -> Clipe. None quando o item nao da render nenhum."""
     if not isinstance(c, dict):
         return None
@@ -290,8 +317,14 @@ def _clipe(c, indice: int) -> Optional[Clipe]:
         # arquivo ele simplesmente nao existe (vira o que estiver embaixo).
         return None
 
-    in_s = _float_nao_negativo(c.get("in"), 0.0)
-    out_s = _float_nao_negativo(c.get("out"), 0.0)
+    in_raw = c.get("in") if c.get("in") is not None else c.get("in_time")
+    out_raw = c.get("out") if c.get("out") is not None else c.get("out_time")
+    in_s = _float_nao_negativo(in_raw, 0.0)
+    out_s = _float_nao_negativo(out_raw, 0.0)
+    if out_s <= in_s:
+        dur = c.get("duration") or c.get("duration_seconds")
+        if dur:
+            out_s = in_s + _float_nao_negativo(dur, 0.0)
     if out_s <= in_s:
         return None  # corte de duracao zero ou invertido: nao existe na tela
 
@@ -326,18 +359,120 @@ def _clipe(c, indice: int) -> Optional[Clipe]:
         except (ValueError, TypeError):
             pass
 
+    # Normalizar crossfades existentes com 'duration' para 'duration_s'
+    for eff in efeitos:
+        if isinstance(eff, dict) and eff.get("type") == "crossfade":
+            if "duration_s" not in eff and "duration" in eff:
+                eff["duration_s"] = eff["duration"]
+
+    # Normalizar crossfades/fades declarados na raiz (fade_in, fadeIn, fade_out, fadeOut, crossfade) para efeitos
+    cf_in = any(isinstance(e, dict) and e.get("type") == "crossfade" and e.get("side") == "in" for e in efeitos)
+    cf_out = any(isinstance(e, dict) and e.get("type") == "crossfade" and e.get("side") == "out" for e in efeitos)
+    if not cf_in:
+        dur_in = None
+        curva_in = "linear"
+        tensao_in = 0.0
+        val_fi = c.get("fade_in") if c.get("fade_in") is not None else c.get("fadeIn")
+        if val_fi is not None and _float_positivo(val_fi, 0.0) > 0:
+            dur_in = _float_positivo(val_fi, 0.0)
+            curva_in = str(c.get("fade_in_curve") or c.get("fadeInCurve") or "linear")
+            tensao_in = float(c.get("fade_in_tension") or c.get("fadeInTension") or 0.0)
+        elif isinstance(c.get("crossfade"), dict):
+            cf_dict = c["crossfade"]
+            d = cf_dict.get("fadeInDuration") or cf_dict.get("inDuration")
+            if d is not None and _float_positivo(d, 0.0) > 0:
+                dur_in = _float_positivo(d, 0.0)
+                curva_in = str(cf_dict.get("curveIn") or cf_dict.get("curve") or "linear")
+                tensao_in = float(cf_dict.get("tensionIn") or 0.0)
+        if dur_in is not None:
+            efeitos.append({
+                "type": "crossfade",
+                "side": "in",
+                "duration_s": dur_in,
+                "curve": curva_in,
+                "tension": tensao_in,
+                "disabled": False,
+            })
+    if not cf_out:
+        dur_out = None
+        curva_out = "linear"
+        tensao_out = 0.0
+        val_fo = c.get("fade_out") if c.get("fade_out") is not None else c.get("fadeOut")
+        if val_fo is not None and _float_positivo(val_fo, 0.0) > 0:
+            dur_out = _float_positivo(val_fo, 0.0)
+            curva_out = str(c.get("fade_out_curve") or c.get("fadeOutCurve") or "linear")
+            tensao_out = float(c.get("fade_out_tension") or c.get("fadeOutTension") or 0.0)
+        elif isinstance(c.get("crossfade"), dict):
+            cf_dict = c["crossfade"]
+            d = cf_dict.get("fadeOutDuration") or cf_dict.get("outDuration")
+            if d is not None and _float_positivo(d, 0.0) > 0:
+                dur_out = _float_positivo(d, 0.0)
+                curva_out = str(cf_dict.get("curveOut") or cf_dict.get("curve") or "linear")
+                tensao_out = float(cf_dict.get("tensionOut") or 0.0)
+        if dur_out is not None:
+            efeitos.append({
+                "type": "crossfade",
+                "side": "out",
+                "duration_s": dur_out,
+                "curve": curva_out,
+                "tension": tensao_out,
+                "disabled": False,
+            })
+
     tipo = str(c.get("type") or "video").lower()
+    kind = str(c.get("kind") or "media").lower()
+    cor = c.get("color")
+    cor_nome = c.get("color_name")
+    cid = str(c.get("id") or "")
+    if tipo == "text":
+        kind = "text"
+        cor = None
+        cor_nome = None
+    elif kind == "adjustment" or tipo == "adjustment" or cid.startswith(("cut_adj_", "adj_")):
+        kind = "adjustment"
+        tipo = "video"
+    elif (
+        kind == "color_matte"
+        or tipo in ("color_matte", "cor")
+        or cid.startswith(("cut_matte_", "matte_"))
+        or bool(cor)
+    ):
+        kind = "color_matte"
+        tipo = "video"
+        if not cor:
+            cor = "#000000"
+        if not cor_nome:
+            cor_nome = "Cor Sólida"
+    else:
+        cor = None
+        cor_nome = None
+
     # Mesma faixa do dialogo de velocidade (timelineState.changeClipSpeed).
     velocidade = min(100.0, max(0.01, _float_positivo(c.get("speed"), 1.0)))
     reverso = bool(c.get("reverse"))
-    if tipo == "photo":
-        velocidade, reverso = 1.0, False  # foto e imagem parada: nao ha o que acelerar
+    if tipo == "photo" or kind in ("adjustment", "color_matte"):
+        velocidade, reverso = 1.0, False  # imagem parada / gerador: nao ha o que acelerar
 
     # Freeze de foto ja e imagem parada; so video precisa segurar o quadro.
-    congelado = bool(c.get("is_freeze")) and tipo != "photo"
+    congelado = bool(c.get("is_freeze")) and tipo != "photo" and kind not in ("adjustment", "color_matte")
     congelar_em_s = _float_nao_negativo(c.get("freeze_time"), in_s) if congelado else 0.0
     if congelado:
         velocidade, reverso = 1.0, False  # quadro unico: velocidade nao se aplica
+
+    blend_mode = str(c.get("blend_mode") or c.get("blendMode") or "").strip().lower()
+    if not blend_mode:
+        for eff in efeitos:
+            if eff.get("type") == "transform" and eff.get("blend_mode"):
+                blend_mode = str(eff.get("blend_mode")).strip().lower()
+                break
+    if not blend_mode:
+        blend_mode = "normal"
+
+    hard_boundaries = bool(c.get("hard_boundaries") or c.get("hardBoundaries"))
+    dur_mid = c.get("source_duration_seconds") or c.get("media_duration") or c.get("source_duration")
+    if dur_mid is None and c.get("source_duration_frames") is not None:
+        dur_mid = _float_positivo(c.get("source_duration_frames"), 0.0) / (fps if fps else FPS_PADRAO)
+    duracao_midia_s = _float_positivo(dur_mid, 0.0) if dur_mid is not None else None
 
     return Clipe(
         bruto=dict(c) if tipo == "text" else None,
@@ -345,7 +480,7 @@ def _clipe(c, indice: int) -> Optional[Clipe]:
         velocidade=velocidade, reverso=reverso,
         corrigir_tom=c.get("pitch_correction") is not False,
         id=str(c.get("id") or f"cut_{indice}"),
-        tipo=str(c.get("type") or "video").lower(),
+        tipo=tipo,
         track=str(c.get("track") or "V1"),
         inicio_s=_float_nao_negativo(inicio, 0.0),
         in_s=in_s,
@@ -357,6 +492,12 @@ def _clipe(c, indice: int) -> Optional[Clipe]:
         origem=str(c.get("origin") or "user"),
         effects=efeitos,
         indice=indice,
+        kind=kind,
+        cor=(str(cor) if cor else None),
+        cor_nome=(str(cor_nome) if cor_nome else None),
+        blend_mode=blend_mode,
+        hard_boundaries=hard_boundaries,
+        duracao_midia_s=duracao_midia_s,
     )
 
 
@@ -418,6 +559,11 @@ def resolver_sobreposicoes(clipes: List[Clipe]) -> List[Clipe]:
                 corrigir_tom=clipe.corrigir_tom,
                 congelado=clipe.congelado, congelar_em_s=clipe.congelar_em_s,
                 bruto=clipe.bruto,
+                kind=clipe.kind, cor=clipe.cor, cor_nome=clipe.cor_nome,
+                blend_mode=clipe.blend_mode,
+                hard_boundaries=clipe.hard_boundaries,
+                duracao_midia_s=clipe.duracao_midia_s,
+                duracao_timeline_s=clipe.duracao_timeline_s,
             )
             resultado.append(recorte)
             donos.append((ini, fim))

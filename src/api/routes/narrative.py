@@ -1403,6 +1403,10 @@ def ultimo_render_timeline(timeline_id: int):
     else:
         estado = "desconhecido"
 
+    tamanho_mb = None
+    if arquivo and "tamanho_bytes" in arquivo:
+        tamanho_mb = round(arquivo["tamanho_bytes"] / (1024 * 1024), 1)
+
     return {
         "ok": True,
         "timeline_id": timeline_id,
@@ -1410,6 +1414,8 @@ def ultimo_render_timeline(timeline_id: int):
         "registro": registro,
         "tarefa": progresso,
         "arquivo": arquivo,
+        "output_path": previsto,
+        "tamanho_mb": tamanho_mb,
         "fonte": "registro_local(.ultimo_.json) + TASK_MANAGER + stat do arquivo",
     }
 

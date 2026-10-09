@@ -259,6 +259,49 @@ def resolver_fontes(seq, pedido, *,
                 "Pista de IA nao entra no render (regra P1).")
             continue
 
+        eh_matte = (
+            getattr(clipe, "e_color_matte", False)
+            or getattr(clipe, "kind", "") == "color_matte"
+            or getattr(clipe, "tipo", "") in ("color_matte", "cor")
+            or bool(getattr(clipe, "cor", None))
+            or str(getattr(clipe, "id", "")).startswith(("cut_matte_", "matte_"))
+        )
+        if eh_matte:
+            fonte_m = FonteClipe(
+                clipe.id, "video", None, "gerador", ST_OK,
+                "Cor sólida gerada sinteticamente (lavfi color).")
+            rel.fontes[clipe.id] = fonte_m
+            base_id = str(clipe.id).split("__", 1)[0]
+            if base_id != str(clipe.id):
+                rel.fontes[base_id] = fonte_m
+            continue
+
+        eh_ajuste = (
+            getattr(clipe, "e_ajuste", False)
+            or getattr(clipe, "kind", "") == "adjustment"
+            or getattr(clipe, "tipo", "") == "adjustment"
+            or str(getattr(clipe, "id", "")).startswith(("cut_adj_", "adj_"))
+        )
+        if eh_ajuste:
+            fonte_a = FonteClipe(
+                clipe.id, "video", None, "ajuste", ST_OK,
+                "Camada de ajuste sintética (efeitos compostos sobre as pistas inferiores).")
+            rel.fontes[clipe.id] = fonte_a
+            base_id = str(clipe.id).split("__", 1)[0]
+            if base_id != str(clipe.id):
+                rel.fontes[base_id] = fonte_a
+            continue
+
+        if getattr(clipe, "tipo", "") == "text" or getattr(clipe, "kind", "") == "text":
+            fonte_t = FonteClipe(
+                clipe.id, "video", None, "titulo", ST_OK,
+                "Título gerado sinteticamente.")
+            rel.fontes[clipe.id] = fonte_t
+            base_id = str(clipe.id).split("__", 1)[0]
+            if base_id != str(clipe.id):
+                rel.fontes[base_id] = fonte_t
+            continue
+
         e_foto = clipe.e_foto
         tipo_midia = "foto" if e_foto else "video"
         midia_id = clipe.photo_id if e_foto else clipe.video_id

@@ -62,6 +62,25 @@ from . import cor, fade, geometria
 
 _EPS_TEMPO = 1e-6
 
+BLEND_MODES_FFMPEG = {
+    "normal": "normal",
+    "multiply": "multiply",
+    "screen": "screen",
+    "overlay": "overlay",
+    "darken": "darken",
+    "lighten": "lighten",
+    "soft-light": "softlight",
+    "softlight": "softlight",
+    "difference": "difference",
+}
+
+
+def mapear_blend_mode(modo: Optional[str]) -> str:
+    if not modo:
+        return "normal"
+    modo_norm = str(modo).strip().lower()
+    return BLEND_MODES_FFMPEG.get(modo_norm, "normal")
+
 
 def _n(valor: float) -> str:
     texto = f"{float(valor):.9f}".rstrip("0").rstrip(".")
@@ -129,22 +148,49 @@ def _montar_alfa(clipe, escopo, delta: float, dur_clipe: float, dur_stream: floa
     grafico: List[str] = []
     op_neutra = abs(opacidade - 1.0) <= 1e-9
 
-    efeitos_cf = clipe.efeitos("crossfade") if escopo.efeito_ligado("crossfade") else []
+    todos_cf = clipe.efeitos("crossfade") if escopo.efeito_ligado("crossfade") else []
+    efeitos_cf = [
+        cf for cf in todos_cf
+        if not cf.get("transitionId") or cf.get("is_transition")
+    ]
 
+    # Filtra apenas os fades que de fato intersectam a janela do stream [0.0, dur_stream].
+    # Em tempo de stream (t = tempo_clipe - delta):
+    # - fade "in": intervalo de fade no stream e [-delta, d - delta].
+    #   Se d - delta <= 0, o fade-in ja terminou antes do stream comecar (alpha = 1.0 constante).
+    # - fade "out": intervalo de fade no stream e [dur_clipe - d - delta, dur_clipe - delta].
+    #   Se dur_clipe - d - delta >= dur_stream, o fade-out so comecaria apos o stream terminar (alpha = 1.0 constante).
+    #   Se dur_clipe - delta <= 0, o clipe todo ja terminou antes do stream comecar.
+    efeitos_cf_ativos: List[Dict[str, Any]] = []
     rampas: List[Tuple[str, float]] = []
+    st_rampas: List[float] = []
+
     for cf in efeitos_cf:
         lado = str(cf.get("side") or "").strip().lower()
         if lado not in ("in", "out"):
             continue  # o player so trata esses dois lados
-        rampas.append((lado, fade.normalizar_duracao(cf.get("duration_s"))))
+        d = fade.normalizar_duracao(cf.get("duration_s"))
+        if lado == "in":
+            if d - delta <= 1e-9:
+                continue  # fade-in concluido antes do inicio do stream
+            st = -delta
+        else:
+            if (dur_clipe - d - delta) >= dur_stream - 1e-9:
+                continue  # fade-out so comeca apos o fim do stream
+            if (dur_clipe - delta) <= 1e-9:
+                continue  # clipe concluido antes do inicio do stream
+            st = dur_clipe - d - delta
+
+        efeitos_cf_ativos.append(cf)
+        rampas.append((lado, d))
+        st_rampas.append(st)
 
     if not rampas:
         if not op_neutra:
             inline.append(f"colorchannelmixer=aa={_n(opacidade)}")
         return inline, grafico, ""
 
-    # Janelas em tempo DE CLIPE; a sobreposicao decide atalho x geq (dois
-    # fades `fade=` encadeados se MULTIPLICARIAM onde cruzam; o player faz min).
+    # Janelas no tempo do clipe para detectar sobreposicao
     janelas = sorted(
         (0.0, d) if lado == "in" else (dur_clipe - d, dur_clipe)
         for (lado, d) in rampas
@@ -153,21 +199,23 @@ def _montar_alfa(clipe, escopo, delta: float, dur_clipe: float, dur_stream: floa
                     for i in range(len(janelas) - 1))
     tudo_atalho = all(
         fade.usa_atalho_linear(cf.get("curve"), cf.get("tension"))
-        for cf in efeitos_cf
+        for cf in efeitos_cf_ativos
     )
+    # O filtro builtin 'fade' do FFmpeg EXIGE st >= 0 (valor negativo causa erro
+    # 'Value ... for parameter st out of range [0 - ...] Result too large').
+    # Se st < 0 (o stream comecou no meio de um fade em andamento), o atalho nao
+    # pode ser usado e cai no caminho geq abaixo, que avalia a curva com precisao.
+    st_validos = all(st >= -1e-9 for st in st_rampas)
 
-    if tudo_atalho and not sobrepoem:
+    if tudo_atalho and st_validos and not sobrepoem:
         if not op_neutra:
             inline.append(f"colorchannelmixer=aa={_n(opacidade)}")
-        for (lado, d) in rampas:
+        for (lado, d), st in zip(rampas, st_rampas):
+            st_limpo = max(0.0, st)
             if lado == "in":
-                inline.append(f"fade=t=in:st={_n(delta)}:d={_n(d)}:alpha=1")
+                inline.append(f"fade=t=in:st={_n(st_limpo)}:d={_n(d)}:alpha=1")
             else:
-                # st pode dar negativo quando a faixa entra no meio do fade;
-                # o filtro cobre (fica no meio-da-rampa em t=0), como na tela.
-                inline.append(
-                    f"fade=t=out:st={_n(dur_clipe - d - delta)}:d={_n(d)}:alpha=1"
-                )
+                inline.append(f"fade=t=out:st={_n(st_limpo)}:d={_n(d)}:alpha=1")
         return inline, grafico, ""
 
     # --- caminho geq -------------------------------------------------------
@@ -175,7 +223,7 @@ def _montar_alfa(clipe, escopo, delta: float, dur_clipe: float, dur_stream: floa
     hi = max(min(max(j[1] for j in janelas) - delta, dur_stream), 0.0)
 
     if hi <= lo + _EPS_TEMPO:
-        # O trecho renderizado nem alcaca a janela do fade.
+        # O trecho renderizado nem alcanca a janela do fade.
         if not op_neutra:
             inline.append(f"colorchannelmixer=aa={_n(opacidade)}")
         return inline, grafico, ""
@@ -185,7 +233,7 @@ def _montar_alfa(clipe, escopo, delta: float, dur_clipe: float, dur_stream: floa
     # 't' minusculo da "Undefined constant". O docstring de fade.py sugere "t"
     # para geq; divergencia do contrato, contornada aqui sem editar o modulo
     # (o parametro existe justamente para isso). Relatado ao integrador.
-    for cf in efeitos_cf:
+    for cf in efeitos_cf_ativos:
         lado = str(cf.get("side") or "").strip().lower()
         if lado not in ("in", "out"):
             continue
@@ -243,7 +291,8 @@ def _montar_alfa(clipe, escopo, delta: float, dur_clipe: float, dur_stream: floa
 
 def cadeia_clipe(clipe, seq, escopo, rotulo_entrada, rotulo_saida,
                  delta_tempo: float = 0.0, duracao_stream: Optional[float] = None,
-                 deslocamento_camada: Optional[float] = None
+                 deslocamento_camada: Optional[float] = None,
+                 tpad_start_s: float = 0.0, tpad_stop_s: float = 0.0
                  ) -> Tuple[str, Tuple[float, float]]:
     """Um clipe -> trecho de filter_complex que consome `rotulo_entrada` e
     produz `rotulo_saida`, mais o offset (x, y) do overlay NA MOLDURA.
@@ -280,7 +329,7 @@ def cadeia_clipe(clipe, seq, escopo, rotulo_entrada, rotulo_saida,
     linear: List[str] = []
     declaracoes: List[str] = []
 
-    if not clipe.e_foto:
+    if not clipe.e_foto and not clipe.e_color_matte:
         # Video chega com -ss antes do -i: garantir base temporal em zero para
         # os st/expressoes de fade e KB.
         linear.append("setpts=PTS-STARTPTS")
@@ -297,6 +346,10 @@ def cadeia_clipe(clipe, seq, escopo, rotulo_entrada, rotulo_saida,
             linear.append("reverse")
         if abs(clipe.velocidade - 1.0) > 1e-9:
             linear.append(f"setpts={_n(1.0 / clipe.velocidade)}*PTS")
+        if tpad_start_s > _EPS_TEMPO:
+            linear.append(f"tpad=start_mode=clone:start_duration={_n(tpad_start_s)}")
+        if tpad_stop_s > _EPS_TEMPO:
+            linear.append(f"tpad=stop_mode=clone:stop_duration={_n(tpad_stop_s)}")
     linear.append("format=rgba")
     linear.extend(geometria.filtro_fit(modo_fit, w, h))
     linear.extend(cor.cadeia_cor(bloco_cor))
@@ -364,6 +417,226 @@ def cadeia_clipe(clipe, seq, escopo, rotulo_entrada, rotulo_saida,
 # Camada de pista e grafo completo
 # ---------------------------------------------------------------------------
 
+_TOLERANCIA_CORTE_S = 0.1
+
+
+def _numero(valor: Any, padrao: float) -> float:
+    try:
+        v = float(valor)
+    except (TypeError, ValueError):
+        return float(padrao)
+    if v != v or v in (float("inf"), float("-inf")):
+        return float(padrao)
+    return v
+
+
+def _transicoes_da_pista(clipes: List[Any],
+                         escopo: Any) -> List[Tuple[Any, List[Dict[str, Any]]]]:
+    """Emparelha os dois lados de cada transição de vídeo da pista.
+
+    Reaplica a arquitetura de grafo_audio:
+    - Clipe A (sai): estende temporalmente até corte + halfB.
+    - Clipe B (entra): recua temporalmente até corte - halfA.
+    - Se não houver folga de mídia na fonte ou hard_boundaries estiver ativo:
+      usa tpad=clone para congelar os quadros de borda.
+    """
+    lados: Dict[str, Dict[str, Tuple[int, Dict[str, Any]]]] = {}
+    if escopo.efeito_ligado("crossfade"):
+        for i, c in enumerate(clipes):
+            for ef in c.effects:
+                if not isinstance(ef, dict) or ef.get("disabled") or not ef.get("transitionId"):
+                    continue
+                tipo_ef = str(ef.get("type") or "").lower()
+                if tipo_ef not in ("crossfade", "video_cross_dissolve", "video_dip_black", "video_dip_white"):
+                    continue
+                lado = str(ef.get("side") or "").lower()
+                if lado in ("in", "out"):
+                    lados.setdefault(str(ef["transitionId"]), {})[lado] = (i, ef)
+
+    por_indice: Dict[int, List[Dict[str, Any]]] = {}
+    for tid, par in lados.items():
+        if "out" not in par or "in" not in par:
+            continue
+        ia, ef_a = par["out"]
+        ib, ef_b = par["in"]
+        a = clipes[ia]
+        b = clipes[ib]
+        if ia == ib or abs(a.fim_s - b.inicio_s) > _TOLERANCIA_CORTE_S:
+            continue
+        corte = b.inicio_s
+        half_a = min(max(0.0, _numero(ef_a.get("duration_s"), 0.0)), a.duracao_s, b.duracao_s)
+        half_b = min(max(0.0, _numero(ef_b.get("duration_s"), 0.0)), b.duracao_s, a.duracao_s)
+        if half_a + half_b <= _EPS_TEMPO:
+            continue
+
+        tipo_trans = str(ef_a.get("transitionType") or ef_b.get("transitionType") or ef_a.get("type") or "video_cross_dissolve").lower()
+
+        if tipo_trans == "video_dip_black":
+            base = {
+                "inicio_s": corte - half_a,
+                "span_s": half_a + half_b,
+                "curve": str(ef_a.get("curve") or "linear"),
+                "tension": _numero(ef_a.get("tension"), 0.0),
+                "type": tipo_trans,
+                "half_a": half_a,
+                "half_b": half_b,
+                "estende_ini_s": 0.0,
+                "estende_fim_s": 0.0,
+                "extensao_midia_ini_s": 0.0,
+                "extensao_midia_fim_s": 0.0,
+                "tpad_start_s": 0.0,
+                "tpad_stop_s": 0.0,
+            }
+            por_indice.setdefault(ia, []).append({**base, "papel": "sai"})
+            por_indice.setdefault(ib, []).append({**base, "papel": "entra"})
+            continue
+
+        # Cross Dissolve / Dip to White
+        # 1. Folga para B (cabeça)
+        if getattr(b, "hard_boundaries", False) or b.reverso:
+            folga_b = 0.0
+        elif b.e_foto or b.e_color_matte or b.congelado:
+            folga_b = half_a
+        else:
+            folga_b = b.in_s / b.velocidade
+
+        ext_midia_b = min(half_a, max(0.0, folga_b))
+        tpad_start_b = half_a - ext_midia_b
+
+        # 2. Folga para A (cauda)
+        if getattr(a, "hard_boundaries", False) or a.reverso:
+            folga_a = 0.0
+        elif a.e_foto or a.e_color_matte or a.congelado:
+            folga_a = half_b
+        elif getattr(a, "duracao_midia_s", None) is not None:
+            folga_a = max(0.0, a.duracao_midia_s - a.out_s) / a.velocidade
+        else:
+            folga_a = half_b
+
+        ext_midia_a = min(half_b, max(0.0, folga_a))
+        tpad_stop_a = half_b - ext_midia_a
+
+        base = {
+            "inicio_s": corte - half_a,
+            "span_s": half_a + half_b,
+            "curve": str(ef_a.get("curve") or "linear"),
+            "tension": _numero(ef_a.get("tension"), 0.0),
+            "type": tipo_trans,
+            "half_a": half_a,
+            "half_b": half_b,
+        }
+        por_indice.setdefault(ia, []).append({
+            **base,
+            "papel": "sai",
+            "estende_ini_s": 0.0,
+            "estende_fim_s": half_b,
+            "extensao_midia_ini_s": 0.0,
+            "extensao_midia_fim_s": ext_midia_a,
+            "tpad_start_s": 0.0,
+            "tpad_stop_s": tpad_stop_a,
+        })
+        por_indice.setdefault(ib, []).append({
+            **base,
+            "papel": "entra",
+            "estende_ini_s": half_a,
+            "estende_fim_s": 0.0,
+            "extensao_midia_ini_s": ext_midia_b,
+            "extensao_midia_fim_s": 0.0,
+            "tpad_start_s": tpad_start_b,
+            "tpad_stop_s": 0.0,
+        })
+
+    return [(c, por_indice.get(i, [])) for i, c in enumerate(clipes)]
+
+
+def _estender(clipe: Any, transicoes: List[Dict[str, Any]]) -> Tuple[Any, float, float]:
+    """Alonga o clipe para cobrir as janelas de transição e sintetiza os fades.
+
+    Devolve (clipe_estendido, tpad_start_s, tpad_stop_s).
+    """
+    ini = max((t["estende_ini_s"] for t in transicoes), default=0.0)
+    fim = max((t["estende_fim_s"] for t in transicoes), default=0.0)
+    tpad_start = max((t.get("tpad_start_s", 0.0) for t in transicoes), default=0.0)
+    tpad_stop = max((t.get("tpad_stop_s", 0.0) for t in transicoes), default=0.0)
+    ext_ini = max((t.get("extensao_midia_ini_s", 0.0) for t in transicoes), default=0.0)
+    ext_fim = max((t.get("extensao_midia_fim_s", 0.0) for t in transicoes), default=0.0)
+
+    import dataclasses
+    novos_efeitos = []
+    for ef in clipe.effects:
+        if isinstance(ef, dict) and ef.get("transitionId"):
+            continue
+        novos_efeitos.append(ef)
+
+    for t in transicoes:
+        if t["papel"] == "entra" and t.get("type", "video_cross_dissolve") != "video_dip_black":
+            # Clipe B dissolve suavemente por cima do Clipe A ao longo de todo o envelope
+            novos_efeitos.append({
+                "type": "crossfade",
+                "side": "in",
+                "duration_s": t["span_s"],
+                "curve": t.get("curve", "linear"),
+                "tension": t.get("tension", 0.0),
+                "is_transition": True,
+                "disabled": False,
+            })
+        elif t.get("type") == "video_dip_black":
+            lado = "out" if t["papel"] == "sai" else "in"
+            dur = t["half_a"] if t["papel"] == "sai" else t["half_b"]
+            novos_efeitos.append({
+                "type": "crossfade",
+                "side": lado,
+                "duration_s": dur,
+                "curve": t.get("curve", "linear"),
+                "tension": t.get("tension", 0.0),
+                "is_transition": True,
+                "disabled": False,
+            })
+
+    if ini <= _EPS_TEMPO and fim <= _EPS_TEMPO:
+        return dataclasses.replace(clipe, effects=novos_efeitos), tpad_start, tpad_stop
+
+    v = clipe.velocidade
+    mais_cedo, mais_tarde = (ext_fim * v, ext_ini * v) if clipe.reverso else (ext_ini * v, ext_fim * v)
+    dur_timeline = clipe.duracao_s + ini + fim
+    clipe_estendido = dataclasses.replace(
+        clipe,
+        inicio_s=clipe.inicio_s - ini,
+        in_s=clipe.in_s - mais_cedo,
+        out_s=clipe.out_s + mais_tarde,
+        effects=novos_efeitos,
+        duracao_timeline_s=dur_timeline,
+    )
+    return clipe_estendido, tpad_start, tpad_stop
+
+
+def normalizar_cor_lavfi(cor: Optional[str]) -> str:
+    """Normaliza representação de cor para o filtro lavfi color do FFmpeg (ex: 0xRRGGBB ou nome)."""
+    if not cor:
+        return "0x000000"
+    s = str(cor).strip()
+    hex_str = s.lstrip("#")
+    if hex_str.lower().startswith("0x"):
+        hex_str = hex_str[2:]
+    if all(ch in "0123456789abcdefABCDEF" for ch in hex_str) and len(hex_str) in (3, 4, 6, 8):
+        if len(hex_str) == 3:
+            return "0x" + "".join(ch * 2 for ch in hex_str)
+        if len(hex_str) == 4:
+            return "0x" + "".join(ch * 2 for ch in hex_str)
+        return "0x" + hex_str
+    import re
+    m_rgb = re.match(r"^rgba?\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)(?:\s*,\s*([\d\.]+))?\s*\)$", s, re.IGNORECASE)
+    if m_rgb:
+        r, g, b = int(m_rgb.group(1)), int(m_rgb.group(2)), int(m_rgb.group(3))
+        r, g, b = max(0, min(255, r)), max(0, min(255, g)), max(0, min(255, b))
+        if m_rgb.group(4) is not None:
+            a = float(m_rgb.group(4))
+            a_int = max(0, min(255, int(round(a * 255 if a <= 1.0 else a))))
+            return f"0x{r:02X}{g:02X}{b:02X}{a_int:02X}"
+        return f"0x{r:02X}{g:02X}{b:02X}"
+    return s
+
+
 def camada_pista(pista, clipes, seq, escopo, inicio_s: float, fim_s: float,
                  prefixo: str = "pista", indice_base: int = 0
                  ) -> Tuple[List[str], str, List[Dict[str, Any]], bool]:
@@ -383,14 +656,58 @@ def camada_pista(pista, clipes, seq, escopo, inicio_s: float, fim_s: float,
     acumulado = base
     usada = False
 
-    for i, c in enumerate(clipes):
+    pares_com_trans = _transicoes_da_pista(clipes, escopo)
+    for i, (c_orig, transicoes) in enumerate(pares_com_trans):
+        c, tpad_start_s, tpad_stop_s = _estender(c_orig, transicoes)
         ini = max(c.inicio_s, inicio_s)
         fim = min(c.fim_s, fim_s)
         if fim - ini <= _EPS_TEMPO:
             continue  # fora da faixa pedida
+        if c.e_ajuste:
+            continue  # camadas de ajuste sao compostas no grafo_completo sobre o acumulado
         usada = True
-        delta = ini - c.inicio_s          # pedaco aparado no comeco (regra P4)
+        delta = ini - c.inicio_s          # pedaco aparado no comeco (regra P4 / render range)
         loc = ini - inicio_s              # instante do clipe DENTRO da camada
+        dur_total = fim - ini
+
+        # Determina quanto de tpad é ativo dentro da janela de render
+        tpad_start_ativo = max(0.0, tpad_start_s - delta) if delta < tpad_start_s else 0.0
+        delta_midia = max(0.0, delta - tpad_start_s)
+        tpad_stop_ativo = max(0.0, tpad_stop_s - max(0.0, c.fim_s - fim))
+        dur_midia = max(0.0, dur_total - tpad_start_ativo - tpad_stop_ativo)
+
+        if c.e_color_matte:
+            cor_val = normalizar_cor_lavfi(c.cor)
+            rot_cor = f"{prefixo}c{i}_cor"
+            declaracoes.append(
+                f"color=c={cor_val}:s={w}x{h}:r={_n(seq.fps)}:d={_n(dur_total)}{_col(rot_cor)}"
+            )
+            sai = f"{prefixo}c{i}s"
+            cadeia, (ox, oy) = cadeia_clipe(
+                c, seq, escopo, _col(rot_cor), _col(sai),
+                delta_tempo=delta, duracao_stream=dur_total,
+                deslocamento_camada=loc,
+            )
+            declaracoes.append(cadeia)
+
+            depois = f"{prefixo}c{i}l"
+            modo_blend = mapear_blend_mode(getattr(c, "blend_mode", "normal"))
+            if modo_blend != "normal":
+                declaracoes.append(
+                    f"{_col(acumulado)}{_col(sai)}"
+                    f"blend=all_mode={modo_blend}:"
+                    f"enable='between(t,{_n(loc)},{_n(loc + dur_total)})'"
+                    f"{_col(depois)}"
+                )
+            else:
+                declaracoes.append(
+                    f"{_col(acumulado)}{_col(sai)}"
+                    f"overlay=x={_n(ox)}:y={_n(oy)}:"
+                    f"enable='between(t,{_n(loc)},{_n(loc + dur_total)})'"
+                    f"{_col(depois)}"
+                )
+            acumulado = depois
+            continue
 
         # O rotulo de entrada e o INDICE REAL do input, nao um simbolo: o k-esimo
         # item de `entradas` vira o k-esimo -i do lado do pacote C, e o grafo tem
@@ -401,22 +718,37 @@ def camada_pista(pista, clipes, seq, escopo, inicio_s: float, fim_s: float,
         sai = f"{prefixo}c{i}s"
         cadeia, (ox, oy) = cadeia_clipe(
             c, seq, escopo, _col(ent), _col(sai),
-            delta_tempo=delta, duracao_stream=fim - ini,
+            delta_tempo=delta, duracao_stream=dur_total,
             deslocamento_camada=loc,
+            tpad_start_s=tpad_start_ativo,
+            tpad_stop_s=tpad_stop_ativo,
         )
         declaracoes.append(cadeia)
 
         depois = f"{prefixo}c{i}l"
-        declaracoes.append(
-            f"{_col(acumulado)}{_col(sai)}"
-            f"overlay=x={_n(ox)}:y={_n(oy)}:"
-            f"enable='between(t,{_n(loc)},{_n(loc + (fim - ini))})'"
-            f"{_col(depois)}"
-        )
+        modo_blend = mapear_blend_mode(getattr(c, "blend_mode", "normal"))
+        if modo_blend != "normal":
+            declaracoes.append(
+                f"{_col(acumulado)}{_col(sai)}"
+                f"blend=all_mode={modo_blend}:"
+                f"enable='between(t,{_n(loc)},{_n(loc + dur_total)})'"
+                f"{_col(depois)}"
+            )
+        else:
+            declaracoes.append(
+                f"{_col(acumulado)}{_col(sai)}"
+                f"overlay=x={_n(ox)}:y={_n(oy)}:"
+                f"enable='between(t,{_n(loc)},{_n(loc + dur_total)})'"
+                f"{_col(depois)}"
+            )
         acumulado = depois
 
         # Trecho da FONTE que cobre a janela (velocidade e reverso inclusos).
-        ss_fonte, t_fonte = c.trecho_fonte(delta, fim - ini)
+        if dur_midia > _EPS_TEMPO:
+            ss_fonte, t_fonte = c.trecho_fonte(delta_midia, dur_midia)
+        else:
+            ss_fonte, t_fonte = c.trecho_fonte(0.0, modelo.JANELA_QUADRO_CONGELADO_S)
+
         entradas.append({
             "tipo": "foto" if c.e_foto else "video",
             "caminho": None,             # midia.py resolve; ver docstring
@@ -458,19 +790,97 @@ def grafo_completo(seq, escopo, inicio_s: float, fim_s: float,
             continue  # escolha do editor no escopo do render
         clipes = seq.clipes_da_pista(pista.id)   # regra P4 aplicada aqui
         prefixo = f"t{indice}"
-        linhas, rotulo, ents, usada = camada_pista(
-            pista, clipes, seq, escopo, inicio, fim, prefixo=prefixo,
-            indice_base=indice_base + len(entradas),
-        )
-        if not usada:
-            continue  # pista sem clipe na faixa: nem camada nem entradas
-        declaracoes.extend(linhas)
-        entradas.extend(ents)
-        depois = f"_apos_t{indice}"
-        declaracoes.append(
-            f"{_col(acumulado)}{_col(rotulo)}overlay=x=0:y=0{_col(depois)}"
-        )
-        acumulado = depois
+
+        # 1. Clipes regulares (vídeo, foto, color_matte) na camada da pista
+        clipes_camada = [c for c in clipes if not c.e_ajuste]
+        if clipes_camada:
+            linhas, rotulo, ents, usada = camada_pista(
+                pista, clipes_camada, seq, escopo, inicio, fim, prefixo=prefixo,
+                indice_base=indice_base + len(entradas),
+            )
+            if usada:
+                declaracoes.extend(linhas)
+                entradas.extend(ents)
+                depois = f"_apos_t{indice}"
+                clipes_com_blend = [c for c in clipes_camada if mapear_blend_mode(getattr(c, "blend_mode", "normal")) != "normal"]
+                if clipes_com_blend:
+                    modo_blend_pista = mapear_blend_mode(clipes_com_blend[0].blend_mode)
+                    enables = [
+                        f"between(t,{_n(max(c.inicio_s, inicio) - inicio)},{_n(min(c.fim_s, fim) - inicio)})"
+                        for c in clipes_com_blend
+                    ]
+                    enable_expr = "+".join(enables)
+                    declaracoes.append(
+                        f"{_col(acumulado)}{_col(rotulo)}blend=all_mode={modo_blend_pista}:enable='{enable_expr}'{_col(depois)}"
+                    )
+                else:
+                    declaracoes.append(
+                        f"{_col(acumulado)}{_col(rotulo)}overlay=x=0:y=0{_col(depois)}"
+                    )
+                acumulado = depois
+
+        # 2. Camadas de ajuste (Adjustment Layer) propagam efeitos sobre o fluxo acumulado inferior
+        clipes_ajuste = [c for c in clipes if c.e_ajuste]
+        for ai, c in enumerate(clipes_ajuste):
+            ini = max(c.inicio_s, inicio)
+            fim_c = min(c.fim_s, fim)
+            if fim_c - ini <= _EPS_TEMPO:
+                continue
+            dur_adj = fim_c - ini
+            loc = ini - inicio
+            delta = ini - c.inicio_s
+
+            bloco_cor = _bloco_ativo(c, "color") if escopo.efeito_ligado("color") else None
+            bloco_crop = _bloco_ativo(c, "crop") if escopo.efeito_ligado("crop") else None
+            bloco_tf = _bloco_ativo(c, "transform") if escopo.efeito_ligado("transform") else None
+
+            adj_pfx = f"{prefixo}_adj{ai}"
+            base_split = f"{adj_pfx}_base"
+            in_split = f"{adj_pfx}_in"
+            out_adj = f"{adj_pfx}_out"
+            declaracoes.append(f"{_col(acumulado)}split{_col(base_split)}{_col(in_split)}")
+
+            filtros_adj = ["format=rgba"]
+            if bloco_cor:
+                filtros_adj.extend(cor.cadeia_cor(bloco_cor))
+
+            opacidade = _num(bloco_tf, "opacity", 1.0)
+            inline_alfa, grafico_alfa, saida_alfa = _montar_alfa(
+                c, escopo, delta, c.duracao_s, dur_adj, opacidade, rotulo_base=adj_pfx
+            )
+            atual_adj = _col(in_split)
+            if grafico_alfa:
+                if filtros_adj:
+                    rot_pre = f"{adj_pfx}_pre"
+                    declaracoes.append(f"{atual_adj}{','.join(filtros_adj)}{_col(rot_pre)}")
+                    atual_adj = _col(rot_pre)
+                    filtros_adj = []
+                declaracoes.append(f"{atual_adj}{grafico_alfa[0]}")
+                declaracoes.extend(grafico_alfa[1:])
+                atual_adj = _col(saida_alfa)
+            else:
+                filtros_adj.extend(inline_alfa)
+
+            if bloco_crop:
+                filtros_adj.extend(geometria.filtros_crop(
+                    _num(bloco_crop, "top", 0.0), _num(bloco_crop, "right", 0.0),
+                    _num(bloco_crop, "bottom", 0.0), _num(bloco_crop, "left", 0.0), w, h,
+                ))
+
+            cauda_adj = ",".join(filtros_adj) if filtros_adj else "null"
+            declaracoes.append(f"{atual_adj}{cauda_adj}{_col(out_adj)}")
+
+            depois_adj = f"_apos_{adj_pfx}"
+            modo_blend = mapear_blend_mode(getattr(c, "blend_mode", "normal"))
+            if modo_blend != "normal":
+                declaracoes.append(
+                    f"{_col(base_split)}{_col(out_adj)}blend=all_mode={modo_blend}:enable='between(t,{_n(loc)},{_n(loc + dur_adj)})'{_col(depois_adj)}"
+                )
+            else:
+                declaracoes.append(
+                    f"{_col(base_split)}{_col(out_adj)}overlay=x=0:y=0:enable='between(t,{_n(loc)},{_n(loc + dur_adj)})'{_col(depois_adj)}"
+                )
+            acumulado = depois_adj
 
     declaracoes.append(f"{_col(acumulado)}null[vout]")
     return {

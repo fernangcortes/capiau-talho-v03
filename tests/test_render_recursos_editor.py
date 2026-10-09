@@ -14,6 +14,7 @@ Recurso que hoje NAO renderiza fica em xfail(strict=True): a suite segue verde
 e o teste passa a falhar no dia em que o recurso for consertado, obrigando a
 tirar a marca (e a lista de lacunas nunca fica mentindo).
 """
+from pathlib import Path
 import sqlite3
 
 import pytest
@@ -280,3 +281,346 @@ def test_pista_oculta_persiste():
     pistas = [dict(p, hidden=True) if p["id"] == "V2" else p for p in PISTAS]
     seq = _salvar_e_ler(_par_av("c1", 0.0, 0.0, 5.0), pistas)
     assert seq.pista("V2").hidden is True
+
+
+def test_color_matte_chega_ao_render():
+    matte = {
+        "id": "matte_1", "type": "color_matte", "kind": "color_matte",
+        "color": "#00FF00", "color_name": "Verde",
+        "in": 0.0, "out": 4.0, "track": "V1", "timeline_start": 0.0,
+        "effects": []
+    }
+    r = _render([matte])
+    fc = r["video"]["filter_complex"]
+    assert "color=c=0x00FF00" in fc or "color=" in fc
+
+
+def test_color_matte_fade_in_fade_out_no_render():
+    matte = {
+        "id": "matte_fade", "type": "color_matte", "kind": "color_matte",
+        "color": "#FF0000", "color_name": "Vermelho",
+        "in": 0.0, "out": 4.0, "track": "V1", "timeline_start": 0.0,
+        "fade_in": 1.0, "fade_out": 1.0,
+        "effects": []
+    }
+    r = _render([matte])
+    fc = r["video"]["filter_complex"]
+    assert "color=c=0xFF0000" in fc or "color=" in fc
+    assert "fade=t=in" in fc or "geq=" in fc
+    assert "fade=t=out" in fc or "geq=" in fc
+
+
+def test_camada_de_ajuste_propaga_efeitos_no_render():
+    base = _video("v1", 0.0, 0.0, 5.0, pista="V1")
+    adj = {
+        "id": "adj_1", "type": "adjustment", "kind": "adjustment",
+        "in": 0.0, "out": 5.0, "track": "V2", "timeline_start": 0.0,
+        "effects": [{"type": "color", "saturation": 0.0, "disabled": False}]
+    }
+    r = _render([base, adj])
+    fc = r["video"]["filter_complex"]
+    assert "split" in fc
+    assert "colorchannelmixer" in fc or "eq=" in fc
+
+
+def test_blend_modes_color_matte_e_clipes():
+    """Valida mapeamento de blend modes para blend=all_mode=... no render FFmpeg."""
+    base = _video("v1", 0.0, 0.0, 5.0, pista="V1")
+    matte_mult = {
+        "id": "matte_mult", "type": "color_matte", "kind": "color_matte",
+        "color": "#FF0000", "color_name": "Vermelho",
+        "in": 0.0, "out": 5.0, "track": "V2", "timeline_start": 0.0,
+        "blend_mode": "multiply",
+        "effects": []
+    }
+    r = _render([base, matte_mult])
+    fc = r["video"]["filter_complex"]
+    assert "blend=all_mode=multiply" in fc
+
+    # Teste de modo soft-light mapeado para softlight
+    matte_soft = {
+        "id": "matte_soft", "type": "color_matte", "kind": "color_matte",
+        "color": "#0000FF", "color_name": "Azul",
+        "in": 0.0, "out": 5.0, "track": "V2", "timeline_start": 0.0,
+        "blend_mode": "soft-light",
+        "effects": []
+    }
+    r2 = _render([base, matte_soft])
+    fc2 = r2["video"]["filter_complex"]
+    assert "blend=all_mode=softlight" in fc2
+
+
+def test_color_matte_nao_gera_aviso_sem_referencia_de_midia():
+    """Clipes de cor sólida (color_matte) são sintéticos e não devem ser apontados como sem mídia."""
+    from src.export.video_render import midia, fidelidade
+    from src.api.schemas import RenderPedidoPayload, pedido_render_do_payload
+
+    matte = {
+        "id": "cut_matte_1791504784785_273", "type": "color_matte", "kind": "color_matte",
+        "color": "#00FF00", "color_name": "Verde Chroma",
+        "in": 0.0, "out": 5.0, "track": "V1", "timeline_start": 0.0,
+        "effects": [
+            {"type": "crossfade", "side": "in", "duration_s": 1.0, "curve": "linear", "tension": 0.0, "disabled": False},
+            {"type": "crossfade", "side": "out", "duration_s": 1.0, "curve": "linear", "tension": 0.0, "disabled": False}
+        ]
+    }
+    seq = _salvar_e_ler([matte])
+    pedido = pedido_render_do_payload(1, RenderPedidoPayload(kind="master"))
+
+    rel_midia = midia.resolver_fontes(seq, pedido)
+    assert "cut_matte_1791504784785_273" not in rel_midia.sem_referencia
+    fonte = rel_midia.fontes.get("cut_matte_1791504784785_273")
+    assert fonte is not None
+    assert fonte.status == "ok"
+    assert fonte.classe == "gerador"
+
+    rel_fid = fidelidade.relatorio(seq, pedido, rel_midia)
+    codigos_avisos = [a["codigo"] for a in rel_fid.get("avisos", [])]
+    assert "CLIPE_SEM_REFERENCIA_DE_MIDIA" not in codigos_avisos
+
+
+def test_camada_ajuste_e_titulo_nao_geram_aviso_sem_referencia():
+    """Camadas de ajuste e títulos também são geradores sintéticos sem video_id/photo_id."""
+    from src.export.video_render import midia, fidelidade
+    from src.api.schemas import RenderPedidoPayload, pedido_render_do_payload
+
+    adj = {
+        "id": "cut_adj_999", "type": "adjustment", "kind": "adjustment",
+        "in": 0.0, "out": 4.0, "track": "V2", "timeline_start": 0.0,
+        "effects": [{"type": "color", "saturation": 0.5, "disabled": False}]
+    }
+    titulo = {
+        "id": "title_1", "type": "text", "text": "Título de Teste",
+        "in": 0.0, "out": 3.0, "track": "T1", "timeline_start": 0.0,
+        "effects": []
+    }
+    seq = _salvar_e_ler([adj, titulo])
+    pedido = pedido_render_do_payload(1, RenderPedidoPayload(kind="master"))
+
+    rel_midia = midia.resolver_fontes(seq, pedido)
+    assert "cut_adj_999" not in rel_midia.sem_referencia
+    assert "title_1" not in rel_midia.sem_referencia
+
+    rel_fid = fidelidade.relatorio(seq, pedido, rel_midia)
+    codigos_avisos = [a["codigo"] for a in rel_fid.get("avisos", [])]
+    assert "CLIPE_SEM_REFERENCIA_DE_MIDIA" not in codigos_avisos
+
+
+def test_clipe_sem_midia_legitimo_continua_gerando_aviso():
+    """Garante que clipes de vídeo reais que de fato perderam referência continuem alertando."""
+    from src.export.video_render import midia, fidelidade
+    from src.api.schemas import RenderPedidoPayload, pedido_render_do_payload
+
+    quebrado = {
+        "id": "cut_orfa_123", "type": "video", "kind": "media",
+        "video_id": None, "photo_id": None,
+        "in": 0.0, "out": 4.0, "track": "V1", "timeline_start": 0.0,
+        "effects": []
+    }
+    seq = _salvar_e_ler([quebrado])
+    pedido = pedido_render_do_payload(1, RenderPedidoPayload(kind="master"))
+
+    rel_midia = midia.resolver_fontes(seq, pedido)
+    assert "cut_orfa_123" in rel_midia.sem_referencia
+
+    rel_fid = fidelidade.relatorio(seq, pedido, rel_midia)
+    codigos_avisos = [a["codigo"] for a in rel_fid.get("avisos", [])]
+    assert "CLIPE_SEM_REFERENCIA_DE_MIDIA" in codigos_avisos
+
+
+def test_color_matte_montar_comando_completo(tmp_path):
+    """Garante que comando.montar_comando processa color_matte sem exceção de mídia não resolvida."""
+    from src.export.video_render import comando, midia
+    from src.api.schemas import RenderPedidoPayload, pedido_render_do_payload
+
+    matte = {
+        "id": "cut_matte_1791504784785_273", "type": "color_matte", "kind": "color_matte",
+        "color": "#00FF00", "color_name": "Verde Chroma",
+        "in": 0.0, "out": 5.0, "track": "V1", "timeline_start": 0.0,
+        "effects": [
+            {"type": "crossfade", "side": "in", "duration_s": 1.0, "curve": "linear", "tension": 0.0, "disabled": False},
+            {"type": "crossfade", "side": "out", "duration_s": 1.0, "curve": "linear", "tension": 0.0, "disabled": False}
+        ]
+    }
+    seq = _salvar_e_ler([matte])
+    pedido = pedido_render_do_payload(1, RenderPedidoPayload(kind="master"))
+    rel_midia = midia.resolver_fontes(seq, pedido)
+
+    res = comando.montar_comando(
+        seq, pedido, str(tmp_path / "saida.mp4"),
+        rel_midia=rel_midia, destino_validado=True
+    )
+    assert res is not None
+    assert "cmd" in res
+    cmd_str = " ".join(res["cmd"])
+    assert "color=c=0x00FF00" in cmd_str
+
+
+def test_color_matte_formato_ui_nao_gera_aviso_sem_referencia():
+    """Formato real da UI (type='video', kind='color_matte', video_id=None) não gera aviso sem_referência."""
+    from src.export.video_render import midia, fidelidade
+    from src.api.schemas import RenderPedidoPayload, pedido_render_do_payload
+
+    matte_ui = {
+        "id": "cut_matte_1791504784785_273",
+        "type": "video",
+        "kind": "color_matte",
+        "color": "#10B981",
+        "color_name": "Esmeralda",
+        "video_id": None,
+        "photo_id": None,
+        "in": 0.0,
+        "out": 3.0,
+        "track": "V1",
+        "timeline_start": 0.0,
+        "effects": []
+    }
+    matte_sem_kind = {
+        "id": "cut_matte_9999999999999_111",
+        "type": "video",
+        "color": "#3B82F6",
+        "video_id": None,
+        "in": 3.0,
+        "out": 6.0,
+        "track": "V1",
+        "timeline_start": 3.0,
+        "effects": []
+    }
+    seq = _salvar_e_ler([matte_ui, matte_sem_kind])
+    pedido = pedido_render_do_payload(1, RenderPedidoPayload(kind="master"))
+
+    rel_midia = midia.resolver_fontes(seq, pedido)
+    assert "cut_matte_1791504784785_273" not in rel_midia.sem_referencia
+    assert "cut_matte_9999999999999_111" not in rel_midia.sem_referencia
+
+    rel_fid = fidelidade.relatorio(seq, pedido, rel_midia)
+    codigos_avisos = [a["codigo"] for a in rel_fid.get("avisos", [])]
+    assert "CLIPE_SEM_REFERENCIA_DE_MIDIA" not in codigos_avisos
+
+
+def test_color_matte_execucao_render_termina_com_sucesso(tmp_path):
+    """Execução real do ffmpeg termina com sucesso e gera arquivo utilizável."""
+    from src.export.video_render import execucao, modelo
+    from src.api.schemas import RenderPedidoPayload, pedido_render_do_payload
+
+    matte = {
+        "id": "cut_matte_1791504784785_273",
+        "type": "video",
+        "kind": "color_matte",
+        "color": "#00FF00",
+        "color_name": "Verde",
+        "in": 0.0,
+        "out": 1.0,
+        "track": "V1",
+        "timeline_start": 0.0,
+        "effects": []
+    }
+    seq = _salvar_e_ler([matte])
+    saida = tmp_path / "saida_matte.mp4"
+    pedido = pedido_render_do_payload(1, RenderPedidoPayload(
+        kind="draft",
+        output={"dir": str(tmp_path), "filename": "saida_matte.mp4"}
+    ))
+    res = execucao.executar_agora(seq, pedido)
+    assert res.get("ok") is True
+    assert res.get("cancelado") is False
+    caminho = res.get("caminho")
+    assert caminho is not None
+    p = Path(caminho)
+    assert p.exists()
+    assert p.stat().st_size > 0
+
+
+def test_color_matte_hex_curto_e_nomes_execucao_ffmpeg(tmp_path):
+    """Cores hex curtas (#fff, #000) e formatos de cor web não devem quebrar o ffmpeg."""
+    from src.export.video_render import execucao, modelo
+    from src.api.schemas import RenderPedidoPayload, pedido_render_do_payload
+
+    matte_fff = {
+        "id": "cut_matte_fff",
+        "type": "video",
+        "kind": "color_matte",
+        "color": "#fff",
+        "color_name": "Branco",
+        "in": 0.0,
+        "out": 0.5,
+        "track": "V1",
+        "timeline_start": 0.0,
+        "effects": []
+    }
+    seq = _salvar_e_ler([matte_fff])
+    pedido = pedido_render_do_payload(1, RenderPedidoPayload(
+        kind="draft",
+        output={"dir": str(tmp_path), "filename": "saida_fff.mp4"}
+    ))
+    res = execucao.executar_agora(seq, pedido)
+    assert res.get("ok") is True
+    p = Path(res.get("caminho"))
+    assert p.exists()
+    assert p.stat().st_size > 0
+
+
+def test_color_matte_transicao_cross_dissolve_ffmpeg(tmp_path):
+    """Dois color mattes adjacentes com cross dissolve executam perfeitamente no FFmpeg."""
+    from src.export.video_render import execucao, modelo
+    from src.api.schemas import RenderPedidoPayload, pedido_render_do_payload
+
+    m1 = {
+        "id": "matte_red", "type": "color_matte", "kind": "color_matte", "color": "#FF0000",
+        "timeline_start": 0.0, "in": 0.0, "out": 1.5, "track": "V1",
+        "effects": [{"type": "crossfade", "side": "out", "duration_s": 0.5, "transitionId": "tr_m", "transitionType": "video_cross_dissolve", "curve": "linear", "tension": 0.0}]
+    }
+    m2 = {
+        "id": "matte_blue", "type": "color_matte", "kind": "color_matte", "color": "#0000FF",
+        "timeline_start": 1.5, "in": 0.0, "out": 1.5, "track": "V1",
+        "effects": [{"type": "crossfade", "side": "in", "duration_s": 0.5, "transitionId": "tr_m", "transitionType": "video_cross_dissolve", "curve": "linear", "tension": 0.0}]
+    }
+    seq = _salvar_e_ler([m1, m2])
+    pedido = pedido_render_do_payload(1, RenderPedidoPayload(
+        kind="draft",
+        output={"dir": str(tmp_path), "filename": "saida_trans.mp4"}
+    ))
+    res = execucao.executar_agora(seq, pedido)
+    assert res.get("ok") is True
+    p = Path(res.get("caminho"))
+    assert p.exists()
+    assert p.stat().st_size > 0
+
+
+def test_clipes_em_cena_inclui_geradores_sinteticos():
+    """_clipes_em_cena deve contar todos os cortes ativos na cena para logging e segmentação."""
+    from src.export.video_render import comando, modelo
+
+    m = {"id": "matte_1", "type": "color_matte", "color": "#000", "timeline_start": 0.0, "in": 0.0, "out": 2.0, "track": "V1"}
+    adj = {"id": "adj_1", "type": "adjustment", "timeline_start": 2.0, "in": 0.0, "out": 2.0, "track": "V2"}
+    seq = modelo.normalizar({
+        "version": 2, "fps": 24, "width": 1920, "height": 1080,
+        "tracks": [{"id": "V1", "kind": "video"}, {"id": "V2", "kind": "video"}],
+        "clips": [m, adj]
+    })
+    em_cena = comando._clipes_em_cena(seq)
+    assert len(em_cena) == 2
+    assert any(c.id == "matte_1" for c in em_cena)
+    assert any(c.id == "adj_1" for c in em_cena)
+
+
+def test_modelo_normalizar_aceita_in_time_out_time():
+    """normalizar() deve tolerar cortes com in_time e out_time (formato schema da API / persistência)."""
+    from src.export.video_render import modelo
+
+    cut = {
+        "id": "c1", "type": "video", "in_time": 1.0, "out_time": 4.0, "track": "V1", "timeline_start": 0.0
+    }
+    seq = modelo.normalizar({
+        "version": 2, "fps": 24, "width": 1920, "height": 1080,
+        "tracks": [{"id": "V1", "kind": "video"}],
+        "clips": [cut]
+    })
+    assert len(seq.clipes) == 1
+    assert seq.clipes[0].in_s == 1.0
+    assert seq.clipes[0].out_s == 4.0
+
+
+
+
+

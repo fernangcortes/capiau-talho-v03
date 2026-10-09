@@ -194,6 +194,100 @@ export function evaluateFadeCurve(progress, curveType = "linear", tension = 0.0)
 }
 
 /**
+ * Calcula o fator de atenuação de fade (0.0 a 1.0) para uma Camada de Ajuste ou clipe no frame atual.
+ * Modula a intensidade cumulativa dos efeitos de neutro (0.0) a 100% (1.0).
+ *
+ * @param {Object} cut - O clipe / camada de ajuste
+ * @param {number} currentFrame - Frame atual da timeline
+ * @param {number} [fps=24] - Taxa de quadros por segundo
+ * @returns {number} Fator de fade entre 0.0 e 1.0
+ */
+export function computeAdjustmentFadeFactor(cut, currentFrame, fps = 24) {
+    if (!cut) return 1.0;
+    const durFrames = ((cut.outFrame || 0) - (cut.inFrame || 0)) ||
+        Math.round(((cut.out || 0) - (cut.in || 0)) * fps) ||
+        Math.round(((cut.duration_s !== undefined ? cut.duration_s : (cut.duration || 0))) * fps);
+    if (durFrames <= 0) return 1.0;
+    const startFrame = cut.timelineStartFrame !== undefined
+        ? cut.timelineStartFrame
+        : Math.round((cut.timeline_start || 0) * fps);
+    const tIn = (currentFrame - startFrame) / fps;
+    const tOut = (startFrame + durFrames - currentFrame) / fps;
+    let fadeFactor = 1.0;
+
+    const effects = Array.isArray(cut.effects) ? cut.effects : [];
+    effects.filter(e => e && e.type === "crossfade").forEach(cf => {
+        if (cf.disabled || cf.transitionId) return;
+        const durVal = cf.duration_s !== undefined ? cf.duration_s : (cf.duration !== undefined ? cf.duration : 0.5);
+        if (typeof durVal === "number" && durVal <= 0) return;
+        const d = Math.max(0.001, durVal);
+        if (cf.side === "in" && tIn < d) {
+            const p = Math.max(0, Math.min(1, tIn / d));
+            const factor = evaluateFadeCurve(p, cf.curve || "linear", cf.tension || 0);
+            if (typeof factor === "number" && Number.isFinite(factor)) {
+                fadeFactor = Math.min(fadeFactor, Math.max(0, Math.min(1, factor)));
+            }
+        }
+        if (cf.side === "out" && tOut < d) {
+            const p = Math.max(0, Math.min(1, tOut / d));
+            const factor = evaluateFadeCurve(p, cf.curve || "linear", cf.tension || 0);
+            if (typeof factor === "number" && Number.isFinite(factor)) {
+                fadeFactor = Math.min(fadeFactor, Math.max(0, Math.min(1, factor)));
+            }
+        }
+    });
+
+    const fadeInDur = (typeof cut.fade_in === "number" && cut.fade_in > 0)
+        ? cut.fade_in
+        : ((typeof cut.fadeIn === "number" && cut.fadeIn > 0) ? cut.fadeIn : 0);
+    if (fadeInDur > 0 && tIn < fadeInDur) {
+        const p = Math.max(0, Math.min(1, tIn / fadeInDur));
+        const factor = evaluateFadeCurve(p, cut.fade_in_curve || cut.fadeInCurve || "linear", cut.fade_in_tension || cut.fadeInTension || 0);
+        if (typeof factor === "number" && Number.isFinite(factor)) {
+            fadeFactor = Math.min(fadeFactor, Math.max(0, Math.min(1, factor)));
+        }
+    }
+
+    const fadeOutDur = (typeof cut.fade_out === "number" && cut.fade_out > 0)
+        ? cut.fade_out
+        : ((typeof cut.fadeOut === "number" && cut.fadeOut > 0) ? cut.fadeOut : 0);
+    if (fadeOutDur > 0 && tOut < fadeOutDur) {
+        const p = Math.max(0, Math.min(1, tOut / fadeOutDur));
+        const factor = evaluateFadeCurve(p, cut.fade_out_curve || cut.fadeOutCurve || "linear", cut.fade_out_tension || cut.fadeOutTension || 0);
+        if (typeof factor === "number" && Number.isFinite(factor)) {
+            fadeFactor = Math.min(fadeFactor, Math.max(0, Math.min(1, factor)));
+        }
+    }
+
+    if (cut.crossfade && typeof cut.crossfade === "object") {
+        const inDur = typeof cut.crossfade.fadeInDuration === "number" ? cut.crossfade.fadeInDuration : (cut.crossfade.inDuration || 0);
+        if (inDur > 0 && tIn < inDur) {
+            const p = Math.max(0, Math.min(1, tIn / inDur));
+            const factor = evaluateFadeCurve(p, cut.crossfade.curveIn || cut.crossfade.curve || "linear", cut.crossfade.tensionIn || 0);
+            if (typeof factor === "number" && Number.isFinite(factor)) {
+                fadeFactor = Math.min(fadeFactor, Math.max(0, Math.min(1, factor)));
+            }
+        }
+        const outDur = typeof cut.crossfade.fadeOutDuration === "number" ? cut.crossfade.fadeOutDuration : (cut.crossfade.outDuration || 0);
+        if (outDur > 0 && tOut < outDur) {
+            const p = Math.max(0, Math.min(1, tOut / outDur));
+            const factor = evaluateFadeCurve(p, cut.crossfade.curveOut || cut.crossfade.curve || "linear", cut.crossfade.tensionOut || 0);
+            if (typeof factor === "number" && Number.isFinite(factor)) {
+                fadeFactor = Math.min(fadeFactor, Math.max(0, Math.min(1, factor)));
+            }
+        }
+    }
+
+    return Math.max(0, Math.min(1, fadeFactor));
+}
+
+/**
+ * Alias semântico universal para modulação de fade em qualquer clipe da timeline
+ * (cor sólida, camada de ajuste, vídeo, foto ou texto).
+ */
+export const computeClipFadeFactor = computeAdjustmentFadeFactor;
+
+/**
  * Retorna o status de sincronia A/V de um clipe vinculado.
  * Se o clipe possuir par vinculado e estiver fora de sincronia em relação à mídia original,
  * retorna um objeto com { clip, partner, clipKind, partnerKind, offset, text, diff }.
@@ -2940,7 +3034,17 @@ export class CapiauTimelineState {
             };
             cuts.push(newClip);
 
-            if (audioTrackId && clipData.type !== "photo") {
+            const isSyntheticGenerator = clipData.type === "photo" ||
+                clipData.kind === "color_matte" || clipData.kind === "adjustment" ||
+                clipData.type === "color_matte" || clipData.type === "adjustment" ||
+                clipData.type === "text" || clipData.kind === "text" ||
+                Boolean(clipData.color) ||
+                String(clipData.id || "").startsWith("cut_matte_") ||
+                String(clipData.id || "").startsWith("matte_") ||
+                String(clipData.id || "").startsWith("cut_adj_") ||
+                String(clipData.id || "").startsWith("adj_");
+
+            if (audioTrackId && !isSyntheticGenerator) {
                 cuts.push({
                     ...clipData,
                     id: `cut_${stamp}_a`,
@@ -4875,6 +4979,274 @@ export class CapiauTimelineState {
     }
 
     /**
+     * Adiciona um corte de Cor Sólida (Color Matte - Task 18) à timeline.
+     * Utilizável em qualquer pista de vídeo (V1, V2, V3...).
+     */
+    addColorMatteCut({ color = "#000000", color_name = "Preto", name = null, durationSec = 5.0, track = null, timelineStartFrame = null, blend_mode = "normal", blendMode = null } = {}) {
+        const wasEmptyTimeline = (STATE.activeTimelineCuts || []).length === 0;
+        let targetTrack = track;
+        if (targetTrack) {
+            const t = this.getTrack(targetTrack);
+            if (!t || t.kind !== "video" || t.locked) targetTrack = null;
+        }
+        if (!targetTrack) {
+            const videoTracks = this.getVideoTracks().filter(t => !t.locked);
+            const v1 = videoTracks.find(t => t.id === "V1");
+            targetTrack = (v1 || videoTracks[0] || { id: "V1" }).id;
+        }
+
+        const fps = this.fps || 24;
+        const dur = Math.max(0.1, Number(durationSec) || 5.0);
+        const outFrame = secondsToFrames(dur, fps);
+        const stamp = `${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+
+        let startFrame = timelineStartFrame;
+        if (startFrame === null || startFrame === undefined) {
+            startFrame = this.playheadFrame;
+        }
+
+        const hexColor = String(color || "#000000").trim();
+        const colorName = String(color_name || name || "Cor Sólida").trim();
+        const itemName = String(name || colorName || `Cor Sólida (${hexColor})`).trim();
+        const bMode = String(blendMode || blend_mode || "normal").trim().toLowerCase();
+
+        const newCut = {
+            id: `cut_matte_${stamp}`,
+            type: "video",
+            kind: "color_matte",
+            color: hexColor,
+            color_name: colorName,
+            name: itemName,
+            blend_mode: bMode,
+            blendMode: bMode,
+            video_id: null,
+            photo_id: null,
+            inFrame: 0,
+            outFrame: outFrame,
+            in: 0.0,
+            out: dur,
+            duration: dur,
+            duration_seconds: dur,
+            track: targetTrack,
+            timelineStartFrame: Math.max(0, Math.round(startFrame)),
+            timeline_start: Math.max(0, Math.round(startFrame)) / fps,
+            link_id: null,
+            disabled: false,
+            effects: [
+                { type: "fit", mode: "fill" },
+                {
+                    type: "transform",
+                    opacity: 1.0,
+                    scale: 1.0,
+                    x: 0,
+                    y: 0,
+                    rotation: 0,
+                    blend_mode: bMode,
+                    blendMode: bMode,
+                    disabled: false
+                }
+            ]
+        };
+
+        TIMELINE_HISTORY.record(() => {
+            const currentCuts = this.conformCuts(STATE.activeTimelineCuts || []);
+            currentCuts.push(newCut);
+            STATE.activeTimelineCuts = currentCuts;
+        });
+
+        if (wasEmptyTimeline) this.zoomToFit();
+        return newCut;
+    }
+
+    /**
+     * Adiciona um corte de Camada de Ajuste (Adjustment Layer - Task 17) à timeline.
+     * Clipes transparentes posicionados em pistas de vídeo superiores (V2, V3...) cujos
+     * efeitos propagam cumulativamente para todas as pistas inferiores.
+     */
+    addAdjustmentCut({ name = null, durationSec = 5.0, track = null, timelineStartFrame = null, effects = [] } = {}) {
+        const wasEmptyTimeline = (STATE.activeTimelineCuts || []).length === 0;
+        let targetTrack = track;
+        if (targetTrack) {
+            const t = this.getTrack(targetTrack);
+            if (!t || t.kind !== "video" || t.locked) targetTrack = null;
+        }
+        if (!targetTrack) {
+            const videoTracks = this.getVideoTracks().filter(t => !t.locked);
+            const v2 = videoTracks.find(t => t.id === "V2");
+            const v3 = videoTracks.find(t => t.id === "V3");
+            targetTrack = (v2 || v3 || videoTracks[0] || { id: "V2" }).id;
+        }
+
+        const fps = this.fps || 24;
+        const dur = Math.max(0.1, Number(durationSec) || 5.0);
+        const outFrame = secondsToFrames(dur, fps);
+        const stamp = `${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+
+        let startFrame = timelineStartFrame;
+        if (startFrame === null || startFrame === undefined) {
+            startFrame = this.playheadFrame;
+        }
+
+        const defaultEffects = (effects && effects.length > 0) ? effects : [
+            {
+                type: "color",
+                brightness: 0,
+                contrast: 0,
+                saturation: 100,
+                hue: 0,
+                sepia: 0,
+                grayscale: 0,
+                blur: 0,
+                disabled: false
+            },
+            {
+                type: "crop",
+                top: 0,
+                bottom: 0,
+                left: 0,
+                right: 0,
+                disabled: false
+            },
+            {
+                type: "transform",
+                opacity: 1.0,
+                scale: 1.0,
+                x: 0,
+                y: 0,
+                rotation: 0,
+                disabled: false
+            }
+        ];
+
+        const newCut = {
+            id: `cut_adj_${stamp}`,
+            type: "video",
+            kind: "adjustment",
+            name: name || "Camada de Ajuste",
+            video_id: null,
+            photo_id: null,
+            inFrame: 0,
+            outFrame: outFrame,
+            in: 0.0,
+            out: dur,
+            duration: dur,
+            duration_seconds: dur,
+            track: targetTrack,
+            timelineStartFrame: Math.max(0, Math.round(startFrame)),
+            timeline_start: Math.max(0, Math.round(startFrame)) / fps,
+            link_id: null,
+            disabled: false,
+            effects: JSON.parse(JSON.stringify(defaultEffects))
+        };
+
+        TIMELINE_HISTORY.record(() => {
+            const currentCuts = this.conformCuts(STATE.activeTimelineCuts || []);
+            currentCuts.push(newCut);
+            STATE.activeTimelineCuts = currentCuts;
+        });
+
+        if (wasEmptyTimeline) this.zoomToFit();
+        return newCut;
+    }
+
+    /**
+     * Retorna o nível hierárquico de uma pista de vídeo (ex: V1 = 1, V2 = 2, V3 = 3).
+     */
+    getTrackLevel(trackId) {
+        if (!trackId) return 0;
+        const m = String(trackId).match(/^V(\d+)$/i);
+        if (m) return parseInt(m[1], 10);
+        const tracks = this.tracks || [];
+        const idx = tracks.findIndex(t => t.id === trackId);
+        if (idx !== -1) {
+            return idx;
+        }
+        const num = parseInt(String(trackId).replace(/\D/g, "") || "0", 10);
+        return num;
+    }
+
+    /**
+     * Retorna se a pista candidateTrack está visualmente/hierarquicamente acima de targetTrackId.
+     */
+    isTrackAbove(candidateTrackId, targetTrackId) {
+        if (!candidateTrackId || !targetTrackId || candidateTrackId === targetTrackId) return false;
+        return this.getTrackLevel(candidateTrackId) > this.getTrackLevel(targetTrackId);
+    }
+
+    /**
+     * Retorna os efeitos cumulativos agregados de todas as camadas de ajuste em pistas
+     * superiores a trackId no frame atual.
+     * @param {string} trackId - ID da pista de referência (ex: "V1")
+     * @param {number} currentFrame - Frame atual da timeline
+     * @returns {Array<Object>} Lista de efeitos ativos ordenados hierarquicamente
+     */
+    getCumulativeAdjustmentEffects(trackId, currentFrame) {
+        const cuts = STATE.activeTimelineCuts || [];
+        const frame = (currentFrame !== undefined && currentFrame !== null) ? currentFrame : this.playheadFrame;
+
+        const matchingCuts = cuts.filter(c => {
+            if (!c || c.kind !== "adjustment" || c.disabled) return false;
+            const start = c.timelineStartFrame || 0;
+            const dur = (c.outFrame || 0) - (c.inFrame || 0);
+            if (frame < start || frame >= start + dur) return false;
+            return this.isTrackAbove(c.track, trackId);
+        });
+
+        // Ordena da pista mais baixa para a mais alta (V2 depois V3) para cascata cumulativa
+        matchingCuts.sort((a, b) => this.getTrackLevel(a.track) - this.getTrackLevel(b.track));
+
+        const aggregated = [];
+        const fps = this.fps || 24;
+        for (const cut of matchingCuts) {
+            const fadeFactor = computeAdjustmentFadeFactor(cut, frame, fps);
+            if (Array.isArray(cut.effects)) {
+                for (const ef of cut.effects) {
+                    if (ef && !ef.disabled) {
+                        const modEff = {
+                            ...ef,
+                            _track: cut.track,
+                            _cutId: cut.id,
+                            _sourceAdjustmentId: cut.id,
+                            _fadeFactor: fadeFactor
+                        };
+                        if (ef.type === "color") {
+                            const rawB = typeof ef.brightness === "number" ? ef.brightness : 0;
+                            const rawC = typeof ef.contrast === "number" ? ef.contrast : 0;
+                            const rawS = typeof ef.saturation === "number" ? ef.saturation : 100;
+                            const rawH = typeof ef.hue === "number" ? ef.hue : 0;
+                            const rawSep = typeof ef.sepia === "number" ? ef.sepia : 0;
+                            const rawGray = typeof ef.grayscale === "number" ? ef.grayscale : 0;
+                            const rawBlur = typeof ef.blur === "number" ? ef.blur : 0;
+
+                            modEff.brightness = rawB * fadeFactor;
+                            modEff.contrast = rawC * fadeFactor;
+                            modEff.saturation = 100 + (rawS - 100) * fadeFactor;
+                            modEff.hue = rawH * fadeFactor;
+                            modEff.sepia = rawSep * fadeFactor;
+                            modEff.grayscale = rawGray * fadeFactor;
+                            modEff.blur = rawBlur * fadeFactor;
+                            if (typeof ef.opacity === "number") {
+                                modEff.opacity = 1.0 - (1.0 - ef.opacity) * fadeFactor;
+                            }
+                        } else if (ef.type === "transform") {
+                            if (typeof ef.opacity === "number") {
+                                modEff.opacity = 1.0 - (1.0 - ef.opacity) * fadeFactor;
+                            }
+                        } else if (ef.type === "crop") {
+                            if (typeof ef.top === "number") modEff.top = ef.top * fadeFactor;
+                            if (typeof ef.right === "number") modEff.right = ef.right * fadeFactor;
+                            if (typeof ef.bottom === "number") modEff.bottom = ef.bottom * fadeFactor;
+                            if (typeof ef.left === "number") modEff.left = ef.left * fadeFactor;
+                        }
+                        aggregated.push(modEff);
+                    }
+                }
+            }
+        }
+        return aggregated;
+    }
+
+    /**
      * Migração A/V: garante que existam pistas de áudio e cria clipes de áudio
      * vinculados para clipes de vídeo sem par (timelines antigas v1/v2 sem áudio).
      */
@@ -5553,6 +5925,7 @@ export class CapiauTimelineState {
                 const secondClip = {
                     ...c,
                     id: `cut_${Date.now()}_${Math.floor(Math.random() * 900 + 100)}_${c.id.endsWith("_a") ? "a" : "v"}`,
+                    effects: Array.isArray(c.effects) ? JSON.parse(JSON.stringify(c.effects)) : [],
                     timelineStartFrame: splitFrame,
                     timeline_start: splitFrame / fps,
                     link_id: linkId
@@ -6758,6 +7131,291 @@ export class CapiauTimelineState {
     }
 
     /**
+     * Aplica transição de vídeo de junção na emenda entre dois clipes contíguos na mesma pista de vídeo (Task 16 — Ctrl+D).
+     * Suporta Cross Dissolve (video_cross_dissolve), Dip to Black (video_dip_black) e Dip to White (video_dip_white).
+     * @param {Object} [options={}] - Parâmetros { clipAId, clipBId, trackId, cutFrame, duration_s, durationFrames, alignment, type, curve, tension }
+     * @returns {Object|null} Objeto com { transition, clipA, clipB } ou null em caso de falha/bloqueio.
+     */
+    addVideoTransition(options = {}) {
+        const cuts = this.conformCuts(STATE.activeTimelineCuts || []);
+        if (!cuts || cuts.length === 0) return null;
+        const fps = this.fps || 24;
+
+        let clipA = null;
+        let clipB = null;
+        let trackId = options.trackId || null;
+
+        // 1. Clipes explicitamente fornecidos
+        if (options.clipAId && options.clipBId) {
+            clipA = cuts.find(c => c.id === options.clipAId);
+            clipB = cuts.find(c => c.id === options.clipBId);
+            if (clipA && !trackId) trackId = clipA.track;
+        } else if (options.clipAId && !options.clipBId) {
+            const target = cuts.find(c => c.id === options.clipAId);
+            if (target && this.trackKindOf(target.track) === "video") {
+                trackId = target.track;
+                const trackClips = cuts.filter(c => c.track === trackId).sort((a, b) => (a.timelineStartFrame || 0) - (b.timelineStartFrame || 0));
+                const targetStart = target.timelineStartFrame || 0;
+                const targetEnd = targetStart + ((target.outFrame || 0) - (target.inFrame || 0));
+                const playhead = (typeof this.playheadFrame === "number") ? this.playheadFrame : targetStart;
+                
+                const distToStart = Math.abs(playhead - targetStart);
+                const distToEnd = Math.abs(playhead - targetEnd);
+                
+                if (distToStart <= distToEnd) {
+                    const pred = trackClips.find(c => {
+                        const cEnd = (c.timelineStartFrame || 0) + ((c.outFrame || 0) - (c.inFrame || 0));
+                        return Math.abs(cEnd - targetStart) <= 1 && c.id !== target.id;
+                    });
+                    if (pred) {
+                        clipA = pred;
+                        clipB = target;
+                    }
+                }
+                if (!clipA || !clipB) {
+                    const succ = trackClips.find(c => {
+                        return Math.abs((c.timelineStartFrame || 0) - targetEnd) <= 1 && c.id !== target.id;
+                    });
+                    if (succ) {
+                        clipA = target;
+                        clipB = succ;
+                    }
+                }
+                if (!clipA || !clipB) {
+                    const pred = trackClips.find(c => {
+                        const cEnd = (c.timelineStartFrame || 0) + ((c.outFrame || 0) - (c.inFrame || 0));
+                        return Math.abs(cEnd - targetStart) <= 1 && c.id !== target.id;
+                    });
+                    if (pred) {
+                        clipA = pred;
+                        clipB = target;
+                    }
+                }
+            }
+        }
+
+        // 2. Clipes selecionados na timeline
+        if (!clipA || !clipB) {
+            const selectedIds = this.selectedClipIds && this.selectedClipIds.size > 0 
+                ? Array.from(this.selectedClipIds) 
+                : (this.selectedClipId ? [this.selectedClipId] : []);
+            
+            const selectedVideoClips = cuts.filter(c => selectedIds.includes(c.id) && this.trackKindOf(c.track) === "video");
+            
+            if (selectedVideoClips.length >= 2) {
+                const byTrack = {};
+                selectedVideoClips.forEach(c => {
+                    if (!byTrack[c.track]) byTrack[c.track] = [];
+                    byTrack[c.track].push(c);
+                });
+                for (const tId in byTrack) {
+                    const list = byTrack[tId].sort((a, b) => (a.timelineStartFrame || 0) - (b.timelineStartFrame || 0));
+                    for (let i = 0; i < list.length - 1; i++) {
+                        const c1 = list[i];
+                        const c2 = list[i + 1];
+                        const end1 = (c1.timelineStartFrame || 0) + ((c1.outFrame || 0) - (c1.inFrame || 0));
+                        if (Math.abs((c2.timelineStartFrame || 0) - end1) <= 1) {
+                            clipA = c1;
+                            clipB = c2;
+                            trackId = tId;
+                            break;
+                        }
+                    }
+                    if (clipA && clipB) break;
+                }
+            } else if (selectedVideoClips.length === 1) {
+                const target = selectedVideoClips[0];
+                trackId = target.track;
+                const trackClips = cuts.filter(c => c.track === trackId).sort((a, b) => (a.timelineStartFrame || 0) - (b.timelineStartFrame || 0));
+                const targetStart = target.timelineStartFrame || 0;
+                const targetEnd = targetStart + ((target.outFrame || 0) - (target.inFrame || 0));
+                const playhead = (typeof this.playheadFrame === "number") ? this.playheadFrame : targetStart;
+                
+                const distToStart = Math.abs(playhead - targetStart);
+                const distToEnd = Math.abs(playhead - targetEnd);
+                
+                if (distToStart <= distToEnd) {
+                    const pred = trackClips.find(c => {
+                        const cEnd = (c.timelineStartFrame || 0) + ((c.outFrame || 0) - (c.inFrame || 0));
+                        return Math.abs(cEnd - targetStart) <= 1 && c.id !== target.id;
+                    });
+                    if (pred) {
+                        clipA = pred;
+                        clipB = target;
+                    }
+                } else {
+                    const succ = trackClips.find(c => {
+                        return Math.abs((c.timelineStartFrame || 0) - targetEnd) <= 1 && c.id !== target.id;
+                    });
+                    if (succ) {
+                        clipA = target;
+                        clipB = succ;
+                    }
+                }
+            }
+        }
+
+        // 3. Detecção automática baseada na agulha de reprodução (Playhead)
+        if (!clipA || !clipB) {
+            const playhead = (typeof this.playheadFrame === "number") ? this.playheadFrame : 0;
+            const videoTracks = (this.tracks || []).filter(t => t.kind === "video" && !t.locked && !t.hidden).map(t => t.id);
+            
+            const tracksToSearch = (this.selectedTrack && videoTracks.includes(this.selectedTrack))
+                ? [this.selectedTrack, ...videoTracks.filter(t => t !== this.selectedTrack)]
+                : videoTracks;
+
+            let closestDist = Infinity;
+            for (const tId of tracksToSearch) {
+                const trackClips = cuts.filter(c => c.track === tId).sort((a, b) => (a.timelineStartFrame || 0) - (b.timelineStartFrame || 0));
+                for (let i = 0; i < trackClips.length - 1; i++) {
+                    const c1 = trackClips[i];
+                    const c2 = trackClips[i + 1];
+                    const end1 = (c1.timelineStartFrame || 0) + ((c1.outFrame || 0) - (c1.inFrame || 0));
+                    const start2 = c2.timelineStartFrame || 0;
+                    if (Math.abs(start2 - end1) <= 1) {
+                        const dist = Math.abs(playhead - end1);
+                        if (dist < closestDist && dist <= Math.max(48, fps * 2)) {
+                            closestDist = dist;
+                            clipA = c1;
+                            clipB = c2;
+                            trackId = tId;
+                        }
+                    }
+                }
+            }
+        }
+
+        if (!clipA || !clipB || !trackId) return null;
+        if (clipA.track !== clipB.track || clipA.track !== trackId) return null;
+
+        // Pistas de vídeo apenas
+        if (this.trackKindOf(trackId) !== "video") return null;
+
+        // Proteção contra pistas travadas
+        const trackObj = (this.tracks || []).find(t => t.id === trackId);
+        if (trackObj && trackObj.locked) return null;
+
+        const cutFrame = options.cutFrame !== undefined 
+            ? options.cutFrame 
+            : (clipA.timelineStartFrame || 0) + ((clipA.outFrame || 0) - (clipA.inFrame || 0));
+        const clipAStart = Math.max(0, clipA.timelineStartFrame || 0);
+        const clipBStart = (clipB.timelineStartFrame !== undefined) ? clipB.timelineStartFrame : cutFrame;
+        const durA = Math.max(1, (clipA.outFrame || 0) - (clipA.inFrame || 0));
+        const durB = Math.max(1, (clipB.outFrame || 0) - (clipB.inFrame || 0));
+        const clipBEnd = clipBStart + durB;
+
+        const safetyMargin = 4;
+        const maxMutualCap = Math.max(1, Math.min(durA - safetyMargin, durB - safetyMargin));
+
+        let maxLimA = Math.max(1, Math.min(maxMutualCap, cutFrame - clipAStart - safetyMargin));
+        let maxLimB = Math.max(1, Math.min(maxMutualCap, clipBEnd - cutFrame - safetyMargin));
+
+        // Prevenção de colisão com outras transições na mesma pista
+        const otherTrs = (this.transitions || []).filter(t => t.track === trackId);
+        const prevTrs = otherTrs.filter(t => t.cutFrame < cutFrame);
+        if (prevTrs.length > 0) {
+            prevTrs.sort((a, b) => b.cutFrame - a.cutFrame);
+            const prevR = prevTrs[0].cutFrame + (prevTrs[0].halfBFrames !== undefined ? prevTrs[0].halfBFrames : 12);
+            maxLimA = Math.min(maxLimA, Math.max(1, cutFrame - prevR - safetyMargin));
+        }
+        const nextTrs = otherTrs.filter(t => t.cutFrame > cutFrame);
+        if (nextTrs.length > 0) {
+            nextTrs.sort((a, b) => a.cutFrame - b.cutFrame);
+            const nextL = nextTrs[0].cutFrame - (nextTrs[0].halfAFrames !== undefined ? nextTrs[0].halfAFrames : 12);
+            maxLimB = Math.min(maxLimB, Math.max(1, nextL - cutFrame - safetyMargin));
+        }
+        const maxSymLim = Math.max(1, Math.min(maxLimA, maxLimB));
+
+        const reqDurFrames = (typeof options.durationFrames === "number" && options.durationFrames > 0)
+            ? options.durationFrames
+            : Math.round(((typeof options.duration_s === "number" ? options.duration_s : 1.0)) * fps);
+
+        const alignment = options.alignment || "center";
+        let halfA, halfB;
+        if (alignment === "start") {
+            halfA = 1;
+            halfB = Math.max(1, Math.min(reqDurFrames, maxLimB));
+        } else if (alignment === "end") {
+            halfA = Math.max(1, Math.min(reqDurFrames, maxLimA));
+            halfB = 1;
+        } else {
+            halfA = Math.max(1, Math.min(Math.floor(reqDurFrames / 2), maxSymLim));
+            halfB = Math.max(1, Math.min(Math.ceil(reqDurFrames / 2), maxSymLim));
+        }
+
+        const totalDurFrames = halfA + halfB;
+        const totalDurS = totalDurFrames / fps;
+
+        const validTypes = ["video_cross_dissolve", "video_dip_black", "video_dip_white"];
+        const transType = validTypes.includes(options.type) ? options.type : "video_cross_dissolve";
+
+        let createdTransition = null;
+
+        TIMELINE_HISTORY.record(() => {
+            const currentCuts = STATE.activeTimelineCuts || [];
+            const cA = currentCuts.find(c => c.id === clipA.id);
+            const cB = currentCuts.find(c => c.id === clipB.id);
+            if (!cA || !cB) return;
+
+            const transId = options.id || ("trans_v_" + Date.now() + "_" + Math.random().toString(36).substr(2, 6));
+            createdTransition = {
+                id: transId,
+                type: transType,
+                kind: "video",
+                track: trackId,
+                cutFrame: cutFrame,
+                clipAId: cA.id,
+                clipBId: cB.id,
+                durationFrames: totalDurFrames,
+                duration_s: totalDurS,
+                halfAFrames: halfA,
+                halfBFrames: halfB,
+                alignment: alignment,
+                curve: options.curve || "linear",
+                tension: typeof options.tension === "number" ? options.tension : 0
+            };
+
+            cA.effects = (cA.effects || []).filter(e => !(e.type === "crossfade" && e.side === "out"));
+            cA.effects.push({
+                type: "crossfade",
+                side: "out",
+                duration_s: halfA / fps,
+                transitionId: createdTransition.id,
+                transitionType: transType,
+                disabled: false
+            });
+
+            cB.effects = (cB.effects || []).filter(e => !(e.type === "crossfade" && e.side === "in"));
+            cB.effects.push({
+                type: "crossfade",
+                side: "in",
+                duration_s: halfB / fps,
+                transitionId: createdTransition.id,
+                transitionType: transType,
+                disabled: false
+            });
+
+            if (!this.transitions) this.transitions = [];
+            this.transitions = this.transitions.filter(t => !(t.track === trackId && Math.abs(t.cutFrame - cutFrame) <= 1));
+            this.transitions.push(createdTransition);
+            this.selectedTransitionId = createdTransition.id;
+
+            STATE.activeTimelineCuts = currentCuts;
+        });
+
+        if (createdTransition) {
+            STATE.emit("timelineCutsChanged", STATE.activeTimelineCuts);
+            STATE.emit("timelineTransitionsChanged", this.transitions);
+        }
+
+        const finalCuts = STATE.activeTimelineCuts || [];
+        const finalClipA = finalCuts.find(c => c.id === clipA.id) || clipA;
+        const finalClipB = finalCuts.find(c => c.id === clipB.id) || clipB;
+
+        return createdTransition ? { transition: createdTransition, clipA: finalClipA, clipB: finalClipB } : null;
+    }
+
+    /**
      * Remove uma transição de corte pelo ID e limpa os efeitos nos clipes correspondentes.
      * @param {string} transitionId - ID da transição a remover
      * @returns {boolean} True se removida com sucesso
@@ -6817,10 +7475,10 @@ export class CapiauTimelineState {
 
         // Margem tátil de segurança para evitar que a alça de transição cole na extremidade
         // do clipe, preservando sempre uma zona de clique/trim visível para o editor
-        const safetyMargin = Math.min(4, Math.max(1, Math.floor(Math.min(durAClip, durBClip) / 6)));
+        const safetyMargin = (tr && tr.kind === "video") ? 4 : Math.min(4, Math.max(1, Math.floor(Math.min(durAClip, durBClip) / 6)));
 
-        // Teto Mútuo Cruzado: um crossfade acústico entre A e B não pode ter uma metade maior
-        // do que a extensão total do clipe parceiro (o clipe oposto deve ter áudio suficiente para a fusão)
+        // Teto Mútuo Cruzado: um crossfade acústico ou de vídeo entre A e B não pode ter uma metade maior
+        // do que a extensão total do clipe parceiro (o clipe oposto deve ter mídia/áudio suficiente para a fusão)
         const maxMutualCap = Math.max(1, Math.min(durAClip - safetyMargin, durBClip - safetyMargin));
 
         // Limite Físico Lado A: nunca antes do início do clipe A, respeitando teto mútuo e margem
@@ -6924,14 +7582,16 @@ export class CapiauTimelineState {
         let effA = clipA.effects.find(e => e.transitionId === tr.id && e.side === "out");
         if (effA) {
             effA.duration_s = clampedHalfA / fps;
+            if (tr.type) effA.transitionType = tr.type;
         } else {
             clipA.effects.push({
                 type: "crossfade",
                 side: "out",
                 duration_s: clampedHalfA / fps,
-                curve: tr.curve || "equal_power",
+                curve: tr.curve || (tr.kind === "video" ? "linear" : "equal_power"),
                 tension: tr.tension || 0,
                 transitionId: tr.id,
+                transitionType: tr.type,
                 disabled: false
             });
         }
@@ -6941,14 +7601,16 @@ export class CapiauTimelineState {
         let effB = clipB.effects.find(e => e.transitionId === tr.id && e.side === "in");
         if (effB) {
             effB.duration_s = clampedHalfB / fps;
+            if (tr.type) effB.transitionType = tr.type;
         } else {
             clipB.effects.push({
                 type: "crossfade",
                 side: "in",
                 duration_s: clampedHalfB / fps,
-                curve: tr.curve || "equal_power",
+                curve: tr.curve || (tr.kind === "video" ? "linear" : "equal_power"),
                 tension: tr.tension || 0,
                 transitionId: tr.id,
+                transitionType: tr.type,
                 disabled: false
             });
         }
@@ -7616,7 +8278,11 @@ export class CapiauTimelineState {
 }
 
 export const TIMELINE_STATE = new CapiauTimelineState();
+TIMELINE_STATE.computeAdjustmentFadeFactor = computeAdjustmentFadeFactor;
+TIMELINE_STATE.computeClipFadeFactor = computeClipFadeFactor;
 window.TIMELINE_STATE = TIMELINE_STATE;
+window.computeAdjustmentFadeFactor = computeAdjustmentFadeFactor;
+window.computeClipFadeFactor = computeClipFadeFactor;
 
 // Sincroniza rotação de mídia com clipes existentes na timeline e estado global
 STATE.on("mediaRotated", ({ mediaType, mediaId, rotation }) => {

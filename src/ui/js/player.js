@@ -2,11 +2,12 @@
 import { STATE } from "./state.js";
 import { CapIAuAPI } from "./api.js";
 import { FaceManager } from "./faces.js";
-import { TIMELINE_STATE, TIMELINE_HISTORY, evaluateFadeCurve, formatRulerTimecode } from "./timelineState.js";
+import { TIMELINE_STATE, TIMELINE_HISTORY, evaluateFadeCurve, computeAdjustmentFadeFactor, computeClipFadeFactor, formatRulerTimecode } from "./timelineState.js";
 import { getActiveElement } from "./workspaceManager.js";
 import { PlayerTextOverlayManager } from "./playerTextOverlay.js";
 import { KEYMAP_SERVICE } from "./keymapService.js";
 import { themeColor } from "./themeTokens.js";
+import { RENDER_CACHE_MANAGER } from "./renderCache.js";
 
 // Foco global do teclado para players: "source" ou "program"
 window.activeFocusedPlayer = "source";
@@ -24,6 +25,92 @@ export function formatTimecode(secs, fps = null) {
 
     const pad = (n) => String(Math.floor(Math.abs(Number(n) || 0))).padStart(2, '0');
     return `${pad(h)}:${pad(m)}:${pad(s)}:${pad(f)}`;
+}
+
+/**
+ * Interpolação Matemática dos 3 subtipos de transição de vídeo:
+ * - video_cross_dissolve: dissolvência cruzada linear (sem escurecimento/dip para preto)
+ * - video_dip_black: mergulho no preto (ponto nulo em t=0.5)
+ * - video_dip_white: flash branco com overlay puro (#program-player-dip-white-overlay)
+ *
+ * @param {number} t - Progresso normalizado de 0.0 a 1.0 na janela da transição.
+ * @param {string} [type="video_cross_dissolve"] - Tipo canônico da transição.
+ * @returns {{ opacityA: number, opacityB: number, overlayWhite: number }}
+ */
+export function evaluateVideoTransitionOpacities(t, type = "video_cross_dissolve") {
+    const clampedT = Math.max(0.0, Math.min(1.0, Number(t) || 0));
+    if (type === "video_cross_dissolve" || type === "cross_dissolve") {
+        return {
+            opacityA: 1.0 - clampedT,
+            opacityB: clampedT,
+            overlayWhite: 0.0
+        };
+    } else if (type === "video_dip_black") {
+        if (clampedT <= 0.5) {
+            return {
+                opacityA: 1.0 - (2.0 * clampedT),
+                opacityB: 0.0,
+                overlayWhite: 0.0
+            };
+        } else {
+            return {
+                opacityA: 0.0,
+                opacityB: 2.0 * (clampedT - 0.5),
+                overlayWhite: 0.0
+            };
+        }
+    } else if (type === "video_dip_white") {
+        const whiteOpacity = 1.0 - 2.0 * Math.abs(clampedT - 0.5);
+        return {
+            opacityA: clampedT <= 0.5 ? 1.0 : 0.0,
+            opacityB: clampedT > 0.5 ? 1.0 : 0.0,
+            overlayWhite: whiteOpacity
+        };
+    }
+    return { opacityA: 1.0, opacityB: 0.0, overlayWhite: 0.0 };
+}
+
+if (typeof window !== "undefined") {
+    window.evaluateVideoTransitionOpacities = evaluateVideoTransitionOpacities;
+}
+
+/**
+ * Converte array de efeitos visuais cumulativos em string CSS backdrop-filter (Task 17 — Adjustment Layer).
+ */
+export function buildCssBackdropFilter(effects) {
+    if (!Array.isArray(effects) || effects.length === 0) return "none";
+    const parts = [];
+    effects.forEach(eff => {
+        if (!eff || eff.disabled) return;
+        if (eff.type === "color") {
+            if (typeof eff.brightness === "number" && eff.brightness !== 0) {
+                parts.push(`brightness(${((eff.brightness + 100) / 100).toFixed(2)})`);
+            }
+            if (typeof eff.contrast === "number" && eff.contrast !== 0) {
+                parts.push(`contrast(${((eff.contrast + 100) / 100).toFixed(2)})`);
+            }
+            if (typeof eff.saturation === "number" && eff.saturation !== 100) {
+                parts.push(`saturate(${(eff.saturation / 100).toFixed(2)})`);
+            }
+            if (typeof eff.hue === "number" && eff.hue !== 0) {
+                parts.push(`hue-rotate(${eff.hue}deg)`);
+            }
+            if (typeof eff.sepia === "number" && eff.sepia > 0) {
+                parts.push(`sepia(${eff.sepia})`);
+            }
+            if (typeof eff.grayscale === "number" && eff.grayscale > 0) {
+                parts.push(`grayscale(${eff.grayscale})`);
+            }
+            if (typeof eff.blur === "number" && eff.blur > 0) {
+                parts.push(`blur(${eff.blur}px)`);
+            }
+        }
+    });
+    return parts.length > 0 ? parts.join(" ") : "none";
+}
+
+if (typeof window !== "undefined") {
+    window.buildCssBackdropFilter = buildCssBackdropFilter;
 }
 
 /**
@@ -3478,49 +3565,207 @@ export class ProgramPlayer {
             });
         }
 
-        // ────────── COMPOSIÇÃO MULTIPISTA ──────────
-        // Camada base = clipe da pista de vídeo MAIS BAIXA no playhead (geralmente falas).
-        // Camada de sobreposição = clipe da pista MAIS ALTA acima da base (cobertura b-roll).
+        // ────────── RENDER CACHE NLE (PRE-RENDERED FRAME HIT) ──────────
+        const renderCacheCanvas = this.el("program-player-render-cache");
+        if (typeof RENDER_CACHE_MANAGER !== "undefined" && RENDER_CACHE_MANAGER && RENDER_CACHE_MANAGER.hasFrame(currentFrame)) {
+            const cachedFrame = RENDER_CACHE_MANAGER.getFrame(currentFrame);
+            if (renderCacheCanvas) {
+                renderCacheCanvas.style.display = "block";
+                const w = renderCacheCanvas.parentElement?.clientWidth || 1280;
+                const h = renderCacheCanvas.parentElement?.clientHeight || 720;
+                if (renderCacheCanvas.width !== w || renderCacheCanvas.height !== h) {
+                    renderCacheCanvas.width = w;
+                    renderCacheCanvas.height = h;
+                }
+                const cCtx = renderCacheCanvas.getContext("2d");
+                if (cCtx && cachedFrame) {
+                    try {
+                        cCtx.drawImage(cachedFrame, 0, 0, renderCacheCanvas.width, renderCacheCanvas.height);
+                    } catch (_) {}
+                }
+            }
+
+            // Oculta camadas DOM ativas para economizar 100% da GPU durante reprodução em cache
+            // Preserva dataset.activeClipId para evitar cold-start dos decoders ao sair do trecho em cache
+            const pool = this._videoPool();
+            pool.forEach(el => {
+                if (el.style.display !== "none") el.style.display = "none";
+            });
+            const imgA = this.el("program-player-photo");
+            const imgB = this.el("program-player-photo-b");
+            if (imgA) imgA.style.display = "none";
+            if (imgB) imgB.style.display = "none";
+            const matteA = this.el("program-player-matte");
+            const matteB = this.el("program-player-matte-b");
+            if (matteA) matteA.style.display = "none";
+            if (matteB) matteB.style.display = "none";
+            const adjEl = this.el("program-player-adjustment");
+            if (adjEl) adjEl.style.display = "none";
+            const dipWhiteOverlay = document.getElementById("program-player-dip-white-overlay");
+            if (dipWhiteOverlay) dipWhiteOverlay.style.display = "none";
+
+            // Sincroniza áudio normalmente
+            this.syncAudioTracks(cuts, currentFrame);
+            if (this.textOverlayManager) {
+                this.textOverlayManager.sync();
+            }
+            return;
+        } else if (renderCacheCanvas && renderCacheCanvas.style.display !== "none") {
+            renderCacheCanvas.style.display = "none";
+        }
+
+        // ────────── COMPOSIÇÃO MULTIPISTA COM TRANSIÇÕES ──────────
+        // Camada base = clipe ou transição da pista de vídeo MAIS BAIXA no playhead.
+        // Camada de sobreposição = clipe ou transição da pista MAIS ALTA acima da base.
         const videoTracks = TIMELINE_STATE.getVideoTracks().filter(t => !TIMELINE_STATE.muteHiddenTracksPlayback || !t.hidden); // ordem visual: topo → base
         const clipAtPlayhead = (trackId) => cuts.find(c =>
             c.track === trackId &&
             !c.disabled &&
+            c.kind !== "adjustment" &&
             currentFrame >= c.timelineStartFrame &&
             currentFrame < (c.timelineStartFrame + (c.outFrame - c.inFrame))
         );
 
+        const findActiveVideoTransition = (trackId) => {
+            return (TIMELINE_STATE?.transitions || []).find(t =>
+                t.track === trackId &&
+                (t.kind === "video" || (t.type && (t.type.startsWith("video_") || t.type === "cross_dissolve"))) &&
+                currentFrame >= (t.cutFrame - (t.halfAFrames !== undefined ? t.halfAFrames : Math.floor((t.durationFrames || 24) / 2))) &&
+                currentFrame < (t.cutFrame + (t.halfBFrames !== undefined ? t.halfBFrames : Math.ceil((t.durationFrames || 24) / 2)))
+            );
+        };
+
+        let baseTrack = null;
+        let baseTrans = null;
         let baseCut = null;
+
         for (let i = videoTracks.length - 1; i >= 0; i--) { // de baixo para cima
-            const hit = clipAtPlayhead(videoTracks[i].id);
+            const tr = videoTracks[i];
+            const trans = findActiveVideoTransition(tr.id);
+            if (trans) {
+                const cA = cuts.find(c => c.id === trans.clipAId && !c.disabled && c.kind !== "adjustment");
+                const cB = cuts.find(c => c.id === trans.clipBId && !c.disabled && c.kind !== "adjustment");
+                if (cA && cB) {
+                    baseTrack = tr;
+                    baseTrans = { transition: trans, clipA: cA, clipB: cB };
+                    break;
+                }
+            }
+            const hit = clipAtPlayhead(tr.id);
             if (hit) {
+                baseTrack = tr;
                 baseCut = hit;
                 break;
             }
         }
 
+        let overlayTrack = null;
+        let overlayTrans = null;
         let overlayCut = null;
+
         for (let i = 0; i < videoTracks.length; i++) { // de cima para baixo
-            const hit = clipAtPlayhead(videoTracks[i].id);
+            const tr = videoTracks[i];
+            if (baseTrack && tr.id === baseTrack.id) continue;
+
+            const trans = findActiveVideoTransition(tr.id);
+            if (trans) {
+                const cA = cuts.find(c => c.id === trans.clipAId && !c.disabled && c.kind !== "adjustment");
+                const cB = cuts.find(c => c.id === trans.clipBId && !c.disabled && c.kind !== "adjustment");
+                if (cA && cB) {
+                    overlayTrack = tr;
+                    overlayTrans = { transition: trans, clipA: cA, clipB: cB };
+                    break;
+                }
+            }
+            const hit = clipAtPlayhead(tr.id);
             if (hit && (!baseCut || hit.id !== baseCut.id)) {
+                overlayTrack = tr;
                 overlayCut = hit;
                 break;
             }
         }
 
+        // Calcula interpolações matemáticas das transições ativas
+        let baseOpacities = null;
+        if (baseTrans) {
+            const tr = baseTrans.transition;
+            const halfA = tr.halfAFrames !== undefined ? tr.halfAFrames : Math.floor((tr.durationFrames || 24) / 2);
+            const halfB = tr.halfBFrames !== undefined ? tr.halfBFrames : Math.ceil((tr.durationFrames || 24) / 2);
+            const tStart = tr.cutFrame - halfA;
+            const tEnd = tr.cutFrame + halfB;
+            const span = Math.max(1, tEnd - tStart);
+            const progress = Math.max(0.0, Math.min(1.0, (currentFrame - tStart) / span));
+
+            const tType = tr.type || "video_cross_dissolve";
+            const evaluated = evaluateVideoTransitionOpacities(progress, tType);
+            let appliedA = evaluated.opacityA;
+            let appliedB = evaluated.opacityB;
+            if (tType === "video_cross_dissolve" || tType === "cross_dissolve") {
+                // Cross-dissolve: Clipe A mantém 1.0 por baixo e Clipe B sobe suavemente de 0.0 a 1.0 por cima
+                appliedA = 1.0;
+                appliedB = evaluated.opacityB;
+            }
+            baseOpacities = {
+                opacityA: appliedA,
+                opacityB: appliedB,
+                overlayWhite: evaluated.overlayWhite,
+                type: tType
+            };
+        }
+
+        let overlayOpacities = null;
+        if (overlayTrans) {
+            const tr = overlayTrans.transition;
+            const halfA = tr.halfAFrames !== undefined ? tr.halfAFrames : Math.floor((tr.durationFrames || 24) / 2);
+            const halfB = tr.halfBFrames !== undefined ? tr.halfBFrames : Math.ceil((tr.durationFrames || 24) / 2);
+            const tStart = tr.cutFrame - halfA;
+            const tEnd = tr.cutFrame + halfB;
+            const span = Math.max(1, tEnd - tStart);
+            const progress = Math.max(0.0, Math.min(1.0, (currentFrame - tStart) / span));
+
+            const tType = tr.type || "video_cross_dissolve";
+            const evaluated = evaluateVideoTransitionOpacities(progress, tType);
+            let appliedA = evaluated.opacityA;
+            let appliedB = evaluated.opacityB;
+            if (tType === "video_cross_dissolve" || tType === "cross_dissolve") {
+                appliedA = 1.0;
+                appliedB = evaluated.opacityB;
+            }
+            overlayOpacities = {
+                opacityA: appliedA,
+                opacityB: appliedB,
+                overlayWhite: evaluated.overlayWhite,
+                type: tType
+            };
+        }
+
+        // Overlay global de Dip to White (#program-player-dip-white-overlay)
+        const dipWhiteOverlay = document.getElementById("program-player-dip-white-overlay");
+        const maxWhite = Math.max(
+            baseOpacities ? (baseOpacities.overlayWhite || 0.0) : 0.0,
+            overlayOpacities ? (overlayOpacities.overlayWhite || 0.0) : 0.0
+        );
+        if (dipWhiteOverlay) {
+            if (maxWhite > 0.001) {
+                dipWhiteOverlay.style.display = "block";
+                dipWhiteOverlay.style.opacity = String(maxWhite);
+                dipWhiteOverlay.style.zIndex = "50";
+            } else {
+                dipWhiteOverlay.style.display = "none";
+                dipWhiteOverlay.style.opacity = "0";
+            }
+        }
+
         // ────────── COMPOSIÇÃO EM BUFFERS (VIRADA DE CLIPE SEM PISCA) ──────────
-        // Cada camada (base / sobreposição) é servida por um buffer <video> do pool.
-        // Virar de clipe = revelar OUTRO buffer, que já está com o arquivo aberto e parado
-        // no primeiro frame do clipe. Dar src/load() no elemento que está no ar zera o
-        // decoder e o <video> pinta preto até o arquivo novo abrir — era essa a piscada.
         const pool = this._videoPool();
         const claimed = new Set();
         const liveEls = new Set();
-        if (!this._layerShown) this._layerShown = { base: null, overlay: null };
+        const onAirVideos = new Set();
+        if (!this._layerShown) this._layerShown = {};
 
         // Escolhe o buffer que vai exibir um clipe, nesta ordem:
         // 1) o buffer que já contém o clipe (pré-carregado ou já no ar) — troca instantânea;
-        // 2) o buffer no ar da camada, quando o corte é contíguo no mesmo arquivo
-        //    (razor cut): continua rodando sem seek, emenda perfeita;
+        // 2) o buffer no ar da camada, quando o corte é contíguo no mesmo arquivo (razor cut);
         // 3) um buffer ocioso — preferindo um que já tenha o mesmo arquivo carregado.
         const claimBuffer = (cut, layerKey) => {
             const held = pool.find(e => e.dataset.activeClipId === String(cut.id));
@@ -3529,8 +3774,7 @@ export class ProgramPlayer {
             const src = this._videoSrcForCut(cut);
             const target = this._targetSecondsFor(cut, currentFrame);
 
-            // O buffer no ar já está com a imagem certa: emendar nele é sempre melhor que
-            // abrir o arquivo de novo.
+            // O buffer no ar já está com a imagem certa: emendar nele é sempre melhor que abrir o arquivo de novo.
             const shown = this._layerShown[layerKey];
             if (shown && !claimed.has(shown) && shown.getAttribute("src") &&
                 shown.dataset.loadedSrc === src &&
@@ -3539,21 +3783,19 @@ export class ProgramPlayer {
                 return shown;
             }
 
-            const otherShown = layerKey === "base" ? this._layerShown.overlay : this._layerShown.base;
-            const busy = new Set([this._layerShown.base, this._layerShown.overlay].filter(Boolean));
+            const busy = new Set(Object.values(this._layerShown).filter(Boolean));
             const idle = pool.filter(e => !claimed.has(e) && !busy.has(e));
             const el = idle.find(e => e.dataset.loadedSrc === src)
                 || idle.find(e => !e.dataset.activeClipId)
                 || idle[0]
-                || pool.find(e => !claimed.has(e) && e !== otherShown)
+                || pool.find(e => !claimed.has(e))
                 || null;
             if (el) claimed.add(el);
             return el;
         };
 
         // Prepara a camada e devolve o elemento que deve estar visível AGORA.
-        // Clipes de foto (still) não usam <video>: a imagem é composta nas camadas <img>.
-        const applyLayer = (cut, layerKey, zIndex) => {
+        const applyLayer = (cut, layerKey, zIndex, opacityOverride = null) => {
             if (!cut || !this._videoSrcForCut(cut)) {
                 this._layerShown[layerKey] = null;
                 return null;
@@ -3563,13 +3805,10 @@ export class ProgramPlayer {
             if (!el) { this._layerShown[layerKey] = null; return null; }
             liveEls.add(el);
 
-            // Buffer que já está no ar nesta camada não sai por "ainda não está pronto":
-            // no pior caso ele segura o quadro anterior por um instante, o que é sempre
-            // melhor que apagar a imagem. Só cai fora se o elemento realmente zerou.
             const wasOnAir = this._layerShown[layerKey] === el && el.readyState > 0;
             this._prepareBuffer(el, cut, currentFrame, true);
             el.style.zIndex = String(zIndex);
-            this.applyMediaEffects(el, cut, currentFrame);
+            this.applyMediaEffects(el, cut, currentFrame, opacityOverride);
 
             const prev = this._layerShown[layerKey];
             if (wasOnAir || this._bufferHasFrame(el, cut, currentFrame) || !prev || el.readyState >= 1) {
@@ -3577,46 +3816,97 @@ export class ProgramPlayer {
                 return el;
             }
 
-            // Buffer ainda abrindo/posicionando (scrub longo, timeline recém-carregada):
-            // segura o último quadro no ar e revela quando houver imagem — nunca preto.
             this._awaitBuffer(el);
             return (prev && prev !== el) ? prev : el;
         };
 
-        const visibleBase = applyLayer(baseCut, "base", 1);
-        const visibleOverlay = applyLayer(overlayCut, "overlay", 10);
+        // Renderiza camadas de vídeo (Base A, Base B na transição, Overlay A, Overlay B na transição)
+        const videoLayers = [
+            { cut: baseTrans ? baseTrans.clipA : baseCut, key: "base", zIndex: 1, opacity: baseTrans ? baseOpacities.opacityA : null },
+            { cut: baseTrans ? baseTrans.clipB : null, key: "base_trans", zIndex: 2, opacity: baseTrans ? baseOpacities.opacityB : null },
+            { cut: overlayTrans ? overlayTrans.clipA : overlayCut, key: "overlay", zIndex: 10, opacity: overlayTrans ? overlayOpacities.opacityA : null },
+            { cut: overlayTrans ? overlayTrans.clipB : null, key: "overlay_trans", zIndex: 11, opacity: overlayTrans ? overlayOpacities.opacityB : null }
+        ];
 
-        // Pré-carrega os próximos clipes nos buffers ociosos: quando o playhead chegar no
-        // corte, o arquivo já está aberto e parado no primeiro frame do clipe.
+        videoLayers.forEach(layer => {
+            if (layer.cut && this._videoSrcForCut(layer.cut)) {
+                const el = applyLayer(layer.cut, layer.key, layer.zIndex, layer.opacity);
+                if (el) onAirVideos.add(el);
+            } else {
+                this._layerShown[layer.key] = null;
+            }
+        });
+
+        // Pré-carrega os próximos clipes nos buffers ociosos
         this._preloadUpcoming(cuts, currentFrame, videoTracks, pool, claimed);
         this._preloadUpcomingAudio(cuts, currentFrame);
 
         pool.forEach(el => {
-            if (el === visibleBase || el === visibleOverlay) {
-                // No ar: z-index, opacidade e play/pause já vieram de applyLayer.
+            if (onAirVideos.has(el)) {
                 if (el.style.display !== "block") el.style.display = "block";
                 return;
             }
             if (claimed.has(el)) {
-                // Buffer reservado (pré-carga, ou camada ainda decodificando): segue
-                // renderizado e invisível para o compositor já ter o frame no corte.
                 if (el.style.display !== "block") el.style.display = "block";
                 el.style.opacity = "0";
                 el.style.zIndex = "0";
-                if (!liveEls.has(el) && !el.paused) el.pause();
+                if (!liveEls.has(el) && !el.paused && typeof el.pause === "function") el.pause();
             } else {
                 if (el.style.display !== "none") el.style.display = "none";
-                if (!el.paused) el.pause();
+                if (!el.paused && typeof el.pause === "function") el.pause();
                 el.dataset.activeClipId = "";
             }
         });
 
         // ────────── CAMADAS DE FOTO (STILL) ──────────
-        // imgA = slot base (z-index 2, acima do vídeo base); imgB = slot overlay (z-index 11).
+        const photoCuts = [
+            { cut: baseTrans ? baseTrans.clipA : baseCut, zIndex: 1, opacity: baseTrans ? baseOpacities.opacityA : null },
+            { cut: baseTrans ? baseTrans.clipB : null, zIndex: 2, opacity: baseTrans ? baseOpacities.opacityB : null },
+            { cut: overlayTrans ? overlayTrans.clipA : overlayCut, zIndex: 10, opacity: overlayTrans ? overlayOpacities.opacityA : null },
+            { cut: overlayTrans ? overlayTrans.clipB : null, zIndex: 11, opacity: overlayTrans ? overlayOpacities.opacityB : null }
+        ].filter(item => item.cut && item.cut.type === "photo" && !item.cut.disabled);
+
         const imgA = this.el("program-player-photo");
         const imgB = this.el("program-player-photo-b");
-        this.applyPhotoSlot(imgA, (baseCut && baseCut.type === "photo") ? baseCut : null, currentFrame, 2);
-        this.applyPhotoSlot(imgB, (overlayCut && overlayCut.type === "photo") ? overlayCut : null, currentFrame, 11);
+
+        if (photoCuts.length >= 1) {
+            this.applyPhotoSlot(imgA, photoCuts[0].cut, currentFrame, photoCuts[0].zIndex, photoCuts[0].opacity);
+        } else {
+            this.applyPhotoSlot(imgA, null, currentFrame, 2);
+        }
+
+        if (photoCuts.length >= 2) {
+            this.applyPhotoSlot(imgB, photoCuts[1].cut, currentFrame, photoCuts[1].zIndex, photoCuts[1].opacity);
+        } else {
+            this.applyPhotoSlot(imgB, null, currentFrame, 11);
+        }
+
+        // ────────── CAMADAS DE COR SÓLIDA (COLOR MATTE) ──────────
+        const matteCuts = [
+            { cut: baseTrans ? baseTrans.clipA : baseCut, zIndex: 1, opacity: baseTrans ? baseOpacities.opacityA : null },
+            { cut: baseTrans ? baseTrans.clipB : null, zIndex: 2, opacity: baseTrans ? baseOpacities.opacityB : null },
+            { cut: overlayTrans ? overlayTrans.clipA : overlayCut, zIndex: 10, opacity: overlayTrans ? overlayOpacities.opacityA : null },
+            { cut: overlayTrans ? overlayTrans.clipB : null, zIndex: 11, opacity: overlayTrans ? overlayOpacities.opacityB : null }
+        ].filter(item => item.cut && (item.cut.kind === "color_matte" || item.cut.type === "color_matte") && !item.cut.disabled);
+
+        const matteA = this.el("program-player-matte");
+        const matteB = this.el("program-player-matte-b");
+
+        if (matteCuts.length >= 1) {
+            this.applyMatteSlot(matteA, matteCuts[0].cut, currentFrame, matteCuts[0].zIndex, matteCuts[0].opacity);
+        } else {
+            this.applyMatteSlot(matteA, null, currentFrame, 1);
+        }
+
+        if (matteCuts.length >= 2) {
+            this.applyMatteSlot(matteB, matteCuts[1].cut, currentFrame, matteCuts[1].zIndex, matteCuts[1].opacity);
+        } else {
+            this.applyMatteSlot(matteB, null, currentFrame, 10);
+        }
+
+        // ────────── CAMADA DE AJUSTE CUMULATIVA (ADJUSTMENT LAYER) ──────────
+        const adjEl = this.el("program-player-adjustment");
+        this.applyAdjustmentLayer(adjEl, cuts, currentFrame);
 
         // Cada pista de áudio tem seu próprio elemento <audio> tocando o clipe sob o playhead
         this.syncAudioTracks(cuts, currentFrame);
@@ -3680,16 +3970,16 @@ export class ProgramPlayer {
 
         // Se um buffer que estava no ar saiu do DOM (pop-out/restauração), esquece a referência.
         if (this._layerShown) {
-            ["base", "overlay"].forEach(k => {
+            Object.keys(this._layerShown).forEach(k => {
                 if (this._layerShown[k] && !pool.includes(this._layerShown[k])) this._layerShown[k] = null;
             });
         }
         return pool;
     }
 
-    /** Caminho do arquivo de vídeo de um clipe (null para fotos ou mídia ausente). */
+    /** Caminho do arquivo de vídeo de um clipe (null para fotos, cor sólida, camadas de ajuste ou mídia ausente). */
     _videoSrcForCut(cut) {
-        if (!cut || cut.type === "photo") return null;
+        if (!cut || cut.type === "photo" || cut.kind === "adjustment" || cut.kind === "color_matte" || cut.type === "color_matte") return null;
         let videoId = cut.parent_video_id || cut.video_id;
         let videoData = STATE.allVideos.find(v => String(v.id) === String(videoId));
         if (!videoData && String(videoId).startsWith("subclip_")) {
@@ -3705,30 +3995,54 @@ export class ProgramPlayer {
         if (videoData.proxy_path && (videoData.proxy_path.startsWith("/") || videoData.proxy_path.startsWith("http"))) {
             return videoData.proxy_path;
         }
+        if (videoData.src) {
+            return videoData.src;
+        }
         return `/api/video/${realId}/stream`;
     }
 
-    /** Instante do arquivo (em segundos) correspondente a um frame da timeline. */
+    /** Instante do arquivo (em segundos) correspondente a um frame da timeline com suporte a handles e hard boundaries. */
     _targetSecondsFor(cut, frame) {
-        if (cut && cut.is_freeze) {
+        if (!cut) return 0;
+        if (cut.is_freeze) {
             return (typeof cut.freeze_time === "number" && !isNaN(cut.freeze_time)) ? cut.freeze_time : (cut.in || 0);
         }
         const fps = TIMELINE_STATE?.fps || 24;
-        const inSec = (cut && typeof cut.in === "number" && !isNaN(cut.in)) ? cut.in : 0;
-        const startFrame = (cut && typeof cut.timelineStartFrame === "number" && !isNaN(cut.timelineStartFrame)) ? cut.timelineStartFrame : 0;
-        const curFrame = (typeof frame === "number" && !isNaN(frame)) ? frame : 0;
+        const inSec = (typeof cut.in === "number" && !isNaN(cut.in)) ? cut.in : ((cut.inFrame || 0) / fps);
+        const durFrames = Math.max(1, (cut.outFrame || 0) - (cut.inFrame || 0));
+        const clipSpeed = (typeof cut.speed === "number" && cut.speed > 0) ? cut.speed : 1.0;
+        const outSec = (typeof cut.out === "number" && !isNaN(cut.out))
+            ? cut.out
+            : (inSec + (durFrames / fps) * clipSpeed);
 
-        const clipSpeed = (cut && typeof cut.speed === "number" && cut.speed > 0) ? cut.speed : 1.0;
+        const startFrame = (typeof cut.timelineStartFrame === "number" && !isNaN(cut.timelineStartFrame)) ? cut.timelineStartFrame : 0;
+        const curFrame = (typeof frame === "number" && !isNaN(frame)) ? frame : 0;
         const offsetSec = ((curFrame - startFrame) / fps) * clipSpeed;
 
-        if (cut && cut.reverse) {
-            const outSec = (cut && typeof cut.out === "number" && !isNaN(cut.out))
-                ? cut.out
-                : (inSec + (((cut.outFrame || 0) - (cut.inFrame || 0)) / fps) * clipSpeed);
-            return Math.max(inSec, Math.min(outSec, outSec - offsetSec));
+        let rawSec = cut.reverse ? (outSec - offsetSec) : (inSec + offsetSec);
+
+        // Clamping de handles vs hard boundaries:
+        // Clipes com hard_boundaries congelam no primeiro/último frame.
+        // Clipes com folga de mídia (handles) avançam até os limites reais do arquivo de vídeo.
+        let minAllowed = 0;
+        let maxAllowed = Infinity;
+
+        if (cut.hard_boundaries) {
+            minAllowed = inSec;
+            maxAllowed = outSec;
+        } else {
+            if (cut.is_subclip && typeof cut.subclip_in === "number") {
+                minAllowed = cut.subclip_in;
+            }
+            if (typeof TIMELINE_STATE?.getMaxMediaFrames === "function") {
+                const maxFrames = TIMELINE_STATE.getMaxMediaFrames(cut);
+                if (Number.isFinite(maxFrames)) {
+                    maxAllowed = maxFrames / fps;
+                }
+            }
         }
 
-        return inSec + offsetSec;
+        return Math.max(minAllowed, Math.min(maxAllowed, rawSec));
     }
 
     /** true quando o buffer já tem o quadro certo decodificado e pode ir ao ar sem piscar. */
@@ -3861,7 +4175,7 @@ export class ProgramPlayer {
      */
     _continuesOnAir(cut, cuts) {
         if (!this._layerShown) return false;
-        const onAir = [this._layerShown.base, this._layerShown.overlay]
+        const onAir = Object.values(this._layerShown)
             .filter(Boolean)
             .map(e => e.dataset.activeClipId);
         if (!onAir.length) return false;
@@ -3884,11 +4198,11 @@ export class ProgramPlayer {
      * no instante do corte não há mais nada a carregar, só revelar o buffer.
      */
     _preloadUpcoming(cuts, currentFrame, videoTracks, pool, claimed) {
-        if (!this._layerShown) this._layerShown = { base: null, overlay: null };
+        if (!this._layerShown) this._layerShown = {};
         const fps = TIMELINE_STATE?.fps || 24;
         const lookaheadFrames = fps * 3; // ~3 s de antecedência para abrir e posicionar
         const trackIds = new Set(videoTracks.map(t => t.id));
-        const busy = new Set([this._layerShown.base, this._layerShown.overlay].filter(Boolean));
+        const busy = new Set(Object.values(this._layerShown || {}).filter(Boolean));
 
         const upcoming = cuts
             .filter(c => trackIds.has(c.track) &&
@@ -3898,11 +4212,29 @@ export class ProgramPlayer {
             .sort((a, b) => a.timelineStartFrame - b.timelineStartFrame);
 
         for (const cut of upcoming) {
+            let targetFrame = cut.timelineStartFrame;
+            const inEffect = (cut.effects || []).find(e => e.type === "crossfade" && e.side === "in" && e.transitionId && !e.disabled);
+            const inTrans = inEffect
+                ? (TIMELINE_STATE?.transitions || []).find(t => t.id === inEffect.transitionId)
+                : (TIMELINE_STATE?.transitions || []).find(t => t.clipBId === cut.id && (t.kind === "video" || (t.type && (t.type.startsWith("video_") || t.type === "cross_dissolve"))));
+            if (inTrans || inEffect) {
+                const halfA = inTrans?.halfAFrames !== undefined
+                    ? inTrans.halfAFrames
+                    : (inEffect?.duration_s !== undefined ? Math.round(inEffect.duration_s * fps) : (inTrans?.durationFrames ? Math.floor(inTrans.durationFrames / 2) : 0));
+                if (halfA > 0) {
+                    targetFrame = Math.max(0, cut.timelineStartFrame - halfA);
+                }
+            }
+
             // Já aquecido: reserva o buffer, senão a varredura final o daria como ocioso
             // e o descartaria — os clipes ficariam se revezando no mesmo buffer.
             const held = pool.find(e => e.dataset.activeClipId === String(cut.id));
             if (held) {
-                const target = this._targetSecondsFor(cut, cut.timelineStartFrame);
+                if (claimed.has(held) || busy.has(held)) {
+                    // Já está no ar ou reivindicado pelas camadas ativas: não altere currentTime para evitar jitter/rewind
+                    continue;
+                }
+                const target = this._targetSecondsFor(cut, targetFrame);
                 if (Math.abs(held.currentTime - target) > BUFFER_CONTINUITY_TOLERANCE) {
                     held.currentTime = Math.max(0, target);
                 }
@@ -3913,7 +4245,8 @@ export class ProgramPlayer {
             // Emenda perfeita (razor cut): o clipe que está no ar é do mesmo arquivo e acaba
             // exatamente onde este começa ⇒ o buffer no ar apenas continua rolando. Aquecer
             // outro buffer só gastaria um decoder e cortaria a reprodução contínua da mídia.
-            if (this._continuesOnAir(cut, cuts)) continue;
+            // Transições exigem buffers sobrepostos, logo não devem pegar atalho de rolo contínuo.
+            if (!(inTrans || inEffect) && this._continuesOnAir(cut, cuts)) continue;
 
             const idle = pool.filter(e => !claimed.has(e) && !busy.has(e));
             if (!idle.length) return;
@@ -3923,7 +4256,7 @@ export class ProgramPlayer {
                 || idle.find(e => !e.dataset.activeClipId)
                 || idle[0];
             claimed.add(el);
-            this._prepareBuffer(el, cut, cut.timelineStartFrame, false);
+            this._prepareBuffer(el, cut, targetFrame, false);
         }
     }
 
@@ -4001,7 +4334,7 @@ export class ProgramPlayer {
      * Compõe uma camada de foto (still) num elemento <img>.
      * cut null ⇒ oculta a camada. Aplica enquadramento/movimento via applyPhotoEffects.
      */
-    applyPhotoSlot(imgEl, cut, currentFrame, zIndex) {
+    applyPhotoSlot(imgEl, cut, currentFrame, zIndex = 2, opacityOverride = null) {
         if (!imgEl) return;
         if (!cut) {
             if (imgEl.style.display !== "none") imgEl.style.display = "none";
@@ -4024,7 +4357,293 @@ export class ProgramPlayer {
         imgEl.dataset.activeClipId = String(cut.id);
         imgEl.style.zIndex = String(zIndex);
         if (imgEl.style.display !== "block") imgEl.style.display = "block";
-        this.applyMediaEffects(imgEl, cut, currentFrame);
+        this.applyMediaEffects(imgEl, cut, currentFrame, opacityOverride);
+    }
+
+    /**
+     * Compõe uma camada de cor sólida (color_matte) pura em um elemento <div> (#program-player-matte).
+     * cut null ⇒ oculta a camada. Aplica cor de fundo, opacidade, transform e crop.
+     */
+    applyMatteSlot(matteEl, cut, currentFrame, zIndex = 1, opacityOverride = null) {
+        if (!matteEl) return;
+        if (!cut || (cut.kind !== "color_matte" && cut.type !== "color_matte") || cut.disabled) {
+            matteEl.style.display = "none";
+            matteEl.style.backgroundColor = "";
+            matteEl.style.mixBlendMode = "normal";
+            matteEl.dataset.activeClipId = "";
+            return;
+        }
+
+        matteEl.style.display = "block";
+        matteEl.style.position = "absolute";
+        matteEl.style.inset = "0";
+        matteEl.style.pointerEvents = "none";
+        matteEl.style.backgroundColor = cut.color || "#000000";
+        matteEl.style.zIndex = String(zIndex);
+        matteEl.dataset.activeClipId = String(cut.id);
+
+        const effects = Array.isArray(cut.effects) ? cut.effects : [];
+        const tf = effects.find(e => e.type === "transform" && !e.disabled) || {};
+        const crop = effects.find(e => e.type === "crop" && !e.disabled);
+        const blendMode = (cut.blend_mode || cut.blendMode || tf.blend_mode || tf.blendMode || "normal").toLowerCase();
+        matteEl.style.mixBlendMode = blendMode;
+
+        // Aplica efeitos cumulativos de camadas de ajuste ativas acima desta pista
+        const adjEffects = (window.TIMELINE_STATE && typeof window.TIMELINE_STATE.getCumulativeAdjustmentEffects === "function")
+            ? window.TIMELINE_STATE.getCumulativeAdjustmentEffects(cut.track, currentFrame)
+            : [];
+        let adjFilterStr = "";
+        let adjOpacity = 1.0;
+        let adjCrop = null;
+
+        if (adjEffects && adjEffects.length > 0) {
+            const adjParts = [];
+            adjEffects.forEach(eff => {
+                if (!eff || eff.disabled) return;
+                if (eff.type === "color") {
+                    if (typeof eff.brightness === "number" && eff.brightness !== 0) {
+                        adjParts.push(`brightness(${((eff.brightness + 100) / 100).toFixed(2)})`);
+                    }
+                    if (typeof eff.contrast === "number" && eff.contrast !== 0) {
+                        adjParts.push(`contrast(${((eff.contrast + 100) / 100).toFixed(2)})`);
+                    }
+                    if (typeof eff.saturation === "number" && eff.saturation !== 100) {
+                        adjParts.push(`saturate(${(eff.saturation / 100).toFixed(2)})`);
+                    }
+                    if (typeof eff.hue === "number" && eff.hue !== 0) {
+                        adjParts.push(`hue-rotate(${eff.hue}deg)`);
+                    }
+                    if (typeof eff.sepia === "number" && eff.sepia > 0) {
+                        adjParts.push(`sepia(${eff.sepia})`);
+                    }
+                    if (typeof eff.grayscale === "number" && eff.grayscale > 0) {
+                        adjParts.push(`grayscale(${eff.grayscale})`);
+                    }
+                    if (typeof eff.blur === "number" && eff.blur > 0) {
+                        adjParts.push(`blur(${eff.blur}px)`);
+                    }
+                } else if (eff.type === "transform") {
+                    if (typeof eff.opacity === "number") {
+                        adjOpacity *= eff.opacity;
+                    }
+                } else if (eff.type === "crop") {
+                    adjCrop = eff;
+                }
+            });
+            if (adjParts.length > 0) {
+                adjFilterStr = adjParts.join(" ");
+            }
+        }
+        // Aplica efeitos de cor do próprio clipe de cor sólida (se houver)
+        const col = effects.find(e => e.type === "color" && !e.disabled) || {};
+        const colParts = [];
+        if (!col.disabled) {
+            if (typeof col.brightness === "number" && col.brightness !== 0) {
+                colParts.push(`brightness(${((col.brightness + 100) / 100).toFixed(2)})`);
+            }
+            if (typeof col.contrast === "number" && col.contrast !== 0) {
+                colParts.push(`contrast(${((col.contrast + 100) / 100).toFixed(2)})`);
+            }
+            if (typeof col.saturation === "number" && col.saturation !== 100) {
+                colParts.push(`saturate(${(col.saturation / 100).toFixed(2)})`);
+            }
+            if (typeof col.hue === "number" && col.hue !== 0) {
+                colParts.push(`hue-rotate(${col.hue}deg)`);
+            }
+            if (typeof col.sepia === "number" && col.sepia > 0) {
+                colParts.push(`sepia(${col.sepia})`);
+            }
+            if (typeof col.grayscale === "number" && col.grayscale > 0) {
+                colParts.push(`grayscale(${col.grayscale})`);
+            }
+            if (typeof col.blur === "number" && col.blur > 0) {
+                colParts.push(`blur(${col.blur}px)`);
+            }
+        }
+        const fullFilter = [...colParts, ...(adjFilterStr ? [adjFilterStr] : [])].join(" ");
+        matteEl.style.filter = fullFilter;
+
+        // Modulação de Fade In / Fade Out em Cor Sólida (Task: /boost fade in / fade out deve modular cor solida)
+        const fps = (window.TIMELINE_STATE && window.TIMELINE_STATE.fps) || 24;
+        let fadeOpacity = 1.0;
+        if (typeof opacityOverride === "number" && Number.isFinite(opacityOverride)) {
+            fadeOpacity = opacityOverride;
+        } else if (typeof computeClipFadeFactor === "function") {
+            fadeOpacity = computeClipFadeFactor(cut, currentFrame, fps);
+        } else if (typeof computeAdjustmentFadeFactor === "function") {
+            fadeOpacity = computeAdjustmentFadeFactor(cut, currentFrame, fps);
+        } else {
+            const durFrames = Math.max(1, ((cut.outFrame || 0) - (cut.inFrame || 0)) ||
+                Math.round(((cut.out || 0) - (cut.in || 0)) * fps) ||
+                Math.round(((cut.duration_s !== undefined ? cut.duration_s : (cut.duration || 0))) * fps));
+            const startFrame = cut.timelineStartFrame !== undefined
+                ? cut.timelineStartFrame
+                : Math.round((cut.timeline_start || 0) * fps);
+            const tIn = (currentFrame - startFrame) / fps;
+            const tOut = (startFrame + durFrames - currentFrame) / fps;
+            effects.filter(e => e && e.type === "crossfade").forEach(cf => {
+                if (cf.disabled || cf.transitionId) return;
+                const durVal = cf.duration_s !== undefined ? cf.duration_s : (cf.duration !== undefined ? cf.duration : 0.5);
+                if (typeof durVal === "number" && durVal <= 0) return;
+                const d = Math.max(0.001, durVal);
+                if (cf.side === "in" && tIn < d) {
+                    const p = Math.max(0, Math.min(1, tIn / d));
+                    const factor = evaluateFadeCurve(p, cf.curve || "linear", cf.tension || 0);
+                    if (typeof factor === "number" && Number.isFinite(factor)) fadeOpacity = Math.min(fadeOpacity, factor);
+                }
+                if (cf.side === "out" && tOut < d) {
+                    const p = Math.max(0, Math.min(1, tOut / d));
+                    const factor = evaluateFadeCurve(p, cf.curve || "linear", cf.tension || 0);
+                    if (typeof factor === "number" && Number.isFinite(factor)) fadeOpacity = Math.min(fadeOpacity, factor);
+                }
+            });
+        }
+
+        const tfOp = (typeof tf.opacity === "number")
+            ? Math.max(0, Math.min(1, tf.opacity))
+            : ((typeof cut.opacity === "number") ? Math.max(0, Math.min(1, cut.opacity)) : 1.0);
+        const op = tfOp * fadeOpacity * adjOpacity;
+        matteEl.style.opacity = String((typeof op === "number" && Number.isFinite(op)) ? Math.max(0, Math.min(1, op)) : 1.0);
+
+        const scale = (typeof tf.scale === "number") ? tf.scale : 1.0;
+        const x = tf.x || 0;
+        const y = tf.y || 0;
+        const rot = tf.rotation || 0;
+
+        const tfParts = [];
+        if (scale !== 1.0) tfParts.push(`scale(${scale})`);
+        if (x !== 0 || y !== 0) tfParts.push(`translate(${x}px, ${y}px)`);
+        if (rot !== 0) tfParts.push(`rotate(${rot}deg)`);
+        matteEl.style.transform = tfParts.length > 0 ? tfParts.join(" ") : "";
+
+        let cropTop = crop ? (crop.top || 0) : 0;
+        let cropRight = crop ? (crop.right || 0) : 0;
+        let cropBottom = crop ? (crop.bottom || 0) : 0;
+        let cropLeft = crop ? (crop.left || 0) : 0;
+        if (adjCrop && !adjCrop.disabled) {
+            cropTop = Math.max(cropTop, adjCrop.top || 0);
+            cropRight = Math.max(cropRight, adjCrop.right || 0);
+            cropBottom = Math.max(cropBottom, adjCrop.bottom || 0);
+            cropLeft = Math.max(cropLeft, adjCrop.left || 0);
+        }
+
+        if (cropTop > 0 || cropRight > 0 || cropBottom > 0 || cropLeft > 0) {
+            matteEl.style.clipPath = `inset(${cropTop}% ${cropRight}% ${cropBottom}% ${cropLeft}%)`;
+        } else {
+            matteEl.style.clipPath = "";
+        }
+    }
+
+    /**
+     * Aplica o efeito cumulativo de camadas de ajuste ativas sobre o viewport via CSS backdrop-filter.
+     */
+    applyAdjustmentLayer(adjEl, cuts, currentFrame) {
+        if (!adjEl) return;
+
+        // Identifica camadas de ajuste ativas no playhead
+        const activeAdjustments = (cuts || []).filter(c => {
+            if (!c || c.kind !== "adjustment" || c.disabled) return false;
+            const start = c.timelineStartFrame || 0;
+            const dur = (c.outFrame || 0) - (c.inFrame || 0);
+            return currentFrame >= start && currentFrame < start + dur;
+        });
+
+        if (activeAdjustments.length === 0) {
+            adjEl.style.display = "none";
+            adjEl.style.backdropFilter = "none";
+            adjEl.style.webkitBackdropFilter = "none";
+            adjEl.style.clipPath = "";
+            adjEl.style.mixBlendMode = "normal";
+            adjEl.dataset.activeClipId = "";
+            return;
+        }
+
+        // Ordena da pista mais baixa para a mais alta (V2 depois V3)
+        const getTrackLevel = (trackId) => {
+            if (window.TIMELINE_STATE?.getTrackLevel) return window.TIMELINE_STATE.getTrackLevel(trackId);
+            const m = String(trackId || "").match(/^V(\d+)$/i);
+            return m ? parseInt(m[1], 10) : 0;
+        };
+        activeAdjustments.sort((a, b) => getTrackLevel(a.track) - getTrackLevel(b.track));
+
+        const aggregatedEffects = [];
+        let combinedCrop = null;
+        let lastOpacity = 1.0;
+        let activeBlendMode = "normal";
+
+        const fps = window.TIMELINE_STATE?.fps || 24;
+        activeAdjustments.forEach(adj => {
+            const bMode = (adj.blend_mode || adj.blendMode || adj.effects?.find(e => e.type === "transform")?.blend_mode || adj.effects?.find(e => e.type === "transform")?.blendMode || "normal").toLowerCase();
+            if (bMode && bMode !== "normal") {
+                activeBlendMode = bMode;
+            }
+            const fadeFactor = (typeof computeAdjustmentFadeFactor === "function")
+                ? computeAdjustmentFadeFactor(adj, currentFrame, fps)
+                : 1.0;
+            (adj.effects || []).forEach(eff => {
+                if (eff && !eff.disabled) {
+                    if (eff.type === "color") {
+                        const rawB = typeof eff.brightness === "number" ? eff.brightness : 0;
+                        const rawC = typeof eff.contrast === "number" ? eff.contrast : 0;
+                        const rawS = typeof eff.saturation === "number" ? eff.saturation : 100;
+                        const rawH = typeof eff.hue === "number" ? eff.hue : 0;
+                        const rawSep = typeof eff.sepia === "number" ? eff.sepia : 0;
+                        const rawGray = typeof eff.grayscale === "number" ? eff.grayscale : 0;
+                        const rawBlur = typeof eff.blur === "number" ? eff.blur : 0;
+
+                        aggregatedEffects.push({
+                            ...eff,
+                            brightness: rawB * fadeFactor,
+                            contrast: rawC * fadeFactor,
+                            saturation: 100 + (rawS - 100) * fadeFactor,
+                            hue: rawH * fadeFactor,
+                            sepia: rawSep * fadeFactor,
+                            grayscale: rawGray * fadeFactor,
+                            blur: rawBlur * fadeFactor
+                        });
+                    } else if (eff.type === "crop") {
+                        combinedCrop = {
+                            ...eff,
+                            top: (eff.top || 0) * fadeFactor,
+                            right: (eff.right || 0) * fadeFactor,
+                            bottom: (eff.bottom || 0) * fadeFactor,
+                            left: (eff.left || 0) * fadeFactor
+                        };
+                    } else if (eff.type === "transform") {
+                        if (typeof eff.opacity === "number") {
+                            const modOp = 1.0 - (1.0 - eff.opacity) * fadeFactor;
+                            lastOpacity *= modOp;
+                        }
+                    }
+                }
+            });
+            lastOpacity *= fadeFactor;
+        });
+
+        const filterStr = buildCssBackdropFilter(aggregatedEffects);
+        adjEl.style.display = "block";
+        adjEl.style.position = "absolute";
+        adjEl.style.inset = "0";
+        adjEl.style.pointerEvents = "none";
+        adjEl.style.zIndex = "25";
+        adjEl.style.backdropFilter = filterStr;
+        adjEl.style.webkitBackdropFilter = filterStr;
+        adjEl.style.opacity = String(lastOpacity);
+        adjEl.style.mixBlendMode = activeBlendMode;
+
+        if (combinedCrop) {
+            const top = combinedCrop.top || 0;
+            const right = combinedCrop.right || 0;
+            const bottom = combinedCrop.bottom || 0;
+            const left = combinedCrop.left || 0;
+            if (top > 0 || right > 0 || bottom > 0 || left > 0) {
+                adjEl.style.clipPath = `inset(${top}% ${right}% ${bottom}% ${left}%)`;
+            } else {
+                adjEl.style.clipPath = "";
+            }
+        } else {
+            adjEl.style.clipPath = "";
+        }
     }
 
     /**
@@ -4032,7 +4651,7 @@ export class ProgramPlayer {
      * crop/movimento (Ken Burns) e filtros de cor (brilho, contraste, saturação, matiz, sépia, grayscale, blur)
      * e fades à foto ou vídeo, derivando o progresso a partir do frame atual.
      */
-    applyMediaEffects(el, cut, currentFrame) {
+    applyMediaEffects(el, cut, currentFrame, opacityOverride = null) {
         if (!el || !cut) return;
         const effects = cut.effects || [];
         const fps = TIMELINE_STATE.fps || 24;
@@ -4155,29 +4774,84 @@ export class ProgramPlayer {
             grayscale(${grayscale}%)
             blur(${blur}px)
         `.trim().replace(/\s+/g, ' ');
-        el.style.filter = cssFilter;
+
+        // Aplica efeitos cumulativos de camadas de ajuste ativas acima desta pista
+        const adjEffects = (window.TIMELINE_STATE && typeof window.TIMELINE_STATE.getCumulativeAdjustmentEffects === "function")
+            ? window.TIMELINE_STATE.getCumulativeAdjustmentEffects(cut.track, currentFrame)
+            : [];
+        let adjFilterStr = "";
+        let adjOpacity = 1.0;
+        let adjCrop = null;
+
+        if (adjEffects && adjEffects.length > 0) {
+            const adjParts = [];
+            adjEffects.forEach(eff => {
+                if (!eff || eff.disabled) return;
+                if (eff.type === "color") {
+                    if (typeof eff.brightness === "number" && eff.brightness !== 0) {
+                        adjParts.push(`brightness(${((eff.brightness + 100) / 100).toFixed(2)})`);
+                    }
+                    if (typeof eff.contrast === "number" && eff.contrast !== 0) {
+                        adjParts.push(`contrast(${((eff.contrast + 100) / 100).toFixed(2)})`);
+                    }
+                    if (typeof eff.saturation === "number" && eff.saturation !== 100) {
+                        adjParts.push(`saturate(${(eff.saturation / 100).toFixed(2)})`);
+                    }
+                    if (typeof eff.hue === "number" && eff.hue !== 0) {
+                        adjParts.push(`hue-rotate(${eff.hue}deg)`);
+                    }
+                    if (typeof eff.sepia === "number" && eff.sepia > 0) {
+                        adjParts.push(`sepia(${eff.sepia})`);
+                    }
+                    if (typeof eff.grayscale === "number" && eff.grayscale > 0) {
+                        adjParts.push(`grayscale(${eff.grayscale})`);
+                    }
+                    if (typeof eff.blur === "number" && eff.blur > 0) {
+                        adjParts.push(`blur(${eff.blur}px)`);
+                    }
+                } else if (eff.type === "transform") {
+                    if (typeof eff.opacity === "number") {
+                        adjOpacity *= eff.opacity;
+                    }
+                } else if (eff.type === "crop") {
+                    adjCrop = eff;
+                }
+            });
+            if (adjParts.length > 0) {
+                adjFilterStr = " " + adjParts.join(" ");
+            }
+        }
+
+        el.style.filter = (cssFilter + adjFilterStr).trim();
 
         // 4. Fades (dissolve) de entrada/saída por opacidade
         let fadeOpacity = 1.0;
-        const tIn = (currentFrame - (cut.timelineStartFrame || 0)) / fps;                       // s desde o início
-        const tOut = ((cut.timelineStartFrame || 0) + durFrames - currentFrame) / fps;          // s até o fim
-        effects.filter(e => e && e.type === "crossfade").forEach(cf => {
-            if (cf.disabled) return;
-            const d = Math.max(0.05, cf.duration_s || 0.5);
-            if (cf.side === "in" && tIn < d) {
-                const p = Math.max(0, Math.min(1, tIn / d));
-                const factor = evaluateFadeCurve(p, cf.curve || "linear", cf.tension || 0);
-                if (typeof factor === "number" && Number.isFinite(factor)) fadeOpacity = Math.min(fadeOpacity, factor);
-            }
-            if (cf.side === "out" && tOut < d) {
-                const p = Math.max(0, Math.min(1, tOut / d));
-                const factor = evaluateFadeCurve(p, cf.curve || "linear", cf.tension || 0);
-                if (typeof factor === "number" && Number.isFinite(factor)) fadeOpacity = Math.min(fadeOpacity, factor);
-            }
-        });
+        if (typeof opacityOverride === "number" && Number.isFinite(opacityOverride)) {
+            fadeOpacity = opacityOverride;
+        } else {
+            const tIn = (currentFrame - (cut.timelineStartFrame || 0)) / fps;                       // s desde o início
+            const tOut = ((cut.timelineStartFrame || 0) + durFrames - currentFrame) / fps;          // s até o fim
+            effects.filter(e => e && e.type === "crossfade").forEach(cf => {
+                if (cf.disabled || cf.transitionId) return;
+                const d = Math.max(0.05, cf.duration_s || 0.5);
+                if (cf.side === "in" && tIn < d) {
+                    const p = Math.max(0, Math.min(1, tIn / d));
+                    const factor = evaluateFadeCurve(p, cf.curve || "linear", cf.tension || 0);
+                    if (typeof factor === "number" && Number.isFinite(factor)) fadeOpacity = Math.min(fadeOpacity, factor);
+                }
+                if (cf.side === "out" && tOut < d) {
+                    const p = Math.max(0, Math.min(1, tOut / d));
+                    const factor = evaluateFadeCurve(p, cf.curve || "linear", cf.tension || 0);
+                    if (typeof factor === "number" && Number.isFinite(factor)) fadeOpacity = Math.min(fadeOpacity, factor);
+                }
+            });
+        }
         
-        const rawFinalOpacity = baseOpacity * fadeOpacity;
+        const rawFinalOpacity = baseOpacity * fadeOpacity * adjOpacity;
         el.style.opacity = String((typeof rawFinalOpacity === "number" && Number.isFinite(rawFinalOpacity)) ? Math.max(0, Math.min(1, rawFinalOpacity)) : 1.0);
+
+        const blendMode = (cut.blend_mode || cut.blendMode || tf.blend_mode || tf.blendMode || "normal").toLowerCase();
+        el.style.mixBlendMode = blendMode;
 
         // 5. Recorte Dinâmico (Crop)
         const cropEffect = effects.find(e => e.type === "crop") || {};
@@ -4188,6 +4862,13 @@ export class ProgramPlayer {
             cropRight = cropEffect.right !== undefined ? cropEffect.right : 0;
             cropBottom = cropEffect.bottom !== undefined ? cropEffect.bottom : 0;
             cropLeft = cropEffect.left !== undefined ? cropEffect.left : 0;
+        }
+
+        if (adjCrop && !adjCrop.disabled) {
+            cropTop = Math.max(cropTop, adjCrop.top || 0);
+            cropRight = Math.max(cropRight, adjCrop.right || 0);
+            cropBottom = Math.max(cropBottom, adjCrop.bottom || 0);
+            cropLeft = Math.max(cropLeft, adjCrop.left || 0);
         }
 
         if (cropTop > 0 || cropRight > 0 || cropBottom > 0 || cropLeft > 0) {
@@ -4388,8 +5069,8 @@ export class ProgramPlayer {
         const durCut = Math.max(1, ((cut.outFrame || 0) - (cut.inFrame || 0)) || (Math.round(((cut.out || 0) - (cut.in || 0)) * fps)));
         const tIn = (currentFrame - (cut.timelineStartFrame || 0)) / fps;
         const tOut = ((cut.timelineStartFrame || 0) + durCut - currentFrame) / fps;
-        effects.filter(e => e && e.type === "crossfade" && !e.transitionId).forEach(cf => {
-            if (cf.disabled) return;
+        effects.filter(e => e && e.type === "crossfade").forEach(cf => {
+            if (cf.disabled || cf.transitionId) return;
             const d = Math.max(0.05, cf.duration_s || 0.5);
             if (cf.side === "in" && tIn < d) {
                 const p = Math.max(0, Math.min(1, tIn / d));
@@ -4500,11 +5181,11 @@ export class ProgramPlayer {
             );
 
             // Se houver reserva pré-carregada e posicionada para este corte, promove de imediato
-            const clipChanged = el.dataset.activeClipId !== String(cut.id);
-            const alvoCut = this._fonteAudioEfetiva(cut, (STATE.allVideos || []).find(v => String(v.id) === String(cut.parent_video_id || cut.video_id)) || {});
+            const clipChanged = cut ? (el.dataset.activeClipId !== String(cut.id)) : Boolean(el.dataset.activeClipId);
+            const alvoCut = cut ? this._fonteAudioEfetiva(cut, (STATE.allVideos || []).find(v => String(v.id) === String(cut.parent_video_id || cut.video_id)) || {}) : null;
             const audioSrcCut = alvoCut?.src;
             const reserva = typeof this._parReservaAudio === "function" ? this._parReservaAudio(track.id, el) : null;
-            if (clipChanged && reserva && reserva.dataset.activeClipId === String(cut.id) &&
+            if (cut && clipChanged && reserva && reserva.dataset.activeClipId === String(cut.id) &&
                 reserva.dataset.loadedSrc === audioSrcCut && reserva.readyState >= 2) {
                 const estavaTocando = !el.paused || this.isPlaying;
                 const rate = el.playbackRate;
@@ -6173,6 +6854,22 @@ export class VideoPlayer {
             return;
         }
 
+        // Renderizar In para Out (Cache NLE) - Tecla Enter
+        if (KEYMAP_SERVICE.matches(e, "timeline.render_in_to_out") || (e.key === "Enter" && !e.ctrlKey && !e.shiftKey && !e.altKey && !e.metaKey)) {
+            e.preventDefault();
+            if (typeof RENDER_CACHE_MANAGER !== "undefined" && RENDER_CACHE_MANAGER) {
+                RENDER_CACHE_MANAGER.renderInOut();
+            }
+            return;
+        }
+
+        // Cancelar pré-renderização em andamento (Escape)
+        if (e.key === "Escape" && typeof RENDER_CACHE_MANAGER !== "undefined" && RENDER_CACHE_MANAGER && RENDER_CACHE_MANAGER._isRendering) {
+            e.preventDefault();
+            RENDER_CACHE_MANAGER.cancelRender();
+            return;
+        }
+
         // Play / Pause (Espaço)
         if (KEYMAP_SERVICE.matches(e, "playback.play_pause")) {
             e.preventDefault();
@@ -7370,6 +8067,12 @@ export class VideoPlayer {
             this.sourcePlayer.openCreateSubclipModal();
         }
     }
+
+    syncVideoToPlayhead() {
+        if (this.programPlayer && typeof this.programPlayer.syncVideoToPlayhead === "function") {
+            this.programPlayer.syncVideoToPlayhead();
+        }
+    }
 }
 
 export function showAnnotationModal(speakers, initialValue = "") {
@@ -7541,3 +8244,5 @@ export function showAnnotationModal(speakers, initialValue = "") {
         });
     });
 }
+
+export { ProgramPlayer as CapiauPlayer };
