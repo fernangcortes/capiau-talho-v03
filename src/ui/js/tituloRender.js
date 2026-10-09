@@ -74,6 +74,11 @@ export function montarElementoTitulo(doc, clip, relTimeS, escala = 1) {
     el.style.top = `calc(50% + ${st.y}%)`;
     el.style.transform = `translate(-50%, -50%) scale(${st.scale}) rotate(${st.rotation}deg)`;
     el.style.opacity = st.opacity;
+    const tf = (Array.isArray(clip.effects) ? clip.effects : []).find(ef => ef && ef.type === "transform") || {};
+    const blendMode = (clip.blend_mode || clip.blendMode || tf.blend_mode || tf.blendMode || "normal").toLowerCase();
+    if (blendMode && blendMode !== "normal") {
+        el.style.mixBlendMode = blendMode;
+    }
     el.style.transformOrigin = "center center";
     el.style.fontFamily = clip.fontFamily ? `"${clip.fontFamily}", sans-serif` : "'Outfit', 'Inter', sans-serif";
     el.style.fontSize = `${st.fontSize * e}px`;

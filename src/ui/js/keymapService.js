@@ -342,6 +342,18 @@ export const COMMANDS_CATALOG = [
         description: "Aplica transição de crossfade de áudio de potência constante (Equal-Power) na emenda entre clipes contíguos ou no clipe selecionado (Ctrl+Shift+D)"
     },
     {
+        id: "edit.apply_video_transition",
+        category: "edit",
+        label: "Transição de Vídeo Padrão (Cross Dissolve)",
+        description: "Aplica transição de vídeo (Cross Dissolve, Dip to Black ou Dip to White) na emenda contígua sob a agulha ou entre os clipes selecionados (Ctrl+D)"
+    },
+    {
+        id: "timeline.render_in_to_out",
+        category: "edit",
+        label: "Renderizar Efeitos In para Out (Cache NLE)",
+        description: "Pré-renderiza o intervalo da timeline (In-Out ou trechos pesados) para playback suave em cache (Enter)"
+    },
+    {
         id: "edit.split",
         category: "edit",
         label: "Dividir Clipe no Playhead (Split)",
@@ -833,6 +845,8 @@ export const KEYMAP_PRESETS = {
         "edit.clip_speed": ["Ctrl+KeyR"],
         "edit.fit_to_gap": ["Ctrl+Alt+KeyR"],
         "edit.apply_audio_crossfade": ["Ctrl+Shift+KeyD"],
+        "edit.apply_video_transition": ["Ctrl+KeyD"],
+        "timeline.render_in_to_out": ["Enter"],
         "edit.split": ["KeyE", "KeyZ", "Alt+KeyE", "Alt+KeyZ"],
         "edit.ripple_trim_head": ["KeyQ"],
         "edit.ripple_trim_tail": ["KeyW"],
@@ -984,6 +998,8 @@ export const KEYMAP_PRESETS = {
         "edit.clip_speed": ["Ctrl+KeyR"],
         "edit.fit_to_gap": ["Ctrl+Alt+KeyR"],
         "edit.apply_audio_crossfade": ["Ctrl+Shift+KeyD", "KeyU"],
+        "edit.apply_video_transition": ["Ctrl+KeyD"],
+        "timeline.render_in_to_out": ["Enter"],
         "edit.split": ["Shift+KeyR", "KeyX"],
         "edit.ripple_trim_head": ["BracketLeft", "KeyQ"],
         "edit.ripple_trim_tail": ["BracketRight", "KeyW"],
@@ -1075,6 +1091,8 @@ export const KEYMAP_PRESETS = {
         "edit.clip_speed": ["Ctrl+KeyR"],
         "edit.fit_to_gap": ["Ctrl+Alt+KeyR"],
         "edit.apply_audio_crossfade": ["Ctrl+Shift+KeyD"],
+        "edit.apply_video_transition": ["Ctrl+KeyD"],
+        "timeline.render_in_to_out": ["Enter"],
         "edit.toggle_clip_disable": ["Shift+KeyE"],
         "edit.split": ["Ctrl+KeyK"],
         "edit.ripple_trim_head": ["KeyQ"],
@@ -1167,6 +1185,8 @@ export const KEYMAP_PRESETS = {
         "edit.clip_speed": ["Ctrl+KeyR"],
         "edit.fit_to_gap": ["Ctrl+Alt+KeyR", "Cmd+Alt+KeyR"],
         "edit.apply_audio_crossfade": ["Alt+KeyT", "Ctrl+Shift+KeyD"],
+        "edit.apply_video_transition": ["Ctrl+KeyT", "Ctrl+KeyD"],
+        "timeline.render_in_to_out": ["Enter"],
         "edit.toggle_clip_disable": ["KeyD"],
         "edit.split": ["Ctrl+Backslash"],
         "edit.ripple_trim_head": ["Shift+BracketLeft", "KeyQ"],
@@ -1259,6 +1279,8 @@ export const KEYMAP_PRESETS = {
         "edit.clip_speed": ["Ctrl+KeyR", "Cmd+KeyR"],
         "edit.fit_to_gap": ["Ctrl+Alt+KeyR", "Cmd+Alt+KeyR"],
         "edit.apply_audio_crossfade": ["Alt+Cmd+KeyT", "Ctrl+Shift+KeyD"],
+        "edit.apply_video_transition": ["Cmd+KeyT", "Ctrl+KeyD"],
+        "timeline.render_in_to_out": ["Enter", "Ctrl+KeyR"],
         "edit.toggle_clip_disable": ["KeyV"],
         "edit.split": ["Cmd+KeyB"],
         "edit.ripple_trim_head": ["Alt+BracketLeft", "KeyQ"],

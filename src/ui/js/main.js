@@ -24,6 +24,7 @@ import { AppearanceWindow } from "./appearanceWindow.js";
 import { TEXT_AI_ENGINE } from "./textAIEngine.js";
 import { TITLES_TAB } from "./titlesTab.js";
 import { carregarFontesDoProjeto } from "./fontManager.js";
+import { RENDER_CACHE_MANAGER } from "./renderCache.js";
 
 // Função para destacar os termos da busca com <mark>
 function highlightTerms(text, query) {
@@ -1913,6 +1914,14 @@ window.addEventListener("DOMContentLoaded", () => {
     // Painel de Exportação de Vídeo: auto-ligado ao #btn-export-video (js/exportVideo.js)
     initExportVideoPanel();
 
+    // Botão de Render Cache: In para Out (ou sequência inteira)
+    const btnRenderCache = document.getElementById("btn-render-cache-timeline");
+    if (btnRenderCache) {
+        btnRenderCache.addEventListener("click", () => {
+            RENDER_CACHE_MANAGER.renderInOut();
+        });
+    }
+
     // -- Open Photos in Player Configuration --
     const btnLibrary = document.getElementById("btn-library-photos-in-player");
     function updatePhotoPlayerBtnStyle(btn, active) {
@@ -2719,7 +2728,7 @@ window.addEventListener("DOMContentLoaded", () => {
                 <input type="text" class="flyout-search-input" placeholder="Buscar mídias..." value="${currentSearchVal ? currentSearchVal.replace(/"/g, '&quot;') : ''}">
             </div>
             <div class="flyout-section-title">Filtrar Mídia</div>
-            <div class="flyout-chips-container" style="display: flex; gap: 4px; padding: 4px 6px;">
+            <div class="flyout-chips-container" style="display: flex; gap: var(--sp-4); padding: var(--sp-4) var(--sp-6);">
                 <button type="button" class="flyout-media-chip ${activeType === 'all' ? 'active' : ''}" data-type-filter="all" title="Todas as Mídias">
                     <i class="fa-solid fa-layer-group"></i> <span>Todas</span>
                 </button>

@@ -199,6 +199,12 @@
                                 <button id="btn-add-media" class="btn-icon" data-tooltip="Importar Pasta/HD Externo" style="font-size: var(--fs-13); background: transparent; border: none; color: var(--text-secondary); cursor: pointer; transition: color 0.2s;">
                                     <i class="fa-solid fa-plus"></i>
                                 </button>
+                                <button id="btn-new-color-matte" class="btn-icon" data-tooltip="Criar Gerador de Cor Sólida (Color Matte)" style="font-size: var(--fs-13); background: transparent; border: none; color: var(--text-secondary); cursor: pointer; transition: color 0.2s;">
+                                    <i class="fa-solid fa-palette"></i>
+                                </button>
+                                <button id="btn-new-adjustment-layer" class="btn-icon" data-tooltip="Criar Camada de Ajuste (Adjustment Layer)" style="font-size: var(--fs-13); background: transparent; border: none; color: var(--text-secondary); cursor: pointer; transition: color 0.2s;">
+                                    <i class="fa-solid fa-wand-magic-sparkles"></i>
+                                </button>
                                 <span id="s3-status-indicator" class="btn-icon offline" data-tooltip="S3 Desconectado" style="font-size: var(--fs-13); color: var(--text-muted); cursor: pointer; transition: color 0.3s; display: inline-flex; align-items: center;">
                                     <i class="fa-solid fa-cloud"></i>
                                 </span>
@@ -1088,6 +1094,19 @@
                                     <!-- Camadas de foto (still) da timeline: A = base, B = sobreposição -->
                                     <img id="program-player-photo" style="display:none; position: absolute; inset: 0; width: 100%; height: 100%; max-width: none; max-height: none;" src="">
                                     <img id="program-player-photo-b" style="display:none; position: absolute; inset: 0; width: 100%; height: 100%; max-width: none; max-height: none;" src="">
+
+                                    <!-- Camadas de cor sólida (color matte) da timeline: A = base, B = sobreposição -->
+                                    <div id="program-player-matte" style="display: none; position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none;"></div>
+                                    <div id="program-player-matte-b" style="display: none; position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none;"></div>
+
+                                    <!-- Camada de ajuste cumulativa (backdrop-filter) -->
+                                    <div id="program-player-adjustment" style="display: none; position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none;"></div>
+
+                                    <!-- Canvas de Render Cache do NLE (Fast-Path de Efeitos e Ajustes) -->
+                                    <canvas id="program-player-render-cache" style="display: none; position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 45;"></canvas>
+
+                                    <!-- Overlay de Dip to White para transições de vídeo -->
+                                    <div id="program-player-dip-white-overlay" style="display: none; position: absolute; inset: 0; width: 100%; height: 100%; background-color: #ffffff; opacity: 0; pointer-events: none; z-index: 50;"></div>
                                 </div>
 
                                 <!-- Guias magnéticas de encaixe de borda e centro -->
@@ -1203,6 +1222,7 @@
                                 <button id="btn-import-timeline" class="btn-header-flat" data-tooltip="Importar Timeline (.otio .xml .edl)"><i class="fa-solid fa-file-import"></i></button>
                                 <button id="btn-export-timeline" class="btn-header-flat" data-tooltip="Exportar Timeline (.otio .xml .edl)"><i class="fa-solid fa-file-export"></i></button>
                                 <button id="btn-export-video" class="btn-header-flat" data-tooltip="Exportar Vídeo (MP4 render)"><i class="fa-solid fa-film"></i></button>
+                                <button id="btn-render-cache-timeline" class="btn-header-flat" data-tooltip="Renderizar Efeitos In para Out (Enter)"><i class="fa-solid fa-bolt"></i></button>
                             </div>
                             <div class="header-v-divider"></div>
                             <!-- Grupo Undo / Redo -->
@@ -2385,6 +2405,74 @@
                 <button id="btn-cancel-subclip" class="btn-secondary" style="height: 30px; font-size: var(--fs-11); padding: 0 var(--sp-14); background: rgba(255,255,255,0.06); border: 1px solid var(--border-glass); color: #cbd5e1; border-radius: 4px; cursor: pointer;">Cancelar</button>
                 <button id="btn-confirm-subclip" class="btn-primary" style="height: 30px; font-size: var(--fs-11); padding: 0 var(--sp-16); --primary-bg: linear-gradient(135deg, rgba(139,92,246,0.8), color-mix(in srgb, var(--t-accent, rgb(6, 182, 212)) 80%, transparent)); border: none; --primary-ink: #fff; font-weight: 600; border-radius: 4px; cursor: pointer; display: inline-flex; align-items: center; gap: var(--sp-6);">
                     <i class="fa-solid fa-scissors"></i> Criar Subclipe
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Novo Gerador de Cor Sólida (Color Matte - Task 18) -->
+    <div id="modal-new-color-matte" class="modal-backdrop glassmorphism" style="display: none; position: fixed; inset: 0; z-index: 9995; background: rgba(0, 0, 0, 0.65); backdrop-filter: blur(8px); align-items: center; justify-content: center;">
+        <div class="modal-card" style="width: 440px; background: var(--t-surface-2, #121218); border: 1px solid var(--t-line-strong, rgba(255, 255, 255, 0.12)); border-radius: 8px; box-shadow: 0 16px 45px rgba(0,0,0,0.8); padding: var(--sp-20); display: flex; flex-direction: column; gap: var(--sp-16);">
+            <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-glass); padding-bottom: var(--sp-12);">
+                <div style="display: flex; align-items: center; gap: var(--sp-8);">
+                    <i class="fa-solid fa-palette" style="color: var(--accent); font-size: var(--fs-14);"></i>
+                    <h3 style="margin: 0; font-size: var(--fs-14); font-weight: 600; color: #f1f5f9;">Novo Gerador de Cor Sólida</h3>
+                </div>
+                <button id="btn-close-color-matte-modal" class="btn-icon" style="background: transparent; border: none; color: var(--text-secondary); font-size: var(--fs-16); cursor: pointer;">&times;</button>
+            </div>
+            <div class="modal-body" style="display: flex; flex-direction: column; gap: var(--sp-14);">
+                <!-- Presets Rápidos -->
+                <div>
+                    <label style="display: block; font-size: var(--fs-11); color: var(--text-secondary); margin-bottom: var(--sp-6);">Presets Oficiais:</label>
+                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--sp-8);">
+                        <button type="button" class="matte-preset-btn" data-color="#000000" data-label="Preto" style="display: flex; align-items: center; gap: var(--sp-6); padding: var(--sp-6) var(--sp-8); background: var(--t-surface-1, #0c0c10); border: 1px solid var(--border-glass); border-radius: 4px; color: #fff; cursor: pointer; font-size: var(--fs-10);">
+                            <span style="display: inline-block; width: 14px; height: 14px; background: #000000; border: 1px solid #444; border-radius: 2px;"></span>
+                            Preto
+                        </button>
+                        <button type="button" class="matte-preset-btn" data-color="#ffffff" data-label="Branco" style="display: flex; align-items: center; gap: var(--sp-6); padding: var(--sp-6) var(--sp-8); background: var(--t-surface-1, #0c0c10); border: 1px solid var(--border-glass); border-radius: 4px; color: #fff; cursor: pointer; font-size: var(--fs-10);">
+                            <span style="display: inline-block; width: 14px; height: 14px; background: #ffffff; border: 1px solid #ccc; border-radius: 2px;"></span>
+                            Branco
+                        </button>
+                        <button type="button" class="matte-preset-btn" data-color="#00ff00" data-label="Verde Chroma" style="display: flex; align-items: center; gap: var(--sp-6); padding: var(--sp-6) var(--sp-8); background: var(--t-surface-1, #0c0c10); border: 1px solid var(--border-glass); border-radius: 4px; color: #fff; cursor: pointer; font-size: var(--fs-10);">
+                            <span style="display: inline-block; width: 14px; height: 14px; background: #00ff00; border-radius: 2px;"></span>
+                            Verde
+                        </button>
+                        <button type="button" class="matte-preset-btn" data-color="#0047bb" data-label="Azul Chroma" style="display: flex; align-items: center; gap: var(--sp-6); padding: var(--sp-6) var(--sp-8); background: var(--t-surface-1, #0c0c10); border: 1px solid var(--border-glass); border-radius: 4px; color: #fff; cursor: pointer; font-size: var(--fs-10);">
+                            <span style="display: inline-block; width: 14px; height: 14px; background: #0047bb; border-radius: 2px;"></span>
+                            Azul
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Seletor de Cor Customizado -->
+                <div style="display: flex; gap: var(--sp-12); align-items: center;">
+                    <div style="flex: 1;">
+                        <label for="color-matte-hex" style="display: block; font-size: var(--fs-11); color: var(--text-secondary); margin-bottom: var(--sp-4);">Código Hex:</label>
+                        <div style="display: flex; gap: var(--sp-6); align-items: center;">
+                            <input type="color" id="color-matte-picker" value="#000000" style="width: 32px; height: 30px; border: 1px solid var(--border-glass); border-radius: 4px; padding: 0; background: transparent; cursor: pointer;">
+                            <input type="text" id="color-matte-hex" value="#000000" placeholder="#000000" style="flex: 1; height: 30px; background: var(--t-surface-1, #0c0c10); border: 1px solid var(--border-glass); border-radius: 4px; color: #fff; padding: 0 var(--sp-8); font-size: var(--fs-12); font-family: monospace;">
+                        </div>
+                    </div>
+                    <div style="width: 72px;">
+                        <label style="display: block; font-size: var(--fs-11); color: var(--text-secondary); margin-bottom: var(--sp-4);">Amostra:</label>
+                        <div id="color-matte-preview" style="width: 100%; height: 30px; background: #000000; border: 1px solid var(--border-glass); border-radius: 4px;"></div>
+                    </div>
+                </div>
+
+                <!-- Nome e Duração -->
+                <div>
+                    <label for="color-matte-name" style="display: block; font-size: var(--fs-11); color: var(--text-secondary); margin-bottom: var(--sp-4);">Nome do Clipe:</label>
+                    <input type="text" id="color-matte-name" value="Preto" placeholder="Nome da Cor" style="width: 100%; height: 30px; background: var(--t-surface-1, #0c0c10); border: 1px solid var(--border-glass); border-radius: 4px; color: #fff; padding: 0 var(--sp-8); font-size: var(--fs-11); box-sizing: border-box;">
+                </div>
+                <div>
+                    <label for="color-matte-duration" style="display: block; font-size: var(--fs-11); color: var(--text-secondary); margin-bottom: var(--sp-4);">Duração Padrão (segundos):</label>
+                    <input type="number" id="color-matte-duration" value="5.0" step="0.5" min="0.1" style="width: 100%; height: 30px; background: var(--t-surface-1, #0c0c10); border: 1px solid var(--border-glass); border-radius: 4px; color: #fff; padding: 0 var(--sp-8); font-size: var(--fs-11); box-sizing: border-box;">
+                </div>
+            </div>
+            <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: var(--sp-10); border-top: 1px solid var(--border-glass); padding-top: var(--sp-12);">
+                <button type="button" id="btn-cancel-color-matte" class="btn-secondary" style="height: 30px; font-size: var(--fs-11); padding: 0 var(--sp-14); background: rgba(255,255,255,0.06); border: 1px solid var(--border-glass); color: #cbd5e1; border-radius: 4px; cursor: pointer;">Cancelar</button>
+                <button type="button" id="btn-confirm-color-matte" class="btn-primary" style="height: 30px; font-size: var(--fs-11); padding: 0 var(--sp-16); background: var(--accent); border: none; color: #000; font-weight: 600; border-radius: 4px; cursor: pointer; display: inline-flex; align-items: center; gap: var(--sp-6);">
+                    <i class="fa-solid fa-check"></i> Criar Cor Sólida
                 </button>
             </div>
         </div>

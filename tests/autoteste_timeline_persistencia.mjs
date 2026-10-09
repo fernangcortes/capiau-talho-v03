@@ -87,6 +87,30 @@ assert.ok(exportVideo.includes("cortesParaSalvar(STATE.activeTimelineCuts, fps)"
 for (const [nome, fonte] of [["panels.js", panels], ["exportVideo.js", exportVideo]]) {
     assert.ok(!/in_time:\s*c\.in/.test(fonte), `${nome} ainda monta o clipe salvo à mão`);
 }
-ok("Salvar, Salvar-e-exportar e Carregar passam pela mesma ponte");
+// 8. Color Matte preserva kind, color e color_name
+const matte = { id: "m1", type: "color_matte", kind: "color_matte", color: "#FF00AA", color_name: "Rosa",
+                in: 0, out: 5, timelineStartFrame: 90, track: "V1", effects: [] };
+const sm = corteParaSalvar(matte, FPS);
+assert.equal(sm.kind, "color_matte");
+assert.equal(sm.color, "#FF00AA");
+assert.equal(sm.color_name, "Rosa");
+const vm = corteDoBanco({ ...sm, in: sm.in_time, out: sm.out_time }, 0, FPS);
+assert.equal(vm.kind, "color_matte");
+assert.equal(vm.color, "#FF00AA");
+assert.equal(vm.timelineStartFrame, 90);
+ok("color_matte preserva kind, color e color_name na ida e volta");
+
+// 9. Adjustment Layer preserva kind e efeitos na ida e volta
+const adj = { id: "adj1", type: "adjustment", kind: "adjustment",
+              in: 0, out: 10, timelineStartFrame: 0, track: "V2",
+              effects: [{ type: "color", saturation: 0 }] };
+const sa = corteParaSalvar(adj, FPS);
+assert.equal(sa.kind, "adjustment");
+assert.equal(sa.effects.length, 1);
+const va = corteDoBanco({ ...sa, in: sa.in_time, out: sa.out_time }, 0, FPS);
+assert.equal(va.kind, "adjustment");
+assert.equal(va.effects[0].type, "color");
+ok("adjustment layer preserva kind e efeitos na ida e volta");
 
 console.log(`\n=== ${n}/${n} TESTES APROVADOS ===`);
+

@@ -6,7 +6,7 @@ import { parseQuery, evaluateAST, getAvailableSuggestions } from "./searchParser
 import { KEYMAP_SERVICE } from "./keymapService.js";
 
 // Armazena o estado das pastas expandidas/recolhidas (persistido por projeto)
-const openFoldersSet = new Set();
+export const openFoldersSet = new Set();
 let _openFoldersLoadedFor = null;
 let _saveOpenFoldersTimer = null;
 
@@ -59,6 +59,79 @@ if (!window.tooltipDisplayPreferences) {
 
 export function getActiveProjectId() {
     return window.STATE?.currentProjectId || window.STATE?.currentProject?.id || Number(localStorage.getItem("activeProjectId")) || 2;
+}
+
+// ── GERADOR DE COR SÓLIDA (COLOR MATTE - TASK 18) ───────────────────
+export const COLOR_MATTE_PRESETS = [
+    { id: "black", label: "Preto", color: "#000000" },
+    { id: "white", label: "Branco", color: "#ffffff" },
+    { id: "green_chroma", label: "Verde Chroma", color: "#00ff00" },
+    { id: "blue_chroma", label: "Azul Chroma", color: "#0047bb" }
+];
+
+export function createColorMatteGenerator(options = {}) {
+    const color = (options.color || "#000000").toLowerCase();
+    const preset = COLOR_MATTE_PRESETS.find(p => p.color.toLowerCase() === color);
+    const colorName = options.color_name || (preset ? preset.label : "Cor Personalizada");
+    const name = options.name || (preset ? preset.label : `Cor Sólida (${color})`);
+    const duration = typeof options.duration === "number" && options.duration > 0 ? options.duration : 5.0;
+    const fps = options.fps || 24;
+    const virtualFolder = options.virtual_folder || options.virtualFolder || "root/Geradores";
+    const blendMode = String(options.blend_mode || options.blendMode || "normal").trim().toLowerCase();
+
+    return {
+        id: options.id || ("matte_" + Date.now() + "_" + Math.random().toString(36).substr(2, 6)),
+        tipo: "cor",
+        kind: "color_matte",
+        type: "color_matte",
+        color: color,
+        color_name: colorName,
+        name: name,
+        duration: duration,
+        duration_seconds: duration,
+        duration_frames: Math.round(duration * fps),
+        is_matte: true,
+        virtual_folder: virtualFolder,
+        blend_mode: blendMode,
+        blendMode: blendMode,
+        created_at: new Date().toISOString()
+    };
+}
+
+export function saveColorMattes(projectId, mattes) {
+    if (!projectId) return;
+    const key = `capiau_color_mattes_v1_${projectId}`;
+    globalThis.localStorage.setItem(key, JSON.stringify(mattes));
+}
+
+export function loadColorMattes(projectId) {
+    if (!projectId) return [];
+    const key = `capiau_color_mattes_v1_${projectId}`;
+    const raw = globalThis.localStorage.getItem(key);
+    if (!raw) return [];
+    try {
+        return JSON.parse(raw);
+    } catch {
+        return [];
+    }
+}
+
+export function deleteColorMatte(projectId, matteId) {
+    if (!projectId || !matteId) return;
+    const mattes = loadColorMattes(projectId);
+    const filtered = mattes.filter(m => m.id !== matteId);
+    saveColorMattes(projectId, filtered);
+    if (window.libraryInstance) {
+        window.libraryInstance.scheduleRenderMedia({ preserveScroll: true });
+    }
+}
+
+if (typeof window !== "undefined") {
+    window.COLOR_MATTE_PRESETS = COLOR_MATTE_PRESETS;
+    window.createColorMatteGenerator = createColorMatteGenerator;
+    window.saveColorMattes = saveColorMattes;
+    window.loadColorMattes = loadColorMattes;
+    window.deleteColorMatte = deleteColorMatte;
 }
 
 // ── ESTADO DOS BINS VIRTUAIS & CUSTOMIZAÇÃO DE PASTAS ───────────────
@@ -308,10 +381,17 @@ export function createSubclip(subclipData, projectId = null) {
         summary: subclipData.summary || videoObj.summary || null,
         description: subclipData.description || videoObj.description || null,
         tags: subclipData.tags || videoObj.tags || null,
-        virtual_folder: subclipData.virtual_folder || videoObj.virtual_folder || null
+        virtual_folder: (subclipData.virtual_folder && subclipData.virtual_folder !== "root")
+            ? subclipData.virtual_folder
+            : ((window.selectedLibraryFolder && window.selectedLibraryFolder.path && window.selectedLibraryFolder.path !== "root")
+                ? window.selectedLibraryFolder.path
+                : (videoObj.virtual_folder && videoObj.virtual_folder !== "root" ? videoObj.virtual_folder : "root/Subclipes"))
     };
 
     delete subclip.video;
+
+    virtualFolderMap[`subclip:${subclipId}`] = subclip.virtual_folder;
+    saveVirtualFoldersState(projectId);
 
     existing.push(subclip);
     saveVirtualSubclipsState(projectId);
@@ -488,6 +568,9 @@ export function classifyMediaSmartBin(item) {
 
 export function getMediaSmartBin(item) {
     if (!item) return "other";
+    if (item.kind === "color_matte" || item.is_matte || item.type === "color_matte") {
+        return "generators";
+    }
     const key = mediaFolderKey(item);
     if (manualSmartBinsMap[key]) {
         return manualSmartBinsMap[key];
@@ -570,6 +653,49 @@ export function getMediaKeyword(item) {
     const raw = item.title || item.label || item.filename || "";
     return extractTitleKeyword(raw);
 }
+export function getMediaShotScale(item) {
+    if (!item) return "outros";
+    if (item.shot_scale) {
+        const s = String(item.shot_scale).toLowerCase().trim();
+        if (s) return s;
+    }
+    if (item.crucial_moments && Array.isArray(item.crucial_moments)) {
+        for (const cm of item.crucial_moments) {
+            if (cm && cm.shot_scale) return String(cm.shot_scale).toLowerCase().trim();
+        }
+    }
+    const tags = Array.isArray(item.tags) ? item.tags : (typeof item.tags === "string" ? [item.tags] : []);
+    const tagStr = tags.join(" ").toLowerCase();
+    if (tagStr.includes("close") || tagStr.includes("rosto") || tagStr.includes("face")) return "close";
+    if (tagStr.includes("plano geral") || tagStr.includes("wide") || tagStr.includes("paisagem") || tagStr.includes("ambiente")) return "plano_geral";
+    if (tagStr.includes("detalhe") || tagStr.includes("macro") || tagStr.includes("objeto")) return "detalhe";
+    if (tagStr.includes("plano medio") || tagStr.includes("médio") || tagStr.includes("cintura")) return "plano_medio";
+    if (tagStr.includes("aereo") || tagStr.includes("aéreo") || tagStr.includes("drone") || tagStr.includes("plonge") || tagStr.includes("plongée")) return "aereo";
+    return "outros";
+}
+
+export function getMediaSpeaker(item) {
+    if (!item) return "Outros / Sem Pessoa";
+    if (item.speaker && typeof item.speaker === "string" && item.speaker.trim()) {
+        return item.speaker.trim();
+    }
+    if (item.speakers) {
+        const spks = Array.isArray(item.speakers) ? item.speakers : [item.speakers];
+        const valid = spks.filter(s => s && typeof s === "string" && s.trim());
+        if (valid.length > 0) return valid[0].trim();
+    }
+    if (item.pessoas) {
+        try {
+            const p = typeof item.pessoas === "string" ? JSON.parse(item.pessoas) : item.pessoas;
+            if (Array.isArray(p) && p.length > 0 && p[0]) return String(p[0]).trim();
+        } catch (_) {}
+    }
+    if (item.video_type === "interview") return "Entrevistado (Fala)";
+    return "Outros / Sem Pessoa";
+}
+
+window.getMediaShotScale = getMediaShotScale;
+window.getMediaSpeaker = getMediaSpeaker;
 window.extractTitleKeyword = extractTitleKeyword;
 window.getMediaKeyword = getMediaKeyword;
 window.classifyMediaSmartBin = classifyMediaSmartBin;
@@ -3040,10 +3166,40 @@ export async function handleDropToFolder(e, targetFolderPath) {
         try {
             const parsed = JSON.parse(dataCapiau);
             if (parsed && parsed.id) {
-                const kind = parsed.type === "photo" ? "photo" : "video";
+                const isMatte = parsed.kind === "color_matte" || parsed.is_matte || parsed.type === "color_matte";
+                const isSub = parsed.is_subclip || parsed.kind === "subclip";
+                const kind = isMatte ? "color_matte" : (isSub ? "subclip" : (parsed.type === "photo" ? "photo" : "video"));
                 virtualDeletedFolders.delete(targetFolderPath);
                 virtualFolderMap[`${kind}:${parsed.id}`] = targetFolderPath;
                 saveVirtualFoldersState(projectId);
+
+                if (isMatte) {
+                    const mattes = loadColorMattes(projectId);
+                    const targetMatte = mattes.find(m => String(m.id) === String(parsed.id));
+                    if (targetMatte) {
+                        targetMatte.virtual_folder = targetFolderPath;
+                        saveColorMattes(projectId, mattes);
+                    }
+                    if (window.libraryInstance) await window.libraryInstance.reloadData();
+                    if (typeof window.showToast === "function") {
+                        window.showToast("Cor sólida movida para a pasta.", "success");
+                    }
+                    return;
+                }
+
+                if (isSub) {
+                    const subclips = getProjectSubclips(projectId);
+                    const targetSubclip = subclips.find(s => String(s.id) === String(parsed.id));
+                    if (targetSubclip) {
+                        targetSubclip.virtual_folder = targetFolderPath;
+                        saveVirtualSubclipsState(projectId);
+                    }
+                    if (window.libraryInstance) await window.libraryInstance.reloadData();
+                    if (typeof window.showToast === "function") {
+                        window.showToast("Subclipe movido para a pasta.", "success");
+                    }
+                    return;
+                }
 
                 // Persiste no banco: antes o move so existia no localStorage e
                 // era perdido em outra maquina ou apos limpar o navegador.
@@ -3169,6 +3325,149 @@ export async function handleDropToFolder(e, targetFolderPath) {
     }
 }
 
+export function initColorMatteModal() {
+    const btnNewMatte = document.getElementById("btn-new-color-matte");
+    const modal = document.getElementById("modal-new-color-matte");
+    if (!modal) return;
+
+    const btnClose = document.getElementById("btn-close-color-matte-modal");
+    const btnCancel = document.getElementById("btn-cancel-color-matte");
+    const btnConfirm = document.getElementById("btn-confirm-color-matte");
+    const colorPicker = document.getElementById("color-matte-picker");
+    const colorHex = document.getElementById("color-matte-hex");
+    const colorNameInput = document.getElementById("color-matte-name");
+    const durationInput = document.getElementById("color-matte-duration");
+    const previewSwatch = document.getElementById("color-matte-preview");
+    const presetBtns = modal.querySelectorAll(".matte-preset-btn");
+
+    function updateColor(hex, label = null) {
+        let cleanHex = String(hex || "#000000").trim();
+        if (!cleanHex.startsWith("#")) cleanHex = "#" + cleanHex;
+        if (/^#[0-9a-fA-F]{6}$/i.test(cleanHex)) {
+            if (colorPicker) colorPicker.value = cleanHex;
+            if (colorHex) colorHex.value = cleanHex;
+            if (previewSwatch) previewSwatch.style.backgroundColor = cleanHex;
+            if (label && colorNameInput) {
+                colorNameInput.value = label;
+            } else if (colorNameInput && (!colorNameInput.value || colorNameInput.value === "Preto" || colorNameInput.value === "Branco" || colorNameInput.value === "Verde Chroma" || colorNameInput.value === "Azul Chroma")) {
+                const preset = COLOR_MATTE_PRESETS.find(p => p.color.toLowerCase() === cleanHex.toLowerCase());
+                colorNameInput.value = preset ? preset.label : `Cor (${cleanHex})`;
+            }
+        }
+    }
+
+    presetBtns.forEach(btn => {
+        btn.addEventListener("click", () => {
+            const c = btn.getAttribute("data-color");
+            const l = btn.getAttribute("data-label");
+            if (c) updateColor(c, l);
+        });
+    });
+
+    if (colorPicker) {
+        colorPicker.addEventListener("input", (e) => {
+            updateColor(e.target.value);
+        });
+    }
+
+    if (colorHex) {
+        colorHex.addEventListener("input", (e) => {
+            const val = e.target.value.trim();
+            if (/^#[0-9a-fA-F]{6}$/i.test(val)) {
+                updateColor(val);
+            }
+        });
+    }
+
+    function openModal() {
+        modal.style.display = "flex";
+        updateColor("#000000", "Preto");
+        if (durationInput) durationInput.value = "5.0";
+    }
+
+    function closeModal() {
+        modal.style.display = "none";
+    }
+
+    if (btnNewMatte && !btnNewMatte._hasColorMatteListener) {
+        btnNewMatte._hasColorMatteListener = true;
+        btnNewMatte.addEventListener("click", openModal);
+    }
+    if (btnClose && !btnClose._hasColorMatteListener) {
+        btnClose._hasColorMatteListener = true;
+        btnClose.addEventListener("click", closeModal);
+    }
+    if (btnCancel && !btnCancel._hasColorMatteListener) {
+        btnCancel._hasColorMatteListener = true;
+        btnCancel.addEventListener("click", closeModal);
+    }
+
+    if (!modal._hasBackdropListener) {
+        modal._hasBackdropListener = true;
+        modal.addEventListener("click", (e) => {
+            if (e.target === modal) closeModal();
+        });
+    }
+
+    if (btnConfirm && !btnConfirm._hasColorMatteListener) {
+        btnConfirm._hasColorMatteListener = true;
+        btnConfirm.addEventListener("click", () => {
+            const color = (colorPicker ? colorPicker.value : (colorHex ? colorHex.value : "#000000")).toLowerCase();
+            const name = (colorNameInput && colorNameInput.value.trim()) || "Cor Sólida";
+            const dur = Math.max(0.1, Number(durationInput ? durationInput.value : 5.0) || 5.0);
+            const projectId = getActiveProjectId();
+
+            let targetFolder = "root/Geradores";
+            const sel = window.selectedLibraryFolder;
+            if (sel && sel.path && sel.path !== "root" && !sel.isSmartBin && !sel.isSmartRoot && !sel.path.startsWith("smart_bins_root")) {
+                targetFolder = sel.path;
+            }
+
+            const matte = createColorMatteGenerator({
+                color,
+                color_name: name,
+                name,
+                duration: dur,
+                virtual_folder: targetFolder
+            });
+
+            virtualFolderMap[`color_matte:${matte.id}`] = targetFolder;
+            openFoldersSet.add(targetFolder);
+            saveVirtualFoldersState(projectId);
+            saveOpenFoldersState(projectId);
+
+            const current = loadColorMattes(projectId);
+            current.push(matte);
+            saveColorMattes(projectId, current);
+
+            closeModal();
+            if (window.libraryInstance) {
+                window.libraryInstance.scheduleRenderMedia({ preserveScroll: true });
+            }
+            if (typeof window.showToast === "function") {
+                window.showToast(`Cor sólida "${name}" criada com sucesso!`, "success");
+            }
+        });
+    }
+
+    // Botão de criar Camada de Ajuste na Timeline
+    const btnNewAdj = document.getElementById("btn-new-adjustment-layer");
+    if (btnNewAdj && !btnNewAdj._hasAdjListener) {
+        btnNewAdj._hasAdjListener = true;
+        btnNewAdj.addEventListener("click", () => {
+            if (window.TIMELINE_STATE) {
+                const cut = window.TIMELINE_STATE.addAdjustmentCut({
+                    name: "Camada de Ajuste",
+                    durationSec: 5.0
+                });
+                if (typeof window.showToast === "function") {
+                    window.showToast("Camada de Ajuste adicionada na pista " + cut.track + "!", "success");
+                }
+            }
+        });
+    }
+}
+
 export function initLibraryDragAndDrop(libInstance) {
     const libraryContainer = document.getElementById("sidebar-left");
     if (!libraryContainer) return;
@@ -3290,6 +3589,8 @@ function isVideoItem(item) {
  * caiam no mesmo bin. Novas gravacoes usam chave "tipo:id".
  */
 function mediaFolderKey(item) {
+    if (item.kind === "color_matte" || item.is_matte || item.type === "color_matte") return `color_matte:${item.id}`;
+    if (item.is_subclip || item.kind === "subclip") return `subclip:${item.id}`;
     return `${isVideoItem(item) ? "video" : "photo"}:${item.id}`;
 }
 
@@ -3298,7 +3599,21 @@ function mediaFolderKey(item) {
  * localStorage sobrevive apenas como legado dos bins criados antes da coluna
  * virtual_folder existir (e so vale para video, que era a unica aba com drag).
  */
-function getItemVirtualFolder(item) {
+export function getItemVirtualFolder(item) {
+    if (item.kind === "color_matte" || item.is_matte || item.type === "color_matte") {
+        if (item.virtual_folder && item.virtual_folder !== "root" && !item.virtual_folder.startsWith("smart_bins_root")) {
+            return item.virtual_folder;
+        }
+        const mapped = virtualFolderMap[`color_matte:${item.id}`] || virtualFolderMap[item.id];
+        if (mapped && mapped !== "root" && !mapped.startsWith("smart_bins_root")) return mapped;
+        return "root/Geradores";
+    }
+    if (item.is_subclip || item.kind === "subclip") {
+        if (item.virtual_folder && item.virtual_folder !== "root") return item.virtual_folder;
+        const mapped = virtualFolderMap[`subclip:${item.id}`] || virtualFolderMap[item.id];
+        if (mapped && mapped !== "root") return mapped;
+        return item.virtual_folder || "root/Subclipes";
+    }
     const stored = item.virtual_folder;
     if (stored && stored !== "root") return stored;
     const typed = virtualFolderMap[mediaFolderKey(item)];
@@ -3308,15 +3623,19 @@ function getItemVirtualFolder(item) {
 }
 
 function makeMediaFileNode(item) {
-    const name = item.filename
+    const name = item.name || item.filename
         || (item.filepath ? item.filepath.split(/[\\/]+/).filter(Boolean).pop() : `Item #${item.id}`);
     const node = { name, type: "file" };
-    if (isVideoItem(item)) node.video = item;
+    if (item.kind === "color_matte" || item.is_matte || item.type === "color_matte") node.color_matte = item;
+    else if (item.is_subclip || item.kind === "subclip") node.subclip = item;
+    else if (isVideoItem(item)) node.video = item;
     else node.photo = item;
     return node;
 }
 
 function mediaFileKey(item, name) {
+    if (item.kind === "color_matte" || item.is_matte || item.type === "color_matte") return `color_matte_${item.id}_${name}`;
+    if (item.is_subclip || item.kind === "subclip") return `subclip_${item.id}_${name}`;
     return `${isVideoItem(item) ? "video" : "photo"}_${item.id}_${name}`;
 }
 
@@ -3333,6 +3652,25 @@ function buildTree(items) {
         isRoot: true,
         isOpen: true
     };
+
+    // Pastas de sistema padronizadas (Geradores, Subclipes, Títulos)
+    const systemFolders = [
+        { name: "Geradores", path: "root/Geradores" },
+        { name: "Subclipes", path: "root/Subclipes" },
+        { name: "Títulos", path: "root/Títulos" },
+    ];
+    systemFolders.forEach(sf => {
+        if (!isPathDeleted(sf.path) && !root.children[sf.name]) {
+            root.children[sf.name] = {
+                name: sf.name,
+                type: "folder",
+                path: sf.path,
+                children: {},
+                isSystem: true,
+                isOpen: openFoldersSet.has(sf.path)
+            };
+        }
+    });
 
     // 1. Inserir todos os Bins Virtuais cadastrados no projeto (mesmo vazios)
     if (Array.isArray(window.projectBinsList)) {
@@ -3494,6 +3832,7 @@ function buildTree(items) {
         const vids = [];
         const photos = [];
         items.forEach(item => {
+            if (item.kind === "color_matte" || item.is_matte || item.type === "color_matte") return;
             const stamp = item.recorded_at || item.created_at || "";
             const dateKey = stamp ? (stamp.split(" ")[0] || "Sem Data") : "Sem Data";
             (itemsByDate[dateKey] || (itemsByDate[dateKey] = [])).push(item);
@@ -4180,7 +4519,11 @@ function renderTreeNode(node, container, depth = 0) {
         // Thumbnail (Real ou Ícone)
         const showRealThumb = !document.body.classList.contains("hide-thumbnails") && document.getElementById("chk-show-thumbnails")?.checked !== false;
         let thumbContent = `<i class="fa-solid ${v.is_subclip ? 'fa-scissors' : (v.video_type === 'interview' ? 'fa-microphone-lines' : 'fa-film')}"></i>`;
-        if (showRealThumb && v.status !== "pending" && v.status !== "error") {
+        if (v.kind === "color_matte") {
+            thumbContent = `<div style="width:100%; height:100%; background-color:${v.color}; border-radius:3px;"></div>`;
+            actionBtn = `<button class="btn-card-action btn-hover-only" style="background:transparent; border:none; color:var(--text-muted); cursor:pointer; padding: var(--sp-2);" onclick="event.stopPropagation(); window.deleteColorMatte(window.getActiveProjectId(), '${v.id}')" data-tooltip="Excluir Cor Sólida"><i class="fa-solid fa-trash-can" style="font-size: var(--fs-10);"></i></button>`;
+            statusBadge = `<span class="badge" style="color: #fff; background: rgba(0,0,0,0.5); border-color: var(--border-glass);">${v.color_name || 'COR'}</span>`;
+        } else if (showRealThumb && v.status !== "pending" && v.status !== "error") {
             const thumbVidId = v.parent_video_id || v.id;
             const vVersion = v._thumbVersion || v.thumb_version || v.updated_at || "";
             const qs = vVersion ? `?v=${vVersion}` : "";
@@ -4367,6 +4710,26 @@ function renderTreeNode(node, container, depth = 0) {
                 clearTimeout(_librarySingleClickTimer);
                 _librarySingleClickTimer = null;
             }
+            if (v.kind === "color_matte") {
+                const payload = {
+                    type: "color_matte",
+                    kind: "color_matte",
+                    tipo: "cor",
+                    id: v.id,
+                    color: v.color,
+                    color_name: v.color_name,
+                    name: v.name,
+                    duration: v.duration || 5.0,
+                    duration_seconds: v.duration || 5.0,
+                    duration_frames: v.duration_frames || 120,
+                    blend_mode: v.blend_mode || v.blendMode || "normal",
+                    virtual_folder: v.virtual_folder || "root/Geradores"
+                };
+                STATE.activeDragMedia = payload;
+                e.dataTransfer.setData("application/x-capiau-media", JSON.stringify(payload));
+                e.dataTransfer.effectAllowed = "copy";
+                return;
+            }
             let inTime = 0.0;
             let outTime = (v.duration && v.duration > 0) ? v.duration : 5.0;
             if (v.is_subclip) {
@@ -4455,6 +4818,20 @@ function renderTreeNode(node, container, depth = 0) {
             if (_librarySingleClickTimer) {
                 clearTimeout(_librarySingleClickTimer);
                 _librarySingleClickTimer = null;
+            }
+
+            if (v.kind === "color_matte") {
+                if (window.TIMELINE_STATE && typeof window.TIMELINE_STATE.addColorMatteCut === "function") {
+                    const dur = (v.duration && v.duration > 0) ? v.duration : 5.0;
+                    window.TIMELINE_STATE.addColorMatteCut({
+                        color: v.color || "#000000",
+                        color_name: v.color_name || v.name || "Cor Sólida",
+                        name: v.name || "Cor Sólida",
+                        durationSec: dur,
+                        track: "V1"
+                    });
+                }
+                return;
             }
 
             let mode = "end";
@@ -6364,6 +6741,7 @@ export class LibraryManager {
             btnAddMedia.addEventListener("click", (e) => handleHeaderImportClick(btnAddMedia));
         }
 
+        initColorMatteModal();
         initLibraryDragAndDrop(this);
 
         // Atalho de teclado global para Desfazer (Ctrl+Z) e Excluir (Delete) ações de biblioteca
@@ -8723,7 +9101,8 @@ export class LibraryManager {
 
         const rawVids = (STATE.allVideos || []).filter(v => !v.is_subclip);
         const subclips = getProjectSubclips();
-        const allVids = rawVids.concat(subclips);
+        const projectMattes = loadColorMattes(STATE.currentProjectId || getActiveProjectId());
+        const allVids = rawVids.concat(subclips).concat(projectMattes);
         const allPhotos = STATE.allPhotos || [];
 
         // Atualiza contadores dos chips de tipo e tooltips com nome e contagem de mídias
@@ -8758,7 +9137,7 @@ export class LibraryManager {
 
         // Marca a origem de cada item uma unica vez: video e foto compartilham
         // a mesma arvore agora, e adivinhar o tipo por `duration` dava falso negativo.
-        for (const v of allVids) v._mediaKind = "video";
+        for (const v of allVids) v._mediaKind = (v.kind === "color_matte") ? "color_matte" : "video";
         for (const ph of allPhotos) ph._mediaKind = "photo";
 
         // Filtro por chip de tipo
@@ -8963,15 +9342,23 @@ export class LibraryManager {
             SMART_BINS_TAXONOMY.forEach(bin => {
                 binMap.set(bin.id, { key: bin.id, label: bin.label, items: [] });
             });
+            const generatorItems = [];
             for (const item of sortedItems) {
+                if (item.kind === "color_matte" || item.is_matte || item.type === "color_matte") {
+                    generatorItems.push(item);
+                    continue;
+                }
                 const bId = getMediaSmartBin(item);
                 if (!binMap.has(bId)) {
                     binMap.set(bId, { key: bId, label: `📁 ${bId}`, items: [] });
                 }
                 binMap.get(bId).items.push(item);
             }
-            // Exibe os 9 núcleos que contêm itens na ordem natural da taxonomia
+            // Exibe os núcleos que contêm itens na ordem natural da taxonomia
             groups = Array.from(binMap.values()).filter(g => g.items.length > 0);
+            if (generatorItems.length > 0) {
+                groups.push({ key: "generators", label: "📁 Geradores", items: generatorItems });
+            }
         } else if (groupingMode === "keyword") {
             const kwMap = new Map();
             for (const item of sortedItems) {
@@ -9307,14 +9694,36 @@ export class LibraryManager {
                     `;
                 }
 
-                itemEl.innerHTML = `
-                    <img class="gallery-thumb-img" src="${defaultThumbSrc}" loading="lazy" decoding="async" alt="Thumb" onerror="this.onerror=null; if(this.src.includes('thumbnail-at')){ this.src='/api/video/${thumbVidId}/thumbnail${qs}'; } else { this.style.opacity='0.4'; }">
-                    ${subclipBadgeHtml}
-                    ${keywordPillHtml}
-                    ${badgeHtml}
-                    ${crucialBadgeHtml}
-                    ${scrubHtml}
-                `;
+                if (item.kind === "color_matte") {
+                    itemEl.classList.add("library-card-matte");
+                    itemEl.style.setProperty("--aspect", "1.778");
+                    itemEl.innerHTML = `
+                        <div class="gallery-thumb-img" style="background-color: ${item.color}; display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; border-radius: 4px;">
+                            <span class="matte-swatch-badge">${escapeHtml(item.color_name || 'Cor')}</span>
+                            <span style="font-size: var(--fs-10); font-weight: 600; color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,0.8);">${escapeHtml(item.name || item.color_name)}</span>
+                        </div>
+                        <button class="btn-delete-matte" data-matte-id="${item.id}" title="Excluir Cor Sólida">
+                            <i class="fa-solid fa-trash"></i>
+                        </button>
+                    `;
+                    const delBtn = itemEl.querySelector(".btn-delete-matte");
+                    if (delBtn) {
+                        delBtn.addEventListener("click", (e) => {
+                            e.stopPropagation();
+                            e.preventDefault();
+                            deleteColorMatte(STATE.currentProjectId || getActiveProjectId(), item.id);
+                        });
+                    }
+                } else {
+                    itemEl.innerHTML = `
+                        <img class="gallery-thumb-img" src="${defaultThumbSrc}" loading="lazy" decoding="async" alt="Thumb" onerror="this.onerror=null; if(this.src.includes('thumbnail-at')){ this.src='/api/video/${thumbVidId}/thumbnail${qs}'; } else { this.style.opacity='0.4'; }">
+                        ${subclipBadgeHtml}
+                        ${keywordPillHtml}
+                        ${badgeHtml}
+                        ${crucialBadgeHtml}
+                        ${scrubHtml}
+                    `;
+                }
 
                 // Adaptação dinâmica imediata ao carregar a imagem real da mídia
                 const thumbImg = itemEl.querySelector(".gallery-thumb-img");
@@ -9340,6 +9749,26 @@ export class LibraryManager {
                 itemEl.draggable = true;
                 itemEl.addEventListener("dragstart", (e) => {
                     window._galleryController.stopAllHover();
+                    if (item.kind === "color_matte") {
+                        const payload = {
+                            type: "color_matte",
+                            kind: "color_matte",
+                            tipo: "cor",
+                            id: item.id,
+                            color: item.color,
+                            color_name: item.color_name,
+                            name: item.name,
+                            duration: item.duration || 5.0,
+                            duration_seconds: item.duration || 5.0,
+                            duration_frames: item.duration_frames || 120,
+                            blend_mode: item.blend_mode || item.blendMode || "normal",
+                            virtual_folder: item.virtual_folder || "root/Geradores"
+                        };
+                        STATE.activeDragMedia = payload;
+                        e.dataTransfer.setData("application/x-capiau-media", JSON.stringify(payload));
+                        e.dataTransfer.effectAllowed = "copy";
+                        return;
+                    }
                     const friendlyTitle = getFriendlyTitle(item);
                     let inTime = 0.0;
                     let outTime = isVideo ? (item.duration || 5.0) : 5.0;
@@ -9412,6 +9841,20 @@ export class LibraryManager {
                     e.preventDefault();
                     e.stopPropagation();
                     window._galleryController.stopAllHover();
+
+                    if (item.kind === "color_matte") {
+                        if (window.TIMELINE_STATE && typeof window.TIMELINE_STATE.addColorMatteCut === "function") {
+                            const dur = (item.duration && item.duration > 0) ? item.duration : 5.0;
+                            window.TIMELINE_STATE.addColorMatteCut({
+                                color: item.color || "#000000",
+                                color_name: item.color_name || item.name || "Cor Sólida",
+                                name: item.name || "Cor Sólida",
+                                durationSec: dur,
+                                track: "V1"
+                            });
+                        }
+                        return;
+                    }
 
                     let mode = "end";
                     if (e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) {

@@ -2102,10 +2102,6 @@ export class CapiauTimelineInteraction {
                     TIMELINE_STATE.hoveredMarkerId = null;
                     if (this.renderer) this.renderer.requestRedraw();
                 }
-                if (TIMELINE_STATE.hoveredPlayhead) {
-                    TIMELINE_STATE.hoveredPlayhead = false;
-                    if (this.renderer) this.renderer.requestRedraw();
-                }
                 return;
             }
 
@@ -3903,6 +3899,31 @@ export class CapiauTimelineInteraction {
                 if (this.renderer) this.renderer.requestRedraw();
             };
             menu.appendChild(itemCrossfade);
+        } else {
+            const itemVideoTrans = document.createElement("div");
+            itemVideoTrans.className = "menu-item";
+            itemVideoTrans.style.display = "flex";
+            itemVideoTrans.style.alignItems = "center";
+            itemVideoTrans.style.justifyContent = "space-between";
+            itemVideoTrans.style.padding = "7px 12px";
+            itemVideoTrans.style.cursor = "pointer";
+            itemVideoTrans.innerHTML = `
+                <span style="display:flex; align-items:center; gap:var(--sp-8);">
+                    <i class="fa-solid fa-wand-magic-sparkles" style="color:var(--color-amber, #f59e0b);"></i>
+                    <span>Transição de Vídeo (Cross Dissolve)</span>
+                </span>
+                <kbd style="font-size:var(--fs-9); background:rgba(255,255,255,0.08); padding:var(--sp-1) var(--sp-4); border-radius:3px;">Ctrl+D</kbd>
+            `;
+            itemVideoTrans.onclick = () => {
+                menu.remove();
+                const res = TIMELINE_STATE.addVideoTransition({ clipAId: clip.id });
+                if (res && typeof window.showToast === "function") {
+                    window.showToast("Transição de Vídeo (Cross Dissolve) aplicada", "success");
+                }
+                this.refreshClipInspector();
+                if (this.renderer) this.renderer.requestRedraw();
+            };
+            menu.appendChild(itemVideoTrans);
         }
 
         // Opções contextuais de Preenchimento de Lacunas na Trilha
@@ -4629,27 +4650,33 @@ export class CapiauTimelineInteraction {
         menu.style.zIndex = "100000";
         menu.style.padding = "6px 0";
 
-        const isAudio = transition.type === "crossfade";
+        const isAudio = transition.kind === "audio" || transition.type === "crossfade" || transition.type === "audio_crossfade";
         const title = document.createElement("div");
         title.style.padding = "6px 12px";
         title.style.fontSize = "var(--fs-10)";
         title.style.fontWeight = "bold";
-        title.style.color = "var(--accent, #06b6d4)";
+        title.style.color = isAudio ? "var(--accent, #06b6d4)" : "var(--color-amber, #f59e0b)";
         title.style.borderBottom = "1px solid var(--border-glass, rgba(255,255,255,0.1))";
         title.style.marginBottom = "4px";
         title.style.display = "flex";
         title.style.alignItems = "center";
         title.style.gap = "6px";
-        title.innerHTML = `<i class="fa-solid ${isAudio ? 'fa-bolt' : 'fa-film'}"></i> ${isAudio ? 'CROSSFADE DE ÁUDIO' : 'TRANSIÇÃO'}`;
+        title.innerHTML = `<i class="fa-solid ${isAudio ? 'fa-bolt' : 'fa-wand-magic-sparkles'}"></i> ${isAudio ? 'CROSSFADE DE ÁUDIO' : 'TRANSIÇÃO DE VÍDEO'}`;
         menu.appendChild(title);
 
         const info = document.createElement("div");
         info.style.padding = "4px 12px 6px 12px";
         info.style.fontSize = "var(--fs-10)";
         info.style.color = "var(--text-muted, #94a3b8)";
-        const durFrames = transition.durationFrames || 30;
-        const curveName = transition.curve === "equal_power" ? "Potência Constante" : (transition.curve || "Equal Power");
-        info.innerText = `Duração: ${durFrames}f • ${curveName}`;
+        const durFrames = transition.durationFrames || 24;
+        const typeNames = {
+            video_cross_dissolve: "Cross Dissolve",
+            video_dip_black: "Dip to Black",
+            video_dip_white: "Dip to White",
+            audio_crossfade: "Potência Constante"
+        };
+        const typeLabel = typeNames[transition.type] || (transition.curve === "equal_power" ? "Potência Constante" : (transition.type || "Transição"));
+        info.innerText = `${typeLabel} • ${durFrames}f (${(durFrames / (TIMELINE_STATE.fps || 24)).toFixed(2)}s)`;
         menu.appendChild(info);
 
         const sep = document.createElement("div");
@@ -5038,7 +5065,11 @@ export class CapiauTimelineInteraction {
             }
         }
 
-        if (payload.type === "photo") {
+        if (payload.kind === "color_matte" || payload.type === "color_matte" || payload.kind === "adjustment") {
+            const dur = (payload.duration || payload.duration_seconds || dragMedia?.duration || 5.0);
+            inTime = 0.0;
+            outTime = Number(dur) || 5.0;
+        } else if (payload.type === "photo") {
             const dur = (dragMedia && dragMedia.effectiveDuration) ? dragMedia.effectiveDuration : (payload.duration || 5.0);
             inTime = 0.0;
             outTime = dur;
@@ -5075,7 +5106,7 @@ export class CapiauTimelineInteraction {
         } else if (payload.type === "photo") {
             const p = (STATE.allPhotos || []).find(it => String(it.id) === String(payload.id));
             itemRot = p ? (p.rotation || 0) : ((STATE.activePhoto && String(STATE.activePhoto.id) === String(payload.id)) ? (STATE.activePhoto.rotation || 0) : 0);
-        } else {
+        } else if (payload.kind !== "color_matte" && payload.type !== "color_matte" && payload.kind !== "adjustment") {
             const v = (STATE.allVideos || []).find(it => String(it.id) === String(realVideoId) || String(it.id) === String(payload.id));
             itemRot = v ? (v.rotation || 0) : ((STATE.activeVideo && (String(STATE.activeVideo.id) === String(realVideoId) || String(STATE.activeVideo.id) === String(payload.id))) ? (STATE.activeVideo.rotation || 0) : 0);
         }
@@ -5102,7 +5133,41 @@ export class CapiauTimelineInteraction {
         const isInsert = mode === "ripple";
         if (isInsert) {
             const effectsList = itemRot ? [{ type: "transform", rotation: itemRot, scale: 1, x: 0, y: 0 }] : [];
-            if (payload.type === "photo") {
+            if (payload.kind === "color_matte" || payload.type === "color_matte") {
+                TIMELINE_STATE.insertClipWithRipple({
+                    type: "video",
+                    kind: "color_matte",
+                    color: payload.color || "#000000",
+                    color_name: payload.color_name || "Cor Sólida",
+                    name: payload.name || payload.color_name || "Cor Sólida",
+                    video_id: null,
+                    photo_id: null,
+                    link_id: null,
+                    inFrame: 0,
+                    outFrame: effDurFrames,
+                    in: 0,
+                    out: effDur,
+                    rotation: 0,
+                    effects: [
+                        { type: "fit", mode: "fill" },
+                        { type: "transform", opacity: 1.0, scale: 1.0, x: 0, y: 0, rotation: 0, disabled: false }
+                    ]
+                }, snappedFrame, targetTrack);
+            } else if (payload.kind === "adjustment") {
+                TIMELINE_STATE.insertClipWithRipple({
+                    type: "video",
+                    kind: "adjustment",
+                    name: payload.name || "Camada de Ajuste",
+                    video_id: null,
+                    photo_id: null,
+                    link_id: null,
+                    inFrame: 0,
+                    outFrame: effDurFrames,
+                    in: 0,
+                    out: effDur,
+                    effects: payload.effects || []
+                }, snappedFrame, targetTrack);
+            } else if (payload.type === "photo") {
                 TIMELINE_STATE.insertClipWithRipple({
                     type: "photo",
                     photo_id: payload.id,
@@ -5138,7 +5203,24 @@ export class CapiauTimelineInteraction {
                 }, snappedFrame, targetTrack);
             }
         } else {
-            if (payload.type === "photo") {
+            if (payload.kind === "color_matte" || payload.type === "color_matte") {
+                TIMELINE_STATE.addColorMatteCut({
+                    color: payload.color || "#000000",
+                    color_name: payload.color_name || "Cor Sólida",
+                    name: payload.name || payload.color_name || "Cor Sólida",
+                    durationSec: effDur,
+                    track: targetTrack,
+                    timelineStartFrame: snappedFrame
+                });
+            } else if (payload.kind === "adjustment") {
+                TIMELINE_STATE.addAdjustmentCut({
+                    name: payload.name || "Camada de Ajuste",
+                    durationSec: effDur,
+                    track: targetTrack,
+                    timelineStartFrame: snappedFrame,
+                    effects: payload.effects
+                });
+            } else if (payload.type === "photo") {
                 TIMELINE_STATE.addPhotoCut(payload.id, { track: targetTrack, timelineStartFrame: snappedFrame });
             } else {
                 TIMELINE_STATE.addCut(realVideoId, inTime, outTime, targetTrack, snappedFrame, isSub ? {
@@ -6326,6 +6408,21 @@ export class CapiauTimelineInteraction {
         }, "video");
     }
 
+    setClipBlendMode(clipId, mode) {
+        const blendMode = (mode || "normal").trim().toLowerCase();
+        this._mutateClipEffects(clipId, (clip) => {
+            clip.blend_mode = blendMode;
+            clip.blendMode = blendMode;
+            let tf = clip.effects.find(e => e.type === "transform");
+            if (!tf) {
+                tf = { type: "transform", scale: 1.0, x: 0, y: 0, rotation: 0, opacity: 1.0 };
+                clip.effects.push(tf);
+            }
+            tf.blend_mode = blendMode;
+            tf.blendMode = blendMode;
+        }, "video");
+    }
+
     setClipColor(clipId, key, value) {
         this._mutateClipEffects(clipId, (clip) => {
             let col = clip.effects.find(e => e.type === "color");
@@ -6558,7 +6655,9 @@ export class CapiauTimelineInteraction {
     }
 
     _defaultAdjustmentOrder(mediaType) {
-        if (mediaType === "text") {
+        if (mediaType === "adjustment") {
+            return ["color", "transform", "crop"];
+        } else if (mediaType === "text") {
             return ["text_style", "transform", "fades"];
         } else if (mediaType === "photo") {
             return ["transform", "crop", "ken_burns", "color", "fades"];
@@ -6617,6 +6716,8 @@ export class CapiauTimelineInteraction {
         switch (sectionId) {
             case "transform": {
                 const tf = effects.find(e => e.type === "transform");
+                const bm = clip.blend_mode || clip.blendMode || (tf && (tf.blend_mode || tf.blendMode));
+                if (bm && bm !== "normal") return true;
                 if (!tf) return false;
                 return (tf.x !== undefined && tf.x !== 0) ||
                        (tf.y !== undefined && tf.y !== 0) ||
@@ -7852,7 +7953,13 @@ export class CapiauTimelineInteraction {
         
         let displayTitle = "Clipe de Áudio";
         let realFilename = "";
-        if (isPhoto) {
+        if (clip.kind === "adjustment") {
+            displayTitle = clip.name || "Camada de Ajuste";
+            realFilename = displayTitle;
+        } else if (clip.kind === "color_matte") {
+            displayTitle = clip.name || "Cor Sólida";
+            realFilename = displayTitle;
+        } else if (isPhoto) {
             const photoData = STATE.allPhotos.find(p => String(p.id) === String(clip.photo_id));
             if (photoData) { displayTitle = photoData.title || photoData.filename; realFilename = photoData.filename; }
         } else {
@@ -7876,6 +7983,7 @@ export class CapiauTimelineInteraction {
         const rotation = tf.rotation !== undefined ? tf.rotation : 0;
         const opacity = tf.opacity !== undefined ? tf.opacity : 1.0;
         const tfDisabled = tf.disabled === true;
+        const blendMode = (clip.blend_mode || clip.blendMode || tf.blend_mode || tf.blendMode || "normal").toLowerCase();
 
         const col = effects.find(e => e.type === "color") || {};
         const brightness = col.brightness !== undefined ? col.brightness : 0;
@@ -7968,7 +8076,8 @@ export class CapiauTimelineInteraction {
         `;
 
         const isText = clip.type === "text";
-        const mediaType = isText ? "text" : (isPhoto ? "photo" : (isAudioTrack ? "audio" : "video"));
+        const isAdjustment = clip.kind === "adjustment";
+        const mediaType = isAdjustment ? "adjustment" : (isText ? "text" : (isPhoto ? "photo" : (isAudioTrack ? "audio" : "video")));
         const sectionOrder = this._getAdjustmentSectionOrder(mediaType);
         let audioDiagHTML = "", audioEqHTML = "", audioDynamicsHTML = "", audioRenderHTML = "", audioResultadoHTML = "", volumeHTML = "", textHTML = "";
 
@@ -8420,6 +8529,21 @@ export class CapiauTimelineInteraction {
                             <input type="range" data-prop="opacity" min="0" max="100" value="${roundVal(opacity * 100)}" data-tooltip="Opacidade: ${roundVal(opacity * 100)}%" style="flex:1;">
                             <span class="value-disp" style="min-width:35px; text-align:right;">${roundVal(opacity * 100)}%</span>
                             ${this._renderKeyframeControl(clip, "opacity", relTimeS)}
+                        </div>
+                    </div>
+                    <div class="adjustments-row" data-control-id="blend_mode">
+                        <label>Mesclagem</label>
+                        <div class="control-wrap" style="flex:1;">
+                            <select id="adj-blend-mode" class="nle-select" style="width:100%; height:24px; font-size:var(--fs-11); background:rgba(0,0,0,0.3); border:1px solid var(--border-glass); color:#fff; border-radius:4px; padding:0 var(--sp-4);">
+                                <option value="normal" ${blendMode === 'normal' ? 'selected' : ''}>Normal</option>
+                                <option value="multiply" ${blendMode === 'multiply' ? 'selected' : ''}>Multiplicação (Multiply)</option>
+                                <option value="screen" ${blendMode === 'screen' ? 'selected' : ''}>Divisão / Tela (Screen)</option>
+                                <option value="overlay" ${blendMode === 'overlay' ? 'selected' : ''}>Sobreposição (Overlay)</option>
+                                <option value="darken" ${blendMode === 'darken' ? 'selected' : ''}>Escurecer (Darken)</option>
+                                <option value="lighten" ${blendMode === 'lighten' ? 'selected' : ''}>Clarear (Lighten)</option>
+                                <option value="soft-light" ${blendMode === 'soft-light' || blendMode === 'softlight' ? 'selected' : ''}>Luz Suave (Soft Light)</option>
+                                <option value="difference" ${blendMode === 'difference' ? 'selected' : ''}>Diferença (Difference)</option>
+                            </select>
                         </div>
                     </div>
                 </div>
@@ -10957,6 +11081,11 @@ export class CapiauTimelineInteraction {
                     }
                 });
                 STATE.activeTimelineCuts = cuts;
+                if (window.player?.programPlayer?.syncVideoToPlayhead) {
+                    window.player.programPlayer.syncVideoToPlayhead();
+                } else if (window.player?.syncVideoToPlayhead) {
+                    window.player.syncVideoToPlayhead();
+                }
                 if (this.renderer) this.renderer.requestRedraw();
             };
 
@@ -11011,6 +11140,37 @@ export class CapiauTimelineInteraction {
             });
         });
 
+        // Modo de Mesclagem
+        const blendModeSelect = container.querySelector("#adj-blend-mode");
+        if (blendModeSelect) {
+            blendModeSelect.onchange = () => {
+                const mode = blendModeSelect.value || "normal";
+                this.setClipBlendMode(clipId, mode);
+                const cuts = [...STATE.activeTimelineCuts];
+                const targetCuts = this.syncMediaCutsMode ? this._getSameMediaVideoCuts(clip, cuts) : [cuts.find(c => c.id === clipId)].filter(Boolean);
+                targetCuts.forEach(tc => {
+                    tc.blend_mode = mode;
+                    tc.blendMode = mode;
+                    let tf = (tc.effects || []).find(e => e.type === "transform");
+                    if (!tf) {
+                        tf = { type: "transform", scale: 1.0, x: 0, y: 0, rotation: 0, opacity: 1.0 };
+                        if (!tc.effects) tc.effects = [];
+                        tc.effects.push(tf);
+                    }
+                    tf.blend_mode = mode;
+                    tf.blendMode = mode;
+                });
+                STATE.activeTimelineCuts = cuts;
+                if (window.player?.programPlayer?.syncVideoToPlayhead) {
+                    window.player.programPlayer.syncVideoToPlayhead();
+                } else if (window.player?.syncVideoToPlayhead) {
+                    window.player.syncVideoToPlayhead();
+                }
+                if (this.renderer) this.renderer.requestRedraw();
+                TIMELINE_HISTORY.commit();
+            };
+        }
+
         // Recorte (Crop)
         const cropLabels = { left: "Recorte Esquerda", right: "Recorte Direita", top: "Recorte Topo", bottom: "Recorte Base" };
         container.querySelectorAll("input[data-crop]").forEach(slider => {
@@ -11045,6 +11205,14 @@ export class CapiauTimelineInteraction {
                     crop[prop] = val;
                 });
                 STATE.activeTimelineCuts = cuts;
+                if (window.player?.programPlayer?.syncVideoToPlayhead) {
+                    window.player.programPlayer.syncVideoToPlayhead();
+                } else if (window.player?.syncVideoToPlayhead) {
+                    window.player.syncVideoToPlayhead();
+                }
+                if (this.renderer && typeof this.renderer.requestRedraw === "function") {
+                    this.renderer.requestRedraw();
+                }
             };
 
             slider.onchange = () => {
@@ -11106,6 +11274,14 @@ export class CapiauTimelineInteraction {
                     col[prop] = val;
                 });
                 STATE.activeTimelineCuts = cuts;
+                if (window.player?.programPlayer?.syncVideoToPlayhead) {
+                    window.player.programPlayer.syncVideoToPlayhead();
+                } else if (window.player?.syncVideoToPlayhead) {
+                    window.player.syncVideoToPlayhead();
+                }
+                if (this.renderer && typeof this.renderer.requestRedraw === "function") {
+                    this.renderer.requestRedraw();
+                }
             };
 
             slider.onchange = () => {
@@ -11394,7 +11570,9 @@ export class CapiauTimelineInteraction {
                     targetClip.effects = targetClip.effects ? targetClip.effects.map(e => ({ ...e })) : [];
                     if (section === "transform") {
                         targetClip.effects = targetClip.effects.filter(e => e.type !== "transform");
-                        targetClip.effects.push({ type: "transform", scale: 1.0, x: 0, y: 0, rotation: 0, opacity: 1.0 });
+                        targetClip.effects.push({ type: "transform", scale: 1.0, x: 0, y: 0, rotation: 0, opacity: 1.0, blend_mode: "normal" });
+                        targetClip.blend_mode = "normal";
+                        targetClip.blendMode = "normal";
                     } else if (section === "crop") {
                         targetClip.effects = targetClip.effects.filter(e => e.type !== "crop");
                         targetClip.effects.push({ type: "crop", top: 0, right: 0, bottom: 0, left: 0 });
@@ -12191,6 +12369,24 @@ export class CapiauTimelineInteraction {
             } else {
                 if (typeof window.showToast === "function") {
                     window.showToast("Nenhuma emenda ou clipe de áudio elegível para crossfade", "warning");
+                }
+            }
+            return;
+        }
+
+        // Transição de Vídeo de Junção (Ctrl+D)
+        if (KEYMAP_SERVICE.matches(e, "edit.apply_video_transition") || (e.ctrlKey && !e.shiftKey && !e.altKey && (e.key === "D" || e.key === "d"))) {
+            e.preventDefault();
+            const res = TIMELINE_STATE.addVideoTransition();
+            if (res) {
+                if (typeof window.showToast === "function") {
+                    window.showToast("Transição de Vídeo (Cross Dissolve) aplicada na emenda", "success");
+                }
+                if (this.renderer) this.renderer.requestRedraw();
+                this.refreshClipInspector();
+            } else {
+                if (typeof window.showToast === "function") {
+                    window.showToast("Nenhuma emenda ou clipe de vídeo elegível para transição", "warning");
                 }
             }
             return;

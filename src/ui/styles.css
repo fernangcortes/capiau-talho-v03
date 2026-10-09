@@ -1353,9 +1353,9 @@ button {
 .library-more-flyout {
     position: fixed;
     z-index: 999999;
-    background: rgba(18, 18, 24, 0.96);
+    background: var(--t-surface-2, rgba(18, 18, 24, 0.96));
     backdrop-filter: blur(14px);
-    border: 1px solid var(--t-line-strong, rgba(6, 182, 212, 0.35));
+    border: 1px solid var(--t-line-strong, color-mix(in srgb, var(--t-accent, rgb(6, 182, 212)) 35%, transparent));
     border-radius: 6px;
     padding: 6px;
     box-shadow: 0 8px 28px rgba(0, 0, 0, 0.85);
@@ -1385,16 +1385,16 @@ button {
 }
 
 .library-more-flyout .flyout-media-chip:hover {
-    background: var(--t-tint-3, rgba(6, 182, 212, 0.15));
+    background: var(--t-tint-3, color-mix(in srgb, var(--t-accent, rgb(6, 182, 212)) 15%, transparent));
     border-color: var(--accent);
     color: #ffffff;
 }
 
 .library-more-flyout .flyout-media-chip.active {
-    background: var(--t-tint-2, rgba(6, 182, 212, 0.25));
+    background: var(--t-tint-2, color-mix(in srgb, var(--t-accent, rgb(6, 182, 212)) 25%, transparent));
     border-color: var(--accent);
     color: #ffffff;
-    box-shadow: 0 0 6px rgba(6, 182, 212, 0.3);
+    box-shadow: 0 0 6px color-mix(in srgb, var(--t-accent, rgb(6, 182, 212)) 30%, transparent);
 }
 
 .library-more-flyout .flyout-media-chip i {
@@ -1444,7 +1444,7 @@ button {
 }
 
 .library-more-flyout .flyout-menu-item:hover {
-    background: var(--t-tint-3, rgba(6, 182, 212, 0.15));
+    background: var(--t-tint-3, color-mix(in srgb, var(--t-accent, rgb(6, 182, 212)) 15%, transparent));
     color: #ffffff;
 }
 
@@ -8588,6 +8588,49 @@ select option, .nle-select option {
     box-shadow: 0 0 8px var(--t-glow, rgba(34, 197, 94, 0.35));
 }
 
+/* ── RENOMEAÇÃO INLINE DE PISTAS (NLE DESIGN SYSTEM) ─────────────────── */
+.track-name-label {
+    cursor: text;
+    user-select: none;
+    -webkit-user-select: none;
+    border-radius: 3px;
+    padding: 1px 4px;
+    margin: -1px -4px;
+    transition: background var(--transition-fast, 0.15s), color var(--transition-fast, 0.15s);
+}
+
+.track-name-label:hover {
+    color: var(--text-primary, #ffffff);
+    background: var(--t-tint-2, rgba(255, 255, 255, 0.05));
+}
+
+.track-name-input {
+    background: var(--t-surface-0, rgba(0, 0, 0, 0.45));
+    border: 1px solid var(--accent, var(--t-accent, #06b6d4));
+    border-radius: 4px;
+    color: var(--text-primary, #ffffff);
+    font-family: var(--font-heading, 'Outfit', sans-serif);
+    font-size: var(--fs-10, 10px);
+    font-weight: 600;
+    padding: 1px 6px;
+    height: 20px;
+    line-height: 18px;
+    outline: none;
+    flex: 1;
+    min-width: 0;
+    width: 100%;
+    box-sizing: border-box;
+    caret-color: var(--accent, var(--t-accent, #06b6d4));
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent, var(--t-accent, #06b6d4)) 25%, transparent), inset 0 1px 2px rgba(0, 0, 0, 0.3);
+    transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+
+.track-name-input:focus {
+    background: var(--t-surface-1, rgba(0, 0, 0, 0.65));
+    border-color: var(--accent, var(--t-accent, #06b6d4));
+    box-shadow: 0 0 0 1px var(--accent, var(--t-accent, #06b6d4)), inset 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
 /* ── SPLITTER & VOLUME SLIDER DAS TRILHAS DA TIMELINE ────────────────── */
 .splitter-timeline-headers {
     width: 4px;
@@ -11459,7 +11502,7 @@ input[type="number"] {
 
 /* ── TOOLTIP DE ÍNDICE TEMÁTICO INTELIGENTE (SCROLL PEEKER) ── */
 #library-scroll-index-tooltip {
-    --card-accent-color: var(--color-cyan, #06b6d4);
+    --card-accent-color: var(--accent, var(--t-accent, #06b6d4));
     --scroll-thumb-width: 128px;
     position: fixed;
     z-index: 3500;
@@ -11512,7 +11555,7 @@ input[type="number"] {
     box-shadow:
         0 8px 24px rgba(0, 0, 0, 0.75),
         0 0 16px color-mix(in srgb, var(--card-accent-color) 20%, transparent);
-    border: 1px solid color-mix(in srgb, var(--card-accent-color) 60%, rgba(255, 255, 255, 0.12));
+    border: 1px solid color-mix(in srgb, var(--card-accent-color) 60%, var(--t-line-strong, rgba(255, 255, 255, 0.12)));
     box-sizing: border-box;
     transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
@@ -11539,7 +11582,7 @@ input[type="number"] {
     font-size: var(--fs-9);
     padding: 1px 5px;
     border-radius: 2px;
-    border: 1px solid rgba(255, 255, 255, 0.18);
+    border: 1px solid var(--t-line-strong, rgba(255, 255, 255, 0.18));
     white-space: nowrap;
     pointer-events: none;
     z-index: 3;
@@ -11561,7 +11604,7 @@ input[type="number"] {
 .scroll-index-thumb-progress-bar {
     height: 100%;
     width: 0%;
-    background: var(--card-accent-color, var(--color-cyan));
+    background: var(--card-accent-color, var(--accent));
     transition: width 0.08s linear;
 }
 
@@ -11574,12 +11617,12 @@ input[type="number"] {
     max-width: 480px;
     box-sizing: border-box;
     background: linear-gradient(145deg,
-        color-mix(in srgb, var(--card-accent-color) 8%, rgba(18, 18, 24, 0.97)) 0%,
-        rgba(12, 12, 16, 0.98) 100%
+        color-mix(in srgb, var(--card-accent-color) 8%, var(--t-surface-2, rgba(18, 18, 24, 0.97))) 0%,
+        var(--t-surface-2, rgba(12, 12, 16, 0.98)) 100%
     );
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
-    border: 1px solid color-mix(in srgb, var(--card-accent-color) 35%, rgba(255, 255, 255, 0.08));
+    border: 1px solid color-mix(in srgb, var(--card-accent-color) 35%, var(--t-line-weak, rgba(255, 255, 255, 0.08)));
     border-left: 3.5px solid var(--card-accent-color);
     border-radius: 2px;
     box-shadow:
@@ -11617,7 +11660,7 @@ input[type="number"] {
 }
 
 .scroll-index-folder i {
-    color: var(--card-accent-color, var(--color-cyan));
+    color: var(--card-accent-color, var(--accent));
     font-size: var(--fs-10);
 }
 
@@ -11690,7 +11733,7 @@ input[type="number"] {
 
 .scroll-index-duration i {
     font-size: var(--fs-9);
-    color: var(--card-accent-color, var(--color-cyan));
+    color: var(--card-accent-color, var(--accent));
     opacity: 0.9;
 }
 
@@ -16400,5 +16443,85 @@ body.layout-monitors-split .btn-swap-player {
     justify-content: space-between;
     align-items: center;
 }
+
+/* ======================================================================
+   Milestone M1 — Color Matte & Adjustment Layer (Tasks 17 & 18)
+   ====================================================================== */
+
+#program-player-matte,
+#program-player-matte-b {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 10;
+}
+
+#program-player-adjustment {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 25;
+}
+
+#program-player-dip-white-overlay {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    background-color: #ffffff;
+    pointer-events: none;
+    z-index: 50;
+    opacity: 0;
+}
+
+.matte-preset-btn {
+    transition: border-color 0.18s ease, background-color 0.18s ease;
+}
+
+.matte-preset-btn:hover {
+    border-color: var(--t-line-strong, rgba(255, 255, 255, 0.25));
+    background: var(--t-surface-2, rgba(255, 255, 255, 0.08));
+}
+
+.library-card-matte .media-thumb {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+}
+
+.library-card-matte .matte-swatch-badge {
+    position: absolute;
+    bottom: var(--sp-4);
+    right: var(--sp-4);
+    font-size: var(--fs-9);
+    font-weight: 700;
+    padding: var(--sp-2) var(--sp-6);
+    border-radius: 3px;
+    background: rgba(0, 0, 0, 0.7);
+    color: #fff;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    border: 1px solid var(--border-glass);
+}
+
+.library-card-matte .btn-delete-matte {
+    position: absolute;
+    top: var(--sp-4);
+    right: var(--sp-4);
+    background: rgba(0, 0, 0, 0.65);
+    border: 1px solid var(--border-glass);
+    border-radius: 3px;
+    color: #f87171;
+    cursor: pointer;
+    font-size: var(--fs-10);
+    padding: var(--sp-2) var(--sp-6);
+    z-index: 10;
+}
+
 
 

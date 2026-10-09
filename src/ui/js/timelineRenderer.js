@@ -6,6 +6,7 @@ import { WaveformManager } from "./waveformManager.js";
 import { getAllKeyframeTimelineFrames } from "./keyframeEngine.js";
 import { themeColor, THEME_CHANGED_EVENT } from "./themeTokens.js";
 import { applyTrackMode } from "./trackColors.js";
+import { RENDER_CACHE_MANAGER } from "./renderCache.js";
 
 // Paleta de cores para pistas de vídeo (V1 roxo/íris clássico NLE, V2 ciano B-roll, etc.)
 const TRACK_PALETTE = [
@@ -266,6 +267,8 @@ export class CapiauTimelineRenderer {
         STATE.on("timelineShowInOutRulerBadgeChanged", () => this.requestRedraw());
         STATE.on("timelineLoopChanged", () => this.requestRedraw());
         WaveformManager.addListener(() => this.requestRedraw());
+        STATE.on("timelineRenderCacheChanged", () => this.requestRedraw());
+        if (typeof window !== "undefined") window.TIMELINE_RENDERER = this;
 
         // Guias de interação e drop
         this.activeSnapFrame = null;
@@ -987,6 +990,43 @@ export class CapiauTimelineRenderer {
                 }
             }
         }
+
+        // 3. Barra de Render Cache NLE (Vermelho / Amarelo / Verde)
+        this.drawRenderBar();
+    }
+
+    /**
+     * Desenha a Barra de Render Cache NLE na base da régua da timeline.
+     * Vermelho: trechos pesados necessitando de renderização (camadas de ajuste, transições, multipistas).
+     * Amarelo: trechos em tempo real limítrofes.
+     * Verde: trechos pré-computados em cache (alta performance a 60fps).
+     */
+    drawRenderBar() {
+        if (!RENDER_CACHE_MANAGER || typeof RENDER_CACHE_MANAGER.getSegments !== "function") return;
+        const ctx = this.ctx;
+        const zoom = TIMELINE_STATE.zoom;
+        const scrollLeft = TIMELINE_STATE.scrollLeftFrame;
+        const startFrame = Math.max(0, scrollLeft);
+        const endFrame = startFrame + Math.ceil(this.width / zoom);
+
+        const segments = RENDER_CACHE_MANAGER.getSegments(startFrame, endFrame);
+        if (!segments || segments.length === 0) return;
+
+        const barHeight = 3;
+        const barY = this.rulerHeight - barHeight;
+
+        ctx.save();
+        for (const seg of segments) {
+            if (!seg.color) continue;
+            const x1 = Math.max(0, (seg.startFrame - scrollLeft) * zoom);
+            const x2 = Math.min(this.width, (seg.endFrame - scrollLeft) * zoom);
+            const w = x2 - x1;
+            if (w <= 0) continue;
+
+            ctx.fillStyle = seg.color;
+            ctx.fillRect(x1, barY, w, barHeight);
+        }
+        ctx.restore();
     }
 
     /**
@@ -1133,6 +1173,10 @@ export class CapiauTimelineRenderer {
         }
     }
 
+    /**
+     * Calcula as métricas, posicionamento e conteúdo adaptativo do badge de resumo In/Out na régua.
+     * Retorna null se não houver intervalo fechado válido ou espaço mínimo seguro.
+     */
     getInOutBadgeInfo() {
         const inF = TIMELINE_STATE.inFrame;
         const outF = TIMELINE_STATE.outFrame;
@@ -1584,7 +1628,9 @@ export class CapiauTimelineRenderer {
             const laneKind = lane.track.kind || "video";
             const isText = cut.type === "text" || laneKind === "text";
             const isPhoto = cut.type === "photo";
-            const video = (isPhoto || isText) ? null : (STATE.allVideos.find(v => String(v.id) === String(cut.video_id)) || (cut.parent_video_id ? STATE.allVideos.find(v => String(v.id) === String(cut.parent_video_id)) : null));
+            const isAdjustment = cut.kind === "adjustment";
+            const isColorMatte = cut.kind === "color_matte";
+            const video = (isPhoto || isText || isAdjustment || isColorMatte) ? null : (STATE.allVideos.find(v => String(v.id) === String(cut.video_id)) || (cut.parent_video_id ? STATE.allVideos.find(v => String(v.id) === String(cut.parent_video_id)) : null));
             const photo = isPhoto ? STATE.allPhotos.find(p => p.id === cut.photo_id) : null;
 
             // Espaçamento interno vertical do clipe
@@ -1603,6 +1649,24 @@ export class CapiauTimelineRenderer {
                 // Faixa colorida sutil no topo do clipe de texto
                 ctx.fillStyle = "rgba(245, 158, 11, 0.8)";
                 ctx.fillRect(startX, clipY, width, 3);
+                ctx.restore();
+            } else if (isAdjustment) {
+                ctx.save();
+                // Tom violeta translúcido para camada de ajuste
+                ctx.fillStyle = "rgba(139, 92, 246, 0.35)";
+                ctx.fillRect(startX, clipY, width, clipHeight);
+                // Faixa colorida violeta vibrante no topo
+                ctx.fillStyle = "#8b5cf6";
+                ctx.fillRect(startX, clipY, width, 3);
+                ctx.restore();
+            } else if (isColorMatte) {
+                ctx.save();
+                // Preenchimento com a cor do próprio color matte
+                ctx.fillStyle = cut.color || "#000000";
+                ctx.fillRect(startX, clipY, width, clipHeight);
+                // Faixa colorida clara no topo para contraste
+                ctx.fillStyle = "rgba(255, 255, 255, 0.6)";
+                ctx.fillRect(startX, clipY, width, 2);
                 ctx.restore();
             }
 
@@ -1791,6 +1855,12 @@ export class CapiauTimelineRenderer {
                 const name = photo ? (photo.title || photo.filename) : `Foto ${cut.photo_id}`;
                 const durS = framesToSeconds(cut.outFrame - cut.inFrame, TIMELINE_STATE.fps);
                 label = `▣ ${name} [${durS.toFixed(1)}s]`;
+            } else if (isAdjustment) {
+                const durS = framesToSeconds(cut.outFrame - cut.inFrame, TIMELINE_STATE.fps);
+                label = `fx [Ajuste] ${cut.name || "Camada de Ajuste"} [${durS.toFixed(1)}s]`;
+            } else if (isColorMatte) {
+                const durS = framesToSeconds(cut.outFrame - cut.inFrame, TIMELINE_STATE.fps);
+                label = `■ [Cor] ${cut.name || cut.color_name || "Cor Sólida"} [${durS.toFixed(1)}s]`;
             } else if (cut.is_freeze) {
                 const fps = TIMELINE_STATE.fps || 24;
                 const durS = framesToSeconds(cut.outFrame - cut.inFrame, fps);
@@ -2519,26 +2589,38 @@ export class CapiauTimelineRenderer {
             const isHovered = TIMELINE_STATE.hoveredTransitionId === tr.id || (TIMELINE_STATE.hoveredTransition && TIMELINE_STATE.hoveredTransition.id === tr.id);
             const top = lane.top + 2;
             const height = lane.height - 4;
+            const isVideo = tr.kind === "video" || (tr.type && tr.type.startsWith("video_"));
 
             ctx.save();
 
             // Fundo da caixa de transição (estilo NLE clássico de transição)
-            ctx.fillStyle = isSelected 
-                ? "rgba(6, 182, 212, 0.38)" 
-                : (isHovered ? "rgba(16, 185, 129, 0.30)" : "rgba(16, 185, 129, 0.18)");
+            if (isVideo) {
+                ctx.fillStyle = isSelected 
+                    ? "rgba(245, 158, 11, 0.42)" 
+                    : (isHovered ? "rgba(245, 158, 11, 0.30)" : "rgba(245, 158, 11, 0.18)");
+                ctx.strokeStyle = isSelected 
+                    ? "rgba(251, 191, 36, 0.95)" 
+                    : (isHovered ? "rgba(245, 158, 11, 0.9)" : "rgba(217, 119, 6, 0.7)");
+            } else {
+                ctx.fillStyle = isSelected 
+                    ? "rgba(6, 182, 212, 0.38)" 
+                    : (isHovered ? "rgba(16, 185, 129, 0.30)" : "rgba(16, 185, 129, 0.18)");
+                ctx.strokeStyle = isSelected 
+                    ? "rgba(6, 182, 212, 0.95)" 
+                    : (isHovered ? "rgba(110, 231, 183, 0.9)" : "rgba(16, 185, 129, 0.65)");
+            }
             ctx.fillRect(startX, top, width, height);
 
             // Borda da transição
-            ctx.strokeStyle = isSelected 
-                ? "rgba(6, 182, 212, 0.95)" 
-                : (isHovered ? "rgba(110, 231, 183, 0.9)" : "rgba(16, 185, 129, 0.65)");
             ctx.lineWidth = isSelected ? 1.5 : 1.0;
             ctx.strokeRect(startX, top, width, height);
 
             // Alças táteis de borda para redimensionamento por arrasto (Bracket Handles NLE)
             if (width >= 12 && height >= 12) {
                 ctx.save();
-                const gripColor = isSelected ? "#06b6d4" : (isHovered ? "#34d399" : "rgba(16, 185, 129, 0.85)");
+                const gripColor = isVideo 
+                    ? (isSelected ? "#f59e0b" : (isHovered ? "#fbbf24" : "rgba(245, 158, 11, 0.85)"))
+                    : (isSelected ? "#06b6d4" : (isHovered ? "#34d399" : "rgba(16, 185, 129, 0.85)"));
                 ctx.fillStyle = gripColor;
                 const gripH = Math.min(18, height - 4);
                 const gripY = top + (height - gripH) / 2;
@@ -2584,11 +2666,18 @@ export class CapiauTimelineRenderer {
                 // Curva Out (descendente: 1 -> 0)
                 ctx.save();
                 ctx.beginPath();
-                ctx.strokeStyle = "rgba(6, 182, 212, 0.9)";
+                ctx.strokeStyle = isVideo ? "rgba(245, 158, 11, 0.9)" : "rgba(6, 182, 212, 0.9)";
                 ctx.lineWidth = 1.6;
                 for (let i = 0; i <= steps; i++) {
                     const p = i / steps;
-                    const factor = evaluateFadeCurve(1 - p, tr.curve || "equal_power", tr.tension || 0);
+                    let factor;
+                    if (tr.type === "video_dip_black") {
+                        factor = p <= 0.5 ? (1.0 - 2.0 * p) : 0.0;
+                    } else if (tr.type === "video_dip_white") {
+                        factor = 1.0 - p;
+                    } else {
+                        factor = evaluateFadeCurve(1 - p, tr.curve || (isVideo ? "linear" : "equal_power"), tr.tension || 0);
+                    }
                     const px = startX + p * width;
                     const py = top + (1 - factor) * (height - 2) + 1;
                     if (i === 0) ctx.moveTo(px, py);
@@ -2600,11 +2689,18 @@ export class CapiauTimelineRenderer {
                 // Curva In (ascendente: 0 -> 1)
                 ctx.save();
                 ctx.beginPath();
-                ctx.strokeStyle = "rgba(110, 231, 183, 0.9)";
+                ctx.strokeStyle = isVideo ? "rgba(251, 191, 36, 0.9)" : "rgba(110, 231, 183, 0.9)";
                 ctx.lineWidth = 1.6;
                 for (let i = 0; i <= steps; i++) {
                     const p = i / steps;
-                    const factor = evaluateFadeCurve(p, tr.curve || "equal_power", tr.tension || 0);
+                    let factor;
+                    if (tr.type === "video_dip_black") {
+                        factor = p >= 0.5 ? 2.0 * (p - 0.5) : 0.0;
+                    } else if (tr.type === "video_dip_white") {
+                        factor = p;
+                    } else {
+                        factor = evaluateFadeCurve(p, tr.curve || (isVideo ? "linear" : "equal_power"), tr.tension || 0);
+                    }
                     const px = startX + p * width;
                     const py = top + (1 - factor) * (height - 2) + 1;
                     if (i === 0) ctx.moveTo(px, py);
@@ -2614,9 +2710,20 @@ export class CapiauTimelineRenderer {
                 ctx.restore();
             }
 
-            // Rótulo com pill translúcida para máxima legibilidade sobre waveforms
+            // Rótulo com pill translúcida para máxima legibilidade
             if (width >= 18 && height >= 14) {
-                const label = width >= 90 ? "Potência Constante" : (width >= 42 ? "Crossfade" : "CF");
+                let label;
+                if (isVideo) {
+                    if (tr.type === "video_dip_black") {
+                        label = width >= 90 ? "Dip to Black" : (width >= 42 ? "Dip Black" : "DB");
+                    } else if (tr.type === "video_dip_white") {
+                        label = width >= 90 ? "Dip to White" : (width >= 42 ? "Dip White" : "DW");
+                    } else {
+                        label = width >= 90 ? "Cross Dissolve" : (width >= 42 ? "Dissolve" : "CD");
+                    }
+                } else {
+                    label = width >= 90 ? "Potência Constante" : (width >= 42 ? "Crossfade" : "CF");
+                }
                 ctx.font = "bold 8.5px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
                 const textMetrics = ctx.measureText(label);
                 const pillW = Math.min(width - 6, textMetrics.width + 8);
@@ -2626,8 +2733,12 @@ export class CapiauTimelineRenderer {
 
                 if (pillW >= 12) {
                     ctx.save();
-                    ctx.fillStyle = isSelected ? "rgba(10, 25, 47, 0.85)" : "rgba(15, 23, 42, 0.75)";
-                    ctx.strokeStyle = isSelected ? "rgba(6, 182, 212, 0.6)" : "rgba(255, 255, 255, 0.15)";
+                    ctx.fillStyle = isSelected 
+                        ? (isVideo ? "rgba(40, 25, 10, 0.88)" : "rgba(10, 25, 47, 0.85)") 
+                        : "rgba(15, 23, 42, 0.75)";
+                    ctx.strokeStyle = isSelected 
+                        ? (isVideo ? "rgba(245, 158, 11, 0.7)" : "rgba(6, 182, 212, 0.6)") 
+                        : "rgba(255, 255, 255, 0.15)";
                     ctx.lineWidth = 1;
                     if (ctx.roundRect) {
                         ctx.beginPath();

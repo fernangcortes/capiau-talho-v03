@@ -199,6 +199,28 @@ export function evaluateClipProperty(clip, propertyName, relativeTimeS, fallback
                 }
             }
         }
+        if (baseVal === fallbackDefault) {
+            const col = clip.effects.find(e => e.type === "color");
+            if (col) {
+                for (const k of keysToTry) {
+                    if (col[k] !== undefined && col[k] !== null && !isNaN(Number(col[k]))) {
+                        baseVal = col[k];
+                        break;
+                    }
+                }
+            }
+        }
+        if (baseVal === fallbackDefault) {
+            const crop = clip.effects.find(e => e.type === "crop");
+            if (crop) {
+                for (const k of keysToTry) {
+                    if (crop[k] !== undefined && crop[k] !== null && !isNaN(Number(crop[k]))) {
+                        baseVal = crop[k];
+                        break;
+                    }
+                }
+            }
+        }
     }
 
     if (clip.keyframes) {
