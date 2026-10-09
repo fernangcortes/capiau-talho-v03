@@ -104,10 +104,10 @@ export function buildCssBackdropFilter(effects) {
                 parts.push(`hue-rotate(${eff.hue}deg)`);
             }
             if (typeof eff.sepia === "number" && eff.sepia > 0) {
-                parts.push(`sepia(${eff.sepia})`);
+                parts.push(`sepia(${(eff.sepia / 100).toFixed(2)})`);
             }
             if (typeof eff.grayscale === "number" && eff.grayscale > 0) {
-                parts.push(`grayscale(${eff.grayscale})`);
+                parts.push(`grayscale(${(eff.grayscale / 100).toFixed(2)})`);
             }
             if (typeof eff.blur === "number" && eff.blur > 0) {
                 parts.push(`blur(${eff.blur}px)`);
@@ -4422,10 +4422,10 @@ export class ProgramPlayer {
                         adjParts.push(`hue-rotate(${eff.hue}deg)`);
                     }
                     if (typeof eff.sepia === "number" && eff.sepia > 0) {
-                        adjParts.push(`sepia(${eff.sepia})`);
+                        adjParts.push(`sepia(${(eff.sepia / 100).toFixed(2)})`);
                     }
                     if (typeof eff.grayscale === "number" && eff.grayscale > 0) {
-                        adjParts.push(`grayscale(${eff.grayscale})`);
+                        adjParts.push(`grayscale(${(eff.grayscale / 100).toFixed(2)})`);
                     }
                     if (typeof eff.blur === "number" && eff.blur > 0) {
                         adjParts.push(`blur(${eff.blur}px)`);
@@ -4459,10 +4459,10 @@ export class ProgramPlayer {
                 colParts.push(`hue-rotate(${col.hue}deg)`);
             }
             if (typeof col.sepia === "number" && col.sepia > 0) {
-                colParts.push(`sepia(${col.sepia})`);
+                colParts.push(`sepia(${(col.sepia / 100).toFixed(2)})`);
             }
             if (typeof col.grayscale === "number" && col.grayscale > 0) {
-                colParts.push(`grayscale(${col.grayscale})`);
+                colParts.push(`grayscale(${(col.grayscale / 100).toFixed(2)})`);
             }
             if (typeof col.blur === "number" && col.blur > 0) {
                 colParts.push(`blur(${col.blur}px)`);
@@ -4809,10 +4809,10 @@ export class ProgramPlayer {
                         adjParts.push(`hue-rotate(${eff.hue}deg)`);
                     }
                     if (typeof eff.sepia === "number" && eff.sepia > 0) {
-                        adjParts.push(`sepia(${eff.sepia})`);
+                        adjParts.push(`sepia(${(eff.sepia / 100).toFixed(2)})`);
                     }
                     if (typeof eff.grayscale === "number" && eff.grayscale > 0) {
-                        adjParts.push(`grayscale(${eff.grayscale})`);
+                        adjParts.push(`grayscale(${(eff.grayscale / 100).toFixed(2)})`);
                     }
                     if (typeof eff.blur === "number" && eff.blur > 0) {
                         adjParts.push(`blur(${eff.blur}px)`);

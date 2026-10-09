@@ -277,10 +277,10 @@ export function buildCssBackdropFilter(effects) {
                 parts.push(`hue-rotate(${eff.hue}deg)`);
             }
             if (typeof eff.sepia === "number" && eff.sepia > 0) {
-                parts.push(`sepia(${eff.sepia})`);
+                parts.push(`sepia(${(eff.sepia / 100).toFixed(2)})`);
             }
             if (typeof eff.grayscale === "number" && eff.grayscale > 0) {
-                parts.push(`grayscale(${eff.grayscale})`);
+                parts.push(`grayscale(${(eff.grayscale / 100).toFixed(2)})`);
             }
             if (typeof eff.blur === "number" && eff.blur > 0) {
                 parts.push(`blur(${eff.blur}px)`);
@@ -564,7 +564,7 @@ await runBattery("Regra P5: Bypass / Desativação (disabled: true é ignorado)"
 // ─────────────────────────────────────────────────────────────────────────────
 await runBattery("Renderização no Program Player e CSS backdrop-filter / clip-path", () => {
     const effects = [
-        { type: "color", brightness: 15, contrast: 20, saturation: 120, hue: 10, sepia: 0.2, blur: 4, disabled: false }
+        { type: "color", brightness: 15, contrast: 20, saturation: 120, hue: 10, sepia: 20, blur: 4, disabled: false }
     ];
 
     // Constrói CSS backdrop-filter a partir dos efeitos
@@ -573,7 +573,7 @@ await runBattery("Renderização no Program Player e CSS backdrop-filter / clip-
     assert.ok(filterStr.includes("contrast(1.20)"), "Deve conter contrast calibrado");
     assert.ok(filterStr.includes("saturate(1.20)"), "Deve conter saturate calibrado");
     assert.ok(filterStr.includes("hue-rotate(10deg)"), "Deve conter hue-rotate calibrado");
-    assert.ok(filterStr.includes("sepia(0.2)"), "Deve conter sepia calibrado");
+    assert.ok(filterStr.includes("sepia(0.20)"), "Deve conter sepia calibrado");
     assert.ok(filterStr.includes("blur(4px)"), "Deve conter blur calibrado");
 
     // Simula aplicação no elemento DOM do player #program-player-adjustment

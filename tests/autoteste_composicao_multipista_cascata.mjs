@@ -375,6 +375,14 @@ assert.equal(adjEl.style.display, "block", "Overlay deve estar visível no frame
 assert.equal(adjEl.style.mixBlendMode, "soft-light", "mixBlendMode deve se manter 'soft-light'");
 assert(adjEl.style.backdropFilter.includes("saturate(1.25)"), "backdropFilter deve modular para saturate(1.25)");
 
+// Sépia e cinzas são gravados em % (slider 0-100, igual ao export): o CSS precisa
+// da fração, senão grayscale(24) grampeia em 1 e a imagem fica toda cinza.
+assert.equal(
+    buildCssBackdropFilter([{ type: "color", sepia: 50, grayscale: 24 }]),
+    "sepia(0.50) grayscale(0.24)",
+    "sépia e cinzas devem sair em fração (valor/100)"
+);
+
 console.log("  ✔ Program Player compõe backdropFilter e mixBlendMode perfeitamente.\n");
 
 // ─────────────────────────────────────────────────────────────────────────────
