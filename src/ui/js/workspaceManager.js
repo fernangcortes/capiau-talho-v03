@@ -4850,8 +4850,9 @@ export class WorkspaceManager {
                                 sel?.removeAllRanges();
                             } catch (err) {}
                             if ((panelEl.id === "sidebar-left" || panelEl.querySelector("#library-main-view")) && (e.ctrlKey || e.metaKey)) {
+                                e.stopPropagation();
                                 if (typeof window.toggleLibraryHeader === "function") {
-                                    window.toggleLibraryHeader();
+                                    window.toggleLibraryHeader(true);
                                 }
                                 return;
                             }

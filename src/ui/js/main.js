@@ -2047,9 +2047,10 @@ window.addEventListener("DOMContentLoaded", () => {
                     sel.removeAllRanges();
                 }
                 // Ctrl + duplo clique no cabeçalho da biblioteca recolhe o cabeçalho
-                if (panelId === "sidebar-left" && (e.ctrlKey || e.metaKey)) {
+                if ((panelId === "sidebar-left" && (e.ctrlKey || e.metaKey)) || (header.id === "library-sidebar-header" && (e.ctrlKey || e.metaKey))) {
+                    e.stopPropagation();
                     if (typeof window.toggleLibraryHeader === "function") {
-                        window.toggleLibraryHeader();
+                        window.toggleLibraryHeader(true);
                     }
                     return;
                 }
@@ -2687,8 +2688,14 @@ window.addEventListener("DOMContentLoaded", () => {
     // Botão de setinha line icon para recolher o cabeçalho da biblioteca
     const btnCollapseLibraryHeader = document.getElementById("btn-collapse-library-header");
     if (btnCollapseLibraryHeader) {
-        btnCollapseLibraryHeader.addEventListener("click", (e) => {
+        const handleCollapse = (e) => {
             e.stopPropagation();
+            toggleLibraryHeader(true);
+        };
+        btnCollapseLibraryHeader.addEventListener("click", handleCollapse);
+        btnCollapseLibraryHeader.addEventListener("dblclick", (e) => {
+            e.stopPropagation();
+            e.preventDefault();
             toggleLibraryHeader(true);
         });
     }
@@ -2878,7 +2885,14 @@ window.addEventListener("DOMContentLoaded", () => {
     // Linha restauradora do cabeçalho da biblioteca
     const reopenLibraryHeader = document.getElementById("reopen-library-header");
     if (reopenLibraryHeader) {
-        reopenLibraryHeader.addEventListener("click", () => {
+        const handleReopen = (e) => {
+            e.stopPropagation();
+            toggleLibraryHeader(false);
+        };
+        reopenLibraryHeader.addEventListener("click", handleReopen);
+        reopenLibraryHeader.addEventListener("dblclick", (e) => {
+            e.stopPropagation();
+            e.preventDefault();
             toggleLibraryHeader(false);
         });
     }
@@ -2886,9 +2900,11 @@ window.addEventListener("DOMContentLoaded", () => {
     // Ctrl + duplo clique em espaço vazio da biblioteca para restaurar o cabeçalho se recolhido
     if (sidebarLeft) {
         sidebarLeft.addEventListener("dblclick", (e) => {
+            if (e.target.closest("#library-sidebar-header, .sidebar-header")) return;
             if (e.target.closest("button, input, select, option, label, a, .tab-btn, .media-tabs, .btn-icon, .btn-toggle-sidebar, .card, .media-item, #s3-status-indicator")) return;
             if ((e.ctrlKey || e.metaKey) && sidebarLeft.classList.contains("library-header-collapsed")) {
                 e.preventDefault();
+                e.stopPropagation();
                 window.getSelection()?.removeAllRanges();
                 toggleLibraryHeader(false);
             }

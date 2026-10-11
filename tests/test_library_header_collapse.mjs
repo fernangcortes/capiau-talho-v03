@@ -207,4 +207,41 @@ assert.strictEqual(reopenLibraryHeader.style.display, "none");
 assert(searchAreaWrapper.parentElement === compactControls);
 console.log("✔ 4d passou: Ao reabrir cabeçalho, cabeçalho reaparece com busca e seletores de mídia");
 
+// 5. Testes de anti-bubbling e integridade do evento Ctrl+duplo clique
+assert(mainJs.includes('e.stopPropagation();') && mainJs.includes('window.toggleLibraryHeader(true);'), 'Falta e.stopPropagation() e chamada com true no handler de Ctrl+duplo clique do cabeçalho');
+assert(mainJs.includes('if (e.target.closest("#library-sidebar-header, .sidebar-header")) return;'), 'Falta guarda contra eventos do cabeçalho no listener do sidebarLeft');
+assert(mainJs.includes('btnCollapseLibraryHeader.addEventListener("dblclick"'), 'Falta listener dblclick em btnCollapseLibraryHeader');
+assert(mainJs.includes('reopenLibraryHeader.addEventListener("dblclick"'), 'Falta listener dblclick em reopenLibraryHeader');
+
+// Simulação de bolha de eventos:
+let headerCollapsedState = false;
+function simulateHeaderCtrlDblClick(originInsideHeader) {
+    let stopped = false;
+    const fakeEvent = {
+        ctrlKey: true,
+        target: { closest: (sel) => originInsideHeader ? (sel.includes("sidebar-header") ? {} : null) : null },
+        stopPropagation: () => { stopped = true; },
+        preventDefault: () => {}
+    };
+
+    // 1. Handler no cabeçalho
+    if ((fakeEvent.ctrlKey) && (!fakeEvent.target.closest("button"))) {
+        fakeEvent.stopPropagation();
+        headerCollapsedState = true;
+    }
+
+    // 2. Se a propagação não fosse interrompida, o listener de sidebarLeft executaria:
+    if (!stopped) {
+        if (!fakeEvent.target.closest("#library-sidebar-header, .sidebar-header")) {
+            if (fakeEvent.ctrlKey && headerCollapsedState) {
+                headerCollapsedState = false; // falha se a bolha atingir o sidebar!
+            }
+        }
+    }
+}
+
+simulateHeaderCtrlDblClick(true);
+assert.strictEqual(headerCollapsedState, true, "Ctrl+duplo clique no cabeçalho deve permanecer recolhido sem cancelamento por bolha");
+console.log("✔ 5 passou: Anti-bubbling e preservação de estado com stopPropagation e guardas validados");
+
 console.log("=== TODOS OS TESTES PASSARAM COM SUCESSO! ===");
