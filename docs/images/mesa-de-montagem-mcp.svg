@@ -1,0 +1,171 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 640" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0d0d12"/>
+      <stop offset="100%" stop-color="#14141f"/>
+    </linearGradient>
+    <style>
+      text { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+      .h { fill: #f8fafc; font-size: 19px; font-weight: 700; }
+      .sub { fill: #94a3b8; font-size: 12px; }
+      .lbl { font-size: 11.5px; font-weight: 700; }
+      .t { fill: #f8fafc; font-size: 10.5px; font-weight: 700; }
+      .d { fill: #94a3b8; font-size: 9.5px; }
+      .box { fill: #1e1e2f; stroke: #2d2d42; stroke-width: 1; }
+      .arrow { stroke-width: 2; fill: none; }
+      .al { font-size: 9.5px; font-weight: 700; }
+    </style>
+  </defs>
+
+  <rect width="880" height="640" rx="16" fill="url(#bgGrad)" stroke="#27273a" stroke-width="1.5"/>
+  <text x="32" y="40" class="h">Mesa de Montagem: multiagentes via MCP</text>
+  <text x="32" y="62" class="sub">Os agentes leem o acervo inteiro e escrevem só em Sequências Fantasma. O aceite é sempre do editor, na interface.</text>
+
+  <!-- ===== HARNESS ===== -->
+  <rect x="24" y="82" width="290" height="392" rx="12" fill="#161622" stroke="#8b5cf6" stroke-width="1.5"/>
+  <text x="38" y="104" class="lbl" fill="#a78bfa">HARNESS MULTIAGENTE</text>
+  <text x="38" y="119" class="d">DSH · Claude Agent SDK · chat interno do CapIAu</text>
+
+  <rect x="38" y="130" width="262" height="50" rx="7" fill="#24183f" stroke="#8b5cf6" stroke-width="1"/>
+  <text x="50" y="149" class="t">Direção de Montagem (orquestrador)</text>
+  <text x="50" y="165" class="d">carta de intenção · escaleta · fases · arbitragem</text>
+
+  <rect x="38" y="190" width="128" height="62" rx="6" class="box"/>
+  <text x="48" y="207" class="t">Estruturalista</text>
+  <text x="48" y="222" class="d">arco · contraponto</text>
+  <text x="48" y="236" class="d">ponto de vista</text>
+
+  <rect x="172" y="190" width="128" height="62" rx="6" class="box"/>
+  <text x="182" y="207" class="t">Montadora</text>
+  <text x="182" y="222" class="d">ritmo · fala limpa</text>
+  <text x="182" y="236" class="d">respiro</text>
+
+  <rect x="38" y="258" width="128" height="62" rx="6" class="box"/>
+  <text x="48" y="275" class="t">Cobertura</text>
+  <text x="48" y="290" class="d">escala de plano</text>
+  <text x="48" y="304" class="d">continuidade · fotos</text>
+
+  <rect x="172" y="258" width="128" height="62" rx="6" class="box"/>
+  <text x="182" y="275" class="t">Som</text>
+  <text x="182" y="290" class="d">diálogo · ambiência</text>
+  <text x="182" y="304" class="d">música · loudness</text>
+
+  <rect x="38" y="326" width="128" height="62" rx="6" class="box"/>
+  <text x="48" y="343" class="t">Cor e Grafismo</text>
+  <text x="48" y="358" class="d">matching · look</text>
+  <text x="48" y="372" class="d">GC · legendas</text>
+
+  <rect x="172" y="326" width="128" height="62" rx="6" class="box"/>
+  <text x="182" y="343" class="t">Produção</text>
+  <text x="182" y="358" class="d">duração · formatos</text>
+  <text x="182" y="372" class="d">custo · direitos</text>
+
+  <rect x="38" y="394" width="262" height="66" rx="6" fill="#2a1520" stroke="#f43f5e" stroke-width="1"/>
+  <text x="48" y="411" class="t">Revisor(a) / Continuísta</text>
+  <text x="48" y="426" class="d">sincronia · jump cut · fala fora de contexto</text>
+  <text x="48" y="440" class="d">mede com ferramentas determinísticas</text>
+  <text x="48" y="454" class="d">e pede a segunda opinião do Jev</text>
+
+  <!-- ===== MCP ===== -->
+  <rect x="340" y="82" width="230" height="392" rx="12" fill="#161622" stroke="#06b6d4" stroke-width="1.5"/>
+  <text x="354" y="104" class="lbl" fill="#06b6d4">SERVIDOR MCP CAPIAU</text>
+  <text x="354" y="119" class="d">um registro de ferramentas, dois transportes</text>
+
+  <rect x="354" y="130" width="202" height="76" rx="6" class="box"/>
+  <text x="364" y="148" class="t">Resources (contexto)</text>
+  <text x="364" y="163" class="d">cartão do projeto · roteiro e cenas</text>
+  <text x="364" y="177" class="d">pessoas · temas · dossiês do acervo</text>
+  <text x="364" y="191" class="d">preferências do editor</text>
+
+  <rect x="354" y="214" width="202" height="90" rx="6" class="box"/>
+  <text x="364" y="232" class="t">Tools · ler, buscar, medir</text>
+  <text x="364" y="247" class="d">find_moments · search_media</text>
+  <text x="364" y="261" class="d">read_sequence_script · get_transcript</text>
+  <text x="364" y="275" class="d">sample_frames · analisar_audio</text>
+  <text x="364" y="289" class="d">check_rhythm · check_continuity</text>
+
+  <rect x="354" y="312" width="202" height="76" rx="6" class="box"/>
+  <text x="364" y="330" class="t">Tools · escrever no fantasma</text>
+  <text x="364" y="345" class="d">open_ghost · apply_ops</text>
+  <text x="364" y="359" class="d">annotate · submit_proposal</text>
+  <text x="364" y="373" class="d">sem acesso à sequência real</text>
+
+  <rect x="354" y="396" width="202" height="64" rx="6" class="box"/>
+  <text x="364" y="414" class="t">Prompts (personas)</text>
+  <text x="364" y="429" class="d">vêm do prompt_registry</text>
+  <text x="364" y="443" class="d">editáveis por projeto</text>
+
+  <!-- ===== ACERVO / MOTOR / BANCO ===== -->
+  <rect x="596" y="82" width="260" height="128" rx="12" fill="#161622" stroke="#3b82f6" stroke-width="1.5"/>
+  <text x="610" y="104" class="lbl" fill="#60a5fa">ACERVO INDEXADO (só leitura)</text>
+  <text x="610" y="124" class="d">transcript · dialogue_utterance</text>
+  <text x="610" y="139" class="d">media_segment (planos, escala)</text>
+  <text x="610" y="154" class="d">theme_segment · scene · entity</text>
+  <text x="610" y="169" class="d">rostos · objetos · audio_render</text>
+  <text x="610" y="184" class="d">Qdrant (texto e imagem)</text>
+  <text x="610" y="199" class="d">dossiês pré-calculados por mídia</text>
+
+  <rect x="596" y="222" width="260" height="122" rx="12" fill="#161622" stroke="#10b981" stroke-width="1.5"/>
+  <text x="610" y="244" class="lbl" fill="#10b981">MOTOR DE MONTAGEM</text>
+  <text x="610" y="262" class="d">recebe o apply_ops do servidor MCP</text>
+  <text x="610" y="276" class="d">núcleo puro do timelineState.js</text>
+  <text x="610" y="290" class="d">headless no Node (como os autotestes)</text>
+  <text x="610" y="304" class="d">as mesmas operações da interface</text>
+  <text x="610" y="318" class="d">valida, simula ripple, resolve âncoras</text>
+  <text x="610" y="332" class="d">e calcula o diff contra a base</text>
+
+  <rect x="596" y="356" width="260" height="118" rx="12" fill="#161622" stroke="#f59e0b" stroke-width="1.5"/>
+  <text x="610" y="378" class="lbl" fill="#f59e0b">BANCO (SQLite)</text>
+  <text x="610" y="398" class="d">sequence · sequence_revision</text>
+  <text x="610" y="413" class="d">proposal · change (blocos e operações)</text>
+  <text x="610" y="428" class="d">agent_run (custo, log, modelos)</text>
+  <text x="610" y="443" class="d">editorial_feedback (aceite e recusa)</text>
+  <text x="610" y="460" class="d">a IA grava só kind = ghost</text>
+
+  <!-- Setas -->
+  <path d="M 314 262 L 336 262" class="arrow" stroke="#a78bfa"/>
+  <polygon points="334,258 342,262 334,266" fill="#a78bfa"/>
+  <path d="M 340 286 L 318 286" class="arrow" stroke="#06b6d4"/>
+  <polygon points="320,282 312,286 320,290" fill="#06b6d4"/>
+  <text x="330" y="440" class="al" fill="#a78bfa" transform="rotate(-90 330 440)">stdio · HTTP local</text>
+
+  <path d="M 556 250 L 590 160" class="arrow" stroke="#60a5fa"/>
+  <polygon points="586,160 593,152 594,163" fill="#60a5fa"/>
+
+  <path d="M 556 350 L 590 290" class="arrow" stroke="#10b981"/>
+  <polygon points="585,290 594,284 593,295" fill="#10b981"/>
+
+  <path d="M 726 344 L 726 350" class="arrow" stroke="#f59e0b"/>
+  <polygon points="722,349 726,356 730,349" fill="#f59e0b"/>
+
+  <path d="M 726 474 L 726 492" class="arrow" stroke="#f59e0b"/>
+  <polygon points="722,491 726,498 730,491" fill="#f59e0b"/>
+
+  <!-- ===== UI ===== -->
+  <rect x="24" y="498" width="832" height="122" rx="12" fill="#161622" stroke="#10b981" stroke-width="1.5"/>
+  <text x="38" y="520" class="lbl" fill="#10b981">INTERFACE · REVISÃO HUMANA</text>
+
+  <rect x="38" y="532" width="196" height="74" rx="6" class="box"/>
+  <text x="48" y="550" class="t">Sobreposição</text>
+  <text x="48" y="565" class="d">diff desenhado nas pistas reais,</text>
+  <text x="48" y="579" class="d">sem a pista "IA"</text>
+
+  <rect x="242" y="532" width="196" height="74" rx="6" class="box"/>
+  <text x="252" y="550" class="t">Contracampo</text>
+  <text x="252" y="565" class="d">base e fantasma empilhadas;</text>
+  <text x="252" y="579" class="d">Program alterna A/B na agulha</text>
+
+  <rect x="446" y="532" width="196" height="74" rx="6" class="box"/>
+  <text x="456" y="550" class="t">Aba</text>
+  <text x="456" y="565" class="d">a fantasma abre como sequência;</text>
+  <text x="456" y="579" class="d">o editor ajusta antes de aceitar</text>
+
+  <rect x="660" y="532" width="182" height="74" rx="6" fill="#10301f" stroke="#10b981" stroke-width="1"/>
+  <text x="670" y="550" class="t">Sequência real</text>
+  <text x="670" y="565" class="d">aceite por bloco, pista</text>
+  <text x="670" y="579" class="d">ou intervalo In–Out</text>
+  <text x="670" y="593" class="d">revisão +1, com Undo</text>
+
+  <path d="M 642 569 L 656 569" class="arrow" stroke="#10b981"/>
+  <polygon points="654,565 662,569 654,573" fill="#10b981"/>
+</svg>

@@ -887,6 +887,7 @@ capiau-talho/
 | ⚙️ [**Guia de configurações de IA**](docs/ai_settings_pro_guide.md) | Referência do painel de configurações, campo a campo |
 | 🔌 [**Referência de APIs**](docs/api_endpoints.md) | Chamadas HTTP internas, para desenvolvedores |
 | 🧭 [**Plano de implementação**](docs/PLANO_IMPLEMENTACAO.md) | Etapas, decisões fechadas e critérios de aceite |
+| 👻 [**Sequência Fantasma e Mesa de Montagem**](docs/PROPOSTA_SEQUENCIA_FANTASMA_IA.md) | Diagnóstico das sugestões de IA na timeline e proposta de sugestão multipista com agentes via MCP |
 | 🚀 [**Walkthrough de desenvolvimento**](walkthrough.md) | Diário técnico e progresso passo a passo do MVP |
 
 ---
