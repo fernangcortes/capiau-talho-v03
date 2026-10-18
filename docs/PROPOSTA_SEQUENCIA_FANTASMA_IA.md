@@ -584,13 +584,21 @@ cenas aninhadas, com a lista do que falta filmar.
 
 ---
 
-## 11. Decisões em aberto
+## 11. Decisões
 
-1. **Harness**: o primeiro cliente MCP será o DSH, o Claude Agent SDK ou os dois? Muda o formato
-   de configuração e o que o orquestrador interno precisa cobrir.
+Fechadas em 18/10/2026:
+
+- **Nomes**: "Sequência Fantasma", "Contracampo" e "Mesa de Montagem" confirmados.
+- **Primeiro cliente MCP**: Claude. Falta escolher entre Claude Code e Claude Agent SDK (item 1
+  abaixo).
+- **Subsequências aninhadas** entram no roadmap da suíte NLE.
+- **Nada desta proposta é implementado** antes de `docs/PLANO_SUITE_NLE_CLASSICO.md` chegar ao
+  repositório e os dois planos serem cruzados e atualizados juntos.
+
+Em aberto:
+
+1. **Claude Code ou Claude Agent SDK** como primeiro cliente: Claude Code para validar ferramentas
+   e personas sem escrever código de orquestração; Agent SDK quando a Mesa virar um botão dentro
+   do Talho.
 2. **Node em produção**: aceitar o Node como dependência de execução do backend (hoje só roda os
    testes) para o motor único? A alternativa (validar só na interface) é mais fraca.
-3. **Nome**: confirmar "Sequência Fantasma", "Contracampo" e "Mesa de Montagem".
-4. **Subsequências** entram no roadmap da suíte NLE junto com as abas, ou depois?
-5. **Plano da suíte NLE**: se `docs/PLANO_SUITE_NLE_CLASSICO.md` existe na máquina local,
-   commitá-lo para que esta proposta se alinhe às Tasks numeradas.
