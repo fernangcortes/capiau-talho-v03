@@ -888,6 +888,7 @@ capiau-talho/
 | 🔌 [**Referência de APIs**](docs/api_endpoints.md) | Chamadas HTTP internas, para desenvolvedores |
 | 🧭 [**Plano de implementação**](docs/PLANO_IMPLEMENTACAO.md) | Etapas, decisões fechadas e critérios de aceite |
 | 👻 [**Sequência Fantasma e Mesa de Montagem**](docs/PROPOSTA_SEQUENCIA_FANTASMA_IA.md) | Diagnóstico das sugestões de IA na timeline e proposta de sugestão multipista com agentes via MCP |
+| 🧩 [**Ordem de implementação**](docs/ORDEM_DE_IMPLEMENTACAO.md) | Todos os planos conferidos contra o código e organizados em ondas, com índice dos itens em CSV |
 | 🚀 [**Walkthrough de desenvolvimento**](walkthrough.md) | Diário técnico e progresso passo a passo do MVP |
 
 ---

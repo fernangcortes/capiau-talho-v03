@@ -100,7 +100,7 @@ O que fica de fora, embora exista no banco:
 
 | Dado | Onde está | Por que importa para montar |
 | :--- | :--- | :--- |
-| Trechos exatos dos candidatos | `transcript`, `dialogue_utterance` | O LLM inventa `source_in_s/out_s` a partir de um resumo do vídeo; a validação só prende o intervalo à duração (`timeline_ai.py:300` em diante). |
+| Trechos exatos dos candidatos | `transcript` (palavra a palavra) | O LLM inventa `source_in_s/out_s` a partir de um resumo do vídeo; a validação só prende o intervalo à duração (`timeline_ai.py:300` em diante). Os trechos indexados no Qdrant e em `theme_segment` são turnos inteiros de falante, não frases; `dialogue_utterance` e `dialogue_word` existem no schema, mas o app nunca as grava. |
 | Planos e escala de plano | `media_segment` (`shot`, `shot_scale`) | Variar escala, evitar jump cut, cortar em borda de plano. |
 | Cenas do roteiro | `scene` | Montar por cena, saber o que falta cobrir. |
 | Temas por trecho | `theme_segment` | Estrutura por assunto, contraponto. |
@@ -152,11 +152,11 @@ a regra de ouro de nunca mutar sem clique do editor. Isso tudo se mantém.
 | # | Defeito | Onde | Efeito |
 | :--- | :--- | :--- | :--- |
 | D1 | INSERT/REPLACE são desenhados na pista de destino, mas o clique só os procura na pista `AI` | `timelineRenderer.js:2865` × `timelineInteraction.js:580` | O ghost não é clicável onde aparece; atalhos de aceitar/recusar dependem da seleção. |
-| D2 | Edições diretas do agente somem quando o porteiro marca a resposta como prévia | `chat_agent.py:2274` e `2372`; `chat.js:282` | Com `insert_clip`, `delete_clip`, `trim_clip`, `move_clip` ou `split_clip`, `is_preview` fica verdadeiro, `final_cuts` volta igual ao que entrou e nada vira ghost (efeito e offset A/V sozinhos passam direto). O chat grava a timeline original. O card diz "Edição aplicada" ao chamar `acceptAllGhostSuggestions` sobre uma lista vazia. `shadow_cuts`, que tem o resultado, não é lido por ninguém. |
+| D2 | Edições diretas do agente corrompem a timeline quando o porteiro marca a resposta como prévia | `chat_agent.py:2274` e `2372`; `chat.js:282-293`; `state.js:176` | Com `insert_clip`, `delete_clip`, `trim_clip`, `move_clip` ou `split_clip`, `is_preview` fica verdadeiro e `final_cuts` volta no formato do payload (`in_s`, `out_s`, `timeline_start_s`). O chat grava isso em `STATE.activeTimelineCuts`, e o setter, que lê `cut.in` e `cut.out`, calcula quadros `NaN` e reposiciona os clipes em fila (o Ctrl+Z desfaz). Nada vira ghost (efeito e offset A/V sozinhos passam direto). O card diz "Edição aplicada" ao chamar `acceptAllGhostSuggestions` sobre uma lista vazia. `shadow_cuts`, que tem o resultado, não é lido por ninguém. |
 | D3 | Marcadores do rough cut não chegam à timeline | `chat_agent.py` devolve `markers`; `populateRoughCutMarkers` (`timelineState.js:5624`) só é chamado em teste | Os beats com justificativa dramática se perdem. |
 | D4 | Pista de reserva errada quando o LLM manda pista inválida | `timeline_ai.py:294` usa `video_track_ids[-1]` | Com a ordem visual padrão (V2 acima de V1), a reserva é a **V1** magnética, não a V2 de cobertura. A interface usa a primeira pista de vídeo (`timelineState.js:5309`): as duas reservas discordam. |
 | D5 | Rough cut sem chave é heurística cega | `parse_and_orchestrate_rough_cut`, `chat_agent.py:1674` | Pega os primeiros 40% (até 12 s) das quatro primeiras entrevistas, a partir do segundo zero. Sem aviso de que não houve IA. |
-| D6 | O chat do agente quebra com clipe sem vídeo na timeline | `CapIAuAPI.chat` (`ui/js/api.js:638`) descarta `type` e `photo_id`; `TimelineShadowCopy.__init__` (`chat_agent.py:32`) faz `int(c.get("video_id", 0))` | Foto, título, cor sólida e camada de ajuste chegam com `video_id: null`; `int(None)` levanta `TypeError` antes do laço e a conversa falha. Mesmo sem o erro, o agente veria fotos como vídeo 0 e não veria títulos. |
+| D6 | O agente não enxerga clipes sem vídeo | `CapIAuAPI.chat` (`ui/js/api.js:638`) descarta `type` e `photo_id`; o setter de `STATE` (`state.js`) troca `video_id` ausente por `null`, e `Number(null)` vira 0 | Foto, título, cor sólida e camada de ajuste chegam ao agente como "vídeo 0" (a cópia-sombra, `chat_agent.py:32`, não quebra). O agente não sabe o que esses clipes são, e uma edição direta os devolveria como vídeo. |
 
 ---
 
@@ -306,8 +306,10 @@ segundos absolutos ficam como último recurso:
 ```
 
 Âncoras aceitas: clipe (`clip`, `after_clip`, `before_clip`), palavra da transcrição
-(`transcript.id` e `dialogue_word.id` já existem), plano (`media_segment.id`), marcador, cena e,
-por fim, tempo (`t`). O motor resolve a âncora na hora de aplicar.
+(`transcript.id`; `dialogue_word` existe no schema, mas o app nunca a grava), plano
+(`media_segment.id`), marcador, cena e, por fim, tempo (`t`). O motor resolve a âncora na hora de
+aplicar. As cenas precisam de id estável: hoje reextrair o roteiro apaga e recria as cenas
+(`src/db/repositories/scenes.py:19`).
 
 ### 4.2 Ajuste fino automático (snap)
 
@@ -376,8 +378,19 @@ regra de paridade do projeto existe para evitar.
 ![Mesa de Montagem: multiagentes via MCP](images/mesa-de-montagem-mcp.svg)
 
 É o E4.C1 do `docs/PLANO_IMPLEMENTACAO.md`, ampliado. **Um registro único de ferramentas** com
-dois transportes: o function-calling que o chat usa hoje (OpenRouter) e o MCP (stdio e HTTP local
-com token). O chat interno vira só mais um cliente.
+dois transportes: o function-calling que o chat usa hoje (OpenRouter) e o MCP (HTTP local com
+token). O chat interno vira só mais um cliente.
+
+Três restrições do código, conferidas em 18/10/2026:
+
+- **O servidor MCP roda dentro do processo do backend.** O Qdrant abre em modo embutido, com trava
+  exclusiva de arquivo (`src/search/semantic.py:93`): um processo MCP separado não abriria o índice.
+  Um cliente que só fale stdio usa uma ponte fina para a API do backend.
+- **Token e CORS antes.** Hoje a API não tem autenticação e aceita qualquer origem
+  (`src/api/server.py:66-72`). Abrir uma porta para agentes exige token local e CORS restrito.
+- **Canal para o navegador.** O backend não guarda a timeline viva nem fala com a interface por
+  conta própria. Para uma fantasma escrita por um agente externo aparecer na tela, é preciso um
+  canal (SSE ou WebSocket) ou a interface consultar o banco.
 
 ### 7.1 Resources (contexto, paginado e por id)
 
@@ -549,8 +562,8 @@ o editor mexer na base é reaplicada sobre a revisão nova e marca só os blocos
 - [ ] Núcleo puro extraído do `timelineState.js` e sidecar Node.
 - [ ] Linguagem de operações da seção 4 com âncoras e snap.
 - [ ] `find_moments`, `read_sequence_script`, `sample_frames`, `check_*` e dossiês em cache.
-- [ ] Servidor MCP (stdio e HTTP local com token) com tools, resources e prompts; o chat interno
-  passa a usar o mesmo registro.
+- [ ] Servidor MCP dentro do processo do backend (HTTP local com token) com tools, resources e
+  prompts, e canal para o navegador; o chat interno passa a usar o mesmo registro.
 
 *Aceite:* de uma sessão de harness externo, buscar momentos, abrir uma fantasma, aplicar dez
 operações variadas e ver o resultado tocar na interface do Talho.
@@ -596,7 +609,10 @@ Fechadas em 18/10/2026:
   ao lado do backend). Pesa a partir da F3; até lá, a fantasma valida só na interface.
 - **Subsequências aninhadas** entram no roadmap da suíte NLE.
 - **Nada desta proposta é implementado** antes de `docs/PLANO_SUITE_NLE_CLASSICO.md` chegar ao
-  repositório e os dois planos serem cruzados e atualizados juntos.
+  repositório e os dois planos serem cruzados e atualizados juntos. Atenção: o `.gitignore` ignora
+  `docs/PLANO_*.md`; o arquivo entra com `git add -f` ou depois da decisão D-01 de
+  `docs/ORDEM_DE_IMPLEMENTACAO.md`. A ordem propõe uma exceção para os defeitos D1 a D6 (decisão
+  D-13), por serem defeitos do fluxo atual, não recurso novo.
 
 Em aberto: nenhuma decisão desta proposta. A ordem de implementação junto com os demais planos
 está em `docs/ORDEM_DE_IMPLEMENTACAO.md`.

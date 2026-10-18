@@ -1,0 +1,161 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 975" width="100%" height="100%">
+<defs><linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#0d0d12"/><stop offset="100%" stop-color="#14141f"/></linearGradient>
+<style>text { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; } .h { fill: #f8fafc; font-size: 19px; font-weight: 700; } .sub { fill: #94a3b8; font-size: 12px; } .ch { font-size: 11px; font-weight: 700; } .cs { fill: #94a3b8; font-size: 9px; } .on { fill: #f8fafc; font-size: 12px; font-weight: 700; } .os { fill: #94a3b8; font-size: 9.5px; } .c { fill: #e2e8f0; font-size: 9.5px; } .k { font-size: 9.5px; font-weight: 700; }</style></defs>
+<rect width="880" height="975" rx="16" fill="url(#bgGrad)" stroke="#27273a" stroke-width="1.5"/>
+<text x="32" y="40" class="h">Ordem de implementação: ondas e trilhas</text>
+<text x="32" y="62" class="sub">Cada linha é uma onda; cada coluna, uma trilha que pode andar em paralelo. ◆ marca o caminho crítico.</text>
+<text x="132" y="88" class="ch" fill="#f59e0b">Você</text>
+<text x="132" y="101" class="cs">dados e decisões</text>
+<text x="280" y="88" class="ch" fill="#06b6d4">Análise e busca</text>
+<text x="280" y="101" class="cs">backend</text>
+<text x="428" y="88" class="ch" fill="#10b981">NLE e interface</text>
+<text x="428" y="101" class="cs">timeline, player</text>
+<text x="576" y="88" class="ch" fill="#3b82f6">Plataforma</text>
+<text x="576" y="101" class="cs">segurança, infra</text>
+<text x="724" y="88" class="ch" fill="#8b5cf6">IA de montagem</text>
+<text x="724" y="101" class="cs">fantasma, Mesa</text>
+<text x="28" y="142" class="on">Onda 0</text>
+<text x="28" y="158" class="os">Destravar</text>
+<rect x="124" y="112" width="140" height="96" rx="7" fill="#161622" stroke="#f59e0b" stroke-opacity="0.95" stroke-width="1.6"/>
+<text x="133" y="132" class="k" fill="#f59e0b">◆</text><text x="145" y="132" class="c">Conciliar bancos (E1.T9)</text>
+<text x="133" y="147" class="c">Enviar plano da suíte NLE</text>
+<text x="133" y="162" class="c">Decisões D-01 a D-14</text>
+<text x="133" y="177" class="c">Testes já possíveis</text>
+<rect x="272" y="112" width="140" height="96" rx="7" fill="#161622" stroke="#06b6d4" stroke-opacity="0.45" stroke-width="1"/>
+<text x="281" y="132" class="c">Docs em dia: plano</text>
+<text x="281" y="147" class="c">principal, revisão,</text>
+<text x="281" y="162" class="c">índice dos chats</text>
+<rect x="420" y="112" width="140" height="96" rx="7" fill="#161622" stroke="#10b981" stroke-opacity="0.45" stroke-width="1"/>
+<text x="429" y="132" class="c">Docs em dia: roadmap,</text>
+<text x="429" y="147" class="c">manual, roteiro de teste</text>
+<text x="429" y="162" class="c">Cruzar plano da suíte</text>
+<rect x="568" y="112" width="140" height="96" rx="7" fill="#161622" stroke="#3b82f6" stroke-opacity="0.45" stroke-width="1"/>
+<text x="577" y="132" class="c">Regra do .gitignore</text>
+<text x="577" y="147" class="c">Recuperar docs locais</text>
+<rect x="716" y="112" width="140" height="96" rx="7" fill="#161622" stroke="#8b5cf6" stroke-opacity="0.45" stroke-width="1"/>
+<text x="725" y="132" class="c">Corrigir a proposta:</text>
+<text x="725" y="147" class="c">D2, D6, âncoras, MCP</text>
+<text x="28" y="246" class="on">Onda 1</text>
+<text x="28" y="262" class="os">Sanear</text>
+<rect x="124" y="216" width="140" height="96" rx="7" fill="#161622" stroke="#f59e0b" stroke-opacity="0.45" stroke-width="1"/>
+<text x="133" y="236" class="c">Rerodar títulos (E1.T10)</text>
+<text x="133" y="251" class="c">Repetir teste manual</text>
+<rect x="272" y="216" width="140" height="96" rx="7" fill="#161622" stroke="#06b6d4" stroke-opacity="0.45" stroke-width="1"/>
+<text x="281" y="236" class="c">Instalação limpa</text>
+<text x="281" y="251" class="c">Integridade de dados</text>
+<text x="281" y="266" class="c">Importador de revisões</text>
+<text x="281" y="281" class="c">Ids de cena estáveis</text>
+<rect x="420" y="216" width="140" height="96" rx="7" fill="#161622" stroke="#10b981" stroke-opacity="0.45" stroke-width="1"/>
+<text x="429" y="236" class="c">Undo de fps e tamanho</text>
+<text x="429" y="251" class="c">Crop, Dip to White, OTIO</text>
+<text x="429" y="266" class="c">Dock e atalhos</text>
+<rect x="568" y="216" width="140" height="96" rx="7" fill="#161622" stroke="#3b82f6" stroke-opacity="0.45" stroke-width="1"/>
+<text x="577" y="236" class="c">Schema versionado</text>
+<text x="577" y="251" class="c">Token e CORS</text>
+<text x="577" y="266" class="c">Chaves cifradas</text>
+<text x="577" y="281" class="c">Nuvem fase 0</text>
+<rect x="716" y="216" width="140" height="96" rx="7" fill="#161622" stroke="#8b5cf6" stroke-opacity="0.45" stroke-width="1"/>
+<text x="725" y="236" class="c">F0: defeitos D1 a D6</text>
+<text x="725" y="251" class="c">(D2 corrompe a timeline)</text>
+<text x="28" y="350" class="on">Onda 2</text>
+<text x="28" y="366" class="os">Medir</text>
+<rect x="124" y="320" width="140" height="96" rx="7" fill="#161622" stroke="#f59e0b" stroke-opacity="0.45" stroke-width="1"/>
+<text x="133" y="340" class="c">Gabaritos (chat 06)</text>
+<text x="133" y="355" class="c">Revisar a triagem</text>
+<text x="133" y="370" class="c">Plano-sequência</text>
+<rect x="272" y="320" width="140" height="96" rx="7" fill="#161622" stroke="#06b6d4" stroke-opacity="0.95" stroke-width="1.6"/>
+<text x="281" y="340" class="k" fill="#06b6d4">◆</text><text x="293" y="340" class="c">Rodada de triagem</text>
+<text x="281" y="355" class="c">Calibração por categoria</text>
+<text x="281" y="370" class="c">EmbeddingGemma 2: testes</text>
+<rect x="420" y="320" width="140" height="96" rx="7" fill="none" stroke="#27273a" stroke-dasharray="3 3"/>
+<rect x="568" y="320" width="140" height="96" rx="7" fill="#161622" stroke="#3b82f6" stroke-opacity="0.45" stroke-width="1"/>
+<text x="577" y="340" class="c">Sondagem da máquina</text>
+<text x="577" y="355" class="c">Dispositivo único (GPU)</text>
+<rect x="716" y="320" width="140" height="96" rx="7" fill="none" stroke="#27273a" stroke-dasharray="3 3"/>
+<text x="28" y="454" class="on">Onda 3</text>
+<text x="28" y="470" class="os">Conteúdo para a</text>
+<text x="28" y="483" class="os">IA</text>
+<rect x="124" y="424" width="140" height="96" rx="7" fill="#161622" stroke="#f59e0b" stroke-opacity="0.45" stroke-width="1"/>
+<text x="133" y="444" class="c">Validar cartão, busca</text>
+<text x="133" y="459" class="c">e cobertura das cenas</text>
+<rect x="272" y="424" width="140" height="96" rx="7" fill="#161622" stroke="#06b6d4" stroke-opacity="0.95" stroke-width="1.6"/>
+<text x="281" y="444" class="c">Cartão de Contexto</text>
+<text x="281" y="459" class="c">Momentos (frases, trechos)</text>
+<text x="281" y="474" class="c">Busca em 3 passos</text>
+<text x="281" y="489" class="k" fill="#06b6d4">◆</text><text x="293" y="489" class="c">Grande reindexação</text>
+<text x="281" y="504" class="c">Cena↔material, objetos</text>
+<rect x="420" y="424" width="140" height="96" rx="7" fill="#161622" stroke="#10b981" stroke-opacity="0.95" stroke-width="1.6"/>
+<text x="429" y="444" class="c">VU, keyframes, ducking</text>
+<text x="429" y="459" class="c">Labels, margens</text>
+<text x="429" y="474" class="k" fill="#10b981">◆</text><text x="441" y="474" class="c">Estado por instância</text>
+<rect x="568" y="424" width="140" height="96" rx="7" fill="#161622" stroke="#3b82f6" stroke-opacity="0.45" stroke-width="1"/>
+<text x="577" y="444" class="c">Fila persistente (job)</text>
+<text x="577" y="459" class="c">Qdrant servidor, volumes</text>
+<rect x="716" y="424" width="140" height="96" rx="7" fill="#161622" stroke="#8b5cf6" stroke-opacity="0.45" stroke-width="1"/>
+<text x="725" y="444" class="c">Registro único de</text>
+<text x="725" y="459" class="c">ferramentas (E4.B1)</text>
+<text x="28" y="558" class="on">Onda 4</text>
+<text x="28" y="574" class="os">Sequências</text>
+<rect x="124" y="528" width="140" height="96" rx="7" fill="#161622" stroke="#f59e0b" stroke-opacity="0.45" stroke-width="1"/>
+<text x="133" y="548" class="c">Testar aninhamento</text>
+<text x="133" y="563" class="c">e a fantasma</text>
+<rect x="272" y="528" width="140" height="96" rx="7" fill="none" stroke="#27273a" stroke-dasharray="3 3"/>
+<rect x="420" y="528" width="140" height="96" rx="7" fill="#161622" stroke="#10b981" stroke-opacity="0.95" stroke-width="1.6"/>
+<text x="429" y="548" class="k" fill="#10b981">◆</text><text x="441" y="548" class="c">Timelines em abas</text>
+<text x="429" y="563" class="k" fill="#10b981">◆</text><text x="441" y="563" class="c">Sequências aninhadas</text>
+<rect x="568" y="528" width="140" height="96" rx="7" fill="#161622" stroke="#3b82f6" stroke-opacity="0.45" stroke-width="1"/>
+<text x="577" y="548" class="c">Migração timeline</text>
+<text x="577" y="563" class="c">→ sequence</text>
+<rect x="716" y="528" width="140" height="96" rx="7" fill="#161622" stroke="#8b5cf6" stroke-opacity="0.95" stroke-width="1.6"/>
+<text x="725" y="548" class="k" fill="#8b5cf6">◆</text><text x="737" y="548" class="c">Fantasma v1 (F1)</text>
+<text x="725" y="563" class="k" fill="#8b5cf6">◆</text><text x="737" y="563" class="c">Fantasma no banco (F2)</text>
+<text x="28" y="662" class="on">Onda 5</text>
+<text x="28" y="678" class="os">Agentes</text>
+<rect x="124" y="632" width="140" height="96" rx="7" fill="#161622" stroke="#f59e0b" stroke-opacity="0.45" stroke-width="1"/>
+<text x="133" y="652" class="c">Conversar com a Mesa</text>
+<text x="133" y="667" class="c">no Claude Code</text>
+<rect x="272" y="632" width="140" height="96" rx="7" fill="#161622" stroke="#06b6d4" stroke-opacity="0.45" stroke-width="1"/>
+<text x="281" y="652" class="c">Dossiês de momentos</text>
+<text x="281" y="667" class="c">viram resources</text>
+<rect x="420" y="632" width="140" height="96" rx="7" fill="#161622" stroke="#10b981" stroke-opacity="0.95" stroke-width="1.6"/>
+<text x="429" y="652" class="k" fill="#10b981">◆</text><text x="441" y="652" class="c">Núcleo headless</text>
+<text x="429" y="667" class="c">no Node</text>
+<rect x="568" y="632" width="140" height="96" rx="7" fill="#161622" stroke="#3b82f6" stroke-opacity="0.95" stroke-width="1.6"/>
+<text x="577" y="652" class="c">Node no deploy</text>
+<text x="577" y="667" class="k" fill="#3b82f6">◆</text><text x="589" y="667" class="c">MCP no processo,</text>
+<text x="577" y="682" class="c">HTTP com token</text>
+<rect x="716" y="632" width="140" height="96" rx="7" fill="#161622" stroke="#8b5cf6" stroke-opacity="0.95" stroke-width="1.6"/>
+<text x="725" y="652" class="c">Personas no Claude Code</text>
+<text x="725" y="667" class="k" fill="#8b5cf6">◆</text><text x="737" y="667" class="c">Mesa de Montagem (F4)</text>
+<text x="725" y="682" class="c">Agent SDK como botão</text>
+<text x="28" y="766" class="on">Onda 6</text>
+<text x="28" y="782" class="os">Cena e filme</text>
+<rect x="124" y="736" width="140" height="96" rx="7" fill="#161622" stroke="#f59e0b" stroke-opacity="0.45" stroke-width="1"/>
+<text x="133" y="756" class="c">Primeiro corte de</text>
+<text x="133" y="771" class="c">um projeto real</text>
+<rect x="272" y="736" width="140" height="96" rx="7" fill="#161622" stroke="#06b6d4" stroke-opacity="0.45" stroke-width="1"/>
+<text x="281" y="756" class="c">Continuidade como</text>
+<text x="281" y="771" class="c">ferramenta da Mesa</text>
+<rect x="420" y="736" width="140" height="96" rx="7" fill="none" stroke="#27273a" stroke-dasharray="3 3"/>
+<rect x="568" y="736" width="140" height="96" rx="7" fill="none" stroke="#27273a" stroke-dasharray="3 3"/>
+<rect x="716" y="736" width="140" height="96" rx="7" fill="#161622" stroke="#8b5cf6" stroke-opacity="0.95" stroke-width="1.6"/>
+<text x="725" y="756" class="k" fill="#8b5cf6">◆</text><text x="737" y="756" class="c">Cena e filme (F5)</text>
+<text x="725" y="771" class="c">Aprendizado (F6)</text>
+<text x="28" y="870" class="on">Sob demanda</text>
+<text x="28" y="886" class="os">quando houver</text>
+<text x="28" y="899" class="os">motivo</text>
+<rect x="124" y="840" width="140" height="96" rx="7" fill="#161622" stroke="#f59e0b" stroke-opacity="0.45" stroke-width="1"/>
+<text x="133" y="860" class="c">Contas, máquinas,</text>
+<text x="133" y="875" class="c">chaves</text>
+<rect x="272" y="840" width="140" height="96" rx="7" fill="#161622" stroke="#06b6d4" stroke-opacity="0.45" stroke-width="1"/>
+<text x="281" y="860" class="c">EG2 fase 3, DINO-X,</text>
+<text x="281" y="875" class="c">Auphonic</text>
+<rect x="420" y="840" width="140" height="96" rx="7" fill="#161622" stroke="#10b981" stroke-opacity="0.45" stroke-width="1"/>
+<text x="429" y="860" class="c">Multicâmera, scopes,</text>
+<text x="429" y="875" class="c">OCIO, WebRTC, dock F6</text>
+<rect x="568" y="840" width="140" height="96" rx="7" fill="#161622" stroke="#3b82f6" stroke-opacity="0.45" stroke-width="1"/>
+<text x="577" y="860" class="c">Farm, nuvem completa,</text>
+<text x="577" y="875" class="c">Capability Manager</text>
+<rect x="716" y="840" width="140" height="96" rx="7" fill="none" stroke="#27273a" stroke-dasharray="3 3"/>
+<text x="32" y="957" class="sub">As ondas agrupam por dependência: uma trilha começa quando os seus pré-requisitos fecham. A Onda 1 anda junto com a Onda 0.</text>
+</svg>

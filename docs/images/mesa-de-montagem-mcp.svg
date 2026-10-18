@@ -127,7 +127,7 @@
   <polygon points="334,258 342,262 334,266" fill="#a78bfa"/>
   <path d="M 340 286 L 318 286" class="arrow" stroke="#06b6d4"/>
   <polygon points="320,282 312,286 320,290" fill="#06b6d4"/>
-  <text x="330" y="440" class="al" fill="#a78bfa" transform="rotate(-90 330 440)">stdio · HTTP local</text>
+  <text x="330" y="440" class="al" fill="#a78bfa" transform="rotate(-90 330 440)">HTTP local · token</text>
 
   <path d="M 556 250 L 590 160" class="arrow" stroke="#60a5fa"/>
   <polygon points="586,160 593,152 594,163" fill="#60a5fa"/>
