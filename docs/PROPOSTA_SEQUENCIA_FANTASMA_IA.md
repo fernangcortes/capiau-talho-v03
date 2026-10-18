@@ -589,16 +589,14 @@ cenas aninhadas, com a lista do que falta filmar.
 Fechadas em 18/10/2026:
 
 - **Nomes**: "Sequência Fantasma", "Contracampo" e "Mesa de Montagem" confirmados.
-- **Primeiro cliente MCP**: Claude. Falta escolher entre Claude Code e Claude Agent SDK (item 1
-  abaixo).
+- **Primeiro cliente MCP**: Claude Code, para validar ferramentas e personas conversando, sem
+  código de orquestração. O Claude Agent SDK entra depois, quando a Mesa virar um botão do Talho;
+  os dois falam com o mesmo servidor MCP.
+- **Node em produção**: aceito para o motor único (núcleo puro do `timelineState.js` num processo
+  ao lado do backend). Pesa a partir da F3; até lá, a fantasma valida só na interface.
 - **Subsequências aninhadas** entram no roadmap da suíte NLE.
 - **Nada desta proposta é implementado** antes de `docs/PLANO_SUITE_NLE_CLASSICO.md` chegar ao
   repositório e os dois planos serem cruzados e atualizados juntos.
 
-Em aberto:
-
-1. **Claude Code ou Claude Agent SDK** como primeiro cliente: Claude Code para validar ferramentas
-   e personas sem escrever código de orquestração; Agent SDK quando a Mesa virar um botão dentro
-   do Talho.
-2. **Node em produção**: aceitar o Node como dependência de execução do backend (hoje só roda os
-   testes) para o motor único? A alternativa (validar só na interface) é mais fraca.
+Em aberto: nenhuma decisão desta proposta. A ordem de implementação junto com os demais planos
+está em `docs/ORDEM_DE_IMPLEMENTACAO.md`.
