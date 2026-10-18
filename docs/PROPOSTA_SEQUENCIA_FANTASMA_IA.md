@@ -521,8 +521,11 @@ Cada fase fecha com uma parada de teste, como no plano principal.
 ### F0 — Consertar o fluxo atual (pequeno, independente)
 
 - [ ] D1: hit-test dos ghosts na pista onde são desenhados.
-- [ ] D2: edições diretas do agente viram ghosts (coerente com "aceite só humano"); o card só diz
-  "aplicada" quando algo foi aplicado.
+- [ ] D2a (primeiro, hotfix): o `chat.js` não grava `final_cuts` quando as operações voltam como
+  prévia; o card de diff segue como único caminho de aplicação e só diz "aplicada" quando algo foi
+  aplicado. Estanca os quadros `NaN`.
+- [ ] D2b: edições diretas do agente viram ghosts (coerente com "aceite só humano"). Depende do D6
+  e de ampliar o vocabulário do ghost (aparo, divisão, movimento); pode ser absorvido pela F1.
 - [ ] D3: `chat.js` passa os `markers` da resposta para `populateRoughCutMarkers`.
 - [ ] D4: reserva de pista igual nos dois lados e apontando para cobertura (V2), nunca para a V1
   magnética.
@@ -563,7 +566,9 @@ o editor mexer na base é reaplicada sobre a revisão nova e marca só os blocos
 - [ ] Linguagem de operações da seção 4 com âncoras e snap.
 - [ ] `find_moments`, `read_sequence_script`, `sample_frames`, `check_*` e dossiês em cache.
 - [ ] Servidor MCP dentro do processo do backend (HTTP local com token) com tools, resources e
-  prompts, e canal para o navegador; o chat interno passa a usar o mesmo registro.
+  prompts, e canal para o navegador; o chat interno passa a usar o mesmo registro. A parte só de
+  leitura (busca, transcrição, Cartão, cenas) é o E4.C1 do plano principal e pode vir antes, sem
+  Node nem fantasma (E4.C1a em `docs/ORDEM_DE_IMPLEMENTACAO.md`).
 
 *Aceite:* de uma sessão de harness externo, buscar momentos, abrir uma fantasma, aplicar dez
 operações variadas e ver o resultado tocar na interface do Talho.
