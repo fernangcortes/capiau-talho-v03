@@ -1219,6 +1219,13 @@ export class CapiauTimelineState {
         return this.tracks.find(t => t.id === id) || null;
     }
 
+    /** Retorna true se a pista existir e estiver travada com cadeado físico (locked: true). */
+    isTrackLocked(trackId) {
+        if (!trackId) return false;
+        const t = this.getTrack(trackId);
+        return !!(t && t.locked);
+    }
+
     /** Pistas de texto em ordem visual (de cima para baixo). */
     getTextTracks() {
         return this.tracks.filter(t => t.kind === "text");
@@ -1249,7 +1256,7 @@ export class CapiauTimelineState {
      * V1→A1 por sufixo numérico; senão por índice (base→topo); senão a primeira de áudio.
      */
     pairedAudioTrackId(videoTrackId) {
-        const audioTracks = this.getAudioTracks();
+        const audioTracks = this.getAudioTracks().filter(t => !t.locked);
         if (!audioTracks.length) return null;
         const num = String(videoTrackId).replace(/\D/g, "");
         if (num) {
@@ -1419,17 +1426,26 @@ export class CapiauTimelineState {
         return track;
     }
 
-    /** Remove uma pista (os clipes dela vão para a pista mais próxima do mesmo tipo). */
+    /** Remove uma pista (os clipes dela vão para a pista destravada mais próxima do mesmo tipo). */
     removeTrack(trackId) {
         const idx = this.tracks.findIndex(t => t.id === trackId);
         if (idx === -1) return false;
         const track = this.tracks[idx];
         if (track.kind === "ai") return false; // pista de IA é permanente
+        if (track.locked) return false; // pista travada com cadeado não pode ser removida
         if (track.kind === "video" && this.getVideoTracks().length <= 1) return false; // sempre resta 1 pista de vídeo
+
+        const remainingSameKind = this.tracks.filter((t, i) => i !== idx && t.kind === track.kind);
+        const unlockedSameKind = remainingSameKind.filter(t => !t.locked);
+        const hasClipsOnTrack = (STATE.activeTimelineCuts || []).some(c => c.track === trackId);
+        // Se houver clipes órfãos e todas as outras pistas do mesmo tipo estiverem travadas, aborta para não violar cadeado
+        if (hasClipsOnTrack && remainingSameKind.length > 0 && unlockedSameKind.length === 0) {
+            return false;
+        }
 
         TIMELINE_HISTORY.record(() => {
             this.tracks.splice(idx, 1);
-            const sameKind = this.tracks.filter(t => t.kind === track.kind);
+            const sameKind = this.tracks.filter(t => t.kind === track.kind && !t.locked);
             const fallback = sameKind.length ? sameKind[sameKind.length - 1] : null;
 
             let cuts = [...STATE.activeTimelineCuts];
@@ -1461,11 +1477,13 @@ export class CapiauTimelineState {
 
     renameTrack(trackId, newName) {
         const track = this.getTrack(trackId);
-        if (!track || !newName) return;
+        if (!track || !newName) return false;
+        if (track.kind !== "ai" && track.locked) return false;
         TIMELINE_HISTORY.record(() => {
             track.name = newName.trim();
             STATE.emit("timelineTracksChanged", this.tracks);
         });
+        return true;
     }
 
     setTrackVolume(trackId, volume) {
@@ -1483,11 +1501,129 @@ export class CapiauTimelineState {
         STATE.emit("timelineCutsUpdated", STATE.activeTimelineCuts);
     }
 
+    _purgeSelectionOnLockedTrack(trackId) {
+        const cuts = STATE.activeTimelineCuts || [];
+        let selectionMutated = false;
+
+        if (this.selectedClipIds && this.selectedClipIds.size > 0) {
+            for (const cid of Array.from(this.selectedClipIds)) {
+                const c = cuts.find(item => item.id === cid);
+                if (c && c.track === trackId) {
+                    this.selectedClipIds.delete(cid);
+                    selectionMutated = true;
+                }
+            }
+        }
+
+        if (this.selectedClipId) {
+            const c = cuts.find(item => item.id === this.selectedClipId);
+            if (c && c.track === trackId) {
+                this.selectedClipId = (this.selectedClipIds && this.selectedClipIds.size > 0)
+                    ? Array.from(this.selectedClipIds)[0]
+                    : null;
+                if (this.manualTransformClipId === c.id) {
+                    this.manualTransformClipId = null;
+                }
+                selectionMutated = true;
+            }
+        }
+
+        if (this.selectedGap && this.selectedGap.trackId === trackId) {
+            this.selectedGap = null;
+            STATE.emit("timelineGapSelected", null);
+            selectionMutated = true;
+        }
+
+        if (this.selectedTransitionId && Array.isArray(this.transitions)) {
+            const tr = this.transitions.find(t => t.id === this.selectedTransitionId);
+            if (tr && tr.track === trackId) {
+                this.selectedTransitionId = null;
+                selectionMutated = true;
+            }
+        }
+
+        if (this.selectedMarkerIds && this.selectedMarkerIds.size > 0 && Array.isArray(this.markers)) {
+            for (const mid of Array.from(this.selectedMarkerIds)) {
+                const m = this.markers.find(item => item.id === mid);
+                if (m && m.clipId) {
+                    const c = cuts.find(item => String(item.id) === String(m.clipId));
+                    if (c && c.track === trackId) {
+                        this.selectedMarkerIds.delete(mid);
+                        selectionMutated = true;
+                    }
+                }
+            }
+        }
+
+        if (selectionMutated) {
+            STATE.emit("timelineSelectionChanged", this.selectedClipId);
+        }
+    }
+
     toggleTrackLock(trackId) {
         const track = this.getTrack(trackId);
-        if (!track || track.kind === "ai") return;
-        track.locked = !track.locked;
+        if (!track || track.kind === "ai") return null;
+
+        TIMELINE_HISTORY.record(() => {
+            const liveTrack = this.getTrack(trackId);
+            if (!liveTrack || liveTrack.kind === "ai") return;
+            liveTrack.locked = !liveTrack.locked;
+            if (liveTrack.locked) {
+                this._purgeSelectionOnLockedTrack(trackId);
+            }
+        });
+
+        const updated = this.getTrack(trackId);
         STATE.emit("timelineTracksChanged", this.tracks);
+        STATE.emit("timelineCutsUpdated", STATE.activeTimelineCuts);
+        return updated ? !!updated.locked : null;
+    }
+
+    /**
+     * Alterna o cadeado físico da pista atualmente ativa/selecionada (atalho Shift+L).
+     */
+    toggleActiveTrackLock() {
+        const nonAiTracks = (this.tracks || []).filter(t => t.kind !== "ai");
+        if (nonAiTracks.length === 0) return null;
+
+        let target = null;
+        if (this.selectedTrack) {
+            const candidate = this.getTrack(this.selectedTrack);
+            if (candidate && candidate.kind !== "ai") target = candidate;
+        }
+        if (!target) {
+            target = nonAiTracks.find(t => t.id === "V1") || nonAiTracks[0];
+        }
+        if (!target) return null;
+
+        this.selectedTrack = target.id;
+        const locked = this.toggleTrackLock(target.id);
+        return { trackId: target.id, locked };
+    }
+
+    /**
+     * Alterna o cadeado físico em todas as pistas não-IA de uma só vez (Ctrl+Alt+Shift+L).
+     * Se alguma estiver destravada, trava todas; se todas já estiverem travadas, destrava todas.
+     */
+    toggleAllTracksLock() {
+        const nonAiTracks = (this.tracks || []).filter(t => t.kind !== "ai");
+        if (nonAiTracks.length === 0) return null;
+
+        const shouldLockAll = nonAiTracks.some(t => !t.locked);
+
+        TIMELINE_HISTORY.record(() => {
+            (this.tracks || []).forEach(t => {
+                if (t.kind === "ai") return;
+                t.locked = shouldLockAll;
+                if (shouldLockAll) {
+                    this._purgeSelectionOnLockedTrack(t.id);
+                }
+            });
+        });
+
+        STATE.emit("timelineTracksChanged", this.tracks);
+        STATE.emit("timelineCutsUpdated", STATE.activeTimelineCuts);
+        return { locked: shouldLockAll, count: nonAiTracks.length };
     }
 
     toggleTrackVisibility(trackId) {
@@ -1669,7 +1805,7 @@ export class CapiauTimelineState {
      * Retorna o gap sob determinado frame em uma pista (ou null se for ocupado por clipe).
      */
     getGapAt(frame, trackId) {
-        if (!trackId) return null;
+        if (!trackId || this.isTrackLocked(trackId)) return null;
         const gaps = this.getTrackGaps(trackId);
         return gaps.find(g => frame >= g.startFrame && frame < g.endFrame) || null;
     }
@@ -1726,6 +1862,7 @@ export class CapiauTimelineState {
      */
     overwriteTimeRange(trackId, startFrame, durationFrames, ignoredClipIds = [], sourceCuts = null, splitLinkMap = null) {
         const cuts = sourceCuts || STATE.activeTimelineCuts || [];
+        if (this.isTrackLocked(trackId)) return [...cuts];
         const endFrame = startFrame + durationFrames;
         const fps = this.fps || 24;
         const newCuts = [];
@@ -1824,7 +1961,9 @@ export class CapiauTimelineState {
     simulateOverwrite(draggedClipId, targetStartFrame, targetTrack = null, sourceCuts = null, isMovingBackwards = false) {
         const base = (sourceCuts || STATE.activeTimelineCuts || []).map(c => ({ ...c }));
         const clip = base.find(c => c.id === draggedClipId);
-        if (!clip) return { simulatedCuts: base, outgoingClip: null, outgoingTime: 0, incomingClip: null, incomingTime: 0 };
+        if (!clip || this.isTrackLocked(clip.track)) {
+            return { simulatedCuts: base, outgoingClip: null, outgoingTime: 0, incomingClip: null, incomingTime: 0 };
+        }
 
         const fps = this.fps || 24;
         const clipKind = this.trackKindOf(clip.track);
@@ -1836,9 +1975,10 @@ export class CapiauTimelineState {
             }
         }
 
-        const partner = clip.link_id
+        const rawPartner = clip.link_id
             ? base.find(c => c.id !== clip.id && c.link_id === clip.link_id)
             : null;
+        const partner = (rawPartner && !this.isTrackLocked(rawPartner.track)) ? rawPartner : null;
 
         let partnerTrackId = partner ? partner.track : null;
         if (clipKind === "video" && finalTrackId !== clip.track && partner) {
@@ -1983,7 +2123,9 @@ export class CapiauTimelineState {
         const rawSource = sourceCuts || STATE.activeTimelineCuts || [];
         const base = rawSource.map(c => ({ ...c }));
         const clip = base.find(c => c.id === draggedClipId);
-        if (!clip) return { simulatedCuts: base, outgoingClip: null, outgoingTime: 0, incomingClip: null, incomingTime: 0 };
+        if (!clip || this.isTrackLocked(clip.track)) {
+            return { simulatedCuts: base, outgoingClip: null, outgoingTime: 0, incomingClip: null, incomingTime: 0 };
+        }
 
         const fps = this.fps || 24;
         const clipKind = this.trackKindOf(clip.track);
@@ -1995,9 +2137,10 @@ export class CapiauTimelineState {
             }
         }
 
-        const partner = clip.link_id
+        const rawPartner = clip.link_id
             ? base.find(c => c.id !== clip.id && c.link_id === clip.link_id)
             : null;
+        const partner = (rawPartner && !this.isTrackLocked(rawPartner.track)) ? rawPartner : null;
 
         let partnerTrackId = partner ? partner.track : null;
         if (clipKind === "video" && finalTrackId !== clip.track && partner) {
@@ -2195,6 +2338,7 @@ export class CapiauTimelineState {
      */
     rippleInsertTimeRange(trackId, startFrame, durationFrames, ignoredClipIds = [], sourceCuts = null, splitLinkMap = null) {
         const cuts = sourceCuts || STATE.activeTimelineCuts || [];
+        if (this.isTrackLocked(trackId)) return [...cuts];
         const fps = this.fps || 24;
         const newCuts = [];
 
@@ -2347,13 +2491,28 @@ export class CapiauTimelineState {
      * Seleciona um clipe específico, substituindo a seleção ou adicionando em modo multi.
      */
     selectClip(clipId, multi = false) {
+        const cuts = STATE.activeTimelineCuts || [];
+        if (clipId) {
+            const cut = cuts.find(c => c.id === clipId);
+            if (cut && this.isTrackLocked(cut.track)) {
+                if (!multi) {
+                    this.selectedClipIds.clear();
+                    this.selectedClipId = null;
+                    this.manualTransformClipId = null;
+                }
+                this.clearSelectedGap();
+                this.selectedGhostClipId = null;
+                STATE.emit("timelineSelectionChanged", this.selectedClipId);
+                return false;
+            }
+        }
         if (!multi) {
             this.selectedClipIds.clear();
         }
         if (clipId) {
             this.selectedClipIds.add(clipId);
             this.selectedClipId = clipId;
-            const cut = (STATE.activeTimelineCuts || []).find(c => c.id === clipId);
+            const cut = cuts.find(c => c.id === clipId);
             if (cut && cut.track) this.selectedTrack = cut.track;
         } else if (!multi) {
             this.selectedClipId = null;
@@ -2361,16 +2520,22 @@ export class CapiauTimelineState {
         this.clearSelectedGap();
         this.selectedGhostClipId = null;
         STATE.emit("timelineSelectionChanged", this.selectedClipId);
+        return true;
     }
 
     /**
-     * Define uma lista de IDs de clipes selecionados.
+     * Define uma lista de IDs de clipes selecionados (filtrando pistas travadas).
      */
     selectClips(clipIds) {
-        this.selectedClipIds = new Set(clipIds);
-        this.selectedClipId = clipIds.length > 0 ? clipIds[0] : null;
+        const cuts = STATE.activeTimelineCuts || [];
+        const safeIds = (Array.isArray(clipIds) ? clipIds : Array.from(clipIds || [])).filter(id => {
+            const cut = cuts.find(c => c.id === id);
+            return !(cut && this.isTrackLocked(cut.track));
+        });
+        this.selectedClipIds = new Set(safeIds);
+        this.selectedClipId = safeIds.length > 0 ? safeIds[0] : null;
         if (this.selectedClipId) {
-            const cut = (STATE.activeTimelineCuts || []).find(c => c.id === this.selectedClipId);
+            const cut = cuts.find(c => c.id === this.selectedClipId);
             if (cut && cut.track) this.selectedTrack = cut.track;
         }
         this.clearSelectedGap();
@@ -2383,10 +2548,15 @@ export class CapiauTimelineState {
      */
     addClipsToSelection(clipIds) {
         if (!this.selectedClipIds) this.selectedClipIds = new Set();
+        const cuts = STATE.activeTimelineCuts || [];
         if (Array.isArray(clipIds)) {
-            clipIds.forEach(id => this.selectedClipIds.add(id));
-            if (!this.selectedClipId && clipIds.length > 0) {
-                this.selectedClipId = clipIds[0];
+            const safeIds = clipIds.filter(id => {
+                const cut = cuts.find(c => c.id === id);
+                return !(cut && this.isTrackLocked(cut.track));
+            });
+            safeIds.forEach(id => this.selectedClipIds.add(id));
+            if (!this.selectedClipId && safeIds.length > 0) {
+                this.selectedClipId = safeIds[0];
             }
         }
         this.clearSelectedGap();
@@ -2405,10 +2575,20 @@ export class CapiauTimelineState {
     }
 
     /**
-     * Alterna a seleção de um clipe (Shift+Clique).
+     * Alterna a seleção de um clipe (Shift+Clique), respeitando o bloqueio físico da pista.
      */
     toggleClipSelection(clipId) {
         if (!clipId) return;
+        const cuts = STATE.activeTimelineCuts || [];
+        const targetCut = cuts.find(c => c.id === clipId);
+        if (targetCut && this.isTrackLocked(targetCut.track)) {
+            this.selectedClipIds.delete(clipId);
+            if (this.selectedClipId === clipId) {
+                this.selectedClipId = this.selectedClipIds.size > 0 ? Array.from(this.selectedClipIds)[0] : null;
+            }
+            STATE.emit("timelineSelectionChanged", this.selectedClipId);
+            return;
+        }
         if (this.selectedClipIds.has(clipId)) {
             this.selectedClipIds.delete(clipId);
             this.selectedClipId = this.selectedClipIds.size > 0 ? Array.from(this.selectedClipIds)[0] : null;
@@ -2417,7 +2597,7 @@ export class CapiauTimelineState {
             this.selectedClipId = clipId;
         }
         if (this.selectedClipId) {
-            const cut = (STATE.activeTimelineCuts || []).find(c => c.id === this.selectedClipId);
+            const cut = cuts.find(c => c.id === this.selectedClipId);
             if (cut && cut.track) this.selectedTrack = cut.track;
         }
         this.clearSelectedGap();
@@ -2427,33 +2607,53 @@ export class CapiauTimelineState {
 
     /**
      * Aplica resultado de seleção por retângulo / caixa (Marquee Selection) aos conjuntos de seleção ativos.
-     * @param {Array<string>} clipIds IDs dos clipes interceptados pela caixa.
-     * @param {Array<string>} markerIds IDs dos marcadores interceptados pela caixa.
-     * @param {"replace"|"add"|"subtract"} mode Modo de combinação com a seleção inicial ("replace", "add", "subtract").
-     * @param {Set<string>|Array<string>|null} initialClipIds Seleção inicial de clipes no início do arraste.
-     * @param {Set<string>|Array<string>|null} initialMarkerIds Seleção inicial de marcadores no início do arraste.
+     * Clipes e marcadores vinculados a clipes em pistas travadas são estritamente ignorados.
      */
     applyMarqueeSelection(clipIds = [], markerIds = [], mode = "replace", initialClipIds = null, initialMarkerIds = null) {
-        const baseClips = initialClipIds ? new Set(initialClipIds) : new Set(this.selectedClipIds || []);
-        if (!initialClipIds && this.selectedClipId) baseClips.add(this.selectedClipId);
+        const cuts = STATE.activeTimelineCuts || [];
+        const isAllowedClipId = (cid) => {
+            const cut = cuts.find(c => c.id === cid);
+            return !(cut && this.isTrackLocked(cut.track));
+        };
+        const isAllowedMarkerId = (mid) => {
+            if (!Array.isArray(this.markers)) return true;
+            const m = this.markers.find(item => item.id === mid);
+            if (m && m.clipId) {
+                const cut = cuts.find(c => String(c.id) === String(m.clipId));
+                if (cut && this.isTrackLocked(cut.track)) return false;
+            }
+            return true;
+        };
 
-        const baseMarkers = initialMarkerIds ? new Set(initialMarkerIds) : new Set(this.selectedMarkerIds || []);
+        const safeClipIds = (Array.isArray(clipIds) ? clipIds : Array.from(clipIds || [])).filter(isAllowedClipId);
+        const safeMarkerIds = (Array.isArray(markerIds) ? markerIds : Array.from(markerIds || [])).filter(isAllowedMarkerId);
+
+        const baseClips = new Set(
+            (initialClipIds ? Array.from(initialClipIds) : Array.from(this.selectedClipIds || [])).filter(isAllowedClipId)
+        );
+        if (!initialClipIds && this.selectedClipId && isAllowedClipId(this.selectedClipId)) {
+            baseClips.add(this.selectedClipId);
+        }
+
+        const baseMarkers = new Set(
+            (initialMarkerIds ? Array.from(initialMarkerIds) : Array.from(this.selectedMarkerIds || [])).filter(isAllowedMarkerId)
+        );
 
         let nextClips = new Set();
         let nextMarkers = new Set();
 
         if (mode === "add") {
-            nextClips = new Set([...baseClips, ...clipIds]);
-            nextMarkers = new Set([...baseMarkers, ...markerIds]);
+            nextClips = new Set([...baseClips, ...safeClipIds]);
+            nextMarkers = new Set([...baseMarkers, ...safeMarkerIds]);
         } else if (mode === "subtract") {
             nextClips = new Set(baseClips);
-            for (const cid of clipIds) nextClips.delete(cid);
+            for (const cid of safeClipIds) nextClips.delete(cid);
             nextMarkers = new Set(baseMarkers);
-            for (const mid of markerIds) nextMarkers.delete(mid);
+            for (const mid of safeMarkerIds) nextMarkers.delete(mid);
         } else {
             // "replace"
-            nextClips = new Set(clipIds);
-            nextMarkers = new Set(markerIds);
+            nextClips = new Set(safeClipIds);
+            nextMarkers = new Set(safeMarkerIds);
         }
 
         this.selectedClipIds = nextClips;
@@ -2481,20 +2681,39 @@ export class CapiauTimelineState {
             if (this.selectedClipId) return this.liftDeleteClip(this.selectedClipId);
             return false;
         }
+        const checkCuts = STATE.activeTimelineCuts || [];
+        const unlockedSelected = Array.from(this.selectedClipIds).filter(id => {
+            const c = checkCuts.find(item => item.id === id);
+            return c && !this.isTrackLocked(c.track);
+        });
+        if (unlockedSelected.length === 0) return false;
+
         TIMELINE_HISTORY.record(() => {
             const cuts = [...STATE.activeTimelineCuts];
-            const toDeleteIds = new Set(this.selectedClipIds);
+            const toDeleteIds = new Set(unlockedSelected);
+            const brokenLinks = new Set();
 
-            // Inclui parceiros vinculados (link_id)
+            // Inclui parceiros vinculados apenas se a pista do parceiro não estiver travada
             cuts.forEach(c => {
                 if (toDeleteIds.has(c.id) && c.link_id) {
                     cuts.forEach(partner => {
-                        if (partner.link_id === c.link_id) toDeleteIds.add(partner.id);
+                        if (partner.link_id === c.link_id) {
+                            if (this.isTrackLocked(partner.track)) {
+                                brokenLinks.add(c.link_id);
+                            } else {
+                                toDeleteIds.add(partner.id);
+                            }
+                        }
                     });
                 }
             });
 
             const remaining = cuts.filter(c => !toDeleteIds.has(c.id));
+            if (brokenLinks.size > 0) {
+                remaining.forEach(c => {
+                    if (c.link_id && brokenLinks.has(c.link_id)) c.link_id = null;
+                });
+            }
             this.clearClipSelection();
             STATE.activeTimelineCuts = remaining;
         });
@@ -2502,21 +2721,35 @@ export class CapiauTimelineState {
     }
 
     /**
-     * Ripple Delete de todos os clipes selecionados.
+     * Ripple Delete de todos os clipes selecionados (protegendo pistas travadas).
      */
     rippleDeleteSelectedClips() {
         if (!this.selectedClipIds || this.selectedClipIds.size === 0) {
             if (this.selectedClipId) return this.rippleDeleteClip(this.selectedClipId);
             return false;
         }
+        const checkCuts = STATE.activeTimelineCuts || [];
+        const unlockedSelected = Array.from(this.selectedClipIds).filter(id => {
+            const c = checkCuts.find(item => item.id === id);
+            return c && !this.isTrackLocked(c.track);
+        });
+        if (unlockedSelected.length === 0) return false;
+
         TIMELINE_HISTORY.record(() => {
             const cuts = [...STATE.activeTimelineCuts];
-            const toDeleteIds = new Set(this.selectedClipIds);
+            const toDeleteIds = new Set(unlockedSelected);
+            const brokenLinks = new Set();
 
             cuts.forEach(c => {
                 if (toDeleteIds.has(c.id) && c.link_id) {
                     cuts.forEach(partner => {
-                        if (partner.link_id === c.link_id) toDeleteIds.add(partner.id);
+                        if (partner.link_id === c.link_id) {
+                            if (this.isTrackLocked(partner.track)) {
+                                brokenLinks.add(c.link_id);
+                            } else {
+                                toDeleteIds.add(partner.id);
+                            }
+                        }
                     });
                 }
             });
@@ -2536,6 +2769,11 @@ export class CapiauTimelineState {
             const durationFrames = Math.max(0, maxEnd - minStart);
             const syncTracks = this.getSyncLockedTrackIds();
             const remaining = cuts.filter(c => !toDeleteIds.has(c.id));
+            if (brokenLinks.size > 0) {
+                remaining.forEach(c => {
+                    if (c.link_id && brokenLinks.has(c.link_id)) c.link_id = null;
+                });
+            }
 
             this.applyRippleShift(remaining, syncTracks, maxEnd, durationFrames, Array.from(toDeleteIds));
 
@@ -2552,7 +2790,7 @@ export class CapiauTimelineState {
         if (!this.selectedClipIds || this.selectedClipIds.size === 0) {
             if (this.selectedClipId) {
                 const cut = STATE.activeTimelineCuts.find(c => c.id === this.selectedClipId);
-                if (cut) {
+                if (cut && !this.isTrackLocked(cut.track)) {
                     const newStart = Math.max(0, (cut.timelineStartFrame || 0) + deltaFrames);
                     TIMELINE_HISTORY.record(() => {
                         cut.timelineStartFrame = newStart;
@@ -2576,7 +2814,7 @@ export class CapiauTimelineState {
         }
 
         const cuts = STATE.activeTimelineCuts;
-        const selectedCuts = cuts.filter(c => this.selectedClipIds.has(c.id));
+        const selectedCuts = cuts.filter(c => this.selectedClipIds.has(c.id) && !this.isTrackLocked(c.track));
         if (selectedCuts.length === 0) return false;
 
         const minStart = Math.min(...selectedCuts.map(c => c.timelineStartFrame || 0));
@@ -2615,6 +2853,9 @@ export class CapiauTimelineState {
     }
 
     selectGap(gap) {
+        if (gap && gap.trackId && this.isTrackLocked(gap.trackId)) {
+            return false;
+        }
         this.selectedGap = gap;
         if (gap) {
             this.selectedClipId = null;
@@ -2659,22 +2900,20 @@ export class CapiauTimelineState {
         const ignoredSet = new Set(ignoredClipIds);
         const activeTracks = new Set(syncTracks);
 
-        // 1. Identificar todos os clipes a jusante (downstream)
-        // Um clipe é a jusante se está em syncTracks e inicia em ou após boundaryFrame - 1
+        // 1. Identificar todos os clipes a jusante (downstream) em pistas destravadas
         const downstreamIds = new Set();
         cuts.forEach(c => {
-            if (!ignoredSet.has(c.id) && activeTracks.has(c.track) && (c.timelineStartFrame || 0) >= boundaryFrame - 1) {
+            if (!ignoredSet.has(c.id) && !this.isTrackLocked(c.track) && activeTracks.has(c.track) && (c.timelineStartFrame || 0) >= boundaryFrame - 1) {
                 downstreamIds.add(c.id);
             }
         });
 
-        // 2. Expandir para incluir parceiros vinculados (link_id)
-        // Clipes com mesmo link_id são inseparáveis: se um move, o parceiro obrigatoriamente move junto!
+        // 2. Expandir para incluir parceiros vinculados (link_id), EXCETO se a pista do parceiro estiver travada com cadeado!
         let addedPartner = true;
         while (addedPartner) {
             addedPartner = false;
             cuts.forEach(c => {
-                if (c.link_id && !ignoredSet.has(c.id) && !downstreamIds.has(c.id)) {
+                if (c.link_id && !ignoredSet.has(c.id) && !downstreamIds.has(c.id) && !this.isTrackLocked(c.track)) {
                     const hasMovingPartner = cuts.some(p => p.link_id === c.link_id && downstreamIds.has(p.id));
                     if (hasMovingPartner) {
                         downstreamIds.add(c.id);
@@ -2731,7 +2970,7 @@ export class CapiauTimelineState {
         movingCuts.forEach(c => {
             if (c.link_id && !linksProcessed.has(c.link_id)) {
                 linksProcessed.add(c.link_id);
-                const partners = cuts.filter(p => p.link_id === c.link_id && !ignoredSet.has(p.id));
+                const partners = cuts.filter(p => p.link_id === c.link_id && !ignoredSet.has(p.id) && !this.isTrackLocked(p.track));
                 partners.forEach(p => {
                     const prevEnd = fixedEndsByTrack[p.track] || 0;
                     const pSpace = Math.max(0, (p.timelineStartFrame || 0) - prevEnd);
@@ -2742,13 +2981,26 @@ export class CapiauTimelineState {
 
         const actualDelta = Math.max(0, maxAllowedShift);
 
-        // 6. Aplicar o deslocamento atômico
+        // 6. Aplicar o deslocamento atômico (preservando parceiros em pistas travadas e recalculando syncOffset)
         if (actualDelta > 0) {
             const fps = this.fps || 24;
             cuts.forEach(c => {
                 if (downstreamIds.has(c.id)) {
                     c.timelineStartFrame = Math.max(0, (c.timelineStartFrame || 0) - actualDelta);
                     c.timeline_start = c.timelineStartFrame / fps;
+                }
+            });
+            // Se um clipe moveu e seu parceiro vinculado ficou congelado em pista travada, atualiza syncOffset
+            cuts.forEach(c => {
+                if (downstreamIds.has(c.id) && c.link_id) {
+                    const frozenPartner = cuts.find(p => p.id !== c.id && p.link_id === c.link_id && !downstreamIds.has(p.id));
+                    if (frozenPartner) {
+                        const v = this.trackKindOf(c.track) === "video" ? c : frozenPartner;
+                        const a = this.trackKindOf(c.track) === "audio" ? c : frozenPartner;
+                        if (v && a) {
+                            a.syncOffset = ((a.timelineStartFrame || 0) - (a.inFrame || 0)) - ((v.timelineStartFrame || 0) - (v.inFrame || 0));
+                        }
+                    }
                 }
             });
         }
@@ -2766,11 +3018,12 @@ export class CapiauTimelineState {
      */
     rippleDeleteGap(trackId, startFrame, durationFrames) {
         if (!durationFrames || durationFrames <= 0) return { actualDelta: 0, blocked: false, fullyClosed: false };
+        if (this.isTrackLocked(trackId)) return { actualDelta: 0, blocked: true, fullyClosed: false };
         let result = { actualDelta: 0, blocked: false, fullyClosed: false };
         TIMELINE_HISTORY.record(() => {
             const cuts = [...STATE.activeTimelineCuts];
             const syncTracks = this.getSyncLockedTrackIds();
-            const targetTracks = Array.from(new Set([...syncTracks, trackId]));
+            const targetTracks = Array.from(new Set([...syncTracks, trackId])).filter(tId => !this.isTrackLocked(tId));
             const boundaryFrame = startFrame + durationFrames;
 
             result = this.applyRippleShift(cuts, targetTracks, boundaryFrame, durationFrames);
@@ -2784,37 +3037,51 @@ export class CapiauTimelineState {
     }
 
     /**
-     * Lift Delete de um clipe: apaga o clipe (e áudio vinculado) deixando o espaço vazio intacto.
+     * Lift Delete de um clipe: apaga o clipe (e áudio vinculado em pista destravada) deixando o espaço vazio intacto.
      */
     liftDeleteClip(clipId) {
         const cuts = [...STATE.activeTimelineCuts];
         const idx = cuts.findIndex(c => c.id === clipId);
         if (idx === -1) return false;
+        if (this.isTrackLocked(cuts[idx].track)) return false;
 
         TIMELINE_HISTORY.record(() => {
             const clip = cuts[idx];
             const linkId = clip.link_id;
             if (linkId) {
+                let lockedSurvivor = false;
                 for (let i = cuts.length - 1; i >= 0; i--) {
-                    if (cuts[i].link_id === linkId) cuts.splice(i, 1);
+                    if (cuts[i].link_id === linkId) {
+                        if (this.isTrackLocked(cuts[i].track)) {
+                            lockedSurvivor = true;
+                        } else {
+                            cuts.splice(i, 1);
+                        }
+                    }
+                }
+                if (lockedSurvivor) {
+                    cuts.forEach(c => {
+                        if (c.link_id === linkId) c.link_id = null;
+                    });
                 }
             } else {
                 cuts.splice(idx, 1);
             }
             if (this.selectedClipId === clipId) this.selectedClipId = null;
+            if (this.selectedClipIds) this.selectedClipIds.delete(clipId);
             STATE.activeTimelineCuts = cuts;
         });
         return true;
     }
 
     /**
-     * Ripple Delete de um clipe: apaga o clipe e fecha o buraco em todas as pistas com Sync Lock,
-     * preservando rigorosamente a sincronia de mídias A/V vinculadas subsequentes.
+     * Ripple Delete de um clipe: apaga o clipe e fecha o buraco em todas as pistas com Sync Lock destravadas,
+     * preservando rigorosamente pistas travadas com cadeado e a sincronia A/V.
      */
     rippleDeleteClip(clipId) {
         const cuts = [...STATE.activeTimelineCuts];
         const clip = cuts.find(c => c.id === clipId);
-        if (!clip) return false;
+        if (!clip || this.isTrackLocked(clip.track)) return false;
 
         TIMELINE_HISTORY.record(() => {
             const startFrame = clip.timelineStartFrame || 0;
@@ -2824,11 +3091,21 @@ export class CapiauTimelineState {
             const deletedIds = [];
 
             if (linkId) {
+                let lockedSurvivor = false;
                 for (let i = cuts.length - 1; i >= 0; i--) {
                     if (cuts[i].link_id === linkId) {
-                        deletedIds.push(cuts[i].id);
-                        cuts.splice(i, 1);
+                        if (this.isTrackLocked(cuts[i].track)) {
+                            lockedSurvivor = true;
+                        } else {
+                            deletedIds.push(cuts[i].id);
+                            cuts.splice(i, 1);
+                        }
                     }
+                }
+                if (lockedSurvivor) {
+                    cuts.forEach(c => {
+                        if (c.link_id === linkId) c.link_id = null;
+                    });
                 }
             } else {
                 const idx = cuts.findIndex(c => c.id === clipId);
@@ -2838,20 +3115,18 @@ export class CapiauTimelineState {
                 }
             }
 
-            // Puxa os clipes posteriores nas pistas sincronizadas com proteção A/V
+            // Puxa os clipes posteriores nas pistas sincronizadas com proteção A/V e pistas travadas
             this.applyRippleShift(cuts, syncTracks, startFrame + durationFrames, durationFrames, deletedIds);
 
             if (this.selectedClipId === clipId) this.selectedClipId = null;
+            if (this.selectedClipIds) this.selectedClipIds.delete(clipId);
             STATE.activeTimelineCuts = cuts;
         });
         return true;
     }
 
     /**
-     * Ripple Trim / Ripple Delete até a posição da agulha (playhead).
-     * @param {"head"|"tail"|"left"|"right"} side - "head"/"left": Início até a agulha (Q); "tail"/"right": Agulha até o fim (W).
-     * @param {string|null} targetClipId - ID opcional de um clipe específico.
-     * @returns {boolean} true se realizou o corte com sucesso, false caso contrário.
+     * Ripple Trim / Ripple Delete até a posição da agulha (playhead), protegendo pistas travadas.
      */
     rippleTrimToPlayhead(side = "head", targetClipId = null) {
         const isHead = side === "head" || side === "left" || side === "prev";
@@ -2859,16 +3134,21 @@ export class CapiauTimelineState {
         const cuts = [...STATE.activeTimelineCuts];
         if (cuts.length === 0) return false;
 
-        // 1. Determina clipes candidatos
+        if (targetClipId) {
+            const explicitClip = cuts.find(item => item.id === targetClipId);
+            if (!explicitClip || this.isTrackLocked(explicitClip.track)) return false;
+        }
+
+        // 1. Determina clipes candidatos em pistas destravadas
         let candidates = [];
         if (targetClipId) {
             const c = cuts.find(item => item.id === targetClipId);
-            if (c) candidates.push(c);
+            if (c && !this.isTrackLocked(c.track)) candidates.push(c);
         } else if (this.selectedClipIds && this.selectedClipIds.size > 0) {
-            candidates = cuts.filter(c => this.selectedClipIds.has(c.id));
+            candidates = cuts.filter(c => this.selectedClipIds.has(c.id) && !this.isTrackLocked(c.track));
         } else if (this.selectedClipId) {
             const c = cuts.find(item => item.id === this.selectedClipId);
-            if (c) candidates.push(c);
+            if (c && !this.isTrackLocked(c.track)) candidates.push(c);
         }
 
         const coversPlayhead = (c) => {
@@ -2880,24 +3160,24 @@ export class CapiauTimelineState {
 
         let intersecting = candidates.filter(coversPlayhead);
 
-        // Se nenhum clipe selecionado intersecta a agulha, busca na pista ativa ou pistas sincronizadas
+        // Se nenhum clipe selecionado intersecta a agulha, busca na pista ativa destravada ou pistas sincronizadas destravadas
         if (intersecting.length === 0) {
-            if (this.selectedTrack) {
+            if (this.selectedTrack && !this.isTrackLocked(this.selectedTrack)) {
                 const trackClip = cuts.find(c => c.track === this.selectedTrack && coversPlayhead(c));
                 if (trackClip) intersecting.push(trackClip);
             }
             if (intersecting.length === 0) {
                 const syncTracks = this.getSyncLockedTrackIds();
-                intersecting = cuts.filter(c => syncTracks.includes(c.track) && coversPlayhead(c));
+                intersecting = cuts.filter(c => syncTracks.includes(c.track) && !this.isTrackLocked(c.track) && coversPlayhead(c));
             }
             if (intersecting.length === 0) {
-                intersecting = cuts.filter(coversPlayhead);
+                intersecting = cuts.filter(c => !this.isTrackLocked(c.track) && coversPlayhead(c));
             }
         }
 
         if (intersecting.length === 0) {
-            // Se a agulha estiver em um gap selecionado e for corte de início
-            if (isHead && this.selectedGap) {
+            // Se a agulha estiver em um gap selecionado de pista destravada e for corte de início
+            if (isHead && this.selectedGap && !this.isTrackLocked(this.selectedGap.trackId)) {
                 const gap = this.selectedGap;
                 this.rippleDeleteGap(gap.trackId, gap.startFrame, gap.durationFrames);
                 return true;
@@ -2905,10 +3185,10 @@ export class CapiauTimelineState {
             return false;
         }
 
-        // Inclui parceiros vinculados (link_id) para manter sincronismo de áudio e vídeo
+        // Inclui parceiros vinculados (link_id) apenas se estiverem em pistas destravadas
         const targetIds = new Set(intersecting.map(c => c.id));
         cuts.forEach(c => {
-            if (c.link_id && intersecting.some(t => t.link_id === c.link_id)) {
+            if (c.link_id && !this.isTrackLocked(c.track) && intersecting.some(t => t.link_id === c.link_id)) {
                 targetIds.add(c.id);
             }
         });
@@ -2995,6 +3275,7 @@ export class CapiauTimelineState {
      * Inserção com Ripple: insere um clipe abrindo espaço nas pistas sincronizadas.
      */
     insertClipWithRipple(clipData, targetFrame, targetTrackId) {
+        if (this.isTrackLocked(targetTrackId)) return null;
         // Captura se a timeline estava vazia ANTES da inserção (Auto-Zoom Inteligente)
         const wasEmptyTimeline = (STATE.activeTimelineCuts || []).length === 0;
         TIMELINE_HISTORY.record(() => {
@@ -3354,8 +3635,8 @@ export class CapiauTimelineState {
         const videoHit = cuts.find(c => unlockedTracks.has(c.track) && c.track && c.track.startsWith("V") && coversPlayhead(c));
         if (videoHit) return videoHit;
 
-        // d) Qualquer outra pista destravada
-        const anyHit = cuts.find(c => (unlockedTracks.size === 0 || unlockedTracks.has(c.track)) && coversPlayhead(c));
+        // d) Qualquer outra pista destravada (jamais retorna pista travada mesmo se todas estiverem travadas)
+        const anyHit = cuts.find(c => unlockedTracks.has(c.track) && coversPlayhead(c));
         return anyHit || null;
     }
 
@@ -3384,7 +3665,15 @@ export class CapiauTimelineState {
      */
     getGapAtPlayhead(playhead = this.playheadFrame, preferredTrack = this.selectedTrack) {
         const cuts = STATE.activeTimelineCuts || [];
-        const trackId = (preferredTrack && this.tracks.some(t => t.id === preferredTrack && !t.locked)) ? preferredTrack : "V1";
+        let trackId = null;
+        if (preferredTrack && this.tracks.some(t => t.id === preferredTrack && !t.locked && t.kind !== "ai")) {
+            trackId = preferredTrack;
+        } else {
+            const v1Open = this.tracks.find(t => t.id === "V1" && !t.locked);
+            const anyOpen = this.tracks.find(t => t.kind !== "ai" && !t.locked);
+            trackId = v1Open ? v1Open.id : (anyOpen ? anyOpen.id : null);
+        }
+        if (!trackId) return null;
         const trackCuts = cuts
             .filter(c => c.track === trackId)
             .sort((a, b) => (a.timelineStartFrame || 0) - (b.timelineStartFrame || 0));
@@ -3463,13 +3752,13 @@ export class CapiauTimelineState {
         if (!targetId) return null;
 
         const clip = cuts.find(c => c.id === targetId);
-        if (!clip) return null;
+        if (!clip || this.isTrackLocked(clip.track)) return null;
 
         const newState = !clip.disabled;
         const targets = [clip];
         if (clip.link_id) {
             const partner = cuts.find(c => c.link_id === clip.link_id && c.id !== clip.id);
-            if (partner) targets.push(partner);
+            if (partner && !this.isTrackLocked(partner.track)) targets.push(partner);
         }
 
         const hist = (typeof TIMELINE_HISTORY !== "undefined" ? TIMELINE_HISTORY : (typeof window !== "undefined" ? window.TIMELINE_HISTORY : null));
@@ -3951,7 +4240,13 @@ export class CapiauTimelineState {
 
         const openVideoTracks = this.getVideoTracks().filter(t => !t.locked && !t.hidden);
         const unlockedVideoTracks = this.getVideoTracks().filter(t => !t.locked);
-        const usableVideoTracks = openVideoTracks.length > 0 ? openVideoTracks : (unlockedVideoTracks.length > 0 ? unlockedVideoTracks : this.getVideoTracks());
+        if (unlockedVideoTracks.length === 0 && mode !== "overlay") {
+            if (typeof window !== "undefined" && typeof window.showToast === "function") {
+                window.showToast("Todas as pistas de vídeo estão travadas com cadeado.", "warning");
+            }
+            return null;
+        }
+        const usableVideoTracks = openVideoTracks.length > 0 ? openVideoTracks : unlockedVideoTracks;
 
         let startFrame = 0;
         let setPlayheadAtStart = false;
@@ -4640,13 +4935,22 @@ export class CapiauTimelineState {
         // Sem pista definida: entrevistas vão para V1 (falas); b-rolls para V2
         if (!track) {
             const videoTracks = this.getVideoTracks().filter(t => !t.locked);
+            if (videoTracks.length === 0) {
+                if (typeof window !== "undefined" && typeof window.showToast === "function") {
+                    window.showToast("Todas as pistas de vídeo estão travadas com cadeado.", "warning");
+                }
+                return null;
+            }
             const v2 = videoTracks.find(t => t.id === "V2");
             const v1 = videoTracks.find(t => t.id === "V1");
             if (video && video.video_type === "broll" && v2) {
                 track = v2.id;
             } else {
-                track = (v1 || videoTracks[0] || { id: "V1" }).id;
+                track = (v1 || videoTracks[0]).id;
             }
+        }
+        if (options && options.audioTrackId && this.isTrackLocked(options.audioTrackId)) {
+            options = { ...options, audioTrackId: this.pairedAudioTrackId(track) };
         }
         // Auto-configuração no primeiro clipe de vídeo (Fase 2.3)
         if (STATE.activeTimelineCuts.length === 0 && video) {
@@ -4881,9 +5185,15 @@ export class CapiauTimelineState {
         }
         if (!track) {
             const videoTracks = this.getVideoTracks().filter(t => !t.locked);
+            if (videoTracks.length === 0) {
+                if (typeof window !== "undefined" && typeof window.showToast === "function") {
+                    window.showToast("Todas as pistas de vídeo estão travadas com cadeado.", "warning");
+                }
+                return null;
+            }
             const v2 = videoTracks.find(t => t.id === "V2");
             const v1 = videoTracks.find(t => t.id === "V1");
-            track = (v2 || v1 || videoTracks[0] || { id: "V1" }).id;
+            track = (v2 || v1 || videoTracks[0]).id;
         }
 
         const dur = Math.max(0.1, Number(durationSec) || PHOTO_DEFAULT_DURATION);
@@ -4944,9 +5254,25 @@ export class CapiauTimelineState {
         const durFrames = durationFrames !== null && durationFrames !== undefined ? Math.max(1, Math.round(durationFrames)) : Math.round(4 * fps); // 4s padrão
 
         let targetTrack = trackId;
+        if (targetTrack && this.isTrackLocked(targetTrack)) {
+            if (typeof window !== "undefined" && typeof window.showToast === "function") {
+                window.showToast("A pista de texto está travada com cadeado.", "warning");
+            }
+            return null;
+        }
         if (!targetTrack) {
-            const textTracks = this.getTextTracks().filter(t => !t.locked && !t.hidden);
-            targetTrack = textTracks.length > 0 ? textTracks[0].id : (this.getTextTracks()[0] || {}).id;
+            const allTextTracks = this.getTextTracks();
+            const openTextTracks = allTextTracks.filter(t => !t.locked && !t.hidden);
+            const unlockedTextTracks = allTextTracks.filter(t => !t.locked);
+            if (allTextTracks.length > 0 && unlockedTextTracks.length === 0) {
+                if (typeof window !== "undefined" && typeof window.showToast === "function") {
+                    window.showToast("Todas as pistas de texto estão travadas com cadeado.", "warning");
+                }
+                return null;
+            }
+            targetTrack = openTextTracks.length > 0
+                ? openTextTracks[0].id
+                : (unlockedTextTracks.length > 0 ? unlockedTextTracks[0].id : null);
             if (!targetTrack) {
                 const newT = this.addTextTrack();
                 targetTrack = newT.id;
@@ -5013,8 +5339,14 @@ export class CapiauTimelineState {
         }
         if (!targetTrack) {
             const videoTracks = this.getVideoTracks().filter(t => !t.locked);
+            if (videoTracks.length === 0) {
+                if (typeof window !== "undefined" && typeof window.showToast === "function") {
+                    window.showToast("Todas as pistas de vídeo estão travadas com cadeado.", "warning");
+                }
+                return null;
+            }
             const v1 = videoTracks.find(t => t.id === "V1");
-            targetTrack = (v1 || videoTracks[0] || { id: "V1" }).id;
+            targetTrack = (v1 || videoTracks[0]).id;
         }
 
         const fps = this.fps || 24;
@@ -5094,9 +5426,15 @@ export class CapiauTimelineState {
         }
         if (!targetTrack) {
             const videoTracks = this.getVideoTracks().filter(t => !t.locked);
+            if (videoTracks.length === 0) {
+                if (typeof window !== "undefined" && typeof window.showToast === "function") {
+                    window.showToast("Todas as pistas de vídeo estão travadas com cadeado.", "warning");
+                }
+                return null;
+            }
             const v2 = videoTracks.find(t => t.id === "V2");
             const v3 = videoTracks.find(t => t.id === "V3");
-            targetTrack = (v2 || v3 || videoTracks[0] || { id: "V2" }).id;
+            targetTrack = (v2 || v3 || videoTracks[0]).id;
         }
 
         const fps = this.fps || 24;
@@ -5349,9 +5687,24 @@ export class CapiauTimelineState {
      */
     acceptGhostSuggestion(ghostId) {
         const index = this.ghostTrack.findIndex(g => g.id === ghostId);
-        if (index === -1) return;
+        if (index === -1) return false;
 
         const suggestion = this.ghostTrack[index];
+        if (suggestion.track && this.isTrackLocked(suggestion.track)) {
+            if (typeof window !== "undefined" && typeof window.showToast === "function") {
+                window.showToast("A pista de destino está travada com cadeado", "warning");
+            }
+            return false;
+        }
+        if (suggestion.targetClipId) {
+            const targetCut = (STATE.activeTimelineCuts || []).find(c => c.id === suggestion.targetClipId);
+            if (targetCut && this.isTrackLocked(targetCut.track)) {
+                if (typeof window !== "undefined" && typeof window.showToast === "function") {
+                    window.showToast("A pista alvo está travada com cadeado", "warning");
+                }
+                return false;
+            }
+        }
 
         TIMELINE_HISTORY.record(() => {
             const currentCuts = this.conformCuts(STATE.activeTimelineCuts);
@@ -5396,13 +5749,21 @@ export class CapiauTimelineState {
                 return pair;
             };
 
-            // Remove um clipe e o par vinculado a ele (mantendo a ordem dos demais)
+            // Remove um clipe e o par vinculado a ele (preservando parceiros em pistas travadas)
             const removeWithPartner = (clipId) => {
                 const target = currentCuts.find(c => c.id === clipId);
-                if (!target) return;
+                if (!target || this.isTrackLocked(target.track)) return;
                 const removeIds = new Set([target.id]);
                 if (target.link_id) {
-                    currentCuts.forEach(c => { if (c.link_id === target.link_id) removeIds.add(c.id); });
+                    currentCuts.forEach(c => {
+                        if (c.link_id === target.link_id) {
+                            if (this.isTrackLocked(c.track)) {
+                                c.link_id = null;
+                            } else {
+                                removeIds.add(c.id);
+                            }
+                        }
+                    });
                 }
                 for (let i = currentCuts.length - 1; i >= 0; i--) {
                     if (removeIds.has(currentCuts[i].id)) currentCuts.splice(i, 1);
@@ -5656,12 +6017,16 @@ export class CapiauTimelineState {
      * Substitui a mídia de um clipe na timeline por uma candidata do carrossel de alternativas.
      */
     replaceClipWithAlternative(clipId, alternativeVideoId, newIn, newOut, useIdealDuration) {
+        const preClip = (STATE.activeTimelineCuts || []).find(c => c.id === clipId);
+        if (!preClip || this.isTrackLocked(preClip.track)) return false;
+
         TIMELINE_HISTORY.record(() => {
             const currentCuts = this.conformCuts(STATE.activeTimelineCuts);
             const targetIdx = currentCuts.findIndex(c => c.id === clipId);
             if (targetIdx === -1) return;
 
             const targetVideoClip = currentCuts[targetIdx];
+            if (this.isTrackLocked(targetVideoClip.track)) return;
             const oldDuration = targetVideoClip.out - targetVideoClip.in;
 
             // Determinar nova duração do slot
@@ -5673,10 +6038,11 @@ export class CapiauTimelineState {
             }
             const delta = newDuration - oldDuration;
 
-            // Encontrar parceiro de áudio
-            const audioPartner = targetVideoClip.link_id
+            // Encontrar parceiro de áudio (somente se a pista de áudio não estiver travada)
+            const rawAudioPartner = targetVideoClip.link_id
                 ? currentCuts.find(c => c.link_id === targetVideoClip.link_id && c.id !== targetVideoClip.id)
                 : null;
+            const audioPartner = (rawAudioPartner && !this.isTrackLocked(rawAudioPartner.track)) ? rawAudioPartner : null;
 
             // A mídia atual vira alternativa (a troca é reversível pelo carrossel)
             const alts = targetVideoClip.alternatives || [];
@@ -5867,7 +6233,11 @@ export class CapiauTimelineState {
             if (working.link_id) {
                 const partner = cuts.find(c => c.id !== working.id && c.link_id === working.link_id) || null;
                 if (partner) {
-                    if (isNewVideo) {
+                    if (this.isTrackLocked(partner.track)) {
+                        // Pista do parceiro travada com cadeado: preserva parceiro intacto desvinculando-o
+                        partner.link_id = null;
+                        working.link_id = null;
+                    } else if (isNewVideo) {
                         // Mantém o par sincronizado (preserva syncOffset de J/L-cuts)
                         partner.video_id = media.id;
                         partner.inFrame = working.inFrame;
@@ -6080,13 +6450,13 @@ export class CapiauTimelineState {
             return playhead > start && playhead < end;
         };
 
-        // 1. Clipes selecionados que cruzam a agulha
+        // 1. Clipes selecionados em pistas destravadas que cruzam a agulha
         let targets = [];
         if (this.selectedClipIds && this.selectedClipIds.size > 0) {
-            targets = cuts.filter(c => this.selectedClipIds.has(c.id) && coversPlayhead(c));
+            targets = cuts.filter(c => this.selectedClipIds.has(c.id) && !this.isTrackLocked(c.track) && coversPlayhead(c));
         } else if (this.selectedClipId) {
             const c = cuts.find(item => item.id === this.selectedClipId);
-            if (c && coversPlayhead(c)) {
+            if (c && !this.isTrackLocked(c.track) && coversPlayhead(c)) {
                 targets.push(c);
             }
         }
@@ -6117,7 +6487,7 @@ export class CapiauTimelineState {
 
             // d) Qualquer outro clipe (áudio, texto, etc.) sob a agulha em pistas destravadas
             if (targets.length === 0) {
-                const anyClip = cuts.find(c => (unlockedTracks.size === 0 || unlockedTracks.has(c.track)) && coversPlayhead(c));
+                const anyClip = cuts.find(c => unlockedTracks.has(c.track) && coversPlayhead(c));
                 if (anyClip) targets.push(anyClip);
             }
         }
@@ -6268,10 +6638,10 @@ export class CapiauTimelineState {
                     }
                 }
             }
-            // d) Fallback para qualquer corte cuja pista comece com "V"
+            // d) Fallback para qualquer corte em pista não travada cuja pista comece com "V"
             if (!targetClip) {
-                targetClip = cuts.find(c => c.track && c.track.startsWith("V") && coversStrict(c)) ||
-                             cuts.find(c => c.track && c.track.startsWith("V") && coversFrame(c));
+                targetClip = cuts.find(c => c.track && c.track.startsWith("V") && !this.isTrackLocked(c.track) && coversStrict(c)) ||
+                             cuts.find(c => c.track && c.track.startsWith("V") && !this.isTrackLocked(c.track) && coversFrame(c));
             }
         }
 
@@ -6774,7 +7144,7 @@ export class CapiauTimelineState {
      * @returns {Object|null}
      */
     getTransitionAt(trackId, frame, toleranceFrames = 6) {
-        if (!trackId || typeof frame !== "number" || !this.transitions) return null;
+        if (!trackId || this.isTrackLocked(trackId) || typeof frame !== "number" || !this.transitions) return null;
         return this.transitions.find(t => {
             if (t.track !== trackId) return false;
             const halfA = t.halfAFrames !== undefined ? t.halfAFrames : Math.round((t.durationFrames || 24) / 2);
@@ -6791,7 +7161,7 @@ export class CapiauTimelineState {
      * @returns {{ transition: Object, edge: "left"|"right"|"body" }|null}
      */
     getTransitionHit(trackId, frame, toleranceFrames = 4) {
-        if (!trackId || typeof frame !== "number" || !this.transitions) return null;
+        if (!trackId || this.isTrackLocked(trackId) || typeof frame !== "number" || !this.transitions) return null;
         const zoom = this.zoom || 1;
         const tol = (typeof toleranceFrames === "number") 
             ? Math.min(toleranceFrames, Math.max(1, Math.round(6 / zoom))) 
@@ -7445,7 +7815,7 @@ export class CapiauTimelineState {
     removeTransition(transitionId) {
         if (!transitionId || !this.transitions) return false;
         const trans = this.transitions.find(t => t.id === transitionId);
-        if (!trans) return false;
+        if (!trans || this.isTrackLocked(trans.track)) return false;
 
         TIMELINE_HISTORY.record(() => {
             const currentCuts = STATE.activeTimelineCuts || [];
@@ -7553,7 +7923,7 @@ export class CapiauTimelineState {
     updateTransitionDuration(transitionId, halfAFrames, halfBFrames, isSymmetric = false) {
         if (!transitionId || !this.transitions) return null;
         const tr = this.transitions.find(t => t.id === transitionId);
-        if (!tr) return null;
+        if (!tr || this.isTrackLocked(tr.track)) return null;
 
         const cuts = STATE.activeTimelineCuts || [];
         const clipA = cuts.find(c => c.id === tr.clipAId);
@@ -8325,6 +8695,7 @@ STATE.on("mediaRotated", ({ mediaType, mediaId, rotation }) => {
 
     let changed = false;
     (STATE.activeTimelineCuts || []).forEach(cut => {
+        if (TIMELINE_STATE.isTrackLocked(cut.track)) return;
         const matches = (mediaType === "video" && String(cut.video_id) === String(mediaId)) ||
                         (mediaType === "photo" && String(cut.photo_id) === String(mediaId));
         if (matches) {

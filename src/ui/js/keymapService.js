@@ -546,6 +546,18 @@ export const COMMANDS_CATALOG = [
         description: "Ativa ou desativa a rolagem automática da timeline para acompanhar o cursor de reprodução"
     },
     {
+        id: "timeline.toggle_track_lock",
+        category: "canvas_history",
+        label: "Travar / Destravar Pista Ativa (Track Lock)",
+        description: "Ativa ou desativa o cadeado físico de proteção total na pista selecionada"
+    },
+    {
+        id: "timeline.toggle_all_tracks_lock",
+        category: "canvas_history",
+        label: "Travar / Destravar Todas as Pistas",
+        description: "Alterna o cadeado físico em todas as pistas de vídeo, áudio e texto da timeline"
+    },
+    {
         id: "history.undo",
         category: "canvas_history",
         label: "Desfazer Ação (Undo)",
@@ -888,6 +900,8 @@ export const KEYMAP_PRESETS = {
         "timeline.zoom_reset": ["Ctrl+Digit1"],
         "timeline.toggle_selection_follows_playhead": ["Ctrl+Alt+KeyP"],
         "timeline.toggle_follow_playhead": ["Ctrl+Alt+KeyF"],
+        "timeline.toggle_track_lock": ["Shift+KeyL"],
+        "timeline.toggle_all_tracks_lock": ["Ctrl+Alt+Shift+KeyL"],
 
         // Layout & Workspace (Numpad & Slots)
         "workspace.numpad_1": ["Numpad1"],
@@ -1032,7 +1046,9 @@ export const KEYMAP_PRESETS = {
         "timeline.zoom_fit": ["Ctrl+Shift+Space"],
         "timeline.zoom_reset": ["Period"],
         "timeline.zoom_in": ["Ctrl+Equal", "Ctrl+NumpadAdd"],
-        "timeline.zoom_out": ["Ctrl+Minus", "Ctrl+NumpadSubtract"]
+        "timeline.zoom_out": ["Ctrl+Minus", "Ctrl+NumpadSubtract"],
+        "timeline.toggle_track_lock": ["Shift+KeyL"],
+        "timeline.toggle_all_tracks_lock": ["Ctrl+Alt+Shift+KeyL"]
     },
 
     // 3. Adobe Premiere Pro
@@ -1126,7 +1142,9 @@ export const KEYMAP_PRESETS = {
         "timeline.zoom_fit": ["Backslash"],
         "timeline.zoom_in": ["Equal", "NumpadAdd"],
         "timeline.zoom_out": ["Minus", "NumpadSubtract"],
-        "timeline.zoom_reset": ["Ctrl+Digit1"]
+        "timeline.zoom_reset": ["Ctrl+Digit1"],
+        "timeline.toggle_track_lock": ["Ctrl+Shift+KeyL", "Shift+KeyL"],
+        "timeline.toggle_all_tracks_lock": ["Ctrl+Alt+Shift+KeyL"]
     },
 
     // 4. DaVinci Resolve
@@ -1220,7 +1238,9 @@ export const KEYMAP_PRESETS = {
         "timeline.zoom_fit": ["Shift+KeyZ"],
         "timeline.zoom_in": ["Ctrl+Equal", "Ctrl+NumpadAdd", "Cmd+Equal"],
         "timeline.zoom_out": ["Ctrl+Minus", "Ctrl+NumpadSubtract", "Cmd+Minus"],
-        "timeline.zoom_reset": ["Shift+Digit1"]
+        "timeline.zoom_reset": ["Shift+Digit1"],
+        "timeline.toggle_track_lock": ["Alt+Shift+KeyL", "Shift+KeyL"],
+        "timeline.toggle_all_tracks_lock": ["Ctrl+Alt+Shift+KeyL"]
     },
 
     // 5. Apple Final Cut Pro
@@ -1314,7 +1334,9 @@ export const KEYMAP_PRESETS = {
         "timeline.zoom_fit": ["Shift+KeyZ"],
         "timeline.zoom_in": ["Cmd+Equal", "Ctrl+Equal"],
         "timeline.zoom_out": ["Cmd+Minus", "Ctrl+Minus"],
-        "timeline.zoom_reset": ["Shift+Digit1"]
+        "timeline.zoom_reset": ["Shift+Digit1"],
+        "timeline.toggle_track_lock": ["Shift+KeyL"],
+        "timeline.toggle_all_tracks_lock": ["Ctrl+Alt+Shift+KeyL"]
     }
 };
 

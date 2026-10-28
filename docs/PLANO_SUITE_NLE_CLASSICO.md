@@ -141,7 +141,7 @@
 | **Sessão 5** | **Task 20**| Borracha de Áudio & Keyframes na Timeline | **`Ctrl + Clique`** | Waveforms de Áudio | 📋 Planejada |
 | **Sessão 5** | **Task 21**| Atenuação Sonora Automática (Auto-Ducking) | Toggle Pista | Pista A2 (Música) | 📋 Planejada |
 | **Sessão 6** | **Task 22**| Rótulos de Cor para Clipes (Color Labels) | Menu Botão Direito | Timeline & Cards | 📋 Planejada |
-| **Sessão 6** | **Task 23**| Trava Total de Pista (Track Lock com Cadeado) | Botão Cadeado | Cabeçalhos de Pistas | 📋 Planejada |
+| **Sessão 6** | **Task 23**| Trava Total de Pista (Track Lock com Cadeado) | Clique no Header / **`Shift+L`** / **`Ctrl+Alt+Shift+L`** | Cabeçalhos de Pistas | ✅ Concluída |
 | **Sessão 6** | **Task 24**| Margens de Segurança & Overlays de Aspecto | Botão Header | Program Player | 📋 Planejada |
 | **Sessão 6** | **Task 25**| Sistema de Múltiplas Timelines em Abas | Barra de Abas | Topo da Timeline | 📋 Planejada |
 
@@ -1274,23 +1274,33 @@ Durante a consolidação da Sessão 1, foi implementado o bloco ergonômico de e
 ---
 
 ### Task 23: Trava Total de Pista com Cadeado Físico (Track Lock)
+> **Status:** ✅ Concluída e Validada com Sucesso (11/11 baterias aprovadas no `autoteste_track_lock.mjs`, Imunidade Total de Pista e Sincronia A/V contra Mutações/Ripple, Hachura Diagonal Neutra a 45° no Canvas e Atalhos nos 5 Perfis NLE)
 
-#### 1. Objetivo & Especificação Funcional
-* Botão de cadeado (`btn-track-lock`) em cada cabeçalho de pista (V1, V2, A1, A2, T1).
-* Pista travada:
-  * Exibe hachura visual sutil no canvas indicando proteção.
-  * Clipes da pista não podem ser selecionados, movidos, cortados pela Lâmina, apagados ou afetados por operações de ripple.
+#### 1. Objetivo & Especificação Funcional Entregue
+* [x] Botão físico de cadeado (`.btn-track-lock`) em todos os cabeçalhos de pista não-IA (`V1`, `V2`, `A1`, `A2`, `T1` e pistas dinâmicas), estilizado com classes semânticas (`.locked` em `var(--color-rose)` e `.unlocked` discreto em `var(--text-muted)` com *hover glow* suave e tooltip reativo via `KEYMAP_SERVICE`).
+* [x] Pista travada (`track.locked === true`):
+  * [x] Exibe hachura diagonal sutil e neutra a 45° (`drawLockedTracksOverlay()`) sobre toda a extensão horizontal da pista no canvas, preservando 100% da cor semântica original dos clipes por baixo.
+  * [x] Expurga instantaneamente seleções residuais de clipes, gaps e transições pertencentes à pista ao travá-la, com suporte atômico a `Undo` / `Redo` (`TIMELINE_HISTORY`).
+  * [x] Imunidade absoluta: clipes, lacunas (gaps), fades, marcadores de clipe e transições na pista travada não podem ser selecionados (clique, multi-seleção, Marquee, Track Select Forward/Backward, Selection Follows Playhead), movidos, empurrados por Nudge, aparados (Trim / Q / W / J-L Cut), cortados (Blade `C`, Global Blade `Shift+C`, Split `S`, Freeze Frame `Ctrl+Shift+F`), deslizados (Slip `Y`, Slide `U`, Rolling `N`, Rate Stretch `Shift+R`), alterados em velocidade/rotação/desativação, deletados (Lift, Ripple Delete, Close Gap, In/Out Lift & Extract), substituídos (Replace Edit, alternativas ou Ghost IA), nem deslocados indiretamente por operações de Ripple em pistas destravadas (mesmo quando vinculados via `link_id`).
+  * [x] Proteção estrutural de pista: bloqueia renomeação inline e remoção da pista travada (e impede que a exclusão de outra pista despeje clipes órfãos em uma pista travada).
+* [x] Atalhos de teclado multi-preset registrados em `COMMANDS_CATALOG` (`category: "canvas_history"`), zero conflitos e preservação integral do cluster *Speed Editing* QWER/ASDF:
+  * `timeline.toggle_track_lock`: **`Shift+L`** universal nos 5 perfis (`capiau`, `kdenlive`, `premiere`, `resolve`, `finalcut`), além de **`Ctrl+Shift+L`** primário em `premiere` e **`Alt+Shift+L`** primário em `resolve`.
+  * `timeline.toggle_all_tracks_lock`: **`Ctrl+Alt+Shift+L`** nos 5 perfis para travar/destravar todas as pistas simultaneamente.
 
-#### 2. Modificações Propostas
-* `[MODIFY]` `src/ui/js/timelineState.js`: Bloqueio estrito de mutações em pistas com `locked: true`.
-* `[MODIFY]` `src/ui/js/panels.js`: Adicionar botão de cadeado nos cabeçalhos de pistas.
+#### 2. Modificações Entregues
+* `[MODIFY]` `src/ui/js/timelineState.js`: Métodos `isTrackLocked()`, `_purgeSelectionOnLockedTrack()`, `toggleTrackLock()`, `toggleActiveTrackLock()`, `toggleAllTracksLock()` e blindagem completa de seleção, corte, exclusão, trim, move, ripple indireto, transições, inserção 3-Point, Replace Edit, Ghost IA e remoção/renomeação de pistas.
+* `[MODIFY]` `src/ui/js/timelineInteraction.js`: Guardas de cadeado em `onMouseDown` (Select, Blade, Slip, Slide, Rate Stretch, Rolling, fades, clip markers), `computeMarqueeIntersections`, `onContextMenu`, `resolveDropTrack`, `onDrop`, `moveClip`, `trimClipLeft/Right`, `nudgeTrim`, `resyncClip`, `linkClips` e disparo dos comandos `timeline.toggle_track_lock` e `timeline.toggle_all_tracks_lock`.
+* `[MODIFY]` `src/ui/js/state.js`: Proteção de pistas travadas na invariante reativa de sincronia A/V (`set activeTimelineCuts`).
+* `[MODIFY]` `src/ui/js/timelineRenderer.js`: Camada `drawLockedTracksOverlay()` com hachura diagonal a 45° (`rgba(255, 255, 255, 0.11)` sobre véu `rgba(8, 10, 16, 0.24)`) respeitando visibilidade e scroll das pistas.
+* `[MODIFY]` `src/ui/js/panels.js` e `src/ui/styles.css`: Classes semânticas `.btn-track-lock.locked` / `.unlocked`, `.track-locked`, `.track-active`, seleção de pista ativa no clique do cabeçalho e bloqueio de remoção/renomeação inline quando travada.
+* `[MODIFY]` `src/ui/js/keymapService.js` e `src/ui/index.html`: Registro dos comandos nos 5 presets NLE + Cheat Sheet e bump de cache-buster (`styles.css?v=93`, `js/main.js?v=80`).
 
 #### 3. Teste Automatizado & Manual
-* `[NEW]` `tests/autoteste_track_lock.mjs`: Validar rejeição de split, delete e trim em pistas travadas.
-* **Teste Manual:** Travar a pista A1 no cadeado, tentar cortar com a Lâmina `C` ou selecionar: verificar que nada se altera.
+* `[NEW]` `tests/autoteste_track_lock.mjs`: 11/11 baterias aprovadas com 100% de sucesso + zero regressões nas suítes existentes e aprovação integral na bateria obrigatória multipista em cascata (`autoteste_composicao_multipista_cascata.mjs` 7/7 e `test_render_composicao_multipista_cascata.py` 5/5).
+* **Teste Manual:** Travar a pista `A1` no cadeado (ou via `Shift+L`), conferir a hachura diagonal a 45° e o cadeado em tom rose, tentar selecionar, arrastar Marquee, cortar com a Lâmina `C`/`Shift+C` ou aplicar Ripple Delete em `V1` vinculada, e verificar que `A1` permanece 100% intacta e imóvel.
 
-> [!CAUTION]
-> **Checkpoint de Parada 23:** Aguardar aprovação do usuário antes da Task 24.
+> [!NOTE]
+> **Checkpoint de Parada 23:** Concluído e validado com sucesso (100% no autoteste `autoteste_track_lock.mjs` e teste manual aprovado). Avanço liberado para a Task 24.
 
 ---
 

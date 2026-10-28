@@ -8521,18 +8521,24 @@ select option, .nle-select option {
     transform: scale(1.15);
 }
 .btn-track-lock.locked {
-    color: #ef4444 !important;
+    color: var(--color-rose) !important;
 }
 .btn-track-lock.locked:hover {
-    color: #f87171 !important;
-    text-shadow: 0 0 8px #ef4444;
+    color: var(--color-rose) !important;
+    text-shadow: 0 0 8px var(--color-rose);
 }
 .btn-track-lock.unlocked {
-    color: var(--color-emerald, #10b981) !important;
+    color: var(--text-muted) !important;
 }
 .btn-track-lock.unlocked:hover {
-    color: #34d399 !important;
-    text-shadow: 0 0 8px var(--color-emerald, #10b981);
+    color: var(--text-primary, #f8fafc) !important;
+    text-shadow: 0 0 6px rgba(255, 255, 255, 0.28);
+}
+.timeline-header-track.track-locked {
+    background: color-mix(in srgb, var(--color-rose) 6%, transparent);
+}
+.timeline-header-track.track-active {
+    box-shadow: inset 2px 0 0 var(--accent);
 }
 
 .btn-track-mute {

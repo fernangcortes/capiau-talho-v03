@@ -369,6 +369,9 @@ export class CapiauTimelineRenderer {
         // Desenha transições de junção (Task 15: Crossfade de Áudio / Task 16: Transições de Vídeo)
         this.drawTransitions();
 
+        // Desenha hachura diagonal sutil neutra translúcida sobre pistas travadas com cadeado (Task 23)
+        this.drawLockedTracksOverlay();
+
         // Desenha as sugestões fantasma da IA (Ghost Clips)
         this.drawGhostClips();
 
@@ -392,6 +395,54 @@ export class CapiauTimelineRenderer {
 
         // Desenha o cursor do Playhead (currentTime)
         this.drawPlayhead();
+    }
+
+    /**
+     * Desenha uma hachura diagonal neutra translúcida (45°) sobre pistas travadas com cadeado físico,
+     * sinalizando proteção absoluta sem distorcer as cores originais dos clipes subjacentes.
+     */
+    drawLockedTracksOverlay() {
+        const ctx = this.ctx;
+        if (!ctx) return;
+
+        const lanes = this.getTrackLanes();
+        if (!lanes || lanes.length === 0) return;
+
+        const step = 12;
+
+        lanes.forEach(lane => {
+            const track = lane.track;
+            if (!track || !track.locked || track.kind === "ai" || track.hidden) return;
+            if (lane.top + lane.height <= this.rulerHeight || lane.top >= this.height) return;
+
+            const yTop = Math.max(this.rulerHeight, lane.top);
+            const yBottom = Math.min(this.height, lane.top + lane.height);
+            const drawH = yBottom - yTop;
+            if (drawH <= 0 || this.width <= 0) return;
+
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(0, yTop, this.width, drawH);
+            ctx.clip();
+
+            // Véu neutro sutil para reforçar legibilidade da hachura sem tingir os clipes
+            ctx.fillStyle = "rgba(8, 10, 16, 0.24)";
+            ctx.fillRect(0, yTop, this.width, drawH);
+
+            // Linhas diagonais a 45° neutras translúcidas (padrão Premiere Pro / DaVinci Resolve)
+            ctx.strokeStyle = "rgba(255, 255, 255, 0.11)";
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            const span = lane.height;
+            const y0 = lane.top;
+            const y1 = lane.top + span;
+            for (let x = -span; x < this.width + span; x += step) {
+                ctx.moveTo(x, y1);
+                ctx.lineTo(x + span, y0);
+            }
+            ctx.stroke();
+            ctx.restore();
+        });
     }
 
     /**

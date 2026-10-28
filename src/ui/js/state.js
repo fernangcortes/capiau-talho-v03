@@ -221,6 +221,14 @@ class AppState extends EventEmitter {
         // Trims independentes do áudio produzem J/L-cuts sem perder o sync,
         // slips independentes preservam suas posições na timeline via syncOffset, e o
         // ripple de inserções/cortes arrasta o áudio junto do vídeo.
+        const isLocked = (trackId) => {
+            if (timelineState && typeof timelineState.getTrack === "function") {
+                const t = timelineState.getTrack(trackId);
+                return !!(t && t.locked);
+            }
+            return false;
+        };
+
         const videoByLink = {};
         this._activeTimelineCuts.forEach(c => {
             if (c.link_id && kindOf(c.track) === "video") videoByLink[c.link_id] = c;
@@ -229,6 +237,14 @@ class AppState extends EventEmitter {
             if (!c.link_id || kindOf(c.track) !== "audio") return;
             const v = videoByLink[c.link_id];
             if (!v) return;
+            // Proteção absoluta de pista travada com cadeado: áudio em pista travada jamais é movido ou aparado
+            if (isLocked(c.track)) {
+                if (typeof c.timelineStartFrame === "number" && !isNaN(c.timelineStartFrame)) {
+                    c.syncOffset = (c.timelineStartFrame - c.inFrame) - (v.timelineStartFrame - v.inFrame);
+                    c.timeline_start = c.timelineStartFrame / timelineFps;
+                }
+                return;
+            }
             let syncOffset = typeof c.syncOffset === "number" ? c.syncOffset : null;
             if (syncOffset === null) {
                 if (c.timelineStartFrame !== undefined && c.timelineStartFrame !== null) {
@@ -267,10 +283,14 @@ class AppState extends EventEmitter {
             if (start < prevEnd) {
                 const shortfall = prevEnd - start;
                 start = prevEnd;
-                // VÍDEO VINCULADO NÃO DEVE DESSINCRONIZAR se não houver syncOffset intencional:
+                // VÍDEO VINCULADO NÃO DEVE DESSINCRONIZAR se não houver syncOffset intencional (salvo se vídeo estiver em pista travada):
                 if (!c.syncOffset) {
-                    v.timelineStartFrame = Math.max(v.timelineStartFrame || 0, (v.timelineStartFrame || 0) + shortfall);
-                    v.timeline_start = v.timelineStartFrame / timelineFps;
+                    if (isLocked(v.track)) {
+                        c.syncOffset = (start - c.inFrame) - (v.timelineStartFrame - v.inFrame);
+                    } else {
+                        v.timelineStartFrame = Math.max(v.timelineStartFrame || 0, (v.timelineStartFrame || 0) + shortfall);
+                        v.timeline_start = v.timelineStartFrame / timelineFps;
+                    }
                 }
             }
             c.timelineStartFrame = start;

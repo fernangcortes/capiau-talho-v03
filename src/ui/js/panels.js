@@ -3406,6 +3406,16 @@ export class PanelsManager {
             row.dataset.compact = (h < 40) ? "true" : "false";
             row.style.cssText = `height: ${h}px; border-bottom: 1px solid var(--border-glass); box-sizing: border-box; display: flex; flex-direction: column; justify-content: center; padding: 4px 8px; font-size: var(--fs-10); font-weight: 700; color: var(--text-secondary); font-family: var(--font-heading); gap: 4px; overflow: hidden;`;
 
+            row.addEventListener("mousedown", (e) => {
+                if (e.target && e.target.closest && e.target.closest(".track-resize-handle")) return;
+                if (track.kind !== "ai" && TIMELINE_STATE.selectedTrack !== trackId) {
+                    TIMELINE_STATE.selectedTrack = trackId;
+                    inner.querySelectorAll(".timeline-header-track").forEach(el => {
+                        el.classList.toggle("track-active", el.dataset.trackId === trackId);
+                    });
+                }
+            });
+
             this.renderTrackRowContent(row, track, h);
 
             // Alça de redimensionamento da altura individual desta pista (borda inferior)
@@ -3532,14 +3542,23 @@ export class PanelsManager {
                 ? `<i class="fa-solid fa-volume-xmark" style="color: var(--color-rose);"></i>`
                 : `<i class="fa-solid fa-volume-high"></i>`;
             const isLocked = !!track.locked;
-            const lockColor = isLocked ? "#ef4444" : "var(--color-emerald, #10b981)";
+            if (row.classList) {
+                row.classList.toggle("track-locked", isLocked);
+                row.classList.toggle("track-active", TIMELINE_STATE.selectedTrack === track.id);
+            }
+            const lockShortcut = (typeof KEYMAP_SERVICE !== "undefined" && KEYMAP_SERVICE && typeof KEYMAP_SERVICE.getShortcutDisplay === "function")
+                ? KEYMAP_SERVICE.getShortcutDisplay("timeline.toggle_track_lock")
+                : "Shift+L";
+            const lockTitle = isLocked
+                ? `Pista travada com cadeado — clique para destravar (${lockShortcut})`
+                : `Travar pista com cadeado (${lockShortcut})`;
             const lockIcon = isLocked
-                ? `<i class="fa-solid fa-lock" style="color: ${lockColor};"></i>`
-                : `<i class="fa-solid fa-lock-open" style="color: ${lockColor};"></i>`;
+                ? `<i class="fa-solid fa-lock"></i>`
+                : `<i class="fa-solid fa-lock-open"></i>`;
             const isSyncLocked = track.syncLocked !== undefined ? !!track.syncLocked : true;
             const syncColor = isSyncLocked ? "var(--accent)" : "var(--text-muted)";
             const syncBtn = `<button class="btn-track-sync-lock btn-track-action" title="${isSyncLocked ? 'Sync Lock ativado: esta pista acompanha operações de Ripple e Inserção' : 'Sync Lock desativado: esta pista permanece fixa no tempo'}" style="color: ${syncColor}; font-size: var(--fs-9);"><i class="fa-solid fa-arrows-left-right-to-line"></i></button>`;
-            const lockBtn = `<button class="btn-track-lock btn-track-action ${isLocked ? 'locked' : 'unlocked'}" title="${isLocked ? 'Pista travada (clique para destravar)' : 'Pista destravada (clique para travar)'}" style="color: ${lockColor}; font-size: var(--fs-9);">${lockIcon}</button>`;
+            const lockBtn = `<button class="btn-track-lock btn-track-action ${isLocked ? 'locked' : 'unlocked'}" data-tooltip="${lockTitle}" title="${lockTitle}" style="font-size: var(--fs-9);">${lockIcon}</button>`;
 
             const visibilityIcon = `<i class="fa-solid fa-eye"></i>`;
             const thumbIcon = track.thumbnailsEnabled
@@ -3634,13 +3653,28 @@ export class PanelsManager {
                 });
             }
 
-            row.querySelector(".btn-track-lock").addEventListener("click", () => TIMELINE_STATE.toggleTrackLock(track.id));
+            row.querySelector(".btn-track-lock").addEventListener("click", (e) => {
+                e.stopPropagation();
+                TIMELINE_STATE.selectedTrack = track.id;
+                TIMELINE_STATE.toggleTrackLock(track.id);
+            });
             const syncEl = row.querySelector(".btn-track-sync-lock");
             if (syncEl) syncEl.addEventListener("click", () => TIMELINE_STATE.toggleTrackSyncLock(track.id));
             row.querySelector(".btn-track-remove").addEventListener("click", () => {
+                const liveTrack = TIMELINE_STATE.getTrack(track.id) || track;
+                if (liveTrack && liveTrack.locked) {
+                    if (typeof window !== "undefined" && typeof window.showToast === "function") {
+                        window.showToast("Destrave o cadeado da pista antes de removê-la.", "warning");
+                    }
+                    return;
+                }
                 if (confirm(`Remover a pista "${track.id} ${track.name}"? Os clipes dela serão movidos para outra pista do mesmo tipo.`)) {
                     if (!TIMELINE_STATE.removeTrack(track.id)) {
-                        alert("Não é possível remover: a timeline precisa de ao menos uma pista de vídeo.");
+                        if (typeof window !== "undefined" && typeof window.showToast === "function") {
+                            window.showToast("Não é possível remover: é necessário ao menos uma pista destravada do mesmo tipo.", "warning");
+                        } else {
+                            alert("Não é possível remover: a timeline precisa de ao menos uma pista de vídeo.");
+                        }
                     }
                 }
             });
@@ -3682,6 +3716,16 @@ export class PanelsManager {
         nameLabel.addEventListener("dblclick", (e) => {
             e.preventDefault();
             e.stopPropagation();
+
+            const liveTrack = (typeof TIMELINE_STATE !== "undefined" && TIMELINE_STATE.getTrack)
+                ? (TIMELINE_STATE.getTrack(track.id) || track)
+                : track;
+            if (liveTrack && liveTrack.kind !== "ai" && liveTrack.locked) {
+                if (typeof window !== "undefined" && typeof window.showToast === "function") {
+                    window.showToast("A pista está travada com cadeado", "warning");
+                }
+                return;
+            }
 
             // Limpa seleções residuais de texto no navegador
             const sel = window.getSelection();
