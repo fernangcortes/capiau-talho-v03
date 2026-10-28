@@ -26,8 +26,7 @@ O que o Fernando ganha:
 
 Fora do escopo: tradução; ASR novo (Parakeet é a seção 4.5 da pesquisa); composição HTML (D2); auditoria WCAG completa (H); BeginFrame (D1).
 
-## 2. Estado atual no Talho (arquivo:linha; invariantes)
-
+## 2. Estado atual no Talho
 ### 2.1 O que existe
 
 | Peça | Onde | O que faz ou limita |
@@ -67,8 +66,7 @@ Fora do escopo: tradução; ASR novo (Parakeet é a seção 4.5 da pesquisa); co
 | Luminância escolhe `screen/overlay/normal` | É regra de legenda animada com blend. Legenda de documentário usa contorno e sombra fixos; trocar o estilo por legenda piscaria. Vira aviso opcional (E8). |
 | Portar `fitTextFontSize` | Depende de `@chenglou/pretext` e cabe em **uma** linha (`HF:packages/core/src/text/fitTextFontSize.ts:1,36-47`). Aqui são 2 linhas, medidas com `measureText` do Canvas: portar o laço, não a dependência. |
 
-## 3. O que o HyperFrames tem (portar / adaptar / inspirar-se)
-
+## 3. O que o HyperFrames tem
 Apache-2.0 (copyright HeyGen): ao portar constantes ou laços, cabeçalho de atribuição e arquivo marcado como alterado. Nenhum código TypeScript é copiado; portam-se **regras e números**.
 
 | Peça | Onde | Veredito |
@@ -213,8 +211,7 @@ Recomendação: **presets sem fade**; fade de 2 quadros é opção. A segunda ex
 | Progresso | Texto no diálogo ("Lendo transcrições 3/5") | Luminância (> 5 s) usa `TASK_MANAGER`, como as outras tarefas |
 | Avisos | Lista "Legendas com aviso" e selo no clipe (`timelineRenderer.js`) | Limites editáveis no diálogo e em Configurações; botões "estender" e "dividir" |
 
-## 5. Decisões de projeto (alternativas e recomendação)
-
+## 5. Decisões de projeto
 ### 5.1 Modelo de dados
 
 | Alternativa | Edição manual | Regenerar | Karaokê | Render | Export | Veredito |

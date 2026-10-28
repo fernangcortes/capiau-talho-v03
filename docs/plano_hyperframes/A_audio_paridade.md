@@ -27,8 +27,7 @@ O `TEXTO_JOELHO_COMPRESSOR` (`fidelidade.py:47-53`: "2,1 dB no limiar, cai a zer
 
 Fora do escopo: reverb/delay (o Talho não tem), automação de volume (item 4.6 da pesquisa), trocar a mixagem ou o crossfade do FFmpeg, e qualquer mudança de comportamento do player.
 
-## 2. Estado atual no Talho (arquivo:linha; invariantes)
-
+## 2. Estado atual no Talho
 ### 2.1 O que existe [lido]
 
 | Peça | Onde | O que faz |
@@ -61,8 +60,7 @@ Fora do escopo: reverb/delay (o Talho não tem), automação de volume (item 4.6
 9. Cenário canônico multipista em cascata verde em toda etapa que toque `grafo_audio.py`, `comando.py`, `execucao.py` ou `player.js`.
 10. `grafo_audio.py:3` e `:72` citam `player.js:2623` e `2537-2555`, defasadas: a cadeia está em `player.js:5254-5398`. O módulo novo vira a fonte única e a docstring passa a apontar para ele.
 
-## 3. O que o HyperFrames tem (portar / adaptar / inspirar-se)
-
+## 3. O que o HyperFrames tem
 ### 3.1 Peças e veredito [lido]
 
 | Peça | Onde | Veredito |
@@ -89,8 +87,7 @@ Fora do escopo: reverb/delay (o Talho não tem), automação de volume (item 4.6
 6. **§4.1 risco** ("desempenho [a medir]"): medido, 72–81× tempo real; mas 1 h numa janela só leva o navegador a 3,35 GB de RAM, então janelas são obrigatórias (4.6).
 7. O HF aplica o envelope **depois** da cadeia; copiar isso quebraria o E2 (3.1).
 
-## 4. Verificações de viabilidade (uma por pergunta abaixo, com veredito e evidência)
-
+## 4. Verificações de viabilidade
 | # | Pergunta | Veredito |
 |---|---|---|
 | 1 | Ciclo de vida da cadeia no player | Por elemento (por pista), estado contínuo entre clipes. O render usa cadeia fria por clipe (erro medido) e, opcional, aquecimento em corte de navalha |
@@ -260,8 +257,7 @@ O nó nativo tem joelho de 30 dB e **ganho de compensação automático** (`full
 - **Gate**: o RMS total é igual, mas a diferença tem pico −16,5 e RMS −61,2 dBFS (−42 dB re. o sinal) nas transições; em pausa o worklet decai a ≈ −73 dBFS e o `agate range=0` vai a −∞.
 - **Mono** e **latência**: 4.7 e 4.3.
 
-## 5. Decisões de projeto (alternativas e recomendação)
-
+## 5. Decisões de projeto
 | # | Decisão | Alternativas (prós e contras) | Recomendação |
 |---|---|---|---|
 | DA1 | Onde roda a cadeia | (a) Página por clipe, com pré-passe FFmpeg e WAV f32 intermediário: paridade por construção; custa ≈ 384 KB/s de disco e uma etapa antes do vídeo. (b) Melhorar a reserva FFmpeg (`compand` com a curva estática do Chromium, Q, `pan`): sem navegador, mas nunca igual (release adaptativo, pré-atraso, detector entre canais) e dois códigos a manter. (c) Página processa a pista e já mixa: reimplementa corte, retime e crossfade fora do FFmpeg e quebra o E2 | **(a)**; (b) só como melhoria da reserva, fora deste plano |
@@ -294,8 +290,7 @@ O nó nativo tem joelho de 30 dB e **ganho de compensação automático** (`full
 - Avisos novos: `AUDIO_CADEIA_NAVEGADOR` (novo) (info), `AUDIO_CADEIA_SEM_NAVEGADOR` (novo), `AUDIO_CADEIA_FALLBACK` (novo), `AUDIO_MULTICANAL_REDUZIDO`, `AUDIO_ESPACO_TEMPORARIO` (novo). Os dois antigos ficam só na reserva, com texto novo.
 - Créditos: o planejador de janelas leva o cabeçalho "Adaptado de HyperFrames, Copyright 2026 HeyGen, Inc., Apache-2.0; portado de TypeScript para Python" e entra na seção de créditos.
 
-## 7. Mudanças por arquivo (tabela)
-
+## 7. Mudanças por arquivo
 | Arquivo | Novo/alterado | O que muda |
 |---|---|---|
 | `src/ui/js/audioCadeia.js` | novo | Sem DOM: `CADEIA_AUDIO_VERSAO`, `LIMITES`, `normalizarEfeitosAudio`, `topologiaCadeia`, `precisaGate`, `criarNosCadeia(ctx)`, `criarGate(ctx)`, `aplicarParametros`, `ligarCadeia(nos, gate, fonte, destino, topologia)`, `carregarGate(ctx, url)`. Corpo = trechos movidos de `player.js:5254-5398` |
@@ -314,8 +309,7 @@ O nó nativo tem joelho de 30 dB e **ganho de compensação automático** (`full
 | `scripts/medir_paridade_audio.py` | novo | Roda no Windows; `msedge`, `chrome`, `headless_shell`; SHA-256, null tests, FFmpeg × página |
 | `docs/plano_hyperframes/A_audio_paridade.md` (novo), `docs/MEDICOES_AUDIO.md` (novo), `docs/PESQUISA_HYPERFRAMES.md` (§1, §4.1) | novo, novo, alterado | plano, números, correções de 3.2 |
 
-## 8. Etapas (cada uma = um commit: mensagem, conteúdo, testes, dias, dependências)
-
+## 8. Etapas
 Mensagens em conventional commits, em português. Em toda etapa que toca `grafo_audio.py`, `comando.py`, `execucao.py` ou `player.js`: rodar `pytest tests/test_render_composicao_multipista_cascata.py`, `node tests/autoteste_composicao_multipista_cascata.mjs` e `pytest tests/test_render_*.py`.
 
 **Etapa 0. Correções do FFmpeg que não dependem do navegador.**
@@ -367,8 +361,7 @@ Mensagens em conventional commits, em português. Em toda etapa que toca `grafo_
 
 Total: 1 + 1,5 + 3 + 3 + 1 + 1,5 + 0,5 = **11,5 dias**; com a Etapa 6, **13,5** [inferência; estimativa grossa]. A D1 (etapas 1 e 2) soma ≈ 3 dias antes da Etapa 2.
 
-## 9. Testes e medições (com número-alvo)
-
+## 9. Testes e medições
 "Medido" = número do contêiner Linux (4.x); metas sem base medida estão marcadas.
 
 | ID | O que | Número-alvo | Como medir |
@@ -418,8 +411,7 @@ Total: 1 + 1,5 + 3 + 3 + 1 + 1,5 + 0,5 = **11,5 dias**; com a Etapa 6, **13,5** 
 | R11 | Taxa do dispositivo ao vivo (44,1 kHz) ≠ 48 kHz do render | só detalhes (4.7); medir uma vez no Windows |
 | R12 | Fonte com mais de 2 canais, ou mono misturado com estéreo no `amix` | aviso `AUDIO_MULTICANAL_REDUZIDO`; [a medir] na Etapa 0 |
 
-## 12. Perguntas para o Fernando (com recomendação)
-
+## 12. Perguntas para o Fernando
 1. **O arquivo com compressor pode ficar mais alto que os de antes** (igual ao que você ouve no Program)? Recomendo sim; os masters antigos tinham compressão bem mais forte que a tela.
 2. **Pode rodar `scripts/medir_paridade_audio.py` no Windows com Edge e Chrome (≈ 10 min) e colar a saída?** Recomendo sim, antes da Etapa 5; é o que libera o `auto`.
 3. **EQ sozinho continua no FFmpeg (com o Q corrigido) e só gate ou compressor sobem o navegador?** Recomendo sim (−93,6 dBFS RMS).

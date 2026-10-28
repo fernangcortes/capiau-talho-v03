@@ -26,8 +26,7 @@ Convenções: **[lido]** conferido no código; **[inferência]** dedução minha
 
 **Fora do escopo desta frente.** Texturas de quadro cheio (grão, light leak, vinheta: ver 3.2 e 5), 3D/WebGL/WebGPU, áudio dentro da composição, editor visual de animação, e HTML do usuário (v2, seção 4.8).
 
-## 2. Estado atual no Talho (arquivo:linha; invariantes)
-
+## 2. Estado atual no Talho
 | Peça | Onde | O que faz e o que implica para D2 |
 |---|---|---|
 | Camada de texto | `playerTextOverlay.js:65-71`, `86-122` | `div#program-text-layer` (`z-index:40`) dentro de `#program-player-viewport`; `sync()` filtra `c.type === "text"` na pista de texto (101-106) |
@@ -56,8 +55,7 @@ Convenções: **[lido]** conferido no código; **[inferência]** dedução minha
 6. Buffers e VRAM (`.agents/rules/nle-parity-and-media-lifecycle.md` §2): nunca destruir o `<iframe>` que está no ar; liberar os fora do ar; sem `ImageBitmap` novo.
 7. Nada de UI antes do render: o que aparece na tela tem de sair no arquivo (a UI de composições só liga quando a Etapa 3 passa).
 
-## 3. O que o HyperFrames tem (portar / adaptar / inspirar-se)
-
+## 3. O que o HyperFrames tem
 ### 3.1 Peças e veredito
 
 | Peça (HF:packages/core/src/runtime ou citada) | Linhas | Veredito | Nota |
@@ -178,8 +176,7 @@ Total das 14: **≈ 12 dias** de porte. Rede no render: GSAP em todas (some com 
 
 **Recomendo v2, não v1.** A v1 só abre a biblioteca curada. O risco é real: um `<iframe>` na mesma origem do app lê `localStorage` e chama `/api/*` (apagar projetos), e `CORSMiddleware(allow_origins=["*"])` (`server.py:67-68`) deixa até uma página de origem opaca ler a API local: só `sandbox` não basta. Defesa em camadas para a v2 (e já na v1, para a biblioteca): (1) `/composicoes/` servido por uma subclasse de `StaticFiles` montada **antes** de `server.py:175`, com `Content-Security-Policy: sandbox allow-scripts; default-src 'none'; …; connect-src 'none'`, o que dá origem opaca até em navegação direta; (2) `<iframe sandbox="allow-scripts">` **sem** `allow-same-origin` (o `sandbox-origin` do HF faz o inverso, `hyperframes-player.ts:373-379`); (3) só `postMessage`, validando `event.source` e o formato; (4) no render, página por token (D1) e `route` bloqueando o resto; (5) aviso de confiança na importação ("este HTML é código") e lint estático (rede, `eval`, GSAP, `requestAnimationFrame`, `Math.random`, `Date.now`). Arquivos do usuário ficam em `data/composicoes/<projeto>/<id>/` (como `fontes_projeto.py`), `origem:"projeto"`, com o mesmo manifesto.
 
-## 5. Decisões de projeto (alternativas e recomendação)
-
+## 5. Decisões de projeto
 | # | Decisão | Alternativas | Recomendação e motivo |
 |---|---|---|---|
 | DP1 | Representação do clipe | (A) `type:"html"`; (B) `type:"text"` + objeto `composicao`; (C) kind de pista novo | **B.** `bruto` já guarda o clipe cru para `text` (`modelo.py:478`) e `type` desconhecido vira vídeo (`modelo.py:422-431`); `fidelidade.py:211-224` já cobre o navegador; A tocaria ≈ 9 arquivos de UI que testam `type === "text"` (`timelineState.js` ×4, `playerTextOverlay.js` ×2, `textAIEngine.js` ×2, `timelineRenderer`, `timelineInteraction`, `panels`, `player`, `creditsNormalizer`, `fontCatalogModal`) e o modelo (≈ +2 dias, mais risco). Timeline nova no Talho antigo abre como título com nome e função. Custo de B: filtrar `composicao` em `playerTextOverlay.js:101` e `subtitles_export.py` |

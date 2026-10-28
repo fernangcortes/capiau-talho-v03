@@ -29,8 +29,7 @@
 | SenseVoice Small | `.venv-nemo` (FunASR) | n/d | sim, confiança 1.0 | 0,9 GB | só zh/en/ja/ko/yue |
 | **Parakeet v3 int8 (novo)** | `.venv` + subprocesso | **a medir** (estimativa 0,05-0,15×) | sim, grade de 80 ms | 670 MB | pt europeu no treino |
 
-## 2. Estado atual no Talho (arquivo:linha; invariantes)
-
+## 2. Estado atual no Talho
 | Peça | Onde | Fato [lido] |
 |---|---|---|
 | Contrato | `motores.py:7-9,59-85` | `ErroASR`, `PlanoASR`, `OpcoesASR(idioma, diarizar, max_falantes, detectar_entidades, whisper_modelo)`, `ResultadoASR` |
@@ -67,8 +66,7 @@
 - F4. `pipeline.py:646` só imprime o motor; nenhuma coluna guarda qual motor transcreveu cada vídeo.
 - F5. A régua do README ("WER contra a AssemblyAI: Deepgram ~77 %, Whisper turbo ~50 %", 61-62) não diz se é erro ou concordância; o relatório da etapa 7 precisa dizer.
 
-## 3. O que o HyperFrames tem (portar / adaptar / inspirar-se)
-
+## 3. O que o HyperFrames tem
 Tudo [lido]; código Apache-2.0, "Copyright 2026 HeyGen, Inc." (`HF:CREDITS.md`; modelo CC-BY-4.0 e sherpa-onnx Apache-2.0 em `HF:CREDITS.md:31-35`).
 
 | Peça | O que faz | Decisão | Destino |
@@ -254,8 +252,7 @@ ModeloLocal(
 | `docs/MEDICAO_PARAKEET.md` (novo) | números, método e decisão do gate | 7 |
 | **Sem mudança** | `venv_nemo_worker.py`, `worker_transcricao.py`, `pipeline.py`, `media.py:956` (preço 0 para local), `schema.py` | — |
 
-## 8. Etapas (cada uma = um commit)
-
+## 8. Etapas
 **Etapa 0 — sonda e dependência (0,25 d).** Commit: `chore(transcricao): sonda do sherpa-onnx e do Parakeet, sem mudar comportamento`. Conteúdo: `scripts/sherpa_sonda.py` + linha no `requirements.txt`. Resolve os [a medir] de 4.1/4.3: prefixo `▁` ou espaço, `durations` e `ys_log_probs` preenchidos, `words`, RTF com 4 e 8 threads, memória. Testes: nenhum automático (script manual). Depende de: modelo baixado à mão por você (decisão sua) e `sherpa-onnx` instalado.
 
 **Etapa 1 — tokens em palavras (0,75 d).** Commit: `feat(transcricao): junta tokens do Parakeet em palavras com tempo e confiança`. Conteúdo: `tokens_para_palavras` com as regras de 4.3 e cabeçalho de atribuição. Testes: `tests/test_sherpa_palavras.py` (prefixo `▁` e espaço; pontuação colada e isolada; número; hífen; duração ausente; palavra vazia; deslocamento de janela; início nunca regride). Depende de: etapa 0.
@@ -343,8 +340,7 @@ Total do núcleo (0 a 7): 0,25 + 0,75 + 1 + 0,75 + 1 + 0,25 + 1 + 0,5 = **5,5 di
 | Nomes próprios, números e siglas do bastidor | alta | baixo-médio | entidades e glossário seguem só na AssemblyAI (`motores.py:332-333`); medir | M5 |
 | Arquivo do modelo truncado ou trocado | baixa | alto | revisão fixa + sha256 + tamanho em `baixado` | critério 5 |
 
-## 12. Perguntas para o Fernando (com recomendação)
-
+## 12. Perguntas para o Fernando
 1. **`sherpa-onnx` entra no `requirements.txt`?** Recomendo sim: wheel de ~2 MB e precedente do faster-whisper (`requirements.txt:11-12`). Alternativa: criar `requirements-opcional.txt`, que `modelos_locais.py:224` já cita e não existe.
 2. **Posso atualizar o sherpa-onnx de 1.13.6 para 1.13.8** se a sonda mostrar que a 1.13.6 não devolve `durations`? Recomendo sim, rodando depois `tests/test_audio_denoise.py` e um denoise real; **não** ir para a 2.x agora.
 3. **Você roda a sonda (etapa 0) com um clipe seu de 20 a 30 s e baixa os 670 MB?** Recomendo a sonda antes de qualquer código; o download pode ser à mão (`huggingface-cli`) ou pela tela depois da etapa 3.
