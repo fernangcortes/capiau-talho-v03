@@ -21,8 +21,8 @@ audiovisuais**.
 
 O sistema roda sobre uma **arquitetura híbrida otimizada para CPU local**: tarefas críticas de
 privacidade e indexação — busca vetorial e biometria facial — acontecem 100% na sua máquina, **sem
-GPU**. Só o trabalho linguístico pesado (transcrição e descrição de imagens) vai para APIs de nuvem,
-de forma econômica e cirúrgica.
+GPU**. Transcrição, descrição de imagens e outras tarefas de linguagem podem usar APIs de nuvem,
+de forma opcional e conforme a configuração do projeto.
 
 Ao contrário de ferramentas que tratam a IA como um acessório isolado, o CapIAu-Talho integra
 modelos de linguagem e visão diretamente a uma **timeline multipista (NLE) em Canvas 2D**. Isso
@@ -91,8 +91,10 @@ semiautônomos — exportáveis para **Kdenlive, Premiere, Resolve e Final Cut**
   exato em menos de 5 ms.
 
 - **Biometria facial local.** Detecte, agrupe por proximidade (clustering DBSCAN) e identifique
-  personagens de forma 100% local, com modelos ONNX otimizados para CPU. Nenhum rosto sai da sua
-  máquina.
+  personagens de forma 100% local, com modelos ONNX otimizados para CPU. No módulo local, nenhum
+  recorte ou embedding biométrico é enviado a serviços externos. Fluxos opcionais de análise visual
+  ou reconhecimento facial em nuvem são separados e podem enviar keyframes ou dados faciais ao
+  provedor configurado.
 
 ### Para editores de montagem profissional <a id="para-editores-de-montagem-profissional"></a>
 
@@ -479,8 +481,8 @@ semiautônomos — exportáveis para **Kdenlive, Premiere, Resolve e Final Cut**
 ### As quatro camadas <a id="as-quatro-camadas"></a>
 
 O CapIAu-Talho é dividido em quatro camadas. A decisão de projeto mais importante está na coluna
-**Onde roda**: tudo que é sensível ou repetitivo fica na sua máquina; a nuvem só é acionada para o
-que exige um modelo grande, uma vez por mídia.
+**Onde roda**: a indexação e a biometria permanecem na sua máquina; a nuvem é acionada apenas para
+os fluxos externos configurados.
 
 | Camada | Onde roda | O que faz | Custo |
 |---|---|---|---|
@@ -499,7 +501,9 @@ que exige um modelo grande, uma vez por mídia.
    catalogar o mesmo material duas vezes) e grava só o *caminho* no SQLite. O arquivo original não
    sai do lugar.
 2. **Proxies.** O FFmpeg gera uma cópia leve em 720p para o player e um MP3 mono de 16 kHz para a
-   transcrição. Só o MP3 sobe para a nuvem — nunca o vídeo.
+   transcrição. O arquivo de vídeo original não é enviado para essas APIs; o MP3 pode ser enviado
+   para transcrição, e os keyframes seguem para análise visual na etapa 4, quando esses serviços
+   estão configurados.
 3. **Segmentação.** O PySceneDetect quebra o vídeo nos cortes reais e subdivide planos longos em
    *beats*, escolhendo um keyframe representativo de cada trecho.
 4. **Análise.** Os keyframes escolhidos (poucos, não um a cada 10 s) vão para o OpenRouter, que
@@ -522,7 +526,7 @@ que exige um modelo grande, uma vez por mídia.
 ## 🛠️ Como rodar o CapIAu-Talho <a id="como-montar-localmente"></a>
 
 Você pode rodar o CapIAu-Talho de duas formas:
-1. **Via Docker (Recomendado)**: Ambiente isolado e 100% reprodutível. Nunca quebra com atualizações do seu computador.
+1. **Via Docker (Recomendado)**: Ambiente isolado e padronizado, sem depender de uma instalação Python global.
 2. **Localmente via Python Virtualenv**: Usando `.venv` com Python 3.12.
 
 > 💡 **Atalho Inteligente no Windows:** Dê duplo clique em `criar-atalho.bat` na raiz do projeto. Ele criará um ícone do CapIAu na sua Área de Trabalho que detecta automaticamente se o Docker está aberto (sobe via container) ou se deve iniciar via Python local. Você também pode fixá-lo na Barra de Tarefas!
@@ -550,6 +554,8 @@ Ou com o comando padrão do Docker:
 ```bash
 docker compose up --build
 ```
+
+> 🔒 **Uso em rede:** o `docker-compose.yml` publica a porta em todas as interfaces e a API não possui autenticação. Para uso somente nesta máquina, altere o mapeamento para `127.0.0.1:8000:8000`. Não exponha o serviço à LAN ou à internet sem autenticação e uma política CORS restritiva.
 
 **3. Acesse a interface:**
 Abra no navegador: [http://localhost:8000](http://localhost:8000)
@@ -812,13 +818,13 @@ python -m pytest tests/ -v
 ```
 
 ### 2. Autotestes da Interface e Timeline NLE (Node.js ESM)
-Bateria com **31 suítes automatizadas** cobrindo manipulação de Canvas 2D, colisões de clipes, ferramentas da Tool Strip (Blade, Slip, Slide, Rolling), montagem de 3/4 pontos, Match Frame bidirecional e keymaps NLE:
+Bateria de suítes automatizadas cobrindo manipulação de Canvas 2D, colisões de clipes, ferramentas da Tool Strip (Blade, Slip, Slide, Rolling), montagem de 3/4 pontos, Match Frame bidirecional e keymaps NLE:
 
 ```bash
 # Executar teste específico (ex.: Match Frame & Reverse Match Frame)
 node tests/autoteste_match_frame.mjs
 
-# Executar todas as 31 baterias sequencialmente
+# Executar todas as baterias sequencialmente
 node -e "import fs from 'node:fs'; import { execSync } from 'node:child_process'; const files = fs.readdirSync('tests').filter(f => f.startsWith('autoteste_') && f.endsWith('.mjs')); for (const f of files) { execSync('node tests/' + f, { stdio: 'inherit' }); }"
 ```
 
@@ -827,7 +833,7 @@ node -e "import fs from 'node:fs'; import { execSync } from 'node:child_process'
 ## 🗺️ Roadmap <a id="roadmap"></a>
 
 O plano completo, com decisões registradas e critérios de aceite, está em
-[`docs/PLANO_IMPLEMENTACAO.md`](docs/PLANO_IMPLEMENTACAO.md) e o plano de NLE Clássico em [`docs/PLANO_SUITE_NLE_CLASSICO.md`](docs/PLANO_SUITE_NLE_CLASSICO.md).
+[`docs/PLANO_IMPLEMENTACAO.md`](docs/PLANO_IMPLEMENTACAO.md).
 
 | Etapa | Escopo | Situação |
 |---|---|---|
@@ -835,7 +841,7 @@ O plano completo, com decisões registradas e critérios de aceite, está em
 | **2 — Segmentação e CLIP local** | Shots, beats, embeddings de imagem e análise condicional | ✅ Concluída |
 | **Suíte NLE Clássico (Sessões 0 a 4)** | Layout 2 Zonas, Tool Strip (Gilete, Slip, Slide, Rolling), 3-Pontos, Match Frame, Replace Edit, Subclipes, Timecode, Freezes, Speed, Rate Stretch, Crossfade | ✅ Concluída (Tasks 0 a 15) |
 | **3 — Sala de Projeto & IA de Montagem** | Cartão de contexto, sugestões de transição e escaleta | 🔄 Em andamento |
-| **4 — Vídeo, Cor & Efeitos NLE** | Transições de Vídeo (Cross Dissolve), Adjustment Layer, VU Meters, Keyframes, Auto-Ducking | 📋 Planejada (Tasks 16 a 25) |
+| **4 — Vídeo, Cor & Efeitos NLE** | Transições de Vídeo (Cross Dissolve e Dips), Adjustment Layer, Color Matte, VU Meters, Keyframes, Auto-Ducking | 🔄 Em andamento (Tasks 16 a 18 concluídas; 19 a 25 planejadas) |
 | **5 — Busca multi-vetor e agentes** | Busca em 3 passos, chat com ferramentas, servidor MCP, farm de GPUs | 📋 Planejada |
 
 ---
@@ -863,7 +869,7 @@ capiau-talho/
 │   ├── ui/            Interface web (HTML, CSS e JS em /ui/js)
 │   └── vision/        Biometria facial local e análise multimodal
 ├── tests/             Suíte de testes automatizados (pytest e autotestes Node.js)
-├── wiki/              Documentação oficial da Wiki do GitHub (17 capítulos)
+├── wiki/              Documentação oficial da Wiki do GitHub
 └── watch/             Pasta observada para ingestão automática
 ```
 
@@ -873,9 +879,8 @@ capiau-talho/
 
 | Documento | Conteúdo |
 |---|---|
-| 🌐 [**Wiki Oficial no GitHub**](https://github.com/fernangcortes/capiau-talho-v03/wiki) | Manual completo de 17 capítulos cobrindo toda a plataforma |
+| 🌐 [**Wiki Oficial no GitHub**](https://github.com/fernangcortes/capiau-talho-v03/wiki) | Manual completo da plataforma |
 | 📖 [**Manual do Usuário**](USER_MANUAL.md) | Operação completa das funcionalidades visuais da tela |
-| 🎞️ [**Suíte NLE Clássico**](docs/PLANO_SUITE_NLE_CLASSICO.md) | Especificação técnica completa de montagem, ferramentas e keymaps |
 | 🎬 [**Fluxo com o Kdenlive**](docs/kdenlive_workflow.md) | Sincronização e exportação para edição offline |
 | 🎹 [**Atalhos de teclado**](docs/shortcuts.md) | Lista de atalhos e mapa do teclado NLE |
 | 💰 [**Custos e segurança de APIs**](docs/costs_and_security.md) | Como economizar na precificação do OpenRouter e AssemblyAI |
