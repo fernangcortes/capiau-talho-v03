@@ -555,6 +555,15 @@ export class SourcePlayer {
         
         this.videoFaces = [];
         this.overlayContainer = null;
+
+        let savedFaceOverlayPref = false;
+        try {
+            const raw = localStorage.getItem("capiau_source_face_overlay");
+            if (raw !== null) savedFaceOverlayPref = raw === "true";
+        } catch (_) {}
+        this.isFaceOverlayEnabled = savedFaceOverlayPref;
+        this._isSourceHovered = false;
+        this._isAltPeekActive = false;
         
         this.init();
     }
@@ -637,12 +646,12 @@ export class SourcePlayer {
             });
             video.addEventListener("seeked", () => {
                 const vid = this.el("source-video");
-                if (vid && vid.paused && !this.isReversing) this.updateFacesOverlay();
+                if (vid && (vid.paused || this._isAltPeekActive) && !this.isReversing) this.updateFacesOverlay();
             });
 
             this.resizeObserver = new ResizeObserver(() => {
                 const vid = this.el("source-video");
-                if (vid && vid.paused && !this.isReversing) this.updateOverlaySize();
+                if (vid && (vid.paused || this._isAltPeekActive) && !this.isReversing) this.updateOverlaySize();
                 if (this.currentRotation) {
                     this.applyRotation(this.currentRotation);
                 }
@@ -689,6 +698,13 @@ export class SourcePlayer {
             });
         }
 
+        const btnToggleFaces = this.el("btn-source-toggle-faces");
+        if (btnToggleFaces) {
+            btnToggleFaces.addEventListener("click", () => this.toggleFaceOverlay());
+        }
+        STATE.on("keymapChanged", () => this.updateFaceOverlayButtonUI());
+        this.updateFaceOverlayButtonUI();
+
         const btnToggleCrucial = this.el("btn-source-toggle-crucial");
         if (btnToggleCrucial) {
             btnToggleCrucial.addEventListener("click", () => this.toggleCrucialMomentAtCurrentTime());
@@ -696,7 +712,11 @@ export class SourcePlayer {
 
         const sourceVideoWrapper = this.el("source-video-wrapper");
         if (sourceVideoWrapper) {
-            sourceVideoWrapper.addEventListener("mouseenter", () => {
+            sourceVideoWrapper.addEventListener("mouseenter", (e) => {
+                this._isSourceHovered = true;
+                if (e && e.altKey && !e.ctrlKey && !e.metaKey) {
+                    this.setAltPeek(true);
+                }
                 if (window._galleryController) {
                     const activeMedia = STATE.activeVideo || STATE.activePhoto;
                     if (activeMedia) {
@@ -707,10 +727,23 @@ export class SourcePlayer {
                 }
             });
             sourceVideoWrapper.addEventListener("mouseleave", () => {
+                this._isSourceHovered = false;
+                if (this._isAltPeekActive) {
+                    this.setAltPeek(false);
+                }
                 if (window._galleryController && window._galleryController.activeItem === sourceVideoWrapper) {
                     window._galleryController.activeItem = null;
                 }
             });
+            sourceVideoWrapper.addEventListener("mousemove", (e) => {
+                const altPressed = !!(e && e.altKey && !e.ctrlKey && !e.metaKey);
+                if (altPressed && !this._isAltPeekActive) {
+                    this.setAltPeek(true);
+                } else if (!altPressed && this._isAltPeekActive) {
+                    this.setAltPeek(false);
+                }
+            });
+
             sourceVideoWrapper.addEventListener("click", (e) => {
                 if ((e.ctrlKey || e.metaKey) && e.shiftKey) {
                     e.stopPropagation();
@@ -719,6 +752,29 @@ export class SourcePlayer {
                 }
             }, true);
         }
+
+            const ownerDoc = sourceVideoWrapper.ownerDocument || document;
+            ownerDoc.addEventListener("keydown", (e) => {
+                if ((e.key === "Alt" || e.code === "AltLeft" || e.code === "AltRight") && !e.ctrlKey && !e.metaKey) {
+                    if (this._isSourceHovered && !this._isAltPeekActive) {
+                        e.preventDefault();
+                        this.setAltPeek(true);
+                    }
+                }
+            });
+            ownerDoc.addEventListener("keyup", (e) => {
+                if (e.key === "Alt" || e.code === "AltLeft" || e.code === "AltRight" || !e.altKey) {
+                    if (this._isAltPeekActive) {
+                        this.setAltPeek(false);
+                    }
+                }
+            });
+            window.addEventListener("blur", () => {
+                this._isSourceHovered = false;
+                if (this._isAltPeekActive) {
+                    this.setAltPeek(false);
+                }
+            });
 
         const btnInterviewSetThumb = this.el("btn-interview-modal-set-thumb");
         if (btnInterviewSetThumb) {
@@ -1123,7 +1179,7 @@ export class SourcePlayer {
             if (handle) handle.style.left = `${pct}%`;
         }
 
-        if (vid.paused) {
+        if (vid.paused || this._isAltPeekActive) {
             this.updateFacesOverlay();
         }
         this.updateCrucialButtonState();
@@ -1940,14 +1996,92 @@ export class SourcePlayer {
         this.overlayContainer.style.height = `${actualHeight}px`;
     }
 
+    toggleFaceOverlay(forceState = null) {
+        if (forceState !== null) {
+            this.isFaceOverlayEnabled = !!forceState;
+        } else {
+            this.isFaceOverlayEnabled = !this.isFaceOverlayEnabled;
+        }
+
+        try {
+            localStorage.setItem("capiau_source_face_overlay", this.isFaceOverlayEnabled ? "true" : "false");
+        } catch (_) {}
+
+        this.updateFaceOverlayButtonUI();
+
+        const btn = this.el("btn-source-toggle-faces");
+        if (btn) {
+            btn.classList.add("btn-thumb-click-pulse");
+            setTimeout(() => btn.classList.remove("btn-thumb-click-pulse"), 250);
+        }
+
+        if (this.isFaceOverlayEnabled) {
+            const vid = this.el("source-video");
+            if (vid && vid.paused && !this.isReversing) {
+                this.updateFacesOverlay();
+            }
+            if (typeof window !== "undefined" && typeof window.showToast === "function") {
+                window.showToast("Detecção Facial no Source: Ativada", "info");
+            }
+        } else {
+            this.clearFacesOverlay();
+            if (typeof window !== "undefined" && typeof window.showToast === "function") {
+                window.showToast("Detecção Facial no Source: Desativada", "info");
+            }
+        }
+    }
+
+    updateFaceOverlayButtonUI() {
+        const btn = this.el("btn-source-toggle-faces");
+        if (!btn) return;
+
+        const isEnabled = !!this.isFaceOverlayEnabled;
+        btn.classList.toggle("active", isEnabled);
+        btn.setAttribute("aria-pressed", isEnabled ? "true" : "false");
+
+        let shortcut = "Ctrl+Alt+B";
+        try {
+            if (typeof KEYMAP_SERVICE !== "undefined" && typeof KEYMAP_SERVICE.getShortcutDisplay === "function") {
+                const s = KEYMAP_SERVICE.getShortcutDisplay("ai.toggle_source_face_overlay");
+                if (s) shortcut = s;
+            }
+        } catch (_) {}
+
+        const tip = isEnabled
+            ? `Detecção Facial no Source: Ativada [${shortcut}] — Clique para desativar`
+            : `Detecção Facial no Source: Desativada [${shortcut}] — Clique para ativar`;
+
+        btn.setAttribute("data-tooltip", tip);
+        btn.title = tip;
+    }
+
+    setAltPeek(active) {
+        if (this._isAltPeekActive === active) return;
+        this._isAltPeekActive = !!active;
+
+        if (this._isAltPeekActive) {
+            if (!this.isFaceOverlayEnabled) {
+                this.updateFacesOverlay();
+            }
+        } else {
+            if (!this.isFaceOverlayEnabled) {
+                this.clearFacesOverlay();
+            }
+        }
+    }
+
     updateFacesOverlay() {
+        if (!this.isFaceOverlayEnabled && !this._isAltPeekActive) {
+            this.clearFacesOverlay();
+            return;
+        }
         const vid = this.el("source-video");
         if (!vid || !vid.src) {
             this.clearFacesOverlay();
             return;
         }
 
-        if (vid.paused) {
+        if (vid.paused || this._isAltPeekActive) {
             if (!this.overlayContainer) {
                 this.createOverlayContainer();
             }
@@ -7367,6 +7501,15 @@ export class VideoPlayer {
             const ok = TIMELINE_STATE.extractRange();
             if (ok && typeof window.showToast === "function") {
                 window.showToast("Extract executado no intervalo IN-OUT", "info");
+            }
+            return;
+        }
+
+        // Alternar Camada de Detecção Facial no Source Player (Ctrl+Alt+B)
+        if (KEYMAP_SERVICE.matches(e, "ai.toggle_source_face_overlay")) {
+            e.preventDefault();
+            if (this.sourcePlayer) {
+                this.sourcePlayer.toggleFaceOverlay();
             }
             return;
         }

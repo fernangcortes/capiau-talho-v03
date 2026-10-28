@@ -490,6 +490,12 @@ export const COMMANDS_CATALOG = [
 
     // ── ASSISTÊNCIA DE IA & TOMADAS ─────────────────────────────────────────
     {
+        id: "ai.toggle_source_face_overlay",
+        category: "ai",
+        label: "Alternar Detecção Facial no Source",
+        description: "Exibe ou oculta a camada visual de caixas de detecção facial e grounding no Monitor de Origem (Source)"
+    },
+    {
         id: "ai.toggle_alternatives",
         category: "ai",
         label: "Alternar Tomadas / Alternativas de IA",
@@ -895,6 +901,7 @@ export const KEYMAP_PRESETS = {
         "markers.prev": ["Alt+KeyM"],
         "markers.toggle_crucial": ["Ctrl+Shift+KeyK", "Ctrl+Shift+KeyM"],
 
+        "ai.toggle_source_face_overlay": ["Ctrl+Alt+KeyB"],
         "ai.toggle_alternatives": ["Alt+KeyA"],
         "ai.accept_ghost": ["Enter", "KeyY"],
         "ai.reject_ghost": ["Delete", "KeyN"],
@@ -1049,6 +1056,7 @@ export const KEYMAP_PRESETS = {
         "markers.prev": ["Alt+Shift+KeyG", "Alt+KeyM"],
         "markers.toggle_crucial": ["Ctrl+Shift+KeyK"],
 
+        "ai.toggle_source_face_overlay": ["Ctrl+Alt+KeyB"],
         "ai.toggle_alternatives": ["KeyA"],
         "ai.accept_ghost": ["Enter", "KeyY"],
         "ai.reject_ghost": ["Delete", "KeyN"],
@@ -1147,6 +1155,7 @@ export const KEYMAP_PRESETS = {
         "markers.prev": ["Ctrl+Shift+KeyM", "Alt+KeyM"],
         "markers.toggle_crucial": ["Ctrl+Shift+KeyK"],
 
+        "ai.toggle_source_face_overlay": ["Ctrl+Alt+KeyB"],
         "ai.toggle_alternatives": ["Shift+KeyT", "KeyA"],
         "ai.accept_ghost": ["Enter", "KeyY"],
         "ai.reject_ghost": ["Delete", "KeyN"],
@@ -1245,6 +1254,7 @@ export const KEYMAP_PRESETS = {
         "markers.prev": ["Alt+KeyM"],
         "markers.toggle_crucial": ["Ctrl+Shift+KeyK"],
 
+        "ai.toggle_source_face_overlay": ["Ctrl+Alt+KeyB"],
         "ai.toggle_alternatives": ["KeyT", "KeyA"],
         "ai.accept_ghost": ["Enter", "KeyY"],
         "ai.reject_ghost": ["Delete", "KeyN"],
@@ -1343,6 +1353,7 @@ export const KEYMAP_PRESETS = {
         "markers.prev": ["Ctrl+Semicolon", "Alt+KeyM"],
         "markers.toggle_crucial": ["Ctrl+Shift+KeyK"],
 
+        "ai.toggle_source_face_overlay": ["Ctrl+Alt+KeyB"],
         "ai.toggle_alternatives": ["KeyY", "KeyA"],
         "ai.accept_ghost": ["Enter", "KeyY"],
         "ai.reject_ghost": ["Delete", "KeyN"],

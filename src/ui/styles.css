@@ -3135,6 +3135,29 @@ button {
     background: #fef08a;
     box-shadow: 0 0 8px var(--t-glow, rgba(251, 191, 36, 0.9));
 }
+.btn-source-toggle-faces {
+    color: var(--text-muted, #64748b) !important;
+    opacity: 0.55;
+    transition: all 0.2s ease;
+}
+.btn-source-toggle-faces:hover {
+    color: var(--text-primary, #fff) !important;
+    opacity: 0.9;
+}
+#btn-source-toggle-faces.active,
+.btn-source-toggle-faces.active {
+    background: rgba(6, 182, 212, 0.15) !important;
+    border-color: rgba(6, 182, 212, 0.4) !important;
+    color: var(--accent, #06b6d4) !important;
+    opacity: 1 !important;
+    box-shadow: 0 0 8px rgba(6, 182, 212, 0.35);
+}
+#btn-source-toggle-faces.active:hover,
+.btn-source-toggle-faces.active:hover {
+    background: rgba(6, 182, 212, 0.25) !important;
+    box-shadow: 0 0 10px rgba(6, 182, 212, 0.5);
+}
+
 #btn-source-toggle-crucial.active {
     background: rgba(251, 191, 36, 0.2) !important;
     border-color: rgba(251, 191, 36, 0.5) !important;
