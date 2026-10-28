@@ -11884,6 +11884,36 @@ export class CapiauTimelineInteraction {
             return;
         }
 
+        // Alternar Margens de Segurança & Guias no Player (Ctrl+Shift+G)
+        if (KEYMAP_SERVICE.matches(e, "timeline.toggle_safe_margins")) {
+            e.preventDefault();
+            e.stopPropagation();
+            const next = TIMELINE_STATE.toggleSafeMargins();
+            if (typeof window !== "undefined" && typeof window.showToast === "function") {
+                const aspect = TIMELINE_STATE.safeMarginsConfig?.aspectMask || "none";
+                const maskInfo = aspect !== "none" ? ` · Máscara ${aspect}` : "";
+                window.showToast(
+                    next
+                        ? `Margens de Segurança: Ativadas (90% / 80%${maskInfo})`
+                        : "Margens de Segurança: Ocultas",
+                    "info"
+                );
+            }
+            return;
+        }
+
+        // Alternar Ciclicamente Máscara de Proporção no Player (Ctrl+Alt+G)
+        if (KEYMAP_SERVICE.matches(e, "timeline.cycle_aspect_mask")) {
+            e.preventDefault();
+            e.stopPropagation();
+            const res = TIMELINE_STATE.cycleSafeMarginsAspectMask();
+            if (typeof window !== "undefined" && typeof window.showToast === "function") {
+                const maskKey = res?.config?.aspectMask || "none";
+                window.showToast(`Máscara de Proporção: ${maskKey === "none" ? "Sem Máscara" : maskKey}`, "info");
+            }
+            return;
+        }
+
         // Ir para Timecode / Navegação Numérica (Ctrl+G / Ctrl+P)
         if (KEYMAP_SERVICE.matches(e, "navigation.goto_timecode")) {
             e.preventDefault();

@@ -1304,18 +1304,21 @@ Durante a consolidação da Sessão 1, foi implementado o bloco ergonômico de e
 
 ---
 
-### Task 24: Margens de Segurança & Overlays de Aspecto no Player (Safe Margins)
+### Task 24: Margens de Segurança & Overlays de Aspecto no Player (Safe Margins) — ✅ Concluída
 
 #### 1. Objetivo & Especificação Funcional
-* Botão toggle `#btn-program-safe-margins` no cabeçalho do Program Player.
-* Projeta sobre o vídeo: Action Safe (90%), Title Safe (80%), Cruz Central e Máscaras de Proporção (16:9, 9:16 vertical, 1:1 e 2.39:1 cinema).
+* Botão toggle `#btn-program-safe-margins` (com badge `#badge-program-safe-margins` e menu `#btn-program-safe-margins-menu`) no cabeçalho do Program Player (`#program-player-panel > .player-header`).
+* Projeta sobre o vídeo (`#program-safe-margins-overlay` dentro de `#program-player-viewport`, escalando e movendo em sincronia com zoom/pan a 0ms de latência): **Action Safe (90%)**, **Title Safe (80%)**, **Cruz Central (Center Crosshair)**, **Grade dos Terços (3×3)** opcional, modo de margens relativas à máscara (`relativeToMask`) e **Máscaras de Proporção** (`16:9`, `9:16` vertical, `1:1` quadrado, `2.39:1` cinema scope, `4:5` retrato social e `4:3` broadcast).
+* Atalhos globais `timeline.toggle_safe_margins` (`Ctrl+Shift+G`) e `timeline.cycle_aspect_mask` (`Ctrl+Alt+G`) registrados sem conflitos nos **5 perfis NLE** (`capiau`, `kdenlive`, `premiere`, `resolve`, `finalcut`), preservando 100% do cluster QWER/ASDF.
 
-#### 2. Modificações Propostas
-* `[MODIFY]` `src/ui/js/player.js`: Overlay Canvas/SVG de latência zero com `pointer-events: none`.
-* `[MODIFY]` `src/ui/index.html`: Botão de margens de segurança no player.
+#### 2. Modificações Realizadas
+* `[MODIFY]` `src/ui/js/timelineState.js`: Motor geométrico puro `computeSafeMarginsGeometry(width, height, config)` e estado reativo `safeMarginsEnabled` / `safeMarginsConfig` com persistência em `localStorage` (`capiau_safe_margins_v1`) e emissão de `safeMarginsChanged`.
+* `[MODIFY]` `src/ui/js/player.js`: Renderizador vetorial `buildSafeMarginsSVGMarkup`, sincronizador `syncSafeMarginsOverlay()` integrado ao `syncProgramViewport()`, e flyout flutuante desacoplado (`position: fixed; z-index: 999999;` no `ownerDocument.body`, compatível com janelas popout via `getActiveElement`).
+* `[MODIFY]` `src/ui/js/keymapService.js` e `src/ui/js/timelineInteraction.js`: Comandos `timeline.toggle_safe_margins` e `timeline.cycle_aspect_mask` registrados no catálogo e nos 5 presets.
+* `[MODIFY]` `src/ui/index.html` e `src/ui/styles.css`: Controles no `.player-header`, `#program-safe-margins-overlay` no viewport, estilização semântica flat e cache-busters atualizados (`styles.css?v=94`, `js/main.js?v=81`).
 
 #### 3. Teste Automatizado & Manual
-* `[NEW]` `tests/autoteste_safe_margins.mjs`: Validar cálculo geométrico das proporções.
+* `[NEW]` `tests/autoteste_safe_margins.mjs`: **84/84 asserções aprovadas (100%)** validando DOM, CSS, cache-busters, atalhos nos 5 presets sem conflitos, preservação QWER/ASDF, cálculo geométrico exato de 90%/80%, Cruz Central, máscaras `16:9`, `9:16`, `1:1`, `2.39:1`, `4:5`, `4:3`, modo `relativeToMask`, persistência em `localStorage` e geração SVG.
 * **Teste Manual:** Ativar o botão, conferir as guias de 80% e 90%, alternar para máscara 9:16 e ver o recorte vertical de redes sociais.
 
 > [!CAUTION]

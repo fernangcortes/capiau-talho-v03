@@ -361,6 +361,255 @@ export const TRACK_HEIGHTS = { ai: 44, text: 52, video: 72, audio: 48 };
 // Duração padrão (segundos) de uma foto (still) ao ser inserida na timeline.
 export const PHOTO_DEFAULT_DURATION = 5;
 
+// --- MARGENS DE SEGURANÇA & OVERLAYS DE ASPECTO (TASK 24) ---
+
+export const SAFE_MARGINS_STORAGE_KEY = "capiau_safe_margins_v1";
+
+export const SAFE_MARGINS_ASPECT_PRESETS = {
+    "none": { id: "none", label: "Sem Máscara (Sequência)", shortLabel: "Livre", ratio: null },
+    "16:9": { id: "16:9", label: "16:9 Widescreen (HD / 4K)", shortLabel: "16:9", ratio: 16 / 9 },
+    "9:16": { id: "9:16", label: "9:16 Vertical (Reels / Shorts / TikTok)", shortLabel: "9:16", ratio: 9 / 16 },
+    "1:1": { id: "1:1", label: "1:1 Quadrado (Feed)", shortLabel: "1:1", ratio: 1.0 },
+    "2.39:1": { id: "2.39:1", label: "2.39:1 Cinema Scope (Anamórfico)", shortLabel: "2.39:1", ratio: 2.39 },
+    "4:5": { id: "4:5", label: "4:5 Retrato Social", shortLabel: "4:5", ratio: 4 / 5 },
+    "4:3": { id: "4:3", label: "4:3 Clássico / Broadcast", shortLabel: "4:3", ratio: 4 / 3 }
+};
+
+export const SAFE_MARGINS_ASPECT_ORDER = ["none", "16:9", "9:16", "1:1", "2.39:1", "4:5", "4:3"];
+
+export const DEFAULT_SAFE_MARGINS_CONFIG = {
+    actionSafe: true,       // Action Safe (90% da área central, 5% de margem por lado)
+    titleSafe: true,        // Title Safe (80% da área central, 10% de margem por lado)
+    centerCross: true,      // Cruz Central (Center Crosshair)
+    ruleOfThirds: false,    // Grade da Regra dos Terços (3x3)
+    aspectMask: "none",     // "none" | "16:9" | "9:16" | "1:1" | "2.39:1" | "4:5" | "4:3"
+    maskOpacity: 0.65,      // Opacidade das barras matte (letterbox / pillarbox)
+    relativeToMask: false   // Se true, projeta Action/Title Safe dentro do quadro da máscara ativa
+};
+
+/**
+ * Calcula de forma pura e determinística a geometria vetorial das Margens de Segurança
+ * (Action Safe 90%, Title Safe 80%, Cruz Central, Grade dos Terços) e das Máscaras de
+ * Proporção (16:9, 9:16, 1:1, 2.39:1, 4:5, 4:3) para uma sequência de dimensões (width x height).
+ *
+ * @param {number} width Largura da sequência / viewport (ex: 1920)
+ * @param {number} height Altura da sequência / viewport (ex: 1080)
+ * @param {object} [config={}] Configuração de exibição e máscara de proporção
+ * @returns {object} Geometria completa em coordenadas absolutas e percentuais
+ */
+export function computeSafeMarginsGeometry(width = 1920, height = 1080, config = {}) {
+    const W = Math.max(1, Number(width) || 1920);
+    const H = Math.max(1, Number(height) || 1080);
+    const seqRatio = W / H;
+
+    const cfg = { ...DEFAULT_SAFE_MARGINS_CONFIG, ...(config || {}) };
+    const maskKey = String(cfg.aspectMask || "none").trim();
+    const preset = SAFE_MARGINS_ASPECT_PRESETS[maskKey] || null;
+
+    let targetRatio = preset ? preset.ratio : null;
+    if (targetRatio === null && maskKey !== "none" && maskKey.includes(":")) {
+        const parts = maskKey.split(":").map(Number);
+        if (parts.length === 2 && parts[0] > 0 && parts[1] > 0) {
+            targetRatio = parts[0] / parts[1];
+        }
+    } else if (targetRatio === null && maskKey !== "none") {
+        const num = Number(maskKey);
+        if (Number.isFinite(num) && num > 0) targetRatio = num;
+    }
+
+    let activeX = 0;
+    let activeY = 0;
+    let activeW = W;
+    let activeH = H;
+    let maskType = "none";
+    let hasMask = false;
+    const bars = [];
+
+    if (targetRatio && targetRatio > 0) {
+        hasMask = true;
+        const ratioDiff = Math.abs(targetRatio - seqRatio);
+        if (ratioDiff <= 1e-4) {
+            // Proporção idêntica à sequência (ex: 16:9 num canvas 1920x1080)
+            maskType = "exact";
+        } else if (targetRatio > seqRatio) {
+            // Mais largo que a sequência (ex: 2.39:1 num canvas 16:9) -> Letterbox (barras superior e inferior)
+            maskType = "letterbox";
+            activeW = W;
+            activeH = W / targetRatio;
+            activeX = 0;
+            activeY = (H - activeH) / 2;
+            bars.push(
+                {
+                    side: "top",
+                    x: 0,
+                    y: 0,
+                    width: W,
+                    height: activeY,
+                    leftPct: 0,
+                    topPct: 0,
+                    widthPct: 100,
+                    heightPct: (activeY / H) * 100
+                },
+                {
+                    side: "bottom",
+                    x: 0,
+                    y: activeY + activeH,
+                    width: W,
+                    height: activeY,
+                    leftPct: 0,
+                    topPct: ((activeY + activeH) / H) * 100,
+                    widthPct: 100,
+                    heightPct: (activeY / H) * 100
+                }
+            );
+        } else {
+            // Mais estreito/vertical que a sequência (ex: 9:16 ou 1:1 num canvas 16:9) -> Pillarbox (barras laterais)
+            maskType = "pillarbox";
+            activeH = H;
+            activeW = H * targetRatio;
+            activeY = 0;
+            activeX = (W - activeW) / 2;
+            bars.push(
+                {
+                    side: "left",
+                    x: 0,
+                    y: 0,
+                    width: activeX,
+                    height: H,
+                    leftPct: 0,
+                    topPct: 0,
+                    widthPct: (activeX / W) * 100,
+                    heightPct: 100
+                },
+                {
+                    side: "right",
+                    x: activeX + activeW,
+                    y: 0,
+                    width: activeX,
+                    height: H,
+                    leftPct: ((activeX + activeW) / W) * 100,
+                    topPct: 0,
+                    widthPct: (activeX / W) * 100,
+                    heightPct: 100
+                }
+            );
+        }
+    }
+
+    const buildSafeBox = (baseX, baseY, baseW, baseH, coverage) => {
+        const marginFrac = (1 - coverage) / 2;
+        const x = baseX + baseW * marginFrac;
+        const y = baseY + baseH * marginFrac;
+        const w = baseW * coverage;
+        const h = baseH * coverage;
+        return {
+            coverage,
+            marginPct: Math.round(marginFrac * 100),
+            x,
+            y,
+            width: w,
+            height: h,
+            right: x + w,
+            bottom: y + h,
+            leftPct: (x / W) * 100,
+            topPct: (y / H) * 100,
+            widthPct: (w / W) * 100,
+            heightPct: (h / H) * 100,
+            rightPct: ((x + w) / W) * 100,
+            bottomPct: ((y + h) / H) * 100
+        };
+    };
+
+    // Caixas Safe Margins 90% e 80% relativas à sequência inteira
+    const sequenceActionSafe = buildSafeBox(0, 0, W, H, 0.90);
+    const sequenceTitleSafe = buildSafeBox(0, 0, W, H, 0.80);
+
+    // Caixas Safe Margins 90% e 80% relativas à máscara de aspecto ativa
+    const maskActionSafe = buildSafeBox(activeX, activeY, activeW, activeH, 0.90);
+    const maskTitleSafe = buildSafeBox(activeX, activeY, activeW, activeH, 0.80);
+
+    const useMaskRelative = Boolean(cfg.relativeToMask && hasMask);
+    const actionSafe = useMaskRelative ? maskActionSafe : sequenceActionSafe;
+    const titleSafe = useMaskRelative ? maskTitleSafe : sequenceTitleSafe;
+
+    // Cruz Central (Center Crosshair)
+    const cx = W / 2;
+    const cy = H / 2;
+    const armLength = Math.min(W, H) * 0.035;
+    const centerCross = {
+        cx,
+        cy,
+        cxPct: 50,
+        cyPct: 50,
+        armLength,
+        radius: Math.min(W, H) * 0.008,
+        horizontal: {
+            x1: cx - armLength,
+            y1: cy,
+            x2: cx + armLength,
+            y2: cy
+        },
+        vertical: {
+            x1: cx,
+            y1: cy - armLength,
+            x2: cx,
+            y2: cy + armLength
+        }
+    };
+
+    // Grade da Regra dos Terços (calculada no quadro ativo para auxiliar composição)
+    const ruleOfThirds = {
+        verticals: [
+            { x: activeX + activeW / 3, y1: activeY, y2: activeY + activeH },
+            { x: activeX + (2 * activeW) / 3, y1: activeY, y2: activeY + activeH }
+        ],
+        horizontals: [
+            { y: activeY + activeH / 3, x1: activeX, x2: activeX + activeW },
+            { y: activeY + (2 * activeH) / 3, x1: activeX, x2: activeX + activeW }
+        ]
+    };
+
+    const activeRect = {
+        x: activeX,
+        y: activeY,
+        width: activeW,
+        height: activeH,
+        right: activeX + activeW,
+        bottom: activeY + activeH,
+        leftPct: (activeX / W) * 100,
+        topPct: (activeY / H) * 100,
+        widthPct: (activeW / W) * 100,
+        heightPct: (activeH / H) * 100,
+        aspectRatio: activeW / activeH
+    };
+
+    return {
+        width: W,
+        height: H,
+        sequenceRatio: seqRatio,
+        config: cfg,
+        actionSafe,
+        titleSafe,
+        sequenceActionSafe,
+        sequenceTitleSafe,
+        maskActionSafe,
+        maskTitleSafe,
+        centerCross,
+        ruleOfThirds,
+        aspectMask: {
+            key: preset ? preset.id : (hasMask ? maskKey : "none"),
+            label: preset ? preset.label : (hasMask ? maskKey : SAFE_MARGINS_ASPECT_PRESETS.none.label),
+            shortLabel: preset ? preset.shortLabel : (hasMask ? maskKey : "Livre"),
+            ratio: targetRatio,
+            hasMask,
+            maskType,
+            opacity: Math.max(0.1, Math.min(0.95, Number(cfg.maskOpacity) || 0.65)),
+            activeRect,
+            bars
+        }
+    };
+}
+
 /**
  * Pistas padrão (ordem do array = ordem visual de cima para baixo).
  * "AI" é a pista de sugestões: somente leitura, recebe os ghost clips.
@@ -453,6 +702,131 @@ export class CapiauTimelineState {
         this.transitions = [];
         this.selectedTransitionId = null;
         this.hoveredTransition = null;
+
+        // Margens de Segurança & Overlays de Aspecto no Player (Task 24):
+        const savedSafeMargins = this.loadSafeMarginsState();
+        this.safeMarginsEnabled = savedSafeMargins.enabled;
+        this.safeMarginsConfig = savedSafeMargins.config;
+    }
+
+    /** Carrega o estado das Margens de Segurança e Máscaras de Proporção do localStorage. */
+    loadSafeMarginsState() {
+        const fallback = {
+            enabled: false,
+            config: { ...DEFAULT_SAFE_MARGINS_CONFIG }
+        };
+        try {
+            if (typeof localStorage !== "undefined") {
+                const raw = localStorage.getItem(SAFE_MARGINS_STORAGE_KEY);
+                if (raw) {
+                    const parsed = JSON.parse(raw);
+                    if (parsed && typeof parsed === "object") {
+                        const enabled = Boolean(parsed.enabled);
+                        const cfg = { ...DEFAULT_SAFE_MARGINS_CONFIG, ...(parsed.config || {}) };
+                        if (!SAFE_MARGINS_ASPECT_PRESETS[cfg.aspectMask]) {
+                            cfg.aspectMask = "none";
+                        }
+                        return { enabled, config: cfg };
+                    }
+                }
+            }
+        } catch (_) {}
+        return fallback;
+    }
+
+    /** Salva o estado das Margens de Segurança e Máscaras de Proporção no localStorage. */
+    _saveSafeMarginsState() {
+        try {
+            if (typeof localStorage !== "undefined") {
+                localStorage.setItem(SAFE_MARGINS_STORAGE_KEY, JSON.stringify({
+                    enabled: Boolean(this.safeMarginsEnabled),
+                    config: { ...this.safeMarginsConfig }
+                }));
+            }
+        } catch (_) {}
+    }
+
+    /** Retorna snapshot imutável do estado atual de Safe Margins. */
+    getSafeMarginsState() {
+        return {
+            enabled: Boolean(this.safeMarginsEnabled),
+            config: { ...DEFAULT_SAFE_MARGINS_CONFIG, ...(this.safeMarginsConfig || {}) }
+        };
+    }
+
+    /** Alterna ou define a visibilidade do overlay de Margens de Segurança no Program Player. */
+    toggleSafeMargins(forceState = null) {
+        this.safeMarginsEnabled = (forceState !== null && forceState !== undefined)
+            ? Boolean(forceState)
+            : !this.safeMarginsEnabled;
+        this._saveSafeMarginsState();
+        const payload = this.getSafeMarginsState();
+        STATE.emit("safeMarginsChanged", payload);
+        return this.safeMarginsEnabled;
+    }
+
+    /** Define a máscara de proporção de aspecto ("none", "16:9", "9:16", "1:1", "2.39:1", "4:5", "4:3"). */
+    setSafeMarginsAspectMask(aspectMask, options = {}) {
+        const key = SAFE_MARGINS_ASPECT_PRESETS[aspectMask] ? aspectMask : "none";
+        this.safeMarginsConfig = {
+            ...DEFAULT_SAFE_MARGINS_CONFIG,
+            ...(this.safeMarginsConfig || {}),
+            aspectMask: key
+        };
+        if (key !== "none" && !options.keepDisabled && !this.safeMarginsEnabled) {
+            this.safeMarginsEnabled = true;
+        }
+        this._saveSafeMarginsState();
+        const payload = this.getSafeMarginsState();
+        STATE.emit("safeMarginsChanged", payload);
+        return payload;
+    }
+
+    /** Alterna ciclicamente entre as máscaras de proporção de aspecto disponíveis. */
+    cycleSafeMarginsAspectMask(direction = 1) {
+        const current = (this.safeMarginsConfig && this.safeMarginsConfig.aspectMask) || "none";
+        const idx = SAFE_MARGINS_ASPECT_ORDER.indexOf(current);
+        const step = direction >= 0 ? 1 : -1;
+        const nextIdx = (idx === -1)
+            ? 1
+            : (idx + step + SAFE_MARGINS_ASPECT_ORDER.length) % SAFE_MARGINS_ASPECT_ORDER.length;
+        const nextKey = SAFE_MARGINS_ASPECT_ORDER[nextIdx];
+        return this.setSafeMarginsAspectMask(nextKey);
+    }
+
+    /** Atualiza parcialmente as configurações de guias (actionSafe, titleSafe, centerCross, ruleOfThirds, aspectMask, maskOpacity, relativeToMask). */
+    setSafeMarginsConfig(partial = {}) {
+        if (!partial || typeof partial !== "object") return this.getSafeMarginsState();
+        const next = {
+            ...DEFAULT_SAFE_MARGINS_CONFIG,
+            ...(this.safeMarginsConfig || {}),
+            ...partial
+        };
+        if (!SAFE_MARGINS_ASPECT_PRESETS[next.aspectMask]) {
+            next.aspectMask = "none";
+        }
+        next.actionSafe = Boolean(next.actionSafe);
+        next.titleSafe = Boolean(next.titleSafe);
+        next.centerCross = Boolean(next.centerCross);
+        next.ruleOfThirds = Boolean(next.ruleOfThirds);
+        next.relativeToMask = Boolean(next.relativeToMask);
+        if (next.maskOpacity !== undefined) {
+            const op = Number(next.maskOpacity);
+            next.maskOpacity = Number.isFinite(op) ? Math.max(0.1, Math.min(0.95, op)) : 0.65;
+        }
+        this.safeMarginsConfig = next;
+        this._saveSafeMarginsState();
+        const payload = this.getSafeMarginsState();
+        STATE.emit("safeMarginsChanged", payload);
+        return payload;
+    }
+
+    /** Calcula a geometria de Safe Margins e Aspect Mask para as dimensões atuais da sequência (ou dimensões fornecidas). */
+    getSafeMarginsGeometry(width = this.width, height = this.height, overrideConfig = null) {
+        const cfg = overrideConfig
+            ? { ...this.safeMarginsConfig, ...overrideConfig }
+            : this.safeMarginsConfig;
+        return computeSafeMarginsGeometry(width || this.width || 1920, height || this.height || 1080, cfg);
     }
 
     /** Carrega a preferência de 'Timeline Segue a Agulha' do localStorage (default: true). */

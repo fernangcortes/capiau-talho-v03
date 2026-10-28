@@ -558,6 +558,18 @@ export const COMMANDS_CATALOG = [
         description: "Alterna o cadeado físico em todas as pistas de vídeo, áudio e texto da timeline"
     },
     {
+        id: "timeline.toggle_safe_margins",
+        category: "canvas_history",
+        label: "Alternar Margens de Segurança & Guias no Player (Safe Margins)",
+        description: "Exibe ou oculta o overlay vetorial de Action Safe (90%), Title Safe (80%), Cruz Central e Máscaras de Proporção no Monitor de Programa"
+    },
+    {
+        id: "timeline.cycle_aspect_mask",
+        category: "canvas_history",
+        label: "Alternar Máscara de Proporção no Player (16:9 / 9:16 / 1:1 / 2.39:1)",
+        description: "Alterna ciclicamente entre as máscaras de proporção de aspecto (16:9, 9:16, 1:1, 2.39:1, 4:5, 4:3, Sem Máscara) no Monitor de Programa"
+    },
+    {
         id: "history.undo",
         category: "canvas_history",
         label: "Desfazer Ação (Undo)",
@@ -902,6 +914,8 @@ export const KEYMAP_PRESETS = {
         "timeline.toggle_follow_playhead": ["Ctrl+Alt+KeyF"],
         "timeline.toggle_track_lock": ["Shift+KeyL"],
         "timeline.toggle_all_tracks_lock": ["Ctrl+Alt+Shift+KeyL"],
+        "timeline.toggle_safe_margins": ["Ctrl+Shift+KeyG"],
+        "timeline.cycle_aspect_mask": ["Ctrl+Alt+KeyG"],
 
         // Layout & Workspace (Numpad & Slots)
         "workspace.numpad_1": ["Numpad1"],
@@ -1048,7 +1062,9 @@ export const KEYMAP_PRESETS = {
         "timeline.zoom_in": ["Ctrl+Equal", "Ctrl+NumpadAdd"],
         "timeline.zoom_out": ["Ctrl+Minus", "Ctrl+NumpadSubtract"],
         "timeline.toggle_track_lock": ["Shift+KeyL"],
-        "timeline.toggle_all_tracks_lock": ["Ctrl+Alt+Shift+KeyL"]
+        "timeline.toggle_all_tracks_lock": ["Ctrl+Alt+Shift+KeyL"],
+        "timeline.toggle_safe_margins": ["Ctrl+Shift+KeyG"],
+        "timeline.cycle_aspect_mask": ["Ctrl+Alt+KeyG"]
     },
 
     // 3. Adobe Premiere Pro
@@ -1144,7 +1160,9 @@ export const KEYMAP_PRESETS = {
         "timeline.zoom_out": ["Minus", "NumpadSubtract"],
         "timeline.zoom_reset": ["Ctrl+Digit1"],
         "timeline.toggle_track_lock": ["Ctrl+Shift+KeyL", "Shift+KeyL"],
-        "timeline.toggle_all_tracks_lock": ["Ctrl+Alt+Shift+KeyL"]
+        "timeline.toggle_all_tracks_lock": ["Ctrl+Alt+Shift+KeyL"],
+        "timeline.toggle_safe_margins": ["Ctrl+Shift+KeyG"],
+        "timeline.cycle_aspect_mask": ["Ctrl+Alt+KeyG"]
     },
 
     // 4. DaVinci Resolve
@@ -1240,7 +1258,9 @@ export const KEYMAP_PRESETS = {
         "timeline.zoom_out": ["Ctrl+Minus", "Ctrl+NumpadSubtract", "Cmd+Minus"],
         "timeline.zoom_reset": ["Shift+Digit1"],
         "timeline.toggle_track_lock": ["Alt+Shift+KeyL", "Shift+KeyL"],
-        "timeline.toggle_all_tracks_lock": ["Ctrl+Alt+Shift+KeyL"]
+        "timeline.toggle_all_tracks_lock": ["Ctrl+Alt+Shift+KeyL"],
+        "timeline.toggle_safe_margins": ["Ctrl+Shift+KeyG"],
+        "timeline.cycle_aspect_mask": ["Ctrl+Alt+KeyG"]
     },
 
     // 5. Apple Final Cut Pro
@@ -1336,7 +1356,9 @@ export const KEYMAP_PRESETS = {
         "timeline.zoom_out": ["Cmd+Minus", "Ctrl+Minus"],
         "timeline.zoom_reset": ["Shift+Digit1"],
         "timeline.toggle_track_lock": ["Shift+KeyL"],
-        "timeline.toggle_all_tracks_lock": ["Ctrl+Alt+Shift+KeyL"]
+        "timeline.toggle_all_tracks_lock": ["Ctrl+Alt+Shift+KeyL"],
+        "timeline.toggle_safe_margins": ["Ctrl+Shift+KeyG"],
+        "timeline.cycle_aspect_mask": ["Ctrl+Alt+KeyG"]
     }
 };
 

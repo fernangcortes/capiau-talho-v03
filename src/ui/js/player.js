@@ -2,7 +2,8 @@
 import { STATE } from "./state.js";
 import { CapIAuAPI } from "./api.js";
 import { FaceManager } from "./faces.js";
-import { TIMELINE_STATE, TIMELINE_HISTORY, evaluateFadeCurve, computeAdjustmentFadeFactor, computeClipFadeFactor, formatRulerTimecode } from "./timelineState.js";
+import { TIMELINE_STATE, TIMELINE_HISTORY, evaluateFadeCurve, computeAdjustmentFadeFactor, computeClipFadeFactor, formatRulerTimecode, computeSafeMarginsGeometry, SAFE_MARGINS_ASPECT_PRESETS, SAFE_MARGINS_ASPECT_ORDER, DEFAULT_SAFE_MARGINS_CONFIG } from "./timelineState.js";
+export { computeSafeMarginsGeometry, SAFE_MARGINS_ASPECT_PRESETS, SAFE_MARGINS_ASPECT_ORDER, DEFAULT_SAFE_MARGINS_CONFIG };
 import { getActiveElement } from "./workspaceManager.js";
 import { PlayerTextOverlayManager } from "./playerTextOverlay.js";
 import { KEYMAP_SERVICE } from "./keymapService.js";
@@ -2522,6 +2523,149 @@ export function syncProgramViewport() {
 
     updateProgramMinimap();
     updateProgramScrollbars();
+    syncSafeMarginsOverlay();
+}
+
+/**
+ * Constrói o markup SVG vetorial para as Margens de Segurança (Action Safe 90%, Title Safe 80%,
+ * Cruz Central, Grade dos Terços) e Máscaras de Proporção (16:9, 9:16, 1:1, 2.39:1, 4:5, 4:3).
+ */
+export function buildSafeMarginsSVGMarkup(width = 1920, height = 1080, config = {}) {
+    const geo = computeSafeMarginsGeometry(width, height, config);
+    const W = geo.width;
+    const H = geo.height;
+    const cfg = geo.config;
+    const fontSize = Math.max(10, Math.round(Math.min(W, H) * 0.018));
+    const pad = Math.max(4, Math.round(fontSize * 0.45));
+
+    const parts = [];
+    parts.push(
+        `<svg class="safe-margins-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" data-aspect-mask="${geo.aspectMask.key}" data-mask-type="${geo.aspectMask.maskType}">`
+    );
+
+    // 1. Máscara de Proporção (Barras Letterbox / Pillarbox + Moldura Ativa)
+    if (geo.aspectMask.hasMask) {
+        for (const bar of geo.aspectMask.bars) {
+            parts.push(
+                `<rect class="safe-mask-bar" data-mask-side="${bar.side}" x="${bar.x.toFixed(2)}" y="${bar.y.toFixed(2)}" width="${bar.width.toFixed(2)}" height="${bar.height.toFixed(2)}" fill-opacity="${geo.aspectMask.opacity}" />`
+            );
+        }
+        const ar = geo.aspectMask.activeRect;
+        parts.push(
+            `<rect class="safe-mask-border" data-mask-active-rect="true" x="${ar.x.toFixed(2)}" y="${ar.y.toFixed(2)}" width="${ar.width.toFixed(2)}" height="${ar.height.toFixed(2)}" />`
+        );
+        parts.push(
+            `<text class="safe-guide-label is-aspect-badge" data-safe-label="aspect" x="${(ar.right - pad * 1.4).toFixed(2)}" y="${(ar.y + fontSize * 1.3).toFixed(2)}" text-anchor="end" font-size="${fontSize}px">${geo.aspectMask.shortLabel}</text>`
+        );
+    }
+
+    // 2. Grade da Regra dos Terços (3x3)
+    if (cfg.ruleOfThirds) {
+        for (const vLine of geo.ruleOfThirds.verticals) {
+            parts.push(
+                `<line class="safe-thirds-line" data-thirds="v" x1="${vLine.x.toFixed(2)}" y1="${vLine.y1.toFixed(2)}" x2="${vLine.x.toFixed(2)}" y2="${vLine.y2.toFixed(2)}" />`
+            );
+        }
+        for (const hLine of geo.ruleOfThirds.horizontals) {
+            parts.push(
+                `<line class="safe-thirds-line" data-thirds="h" x1="${hLine.x1.toFixed(2)}" y1="${hLine.y.toFixed(2)}" x2="${hLine.x2.toFixed(2)}" y2="${hLine.y.toFixed(2)}" />`
+            );
+        }
+    }
+
+    // 3. Action Safe (90%)
+    if (cfg.actionSafe !== false) {
+        const a = geo.actionSafe;
+        parts.push(
+            `<rect class="safe-box-action" data-safe-zone="action-90" data-coverage="0.9" x="${a.x.toFixed(2)}" y="${a.y.toFixed(2)}" width="${a.width.toFixed(2)}" height="${a.height.toFixed(2)}" />`
+        );
+        parts.push(
+            `<text class="safe-guide-label is-action-safe" data-safe-label="action-90" x="${(a.x + pad).toFixed(2)}" y="${(a.y + fontSize * 1.15).toFixed(2)}" font-size="${fontSize}px">90%</text>`
+        );
+    }
+
+    // 4. Title Safe (80%)
+    if (cfg.titleSafe !== false) {
+        const t = geo.titleSafe;
+        parts.push(
+            `<rect class="safe-box-title" data-safe-zone="title-80" data-coverage="0.8" x="${t.x.toFixed(2)}" y="${t.y.toFixed(2)}" width="${t.width.toFixed(2)}" height="${t.height.toFixed(2)}" />`
+        );
+        parts.push(
+            `<text class="safe-guide-label is-title-safe" data-safe-label="title-80" x="${(t.x + pad).toFixed(2)}" y="${(t.y + fontSize * 1.15).toFixed(2)}" font-size="${fontSize}px">80%</text>`
+        );
+    }
+
+    // 5. Cruz Central (Center Crosshair)
+    if (cfg.centerCross !== false) {
+        const c = geo.centerCross;
+        parts.push(`<g class="safe-center-cross" data-safe-zone="center-cross">`);
+        parts.push(
+            `<line class="safe-center-cross-line" data-axis="h" x1="${c.horizontal.x1.toFixed(2)}" y1="${c.horizontal.y1.toFixed(2)}" x2="${c.horizontal.x2.toFixed(2)}" y2="${c.horizontal.y2.toFixed(2)}" />`
+        );
+        parts.push(
+            `<line class="safe-center-cross-line" data-axis="v" x1="${c.vertical.x1.toFixed(2)}" y1="${c.vertical.y1.toFixed(2)}" x2="${c.vertical.x2.toFixed(2)}" y2="${c.vertical.y2.toFixed(2)}" />`
+        );
+        parts.push(
+            `<circle class="safe-center-cross-circle" cx="${c.cx.toFixed(2)}" cy="${c.cy.toFixed(2)}" r="${c.radius.toFixed(2)}" />`
+        );
+        parts.push(`</g>`);
+    }
+
+    parts.push(`</svg>`);
+    return parts.join("");
+}
+
+/**
+ * Sincroniza o botão, badge e overlay vetorial de Margens de Segurança no Program Player
+ * (compatível com janelas popout via getActiveElement — Diretriz 6).
+ */
+export function syncSafeMarginsOverlay() {
+    const enabled = Boolean(TIMELINE_STATE?.safeMarginsEnabled);
+    const cfg = TIMELINE_STATE?.safeMarginsConfig || DEFAULT_SAFE_MARGINS_CONFIG;
+    const tw = TIMELINE_STATE?.width || 1920;
+    const th = TIMELINE_STATE?.height || 1080;
+
+    const btn = getActiveElement("btn-program-safe-margins");
+    const badge = getActiveElement("badge-program-safe-margins");
+    const overlay = getActiveElement("program-safe-margins-overlay");
+
+    const aspectKey = cfg.aspectMask || "none";
+    const preset = SAFE_MARGINS_ASPECT_PRESETS[aspectKey] || SAFE_MARGINS_ASPECT_PRESETS.none;
+
+    if (btn) {
+        btn.classList.toggle("active", enabled);
+        btn.setAttribute("aria-pressed", String(enabled));
+        const statusStr = enabled ? "Ativo" : "Inativo";
+        const maskStr = aspectKey !== "none" ? ` · Máscara ${preset.shortLabel}` : "";
+        btn.setAttribute(
+            "data-tooltip",
+            `Margens de Segurança (${statusStr}${maskStr}) — Action 90% / Title 80% / Cruz Central [Ctrl+Shift+G] · Clique direito ou seta para opções`
+        );
+    }
+
+    if (badge) {
+        if (aspectKey !== "none") {
+            badge.textContent = preset.shortLabel;
+            badge.style.display = "inline-flex";
+        } else {
+            badge.textContent = "";
+            badge.style.display = "none";
+        }
+    }
+
+    if (!overlay) return;
+
+    if (!enabled) {
+        overlay.style.display = "none";
+        return;
+    }
+
+    overlay.style.display = "block";
+    const renderKey = `${tw}x${th}:${JSON.stringify(cfg)}`;
+    if (overlay._lastSafeMarginsKey !== renderKey || !overlay.innerHTML) {
+        overlay._lastSafeMarginsKey = renderKey;
+        overlay.innerHTML = buildSafeMarginsSVGMarkup(tw, th, cfg);
+    }
 }
 
 // Tolerância (s) para considerar que um buffer já está no ponto certo da mídia e portanto
@@ -2622,6 +2766,14 @@ export class ProgramPlayer {
             });
             STATE.on("timelineAutoTransformOverlayChanged", (isAuto) => updateTransformBtnUI(isAuto));
         }
+
+        // Botão e Flyout de Margens de Segurança & Máscaras de Proporção (Task 24)
+        this.initSafeMarginsControls();
+        STATE.on("safeMarginsChanged", () => {
+            syncSafeMarginsOverlay();
+            this._refreshSafeMarginsFlyoutIfOpen();
+        });
+        syncSafeMarginsOverlay();
 
         // Botão Play Program
         const btnPlay = this.el("btn-program-play");
@@ -2756,6 +2908,213 @@ export class ProgramPlayer {
 
         // Inicializa controle de zoom livre, pan/scroll e minimapa
         this.initProgramZoomAndPan();
+    }
+
+    initSafeMarginsControls() {
+        const bindButtons = () => {
+            const btn = this.el("btn-program-safe-margins");
+            const btnMenu = this.el("btn-program-safe-margins-menu");
+
+            if (btn && !btn._safeMarginsBound) {
+                btn._safeMarginsBound = true;
+                btn.addEventListener("click", (e) => {
+                    e.stopPropagation();
+                    const next = TIMELINE_STATE.toggleSafeMargins();
+                    if (typeof window !== "undefined" && typeof window.showToast === "function") {
+                        const aspect = TIMELINE_STATE.safeMarginsConfig?.aspectMask || "none";
+                        const maskInfo = aspect !== "none" ? ` · Máscara ${aspect}` : "";
+                        window.showToast(
+                            next
+                                ? `Margens de Segurança: Ativadas (90% / 80%${maskInfo})`
+                                : "Margens de Segurança: Ocultas",
+                            "info"
+                        );
+                    }
+                });
+                btn.addEventListener("contextmenu", (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.toggleSafeMarginsFlyout(btn);
+                });
+            }
+
+            if (btnMenu && !btnMenu._safeMarginsMenuBound) {
+                btnMenu._safeMarginsMenuBound = true;
+                btnMenu.addEventListener("click", (e) => {
+                    e.stopPropagation();
+                    this.toggleSafeMarginsFlyout(btnMenu);
+                });
+            }
+        };
+
+        bindButtons();
+        STATE.on("workspacePopoutChanged", () => {
+            setTimeout(() => {
+                bindButtons();
+                syncSafeMarginsOverlay();
+            }, 60);
+        });
+    }
+
+    toggleSafeMarginsFlyout(anchorEl = null) {
+        const trigger = anchorEl || this.el("btn-program-safe-margins-menu") || this.el("btn-program-safe-margins");
+        if (!trigger || typeof document === "undefined") return;
+
+        const doc = trigger.ownerDocument || document;
+        const existing = doc.getElementById("safe-margins-flyout-menu");
+        if (existing) {
+            this.closeSafeMarginsFlyout(doc);
+            return;
+        }
+
+        const flyout = doc.createElement("div");
+        flyout.id = "safe-margins-flyout-menu";
+        flyout.className = "safe-margins-flyout";
+
+        const btnChevron = this.el("btn-program-safe-margins-menu");
+        if (btnChevron) btnChevron.classList.add("is-open");
+
+        this._populateSafeMarginsFlyout(flyout);
+        doc.body.appendChild(flyout);
+
+        // Posicionamento fixo ancorado ao botão sem cortar nas bordas da janela (Diretriz 14)
+        const rect = trigger.getBoundingClientRect();
+        const winW = doc.defaultView?.innerWidth || 1280;
+        const winH = doc.defaultView?.innerHeight || 720;
+        const flyW = flyout.offsetWidth || 240;
+        const flyH = flyout.offsetHeight || 280;
+
+        let left = rect.right - flyW;
+        if (left < 8) left = Math.max(8, rect.left);
+        if (left + flyW > winW - 8) left = Math.max(8, winW - flyW - 8);
+
+        let top = rect.bottom + 6;
+        if (top + flyH > winH - 8) {
+            top = Math.max(8, rect.top - flyH - 6);
+        }
+
+        flyout.style.left = `${Math.round(left)}px`;
+        flyout.style.top = `${Math.round(top)}px`;
+
+        const onDocMouseDown = (ev) => {
+            if (!flyout.contains(ev.target) && !trigger.contains(ev.target)) {
+                this.closeSafeMarginsFlyout(doc);
+            }
+        };
+        const onDocKeyDown = (ev) => {
+            if (ev.key === "Escape") {
+                this.closeSafeMarginsFlyout(doc);
+            }
+        };
+        flyout._cleanupListeners = () => {
+            doc.removeEventListener("mousedown", onDocMouseDown, true);
+            doc.removeEventListener("keydown", onDocKeyDown, true);
+        };
+        doc.addEventListener("mousedown", onDocMouseDown, true);
+        doc.addEventListener("keydown", onDocKeyDown, true);
+    }
+
+    _populateSafeMarginsFlyout(flyout) {
+        if (!flyout) return;
+        const state = TIMELINE_STATE.getSafeMarginsState();
+        const enabled = state.enabled;
+        const cfg = state.config;
+
+        const checkIcon = (on) => on
+            ? `<i class="fa-solid fa-check" style="color: var(--accent, #06b6d4); font-size: var(--fs-10);"></i>`
+            : `<span style="width: 10px; display: inline-block;"></span>`;
+
+        const aspectButtonsHtml = SAFE_MARGINS_ASPECT_ORDER.map(key => {
+            const p = SAFE_MARGINS_ASPECT_PRESETS[key];
+            const isAct = (cfg.aspectMask || "none") === key;
+            return `<button type="button" class="safe-margins-aspect-pill ${isAct ? "is-active" : ""}" data-aspect-mask="${key}" title="${p.label}">${p.shortLabel}</button>`;
+        }).join("");
+
+        flyout.innerHTML = `
+            <div class="safe-margins-flyout-section-title">Guias do Monitor (Safe Margins)</div>
+            <button type="button" class="safe-margins-flyout-item ${enabled ? "is-active" : ""}" data-safe-action="toggle-enabled">
+                <span>Exibir Overlay no Monitor</span>
+                ${checkIcon(enabled)}
+            </button>
+            <div class="safe-margins-flyout-sep"></div>
+            <button type="button" class="safe-margins-flyout-item ${cfg.actionSafe ? "is-active" : ""}" data-safe-toggle="actionSafe">
+                <span>Action Safe (90%)</span>
+                ${checkIcon(cfg.actionSafe)}
+            </button>
+            <button type="button" class="safe-margins-flyout-item ${cfg.titleSafe ? "is-active" : ""}" data-safe-toggle="titleSafe">
+                <span>Title Safe (80%)</span>
+                ${checkIcon(cfg.titleSafe)}
+            </button>
+            <button type="button" class="safe-margins-flyout-item ${cfg.centerCross ? "is-active" : ""}" data-safe-toggle="centerCross">
+                <span>Cruz Central (Center Cross)</span>
+                ${checkIcon(cfg.centerCross)}
+            </button>
+            <button type="button" class="safe-margins-flyout-item ${cfg.ruleOfThirds ? "is-active" : ""}" data-safe-toggle="ruleOfThirds">
+                <span>Grade dos Terços (3×3)</span>
+                ${checkIcon(cfg.ruleOfThirds)}
+            </button>
+            <button type="button" class="safe-margins-flyout-item ${cfg.relativeToMask ? "is-active" : ""}" data-safe-toggle="relativeToMask">
+                <span>Margens 90%/80% na Máscara</span>
+                ${checkIcon(cfg.relativeToMask)}
+            </button>
+            <div class="safe-margins-flyout-sep"></div>
+            <div class="safe-margins-flyout-section-title">Máscara de Proporção (Aspect Ratio)</div>
+            <div class="safe-margins-aspect-grid">
+                ${aspectButtonsHtml}
+            </div>
+        `;
+
+        const btnToggleMain = flyout.querySelector('[data-safe-action="toggle-enabled"]');
+        if (btnToggleMain) {
+            btnToggleMain.addEventListener("click", (e) => {
+                e.stopPropagation();
+                TIMELINE_STATE.toggleSafeMargins();
+            });
+        }
+
+        flyout.querySelectorAll("[data-safe-toggle]").forEach(btn => {
+            btn.addEventListener("click", (e) => {
+                e.stopPropagation();
+                const prop = btn.dataset.safeToggle;
+                const cur = Boolean(TIMELINE_STATE.safeMarginsConfig?.[prop]);
+                TIMELINE_STATE.setSafeMarginsConfig({ [prop]: !cur });
+                if (!TIMELINE_STATE.safeMarginsEnabled) {
+                    TIMELINE_STATE.toggleSafeMargins(true);
+                }
+            });
+        });
+
+        flyout.querySelectorAll("[data-aspect-mask]").forEach(pill => {
+            pill.addEventListener("click", (e) => {
+                e.stopPropagation();
+                const maskKey = pill.dataset.aspectMask;
+                TIMELINE_STATE.setSafeMarginsAspectMask(maskKey);
+            });
+        });
+    }
+
+    _refreshSafeMarginsFlyoutIfOpen() {
+        if (typeof document === "undefined") return;
+        const btn = this.el("btn-program-safe-margins");
+        const doc = btn?.ownerDocument || document;
+        const flyout = doc.getElementById("safe-margins-flyout-menu");
+        if (flyout) {
+            this._populateSafeMarginsFlyout(flyout);
+        }
+    }
+
+    closeSafeMarginsFlyout(targetDoc = null) {
+        if (typeof document === "undefined") return;
+        const doc = targetDoc || this.el("btn-program-safe-margins")?.ownerDocument || document;
+        const flyout = doc.getElementById("safe-margins-flyout-menu");
+        if (flyout) {
+            if (typeof flyout._cleanupListeners === "function") {
+                flyout._cleanupListeners();
+            }
+            flyout.remove();
+        }
+        const btnChevron = this.el("btn-program-safe-margins-menu");
+        if (btnChevron) btnChevron.classList.remove("is-open");
     }
 
     jumpToFrame(res) {
@@ -6947,6 +7306,35 @@ export class VideoPlayer {
         if (KEYMAP_SERVICE.matches(e, "playback.toggle_loop")) {
             e.preventDefault();
             TIMELINE_STATE.toggleLoop();
+            return;
+        }
+
+        // Alternar Margens de Segurança & Guias no Player (Ctrl+Shift+G)
+        if (KEYMAP_SERVICE.matches(e, "timeline.toggle_safe_margins")) {
+            e.preventDefault();
+            const next = TIMELINE_STATE.toggleSafeMargins();
+            if (typeof window !== "undefined" && typeof window.showToast === "function") {
+                const aspect = TIMELINE_STATE.safeMarginsConfig?.aspectMask || "none";
+                const maskInfo = aspect !== "none" ? ` · Máscara ${aspect}` : "";
+                window.showToast(
+                    next
+                        ? `Margens de Segurança: Ativadas (90% / 80%${maskInfo})`
+                        : "Margens de Segurança: Ocultas",
+                    "info"
+                );
+            }
+            return;
+        }
+
+        // Alternar Ciclicamente Máscara de Proporção no Player (Ctrl+Alt+G)
+        if (KEYMAP_SERVICE.matches(e, "timeline.cycle_aspect_mask")) {
+            e.preventDefault();
+            const res = TIMELINE_STATE.cycleSafeMarginsAspectMask();
+            if (typeof window !== "undefined" && typeof window.showToast === "function") {
+                const maskKey = res?.config?.aspectMask || "none";
+                const preset = SAFE_MARGINS_ASPECT_PRESETS[maskKey] || SAFE_MARGINS_ASPECT_PRESETS.none;
+                window.showToast(`Máscara de Proporção: ${preset.label}`, "info");
+            }
             return;
         }
 

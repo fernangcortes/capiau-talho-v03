@@ -17,7 +17,7 @@
     <!-- FontAwesome para ícones premium -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Estilos Customizados -->
-    <link rel="stylesheet" href="styles.css?v=93">
+    <link rel="stylesheet" href="styles.css?v=94">
     <link rel="stylesheet" href="theme.css?v=5">
     <script src="js/themeBoot.js?v=2"></script>
 </head>
@@ -1062,6 +1062,20 @@
                                         <circle cx="8" cy="8" r="1.2" fill="currentColor"/>
                                     </svg>
                                 </button>
+                                <div class="safe-margins-control-wrap">
+                                    <button id="btn-program-safe-margins" class="btn-control btn-safe-margins" data-tooltip="Margens de Segurança & Guias de Proporção (Action 90% / Title 80% / Aspect Ratio) [Ctrl+Shift+G] — Clique direito ou seta para opções" aria-pressed="false">
+                                        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round">
+                                            <rect x="1.5" y="2.5" width="13" height="11" rx="1.2"/>
+                                            <rect x="3.5" y="4.2" width="9" height="7.6" rx="0.6" stroke-dasharray="2 1.5"/>
+                                            <line x1="8" y1="6.2" x2="8" y2="9.8"/>
+                                            <line x1="6.2" y1="8" x2="9.8" y2="8"/>
+                                        </svg>
+                                        <span id="badge-program-safe-margins" class="safe-margins-badge" style="display: none;"></span>
+                                    </button>
+                                    <button id="btn-program-safe-margins-menu" class="btn-control btn-safe-margins-chevron" data-tooltip="Opções de Margens de Segurança e Máscaras de Proporção (16:9, 9:16, 1:1, 2.39:1) [Ctrl+Alt+G]" aria-label="Opções de Margens de Segurança">
+                                        <i class="fa-solid fa-chevron-down"></i>
+                                    </button>
+                                </div>
                                 <select id="program-preview-zoom" title="Zoom do Preview" style="font-size: var(--fs-10); height: 20px; padding: 0 var(--sp-4); border: 1px solid var(--border-glass); background: rgba(0,0,0,0.3); color: #fff; border-radius: 4px; outline: none; cursor: pointer;">
                                     <option value="fit">Ajustar</option>
                                     <option value="0.1">10%</option>
@@ -1118,6 +1132,9 @@
                                     <div class="snap-guide-line snap-guide-center-x" data-guide="center-x"></div>
                                     <div class="snap-guide-line snap-guide-center-y" data-guide="center-y"></div>
                                 </div>
+
+                                <!-- Overlay Vetorial de Margens de Segurança & Máscaras de Proporção (Task 24) -->
+                                <div id="program-safe-margins-overlay" class="program-safe-margins-overlay" style="display: none; position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 62;"></div>
 
                                 <!-- Overlay de transformação (Fase 4) - alças acessíveis sem tingimento de cor -->
                                 <div id="program-transform-overlay"></div>
@@ -3934,7 +3951,7 @@
     </div>
 
     <!-- Lógica da Aplicação -->
-    <script type="module" src="js/main.js?v=80"></script>
+    <script type="module" src="js/main.js?v=81"></script>
 </body>
 </html>
 
