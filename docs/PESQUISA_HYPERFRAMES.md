@@ -5,6 +5,12 @@
 > Convenção: **[lido]** = conferido no código-fonte; **[inferência]** = dedução minha;
 > **[a medir]** = precisa de teste prático antes de decidir.
 
+> **Errata (28/10/2026).** A análise detalhada por frente, em [`docs/plano_hyperframes/`](plano_hyperframes/README.md),
+> corrigiu pontos deste documento. Os mais importantes: o Whisper local já dá tempo por palavra (o ganho do Parakeet é
+> velocidade e estabilidade); as divergências de áudio são maiores que as descritas aqui (compressor de 0,6 a 19 dB, EQ
+> até 2 dB, mono −3 dB); servir o WAV pela rota interna é inviável; SRT/VTT/ASS não passam pelo backend; o BeginFrame do
+> HyperFrames só existe em Linux e não preserva alfa. A lista completa está na seção 11 do plano mestre.
+
 ---
 
 ## 1. Resumo
