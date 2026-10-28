@@ -3753,12 +3753,18 @@ export class WorkspaceManager {
         }
     }
 
-    renameCustomWorkspace(wsId) {
+    async renameCustomWorkspace(wsId, anchorEl = null) {
         const customWorkspaces = this.getCustomWorkspaces();
         if (!customWorkspaces[wsId]) return;
 
         const oldName = customWorkspaces[wsId].name;
-        const newName = prompt("Digite o novo nome para esta workspace customizada:", oldName);
+        const newName = await (window.showPromptDialog || showPromptDialog)({
+            targetEl: anchorEl || document.getElementById("select-workspace"),
+            title: "Renomear Workspace",
+            message: "Digite o novo nome para esta workspace customizada:",
+            defaultValue: oldName,
+            confirmText: "Renomear"
+        });
         if (newName && newName.trim() && newName.trim() !== oldName) {
             customWorkspaces[wsId].name = newName.trim();
             customWorkspaces[wsId].updated = Date.now();
@@ -3770,23 +3776,30 @@ export class WorkspaceManager {
                 selectWorkspace.value = wsId;
             }
             if (window.showToast) {
-                window.showToast(`Workspace renomeada para "${newName.trim()}"!`, "success");
+                window.showToast(`Workspace renomeada para "${newName.trim()}"!`, "success", anchorEl);
             }
         }
     }
 
-    deleteCustomWorkspace(wsId) {
+    async deleteCustomWorkspace(wsId, anchorEl = null) {
         const customWorkspaces = this.getCustomWorkspaces();
         if (!customWorkspaces[wsId]) return;
 
         const name = customWorkspaces[wsId].name;
-        if (confirm(`Deseja realmente excluir a workspace customizada "${name}"?`)) {
+        const ok = await (window.showConfirmModal || showConfirmModal)({
+            target: anchorEl || document.getElementById("select-workspace"),
+            title: "Excluir Workspace",
+            message: `Deseja realmente excluir a workspace customizada "${name}"?`,
+            confirmText: "Excluir Workspace",
+            danger: true
+        });
+        if (ok) {
             delete customWorkspaces[wsId];
             this.saveCustomWorkspacesDict(customWorkspaces);
             this.applyWorkspace("default");
 
             if (window.showToast) {
-                window.showToast(`Workspace "${name}" excluída.`, "success");
+                window.showToast(`Workspace "${name}" excluída.`, "success", anchorEl);
             }
         }
     }
@@ -6460,26 +6473,37 @@ export class SplitterHelper {
     }
 }
 
-export function showToast(msg, type = "info") {
-    let toast = document.getElementById("global-nle-toast");
-    if (!toast && typeof document.createElement === "function") {
-        toast = document.createElement("div");
+export function showToast(msg, type = "info", target = null) {
+    let targetDoc = null;
+    if (target && target.ownerDocument) {
+        targetDoc = target.ownerDocument;
+    } else if (typeof window !== "undefined" && typeof window.resolveTargetContext === "function") {
+        targetDoc = window.resolveTargetContext(target).doc;
+    }
+    if (!targetDoc) targetDoc = document;
+
+    let toast = targetDoc.getElementById("global-nle-toast");
+    if (!toast && typeof targetDoc.createElement === "function") {
+        toast = targetDoc.createElement("div");
         if (toast) {
             toast.id = "global-nle-toast";
             toast.className = "nle-toast";
-            if (document.body) document.body.appendChild(toast);
+            if (targetDoc.body) targetDoc.body.appendChild(toast);
         }
     }
     if (!toast) return;
     toast.textContent = msg;
     if (toast.style) {
         toast.style.display = "block";
-        toast.style.borderColor = type === "success" ? "rgba(16, 185, 129, 0.6)" : "rgba(6, 182, 212, 0.6)";
+        toast.style.borderColor = type === "success" 
+            ? "rgba(16, 185, 129, 0.7)" 
+            : (type === "warning" ? "rgba(244, 63, 94, 0.7)" : "rgba(6, 182, 212, 0.7)");
     }
     if (toast.classList) {
         toast.classList.add("visible");
     }
-    setTimeout(() => {
+    clearTimeout(toast._timer);
+    toast._timer = setTimeout(() => {
         if (toast.classList) toast.classList.remove("visible");
         setTimeout(() => { if (toast.style) toast.style.display = "none"; }, 300);
     }, 2500);

@@ -1,5 +1,6 @@
 import { STATE } from "./state.js";
 import { CapIAuAPI } from "./api.js";
+import { showConfirmModal } from "./dialogs.js";
 
 class LogManager {
     constructor() {
@@ -382,9 +383,15 @@ class LogManager {
 
         // Se já está exibindo o mesmo relatório na tela, solicita confirmação antes de regenerar
         if (this.lastReportContent[type] && !isContainerHidden && this.lastReportType === type) {
-            if (!confirm(`Deseja gerar um novo relatório do tipo "${type === "human" ? "Humano" : "Técnico"}"? Isso substituirá o atual.`)) {
-                return;
-            }
+            const ok = await showConfirmModal({
+                title: "Regenerar Relatório IA",
+                message: `Deseja gerar um novo relatório do tipo "${type === "human" ? "Humano" : "Técnico"}"? Isso substituirá o atual.`,
+                confirmText: "Regenerar",
+                cancelText: "Cancelar",
+                danger: false,
+                target: this.aiContainer
+            });
+            if (!ok) return;
         }
         
         const logsText = this.formatLogsText();

@@ -123,9 +123,15 @@ export class SettingsPanelManager {
         this.setDrawerVisible(true);
     }
 
-    close() {
-        if (this.hasDirty() && !confirm("Há alterações não salvas. Descartar e fechar?")) {
-            return;
+    async close() {
+        if (this.hasDirty()) {
+            const ok = await (window.showConfirmModal || showConfirmModal)({
+                title: "Descartar Alterações?",
+                message: "Há alterações não salvas nas configurações. Descartar e fechar?",
+                confirmText: "Descartar",
+                danger: true
+            });
+            if (!ok) return;
         }
         this.dirty.global.clear();
         this.dirty.project.clear();
@@ -448,13 +454,20 @@ export class SettingsPanelManager {
                         this.dirty.prompts.delete(prompt.id);
                         this.renderAll();
                     } else {
-                        if (confirm(`Remover personalização de "${prompt.label}" e voltar ao padrão?`)) {
+                        const ok = await (window.showConfirmPopover || showConfirmPopover)({
+                            targetEl: revertBtn,
+                            title: "Restaurar Padrão?",
+                            message: `Remover personalização de "${prompt.label}" e voltar ao padrão?`,
+                            confirmText: "Restaurar",
+                            danger: false
+                        });
+                        if (ok) {
                             try {
                                 await CapIAuAPI.deletePromptOverride(prompt.id, this.scope, STATE.currentProjectId);
                                 await this.refresh();
                                 this.renderAll();
                             } catch (err) {
-                                alert(`Erro ao restaurar prompt: ${err.message}`);
+                                if (window.showToast) window.showToast(`Erro ao restaurar prompt: ${err.message}`, "error", revertBtn);
                             }
                         }
                     }
@@ -681,7 +694,14 @@ export class SettingsPanelManager {
             clearBtn.setAttribute("data-tooltip", "Apagar a chave salva no app e voltar a usar a do arquivo .env.");
             clearBtn.disabled = disabled;
             clearBtn.addEventListener("click", async () => {
-                if (!confirm(`Apagar a chave salva de "${entry.label}" e voltar ao .env?`)) return;
+                const ok = await (window.showConfirmPopover || showConfirmPopover)({
+                    targetEl: clearBtn,
+                    title: "Limpar Chave Salva?",
+                    message: `Apagar a chave salva de "${entry.label}" e voltar ao .env?`,
+                    confirmText: "Limpar Chave",
+                    danger: true
+                });
+                if (!ok) return;
                 try {
                     await CapIAuAPI.resetSettings("global", null, [entry.key]);
                     this.dirty.global.delete(entry.key);
@@ -888,7 +908,13 @@ export class SettingsPanelManager {
 
     async applyPreset(presetId, presetLabel) {
         const scopeLabel = this.scope === "project" ? "no projeto atual" : "como padrão global";
-        if (!confirm(`Aplicar o preset "${presetLabel}" ${scopeLabel}? Isso ajusta várias configurações de uma vez.`)) return;
+        const ok = await (window.showConfirmModal || showConfirmModal)({
+            title: "Aplicar Preset?",
+            message: `Aplicar o preset "${presetLabel}" ${scopeLabel}? Isso ajusta várias configurações de uma vez.`,
+            confirmText: "Aplicar Preset",
+            danger: false
+        });
+        if (!ok) return;
         try {
             await CapIAuAPI.applySettingsPreset(
                 presetId,

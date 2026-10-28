@@ -4,6 +4,7 @@ import { CapIAuAPI } from "./api.js";
 import { FaceManager } from "./faces.js";
 import { parseQuery, evaluateAST, getAvailableSuggestions } from "./searchParser.js";
 import { KEYMAP_SERVICE } from "./keymapService.js";
+import { showConfirmPopover, showConfirmModal, showPromptDialog } from "./dialogs.js";
 
 // Armazena o estado das pastas expandidas/recolhidas (persistido por projeto)
 export const openFoldersSet = new Set();
@@ -772,11 +773,13 @@ export function isAnyModalOpen(targetDoc = null) {
             #timeline-alternatives-backdrop,
             .face-inspector-overlay,
             #face-inspector-overlay,
-            dialog[open]
+            dialog[open],
+            .nle-confirm-popover,
+            .nle-dialog-overlay
         `);
         for (let i = 0; i < candidateModals.length; i++) {
             const el = candidateModals[i];
-            if (el.classList.contains("active")) return true;
+            if (el.classList.contains("active") || el.classList.contains("visible")) return true;
             const inlineDisplay = el.style.display;
             if (inlineDisplay && inlineDisplay !== "none") return true;
             try {
@@ -1474,15 +1477,21 @@ export function showMediaContextMenu(e, item, kind, cardEl) {
     const renameItem = document.createElement("div");
     renameItem.className = "menu-item";
     renameItem.innerHTML = `<i class="fa-solid fa-pen-to-square"></i><span class="menu-item-text">${item.is_subclip ? "Renomear Subclipe" : "Renomear Título"}</span>`;
-    renameItem.addEventListener("click", () => {
+    renameItem.addEventListener("click", async () => {
         menu.remove();
         if (item.is_subclip) {
             const currentTitle = item.title || item.name || "";
-            const novo = prompt("Novo nome para o subclipe:", currentTitle);
+            const novo = await (window.showPromptDialog || showPromptDialog)({
+                targetEl: cardEl,
+                title: "Renomear Subclipe",
+                message: "Digite o novo nome para o subclipe:",
+                defaultValue: currentTitle,
+                confirmText: "Renomear"
+            });
             if (novo && novo.trim() && novo.trim() !== currentTitle) {
                 renameSubclip(item.id, novo.trim());
                 if (typeof window.showToast === "function") {
-                    window.showToast("Subclipe renomeado com sucesso!", "success");
+                    window.showToast("Subclipe renomeado com sucesso!", "success", cardEl);
                 }
             }
         } else {
@@ -1797,10 +1806,10 @@ export function showMediaContextMenu(e, item, kind, cardEl) {
                     window.showToast("Caminho copiado para a área de transferência!", "success");
                 }
             }).catch(() => {
-                prompt("Caminho do arquivo:", filePath);
+                showPromptDialog({ title: "Caminho do Arquivo", message: "Copie o caminho do arquivo abaixo:", defaultValue: filePath });
             });
         } else {
-            prompt("Caminho do arquivo:", filePath);
+            showPromptDialog({ title: "Caminho do Arquivo", message: "Copie o caminho do arquivo abaixo:", defaultValue: filePath });
         }
     });
     menu.appendChild(copyPathItem);
@@ -1960,13 +1969,20 @@ export function showMediaContextMenu(e, item, kind, cardEl) {
         const deleteSubclipItem = document.createElement("div");
         deleteSubclipItem.className = "menu-item menu-item-destructive";
         deleteSubclipItem.innerHTML = `<i class="fa-solid fa-trash-can"></i><span class="menu-item-text">Excluir Subclipe da Biblioteca</span>`;
-        deleteSubclipItem.addEventListener("click", () => {
+        deleteSubclipItem.addEventListener("click", async () => {
             menu.remove();
             const clipName = item.title || item.name || "Subclipe";
-            if (!confirm(`Deseja realmente excluir o subclipe "${clipName}" da biblioteca?\n\nO arquivo original não será afetado.`)) return;
+            const ok = await (window.showConfirmModal || showConfirmModal)({
+                target: cardEl,
+                title: "Excluir Subclipe",
+                message: `Deseja realmente excluir o subclipe "${clipName}" da biblioteca?\n\nO arquivo original não será afetado.`,
+                confirmText: "Excluir Subclipe",
+                danger: true
+            });
+            if (!ok) return;
             deleteSubclip(item.id);
             if (typeof window.showToast === "function") {
-                window.showToast(`Subclipe "${clipName}" removido da biblioteca.`, "info");
+                window.showToast(`Subclipe "${clipName}" removido da biblioteca.`, "info", cardEl);
             }
         });
         menu.appendChild(deleteSubclipItem);
@@ -1978,7 +1994,14 @@ export function showMediaContextMenu(e, item, kind, cardEl) {
         cleanProxyItem.addEventListener("click", async () => {
             menu.remove();
             const msg = `Deseja realmente excluir o arquivo proxy físico de "${item.filename}"?\n\nO clipe permanecerá no projeto, mas precisará ser recodificado para exibição local suave.`;
-            if (!confirm(msg)) return;
+            const ok = await (window.showConfirmModal || showConfirmModal)({
+                target: cardEl,
+                title: "Deletar / Limpar Proxy",
+                message: msg,
+                confirmText: "Excluir Proxy",
+                danger: true
+            });
+            if (!ok) return;
             try {
                 if (isVideo) {
                     await CapIAuAPI.deleteVideoProxy(item.id);
@@ -1986,13 +2009,13 @@ export function showMediaContextMenu(e, item, kind, cardEl) {
                     await CapIAuAPI.deletePhotoProxy(item.id);
                 }
                 if (typeof window.showToast === "function") {
-                    window.showToast("Proxy físico removido com sucesso!", "success");
+                    window.showToast("Proxy físico removido com sucesso!", "success", cardEl);
                 }
                 if (window.libraryInstance) await window.libraryInstance.reloadData();
                 else STATE.emit("projectChanged");
             } catch (err) {
                 if (typeof window.showToast === "function") {
-                    window.showToast("Erro ao excluir proxy: " + err.message, "error");
+                    window.showToast("Erro ao excluir proxy: " + err.message, "error", cardEl);
                 } else {
                     alert("Erro ao excluir proxy: " + err.message);
                 }
@@ -2007,7 +2030,14 @@ export function showMediaContextMenu(e, item, kind, cardEl) {
         removeMediaItem.addEventListener("click", async () => {
             menu.remove();
             const msg = `⚠️ ATENÇÃO: Deseja remover permanentemente "${item.filename}" do projeto?\n\nTodos os dados de decupagem, transcrição e indexação visual serão excluídos do banco de dados.`;
-            if (!confirm(msg)) return;
+            const ok = await (window.showConfirmModal || showConfirmModal)({
+                target: cardEl,
+                title: "Remover Mídia do Projeto",
+                message: msg,
+                confirmText: "Remover Mídia",
+                danger: true
+            });
+            if (!ok) return;
             try {
                 if (isVideo) {
                     await CapIAuAPI.deleteVideo(item.id);
@@ -2015,13 +2045,13 @@ export function showMediaContextMenu(e, item, kind, cardEl) {
                     await CapIAuAPI.deletePhoto(item.id);
                 }
                 if (typeof window.showToast === "function") {
-                    window.showToast("Mídia removida do projeto!", "info");
+                    window.showToast("Mídia removida do projeto!", "info", cardEl);
                 }
                 if (window.libraryInstance) await window.libraryInstance.reloadData();
                 else STATE.emit("projectChanged");
             } catch (err) {
                 if (typeof window.showToast === "function") {
-                    window.showToast("Erro ao remover mídia: " + err.message, "error");
+                    window.showToast("Erro ao remover mídia: " + err.message, "error", cardEl);
                 } else {
                     alert("Erro ao remover mídia: " + err.message);
                 }
@@ -5167,32 +5197,53 @@ function renderTreeNode(node, container, depth = 0) {
 
 // Expor utilitários e ações globais para compatibilidade com onclick inline do HTML
 window.cancelConversion = async function(videoId) {
-    if (!confirm("Deseja cancelar a tarefa ativa desse vídeo?")) return;
+    const ok = await (window.showConfirmModal || showConfirmModal)({
+        title: "Cancelar Tarefa",
+        message: "Deseja cancelar a tarefa ativa desse vídeo?",
+        confirmText: "Cancelar Tarefa",
+        danger: true
+    });
+    if (!ok) return;
     try {
         await CapIAuAPI.cancelConversion(videoId);
         STATE.emit("projectChanged");
+        if (window.showToast) window.showToast("Tarefa cancelada.", "info");
     } catch (err) {
-        alert("Erro ao cancelar tarefa: " + err.message);
+        if (window.showToast) window.showToast("Erro ao cancelar tarefa: " + err.message, "error");
     }
 };
 
 window.deleteProxy = async function(videoId) {
-    if (!confirm("Deseja excluir o arquivo proxy físico e reverter o status deste vídeo?")) return;
+    const ok = await (window.showConfirmModal || showConfirmModal)({
+        title: "Excluir Proxy Físico",
+        message: "Deseja excluir o arquivo proxy físico e reverter o status deste vídeo?",
+        confirmText: "Excluir Proxy",
+        danger: true
+    });
+    if (!ok) return;
     try {
         await CapIAuAPI.deleteVideoProxy(videoId);
         STATE.emit("projectChanged");
+        if (window.showToast) window.showToast("Proxy físico excluído.", "info");
     } catch (err) {
-        alert("Erro ao excluir proxy: " + err.message);
+        if (window.showToast) window.showToast("Erro ao excluir proxy: " + err.message, "error");
     }
 };
 
 window.deleteDocument = async function(docId) {
-    if (!confirm("Tem certeza que deseja remover este documento? Seus dados indexados no Qdrant também serão excluídos!")) return;
+    const ok = await (window.showConfirmModal || showConfirmModal)({
+        title: "Remover Documento",
+        message: "Tem certeza que deseja remover este documento? Seus dados indexados no Qdrant também serão excluídos!",
+        confirmText: "Remover Documento",
+        danger: true
+    });
+    if (!ok) return;
     try {
         await CapIAuAPI.deleteDocument(docId, STATE.currentProjectId);
         STATE.emit("projectChanged");
+        if (window.showToast) window.showToast("Documento removido.", "info");
     } catch (err) {
-        alert("Erro ao excluir documento: " + err.message);
+        if (window.showToast) window.showToast("Erro ao excluir documento: " + err.message, "error");
     }
 };
 
@@ -5225,10 +5276,13 @@ window.startScriptExtraction = async function(docId, filename) {
     }
 
     if (preview.needs_review || preview.strategy === "prose") {
-        const tryLLM = confirm(
-            `Não identifiquei com confiança um padrão de cenas em "${filename}" (${SCRIPT_STRATEGY_LABELS[preview.strategy] || preview.strategy}).\n\n` +
-            `Quer que a IA tente identificar o formato antes de decidir (1 chamada de custo baixo)?`
-        );
+        const tryLLM = await showConfirmModal({
+            title: "Padrão de Cenas não Identificado",
+            message: `Não identifiquei com confiança um padrão de cenas em "${filename}" (${SCRIPT_STRATEGY_LABELS[preview.strategy] || preview.strategy}).\n\nQuer que a IA tente identificar o formato antes de decidir (1 chamada de custo baixo)?`,
+            confirmText: "Consultar IA",
+            cancelText: "Não Consultar",
+            danger: false
+        });
         if (tryLLM) {
             try {
                 preview = await CapIAuAPI.fetchStructurePreview(docId, projectId, true);
@@ -5251,7 +5305,14 @@ window.startScriptExtraction = async function(docId, filename) {
             (sample ? `Primeiras cenas:\n${sample}\n\n` : "") +
             `Confirma a extração? Isso gasta algumas chamadas de IA (uma por trecho do roteiro; reaproveita o resultado se o texto não mudar).`;
     }
-    if (!confirm(message)) return;
+    const okExtract = await showConfirmModal({
+        title: "Extração de Cenas do Roteiro",
+        message: message,
+        confirmText: "Confirmar Extração",
+        cancelText: "Cancelar",
+        danger: false
+    });
+    if (!okExtract) return;
 
     let result;
     try {
@@ -6737,8 +6798,16 @@ export class LibraryManager {
 
         const btnCancelAllAnalyses = document.getElementById("btn-cancel-all-analyses");
         if (btnCancelAllAnalyses) {
-            btnCancelAllAnalyses.addEventListener("click", async () => {
-                if (!confirm("Deseja cancelar todas as análises de visão em andamento neste projeto?")) return;
+            btnCancelAllAnalyses.addEventListener("click", async (e) => {
+                const btn = e.currentTarget || btnCancelAllAnalyses;
+                const ok = await (window.showConfirmPopover || showConfirmPopover)({
+                    targetEl: btn,
+                    title: "Cancelar Análises?",
+                    message: "Deseja cancelar todas as análises de visão em andamento neste projeto?",
+                    confirmText: "Cancelar Todas",
+                    danger: true
+                });
+                if (!ok) return;
                 try {
                     const res = await CapIAuAPI.cancelAllAnalyses(STATE.currentProjectId);
                     if (window.showToast) window.showToast(`Cancelamento solicitado para ${res.count || 0} análises!`, "info");
@@ -6837,10 +6906,13 @@ export class LibraryManager {
                     if (response.status === 409 && body.detail && body.detail.reason === "near_version") {
                         const info = body.detail;
                         const pct = Math.round((info.similarity || 0) * 100);
-                        const wantsReplace = confirm(
-                            `Parece uma nova versão de "${info.existing_filename}" (${pct}% parecido).\n\n` +
-                            `Substituir? Os trechos antigos saem da busca e do chat.`
-                        );
+                        const wantsReplace = await showConfirmModal({
+                            title: "Nova Versão Detectada",
+                            message: `Parece uma nova versão de "${info.existing_filename}" (${pct}% parecido).\n\nSubstituir? Os trechos antigos saem da busca e do chat.`,
+                            confirmText: "Substituir Versão",
+                            cancelText: "Cancelar",
+                            danger: true
+                        });
                         if (wantsReplace) {
                             response = await postDoc(info.existing_id);
                             body = await response.json().catch(() => ({}));
@@ -7229,7 +7301,14 @@ export class LibraryManager {
             if (btnRegenTitles) {
                 btnRegenTitles.addEventListener("click", async (e) => {
                     e.stopPropagation();
-                    if (!confirm("Deseja gerar títulos executivos inteligentes (3 a 6 palavras) para os vídeos da biblioteca via IA?")) return;
+                    const ok = await (window.showConfirmPopover || showConfirmPopover)({
+                        targetEl: btnRegenTitles,
+                        title: "Gerar Títulos Inteligentes?",
+                        message: "Deseja gerar títulos executivos inteligentes (3 a 6 palavras) para os vídeos da biblioteca via IA?",
+                        confirmText: "Gerar Títulos",
+                        danger: false
+                    });
+                    if (!ok) return;
                     btnRegenTitles.disabled = true;
                     btnRegenTitles.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Gerando...`;
                     try {
@@ -10564,7 +10643,14 @@ export class LibraryManager {
             "ATENÇÃO: a BUSCA SEMÂNTICA fica indisponível até o fim da rodada " +
             "(o banco vetorial é embutido e só aceita um processo por vez). " +
             "Ela volta sozinha quando o worker terminar.";
-        if (!confirm(aviso)) return;
+        const okTrans = await showConfirmModal({
+            title: "Transcrição em Lote",
+            message: aviso,
+            confirmText: "Iniciar Transcrição",
+            cancelText: "Cancelar",
+            danger: false
+        });
+        if (!okTrans) return;
 
         try {
             const res = await CapIAuAPI.launchTranscriptionWorker(STATE.currentProjectId);
@@ -10643,8 +10729,13 @@ export class LibraryManager {
         }
     }
 
-    async promptRelinkProjectMedia() {
-        const searchDir = prompt("Informe a pasta para buscar e reconectar automaticamente os arquivos originais perdidos:", "D:\\makinof-monstro\\");
+    async promptRelinkProjectMedia(triggerEl = null) {
+        const searchDir = await showPromptDialog({
+            title: "Reconectar Arquivos Originais (Relink)",
+            message: "Informe a pasta para buscar e reconectar automaticamente os arquivos originais perdidos:",
+            defaultValue: "D:\\makinof-monstro\\",
+            targetEl: triggerEl
+        });
         if (!searchDir || !searchDir.trim()) return;
 
         try {
@@ -11127,7 +11218,12 @@ export class LibraryManager {
                         promptMsg += "\nFalantes/Pessoas existentes:\n" + speakers.join(", ") + "\n";
                     }
                     
-                    const name = prompt(promptMsg, face.name || "");
+                    const name = await showPromptDialog({
+                        title: "Rotular Pessoa / Rosto",
+                        message: promptMsg,
+                        defaultValue: face.name || "",
+                        targetEl: faceDiv
+                    });
                     if (name !== null) {
                         const trimmedName = name.trim();
                         const res = await CapIAuAPI.labelFace(face.id, trimmedName);
@@ -11863,7 +11959,14 @@ export class LibraryManager {
 
         const restaurar = async (versao, btn) => {
             const quando = this.formatarDataHistorico(versao.created_at);
-            if (!confirm(`Restaurar a versão de ${quando}?\n\nA decupagem que está no ar agora vai para o histórico, então dá para voltar atrás.`)) return;
+            const ok = await (window.showConfirmPopover || showConfirmPopover)({
+                targetEl: btn,
+                title: "Restaurar Versão?",
+                message: `Restaurar a versão de ${quando}?\n\nA decupagem que está no ar agora vai para o histórico, então dá para voltar atrás.`,
+                confirmText: "Restaurar Versão",
+                danger: false
+            });
+            if (!ok) return;
             btn.disabled = true;
             btn.style.opacity = "0.5";
             try {
@@ -12032,7 +12135,13 @@ export class LibraryManager {
                                 alert("Navegue o Source Player para a posição de tempo contida dentro desta fala para dividi-la!");
                                 return;
                             }
-                            const newSpk = prompt("Digite o nome/ID do novo falante a partir deste ponto:", d.speaker_id + "_2");
+                            const splitBtn = block.querySelector(".btn-dialogue-split");
+                            const newSpk = await showPromptDialog({
+                                title: "Dividir Fala",
+                                message: "Digite o nome/ID do novo falante a partir deste ponto:",
+                                defaultValue: d.speaker_id + "_2",
+                                targetEl: splitBtn
+                            });
                             if (newSpk && newSpk.trim()) {
                                 try {
                                     await CapIAuAPI.splitTranscript(video.id, currentTime, newSpk.trim());
@@ -12191,13 +12300,21 @@ export class LibraryManager {
                             // Delete segment link
                             card.querySelector(".inspector-theme-delete-btn").addEventListener("click", async (e) => {
                                 e.stopPropagation();
-                                if (confirm(`Deseja desvincular o tema "${theme.title}" deste segmento?`)) {
+                                const deleteBtn = e.currentTarget || card.querySelector(".inspector-theme-delete-btn");
+                                const ok = await (window.showConfirmPopover || showConfirmPopover)({
+                                    targetEl: deleteBtn,
+                                    title: "Desvincular Tema?",
+                                    message: `Deseja desvincular o tema "${theme.title}" deste segmento?`,
+                                    confirmText: "Desvincular",
+                                    danger: true
+                                });
+                                if (ok) {
                                     try {
                                         await CapIAuAPI.deleteThemeSegment(seg.id);
-                                        alert("Tema desvinculado com sucesso!");
+                                        if (window.showToast) window.showToast("Tema desvinculado com sucesso!", "info", deleteBtn);
                                         this.loadInspectorThemes(video);
                                     } catch(err) {
-                                        alert("Erro ao desvincular tema: " + err.message);
+                                        if (window.showToast) window.showToast("Erro ao desvincular tema: " + err.message, "error", deleteBtn);
                                     }
                                 }
                             });

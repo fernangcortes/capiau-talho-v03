@@ -127,6 +127,7 @@
     <main id="group-workspace"></main>
 
     <script type="module">
+        import "./js/dialogs.js";
         import { edgeInLine, visibleSplitters } from "./js/panelCollapse.js";
         const params = new URLSearchParams(window.location.search);
         const panels = (params.get("group") || "").split(",").map(p => p.trim()).filter(Boolean).slice(0, 4);

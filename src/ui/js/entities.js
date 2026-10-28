@@ -306,9 +306,13 @@ export class EntityManager {
             return e ? `${e.name} (${e.mention_count} menções)` : id;
         }).join(", ");
 
-        if (!confirm(`Fundir ${otherLabels} em "${survivor.name}"?\n\nOs nomes antigos viram aliases da sobrevivente e as menções são movidas para ela. Esta ação não pode ser desfeita.`)) {
-            return;
-        }
+        const ok = await (window.showConfirmModal || showConfirmModal)({
+            title: "Fundir Entidades?",
+            message: `Fundir ${otherLabels} em "${survivor.name}"?\n\nOs nomes antigos viram aliases da sobrevivente e as menções são movidas para ela. Esta ação não pode ser desfeita.`,
+            confirmText: "Fundir Entidades",
+            danger: true
+        });
+        if (!ok) return;
 
         try {
             const projectId = STATE.currentProjectId;
@@ -329,10 +333,19 @@ export class EntityManager {
 
     static handleLinkAction(tr, entity) {
         if (entity.linked_entity_id) {
-            if (!confirm(`Desvincular "${entity.name}" de "${entity.linked_entity_name}"?`)) return;
-            CapIAuAPI.updateEntity(entity.id, { linked_entity_id: null })
-                .then(() => this.loadEntities())
-                .catch(e => alert("Erro ao desvincular: " + e.message));
+            (async () => {
+                const ok = await (window.showConfirmPopover || showConfirmPopover)({
+                    targetEl: tr,
+                    title: "Desvincular Entidade?",
+                    message: `Desvincular "${entity.name}" de "${entity.linked_entity_name}"?`,
+                    confirmText: "Desvincular",
+                    danger: true
+                });
+                if (!ok) return;
+                CapIAuAPI.updateEntity(entity.id, { linked_entity_id: null })
+                    .then(() => this.loadEntities())
+                    .catch(e => { if (window.showToast) window.showToast("Erro ao desvincular: " + e.message, "error", tr); });
+            })();
             return;
         }
 

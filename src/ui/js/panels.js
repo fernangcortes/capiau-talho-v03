@@ -6,6 +6,7 @@ import { parseQuery, evaluateAST } from "./searchParser.js";
 import { CapiauTimelineRenderer } from "./timelineRenderer.js";
 import { CapiauTimelineInteraction } from "./timelineInteraction.js";
 import { TIMELINE_STATE, TIMELINE_HISTORY, secondsToFrames } from "./timelineState.js";
+import { showConfirmPopover, showConfirmModal, showPromptDialog, confirmNLE, promptNLE } from "./dialogs.js";
 import { cortesParaSalvar, cortesDoBanco } from "./timelinePersistencia.js";
 import { getActiveElement, getActiveQuerySelector } from "./workspaceManager.js";
 import { WaveformManager } from "./waveformManager.js";
@@ -157,15 +158,21 @@ export class PanelsManager {
         
         const btnReanalyzeBeatsClip = document.getElementById("btn-reanalyze-beats-clip");
         if (btnReanalyzeBeatsClip) {
-            btnReanalyzeBeatsClip.addEventListener("click", async () => {
+            btnReanalyzeBeatsClip.addEventListener("click", async (e) => {
+                const btn = e.currentTarget || btnReanalyzeBeatsClip;
                 if (!STATE.activeVideo) {
-                    alert("Selecione um vídeo na Biblioteca para reanalisar.");
+                    if (window.showToast) window.showToast("Selecione um vídeo na Biblioteca para reanalisar.", "warning", btn);
                     return;
                 }
                 const filename = STATE.activeVideo.filename;
-                if (!confirm(`Reanalisar "${filename}" com CLIP na deriva dos beats?\n\nMais preciso em planos longos, porém mais lento na CPU. Substitui a análise atual deste clipe.`)) {
-                    return;
-                }
+                const ok = await (window.showConfirmPopover || showConfirmPopover)({
+                    targetEl: btn,
+                    title: "Reanalisar Beats CLIP?",
+                    message: `Reanalisar "${filename}" com CLIP na deriva dos beats?\nMais preciso em planos longos, porém mais lento na CPU. Substitui a análise atual deste clipe.`,
+                    confirmText: "Reanalisar",
+                    danger: false
+                });
+                if (!ok) return;
                 try {
                     await CapIAuAPI.analyzeVideoVision(STATE.activeVideo.id, "clip");
                     if (window.logManager) {
@@ -183,8 +190,16 @@ export class PanelsManager {
 
         const btnAnalyzeVisionAll = document.getElementById("btn-analyze-vision-all");
         if (btnAnalyzeVisionAll) {
-            btnAnalyzeVisionAll.addEventListener("click", async () => {
-                const force = confirm("Deseja FORÇAR a reanálise de TODAS as mídias do projeto (incluindo as já analisadas) para aplicar a nova configuração?\n\nClique em 'OK' para reanalisar tudo de novo, ou 'Cancelar' para analisar apenas as novas/pendentes.");
+            btnAnalyzeVisionAll.addEventListener("click", async (e) => {
+                const btn = e.currentTarget || btnAnalyzeVisionAll;
+                const force = await (window.showConfirmModal || showConfirmModal)({
+                    target: btn,
+                    title: "Reanálise Completa em Lote",
+                    message: "Deseja FORÇAR a reanálise de TODAS as mídias do projeto (incluindo as já analisadas)?\n\nClique em 'Confirmar' para reanalisar tudo de novo, ou 'Cancelar' para analisar apenas as novas/pendentes.",
+                    confirmText: "Forçar Todas",
+                    cancelText: "Apenas Pendentes",
+                    danger: false
+                });
                 if (force) {
                     try {
                         await CapIAuAPI.analyzeAllVision(STATE.currentProjectId, true);
@@ -199,7 +214,15 @@ export class PanelsManager {
                         alert("Erro ao disparar reanálise: " + err.message);
                     }
                 } else {
-                    if (confirm("Disparar análise apenas para as novas mídias pendentes?")) {
+                    const ok = await showConfirmModal({
+                        title: "Análise de Visão IA",
+                        message: "Disparar análise apenas para as novas mídias pendentes?",
+                        confirmText: "Analisar Pendentes",
+                        cancelText: "Cancelar",
+                        danger: false,
+                        target: this.btnAnalyzeVisionAll
+                    });
+                    if (ok) {
                         try {
                             await CapIAuAPI.analyzeAllVision(STATE.currentProjectId, false);
                             if (window.logManager) {
@@ -217,7 +240,7 @@ export class PanelsManager {
             });
         }
 
-        if (this.btnSaveTimeline) this.btnSaveTimeline.addEventListener("click", () => this.saveActiveTimeline());
+        if (this.btnSaveTimeline) this.btnSaveTimeline.addEventListener("click", (e) => this.saveActiveTimeline(e.currentTarget || this.btnSaveTimeline));
         if (this.btnExportTimeline) {
             this.btnExportTimeline.addEventListener("click", () => this.exportTimeline());
         }
@@ -282,14 +305,21 @@ export class PanelsManager {
         // Botão de carregar timeline salva
         const btnLoadTimeline = document.getElementById("btn-load-timeline");
         if (btnLoadTimeline) {
-            btnLoadTimeline.addEventListener("click", () => this.loadTimelinePrompt());
+            btnLoadTimeline.addEventListener("click", (e) => this.loadTimelinePrompt(e.currentTarget || btnLoadTimeline));
         }
 
         // ── Cabeçalhos dinâmicos das pistas ──
         const btnAddTextTrack = document.getElementById("btn-add-text-track");
         if (btnAddTextTrack) {
-            btnAddTextTrack.addEventListener("click", () => {
-                const name = prompt("Nome da nova pista de texto/títulos:", "Títulos & GCs");
+            btnAddTextTrack.addEventListener("click", async (e) => {
+                const btn = e.currentTarget || btnAddTextTrack;
+                const name = await (window.showPromptDialog || showPromptDialog)({
+                    targetEl: btn,
+                    title: "Nova Pista de Texto / Títulos",
+                    message: "Digite o nome para a nova pista de texto e legendas:",
+                    defaultValue: "Títulos & GCs",
+                    confirmText: "Criar Pista"
+                });
                 if (name !== null) {
                     TIMELINE_STATE.addTextTrack(name.trim() || null);
                 }
@@ -298,8 +328,15 @@ export class PanelsManager {
 
         const btnAddTrack = document.getElementById("btn-add-track");
         if (btnAddTrack) {
-            btnAddTrack.addEventListener("click", () => {
-                const name = prompt("Nome da nova pista de vídeo:", "Nova Pista");
+            btnAddTrack.addEventListener("click", async (e) => {
+                const btn = e.currentTarget || btnAddTrack;
+                const name = await (window.showPromptDialog || showPromptDialog)({
+                    targetEl: btn,
+                    title: "Nova Pista de Vídeo",
+                    message: "Digite o nome para a nova pista de vídeo:",
+                    defaultValue: "Nova Pista",
+                    confirmText: "Criar Pista"
+                });
                 if (name !== null) {
                     TIMELINE_STATE.addVideoTrack(name.trim() || null);
                 }
@@ -308,8 +345,15 @@ export class PanelsManager {
 
         const btnAddAudioTrack = document.getElementById("btn-add-audio-track");
         if (btnAddAudioTrack) {
-            btnAddAudioTrack.addEventListener("click", () => {
-                const name = prompt("Nome da nova pista de áudio:", "Áudio Extra");
+            btnAddAudioTrack.addEventListener("click", async (e) => {
+                const btn = e.currentTarget || btnAddAudioTrack;
+                const name = await (window.showPromptDialog || showPromptDialog)({
+                    targetEl: btn,
+                    title: "Nova Pista de Áudio",
+                    message: "Digite o nome para a nova pista de áudio:",
+                    defaultValue: "Áudio Extra",
+                    confirmText: "Criar Pista"
+                });
                 if (name !== null) {
                     TIMELINE_STATE.addAudioTrack(name.trim() || null);
                 }
@@ -910,7 +954,12 @@ export class PanelsManager {
                 STATE.emit("statusChanged", { text: "Clique em uma palavra do balão para selecionar o ponto de divisão.", active: true });
             } else {
                 if (selectedWordForSplit) {
-                    const newSpeaker = prompt("Digite o ID/Nome do novo falante:", d.speaker_id + "_2");
+                    const newSpeaker = await showPromptDialog({
+                        title: "Dividir Fala",
+                        message: "Digite o ID/Nome do novo falante:",
+                        defaultValue: d.speaker_id + "_2",
+                        targetEl: splitBtn
+                    });
                     if (newSpeaker) {
                         try {
                             await CapIAuAPI.splitTranscript(STATE.activeVideo.id, selectedWordForSplit.start_time, newSpeaker);
@@ -1538,9 +1587,14 @@ export class PanelsManager {
         optNew.style.color = "var(--accent)";
         selectSpk.appendChild(optNew);
         
-        selectSpk.addEventListener("change", (e) => {
+        selectSpk.addEventListener("change", async (e) => {
             if (e.target.value === "_new_") {
-                const name = prompt("Digite o nome do novo falante:");
+                const name = await showPromptDialog({
+                    title: "Novo Falante",
+                    message: "Digite o nome do novo falante:",
+                    defaultValue: "",
+                    targetEl: selectSpk
+                });
                 if (name && name.trim()) {
                     const cleanName = name.trim();
                     const newOpt = document.createElement("option");
@@ -1785,7 +1839,12 @@ export class PanelsManager {
                 const targetTime = curDiag.start_time + (clickX / rectC.width) * curDur;
                 const formattedTime = formatTimecode(targetTime);
                 
-                const newSpeaker = prompt(`Deseja dividir a fala em ${formattedTime}? Digite o nome do novo falante:`, (curDiag.speaker_id || "speaker") + "_2");
+                const newSpeaker = await showPromptDialog({
+                    title: "Dividir Fala",
+                    message: `Deseja dividir a fala em ${formattedTime}? Digite o nome do novo falante:`,
+                    defaultValue: (curDiag.speaker_id || "speaker") + "_2",
+                    targetEl: canvas
+                });
                 if (newSpeaker && newSpeaker.trim()) {
                     try {
                         await CapIAuAPI.splitTranscript(STATE.activeVideo.id, targetTime, newSpeaker.trim());
@@ -1863,7 +1922,13 @@ export class PanelsManager {
             
             row.querySelector(".btn-split-silence").addEventListener("click", async (e) => {
                 e.stopPropagation();
-                const newSpeaker = prompt(`Dividir fala às ${formatTimecode(s.timestamp)}? Digite o nome do novo falante:`, d.speaker_id + "_2");
+                const targetBtn = e.currentTarget;
+                const newSpeaker = await showPromptDialog({
+                    title: "Dividir Fala no Silêncio",
+                    message: `Dividir fala às ${formatTimecode(s.timestamp)}? Digite o nome do novo falante:`,
+                    defaultValue: d.speaker_id + "_2",
+                    targetEl: targetBtn
+                });
                 if (newSpeaker && newSpeaker.trim()) {
                     try {
                         await CapIAuAPI.splitTranscript(STATE.activeVideo.id, s.timestamp, newSpeaker.trim());
@@ -1916,7 +1981,12 @@ export class PanelsManager {
                 const assignAction = async (e) => {
                     e.stopPropagation();
                     if (!face.name) {
-                        const name = prompt("Este rosto ainda não está rotulado. Digite o nome da pessoa:");
+                        const name = await showPromptDialog({
+                            title: "Rotular Rosto",
+                            message: "Este rosto ainda não está rotulado. Digite o nome da pessoa:",
+                            defaultValue: "",
+                            targetEl: e.currentTarget
+                        });
                         if (name && name.trim()) {
                             try {
                                 await CapIAuAPI.labelFace(face.id, name.trim());
@@ -1997,7 +2067,12 @@ export class PanelsManager {
         
         menu.querySelector("#ctx-split").addEventListener("click", async () => {
             const formattedTime = formatTimecode(word.start_time);
-            const newSpeaker = prompt(`Dividir fala às ${formattedTime}? Digite o nome do novo falante:`, dialogue.speaker_id + "_2");
+            const newSpeaker = await showPromptDialog({
+                title: "Dividir Fala",
+                message: `Dividir fala às ${formattedTime}? Digite o nome do novo falante:`,
+                defaultValue: dialogue.speaker_id + "_2",
+                targetEl: menu
+            });
             if (newSpeaker && newSpeaker.trim()) {
                 try {
                     await CapIAuAPI.splitTranscript(STATE.activeVideo.id, word.start_time, newSpeaker.trim());
@@ -2143,9 +2218,14 @@ export class PanelsManager {
         }
     }
 
-    async splitTranscript(startTime) {
+    async splitTranscript(startTime, targetEl = null) {
         if (!STATE.activeVideo) return;
-        const newSpeaker = prompt("Digite o ID/Nome do novo falante a partir deste ponto:");
+        const newSpeaker = await showPromptDialog({
+            title: "Dividir Falas (Modo Tesoura)",
+            message: "Digite o ID/Nome do novo falante a partir deste ponto:",
+            defaultValue: "",
+            targetEl: targetEl || this.btnScissors
+        });
         if (!newSpeaker) return;
         
         try {
@@ -2158,8 +2238,16 @@ export class PanelsManager {
         }
     }
 
-    async runClustering() {
-        if (confirm("IA analisará todas as falas das entrevistas gravadas para agrupar temas em comum. Prosseguir?")) {
+    async runClustering(triggerEl = null) {
+        const ok = await showConfirmModal({
+            title: "Agrupamento Temático por IA",
+            message: "IA analisará todas as falas das entrevistas gravadas para agrupar temas em comum. Prosseguir?",
+            confirmText: "Agrupar Temas",
+            cancelText: "Cancelar",
+            danger: false,
+            target: triggerEl || this.getThemesContainer()
+        });
+        if (ok) {
             await CapIAuAPI.clusterThemes(STATE.currentProjectId);
             alert("Clustering temático iniciado em background.");
             this.loadThemes();
@@ -2372,13 +2460,24 @@ export class PanelsManager {
         }
     }
 
-    async saveActiveTimeline() {
+    async saveActiveTimeline(anchorEl = null) {
+        const target = anchorEl || getActiveElement("btn-save-timeline") || null;
         if (STATE.activeTimelineCuts.length === 0) {
-            alert("A timeline está vazia.");
+            if (typeof window.showToast === "function") {
+                window.showToast("A timeline está vazia.", "warning", target);
+            } else {
+                alert("A timeline está vazia.");
+            }
             return;
         }
-        const name = prompt("Digite um nome para esta versão da timeline:", "Versão 1 - Rascunho");
-        if (!name) return;
+        const name = await (window.showPromptDialog || showPromptDialog)({
+            targetEl: target,
+            title: "Salvar Versão da Timeline",
+            message: "Digite um nome para esta versão da timeline:",
+            defaultValue: "Versão 1 - Rascunho",
+            confirmText: "Salvar Versão"
+        });
+        if (!name || !name.trim()) return;
 
         try {
             const fps = TIMELINE_STATE.fps || 24;
@@ -2386,10 +2485,14 @@ export class PanelsManager {
             const tracks = TIMELINE_STATE.serializeTracks();
             const width = TIMELINE_STATE.width || 1920;
             const height = TIMELINE_STATE.height || 1080;
-            await CapIAuAPI.saveTimeline(STATE.currentProjectId, name, "Corte criado no editor", cuts, tracks, fps, width, height);
-            alert("Timeline salva com sucesso (formato multipista v2).");
+            await CapIAuAPI.saveTimeline(STATE.currentProjectId, name.trim(), "Corte criado no editor", cuts, tracks, fps, width, height);
+            if (typeof window.showToast === "function") {
+                window.showToast(`Timeline "${name.trim()}" salva com sucesso!`, "success", target);
+            }
         } catch (e) {
-            alert("Erro ao salvar timeline.");
+            if (typeof window.showToast === "function") {
+                window.showToast("Erro ao salvar timeline: " + (e.message || ""), "warning", target);
+            }
         }
     }
 
@@ -2976,7 +3079,14 @@ export class PanelsManager {
                 e.stopPropagation();
                 const isProxy = !isNaN(Number(key));
                 if (key.startsWith("thumbs-")) {
-                    if (confirm("Cancelar geração de miniaturas para este vídeo?")) {
+                    const ok = await (window.showConfirmPopover || showConfirmPopover)({
+                        targetEl: cancelBtn,
+                        title: "Cancelar Miniaturas?",
+                        message: "Deseja cancelar a geração de miniaturas para este vídeo?",
+                        confirmText: "Cancelar Miniaturas",
+                        danger: true
+                    });
+                    if (ok) {
                         const videoId = Number(key.split("thumbs-")[1]);
                         try {
                             await CapIAuAPI.cancelThumbnails(videoId);
@@ -2985,45 +3095,66 @@ export class PanelsManager {
                             }
                             await this.refreshTasks();
                         } catch (err) {
-                            alert("Falha ao cancelar geração de miniaturas.");
+                            if (window.showToast) window.showToast("Falha ao cancelar geração de miniaturas.", "error", cancelBtn);
                         }
                     }
                 } else if (key.startsWith("enrich") || t.type === "enrich") {
-                    if (confirm("Cancelar a sincronização de descrições?")) {
+                    const ok = await (window.showConfirmPopover || showConfirmPopover)({
+                        targetEl: cancelBtn,
+                        title: "Cancelar Sincronização?",
+                        message: "Deseja cancelar a sincronização de descrições?",
+                        confirmText: "Cancelar Sincronização",
+                        danger: true
+                    });
+                    if (ok) {
                         try {
                             await CapIAuAPI.cancelTask(key);
-                            if (window.showToast) window.showToast("Sincronização de descrições cancelada!", "info");
+                            if (window.showToast) window.showToast("Sincronização de descrições cancelada!", "info", cancelBtn);
                             if (window.logManager) {
                                 window.logManager.log("Tasks", `Cancelada sincronização de descrições (${key})`, "WARN");
                             }
                             await this.refreshTasks();
                         } catch (err) {
-                            alert("Falha ao cancelar sincronização de descrições: " + err.message);
+                            if (window.showToast) window.showToast("Falha ao cancelar sincronização: " + err.message, "error", cancelBtn);
                         }
                     }
                 } else if (isProxy || key.startsWith("vision-") || key.startsWith("proxy-") || !isNaN(Number(key))) {
-                    if (confirm("Cancelar a análise ou processamento desta mídia?")) {
+                    const ok = await (window.showConfirmPopover || showConfirmPopover)({
+                        targetEl: cancelBtn,
+                        title: "Cancelar Processamento?",
+                        message: "Deseja cancelar a análise ou processamento desta mídia?",
+                        confirmText: "Cancelar Processamento",
+                        danger: true
+                    });
+                    if (ok) {
                         try {
                             const videoId = Number(key.replace("vision-", "").replace("proxy-", ""));
                             await CapIAuAPI.cancelConversion(videoId);
-                            if (window.showToast) window.showToast(`Análise do vídeo #${videoId} cancelada!`, "info");
+                            if (window.showToast) window.showToast(`Análise do vídeo #${videoId} cancelada!`, "info", cancelBtn);
                             if (window.libraryInstance) window.libraryInstance.reloadData();
                             await this.refreshTasks();
                         } catch (err) {
-                            alert("Falha ao cancelar tarefa: " + err.message);
+                            if (window.showToast) window.showToast("Falha ao cancelar tarefa: " + err.message, "error", cancelBtn);
                         }
                     }
                 } else {
-                    if (confirm(`Cancelar a tarefa "${title}"?`)) {
+                    const ok = await (window.showConfirmPopover || showConfirmPopover)({
+                        targetEl: cancelBtn,
+                        title: "Cancelar Tarefa?",
+                        message: `Cancelar a tarefa "${title}"?`,
+                        confirmText: "Cancelar Tarefa",
+                        danger: true
+                    });
+                    if (ok) {
                         try {
                             await CapIAuAPI.cancelTask(key);
-                            if (window.showToast) window.showToast(`Tarefa "${title}" cancelada!`, "info");
+                            if (window.showToast) window.showToast(`Tarefa "${title}" cancelada!`, "info", cancelBtn);
                             if (window.logManager) {
                                 window.logManager.log("Tasks", `Tarefa ${key} cancelada pelo usuário`, "WARN");
                             }
                             await this.refreshTasks();
                         } catch (err) {
-                            alert("Falha ao cancelar tarefa: " + err.message);
+                            if (window.showToast) window.showToast("Falha ao cancelar tarefa: " + err.message, "error", cancelBtn);
                         }
                     }
                 }
@@ -3660,20 +3791,29 @@ export class PanelsManager {
             });
             const syncEl = row.querySelector(".btn-track-sync-lock");
             if (syncEl) syncEl.addEventListener("click", () => TIMELINE_STATE.toggleTrackSyncLock(track.id));
-            row.querySelector(".btn-track-remove").addEventListener("click", () => {
+            row.querySelector(".btn-track-remove").addEventListener("click", async (e) => {
+                const btn = e.currentTarget || row.querySelector(".btn-track-remove");
                 const liveTrack = TIMELINE_STATE.getTrack(track.id) || track;
                 if (liveTrack && liveTrack.locked) {
                     if (typeof window !== "undefined" && typeof window.showToast === "function") {
-                        window.showToast("Destrave o cadeado da pista antes de removê-la.", "warning");
+                        window.showToast("Destrave o cadeado da pista antes de removê-la.", "warning", btn);
                     }
                     return;
                 }
-                if (confirm(`Remover a pista "${track.id} ${track.name}"? Os clipes dela serão movidos para outra pista do mesmo tipo.`)) {
+                const confirmed = await (window.showConfirmPopover || showConfirmPopover)({
+                    targetEl: btn,
+                    title: `Remover a pista "${track.id} ${track.name}"?`,
+                    message: "Os clipes dela serão movidos para outra pista do mesmo tipo.",
+                    confirmText: "Remover Pista",
+                    cancelText: "Cancelar",
+                    danger: true
+                });
+                if (confirmed) {
                     if (!TIMELINE_STATE.removeTrack(track.id)) {
                         if (typeof window !== "undefined" && typeof window.showToast === "function") {
-                            window.showToast("Não é possível remover: é necessário ao menos uma pista destravada do mesmo tipo.", "warning");
+                            window.showToast("Não é possível remover: é necessário ao menos uma pista destravada do mesmo tipo.", "warning", btn);
                         } else {
-                            alert("Não é possível remover: a timeline precisa de ao menos uma pista de vídeo.");
+                            window.showToast("Não é possível remover: a timeline precisa de ao menos uma pista de vídeo.", "warning", btn);
                         }
                     }
                 }
@@ -3822,17 +3962,28 @@ export class PanelsManager {
     }
 
     /** Lista as timelines salvas e carrega a escolhida (com pistas e posições). */
-    async loadTimelinePrompt() {
+    async loadTimelinePrompt(anchorEl = null) {
+        const target = anchorEl || getActiveElement("btn-load-timeline") || null;
         try {
             const timelines = await CapIAuAPI.fetchTimelines(STATE.currentProjectId);
             if (!timelines || timelines.length === 0) {
-                alert("Nenhuma timeline salva neste projeto ainda.");
+                if (typeof window.showToast === "function") {
+                    window.showToast("Nenhuma timeline salva neste projeto ainda.", "info", target);
+                } else {
+                    alert("Nenhuma timeline salva neste projeto ainda.");
+                }
                 return;
             }
 
-            const options = timelines.slice(0, 15).map(t => `${t.id}: ${t.name}`).join("\n");
-            const answer = prompt(`Digite o ID da timeline para carregar:\n\n${options}`, String(timelines[0].id));
-            if (!answer) return;
+            const options = timelines.slice(0, 10).map(t => `${t.id}: ${t.name}`).join("\n");
+            const answer = await (window.showPromptDialog || showPromptDialog)({
+                targetEl: target,
+                title: "Carregar Versão da Timeline",
+                message: `Timelines disponíveis:\n${options}\n\nDigite o ID da timeline para carregar:`,
+                defaultValue: String(timelines[0].id),
+                confirmText: "Carregar Timeline"
+            });
+            if (!answer || !answer.trim()) return;
 
             const timelineId = parseInt(answer.trim(), 10);
             if (isNaN(timelineId)) return;
@@ -3840,10 +3991,14 @@ export class PanelsManager {
             const detail = await CapIAuAPI.fetchTimelineDetail(timelineId);
             this.applyTimelineDetailToScreen(detail);
 
-            console.log(`[Timeline] Timeline ${timelineId} carregada.`);
+            if (typeof window.showToast === "function") {
+                window.showToast(`Timeline ${timelineId} carregada com sucesso!`, "success", target);
+            }
         } catch (e) {
             console.error("Erro ao carregar timeline:", e);
-            alert("Erro ao carregar timeline: " + e.message);
+            if (typeof window.showToast === "function") {
+                window.showToast("Erro ao carregar timeline: " + e.message, "warning", target);
+            }
         }
     }
 
@@ -4184,12 +4339,21 @@ export class PanelsManager {
         }
 
         if (btnReset) {
-            btnReset.addEventListener("click", () => {
-                if (confirm("Deseja restaurar todos os atalhos para os valores de fábrica do CapIAu?")) {
+            btnReset.addEventListener("click", async (e) => {
+                const btn = e.currentTarget || btnReset;
+                const ok = await (window.showConfirmPopover || showConfirmPopover)({
+                    targetEl: btn,
+                    title: "Restaurar Atalhos de Fábrica?",
+                    message: "Deseja restaurar todos os atalhos para os valores de fábrica do CapIAu?",
+                    confirmText: "Restaurar Padrão",
+                    cancelText: "Cancelar",
+                    danger: true
+                });
+                if (ok) {
                     KEYMAP_SERVICE.resetAllToDefault();
                     refreshAll();
                     if (typeof window.showToast === "function") {
-                        window.showToast("Atalhos restaurados para o padrão de fábrica", "info");
+                        window.showToast("Atalhos restaurados para o padrão de fábrica", "info", btn);
                     }
                 }
             });

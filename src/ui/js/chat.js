@@ -4,6 +4,7 @@ import { CapIAuAPI } from "./api.js";
 import { getActiveElement, getActiveQuerySelector, SplitterHelper } from "./workspaceManager.js";
 import { TIMELINE_STATE, TIMELINE_HISTORY } from "./timelineState.js";
 import { formatTimecode } from "./player.js";
+import { showConfirmModal } from "./dialogs.js";
 
 export class ChatManager {
     constructor() {
@@ -215,7 +216,15 @@ export class ChatManager {
 
             const keyInfo = settings.values && settings.values["api.openrouter_key"];
             if (savedKey && keyInfo && keyInfo.origin === "default") {
-                if (confirm("Encontrei sua chave OpenRouter salva no navegador (campo antigo do chat). Migrar para o novo painel de configurações da IA? Ela passa a ser guardada no banco local do app.")) {
+                const ok = await showConfirmModal({
+                    title: "Migrar Chave OpenRouter",
+                    message: "Encontrei sua chave OpenRouter salva no navegador (campo antigo do chat). Migrar para o novo painel de configurações da IA? Ela passa a ser guardada no banco local do app.",
+                    confirmText: "Migrar Chave",
+                    cancelText: "Não Migrar",
+                    danger: false,
+                    target: this.chatContainer
+                });
+                if (ok) {
                     values["api.openrouter_key"] = savedKey;
                 }
             }

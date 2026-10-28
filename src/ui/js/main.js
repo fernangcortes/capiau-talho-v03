@@ -25,6 +25,7 @@ import { TEXT_AI_ENGINE } from "./textAIEngine.js";
 import { TITLES_TAB } from "./titlesTab.js";
 import { carregarFontesDoProjeto } from "./fontManager.js";
 import { RENDER_CACHE_MANAGER } from "./renderCache.js";
+import { showPromptDialog, showConfirmModal } from "./dialogs.js";
 
 // Função para destacar os termos da busca com <mark>
 function highlightTerms(text, query) {
@@ -2232,9 +2233,16 @@ window.addEventListener("DOMContentLoaded", () => {
     const timelineNameDisplay = document.getElementById("timeline-name-display");
     const timelineTitleGroup = document.getElementById("timeline-title-group");
 
-    const doRenameTimeline = () => {
+    const doRenameTimeline = async (e = null) => {
+        const btn = (e && (e.currentTarget || e.target)) || btnRenameTimeline || timelineTitleGroup;
         const currentName = timelineNameInput ? timelineNameInput.value : (timelineNameDisplay ? timelineNameDisplay.textContent : "Rascunho Making Of #1");
-        const newName = prompt("Renomear a timeline atual:", currentName);
+        const newName = await (window.showPromptDialog || showPromptDialog)({
+            targetEl: btn,
+            title: "Renomear Timeline",
+            message: "Digite o novo nome para esta timeline:",
+            defaultValue: currentName,
+            confirmText: "Renomear"
+        });
         if (newName !== null && newName.trim() !== "") {
             const clean = newName.trim();
             if (timelineNameInput) {
@@ -2246,6 +2254,9 @@ window.addEventListener("DOMContentLoaded", () => {
             }
             if (btnRenameTimeline) {
                 btnRenameTimeline.setAttribute("data-tooltip", `Renomear Timeline (Atual: ${clean})`);
+            }
+            if (typeof window.showToast === "function") {
+                window.showToast(`Timeline renomeada para "${clean}"`, "info", btn);
             }
         }
     };
@@ -3225,7 +3236,15 @@ window.addEventListener("DOMContentLoaded", () => {
                 alert(`Backup cancelado por segurança de custos! O limite de 150 GB foi atingido no bucket S3 (${status.total_size_gb.toFixed(2)} GB).`);
                 return;
             }
-            if (confirm("Deseja realizar o backup manual do banco de dados relacional (capiau.db) para o Amazon S3?")) {
+            const ok = await showConfirmModal({
+                title: "Backup Manual S3",
+                message: "Deseja realizar o backup manual do banco de dados relacional (capiau.db) para o Amazon S3?",
+                confirmText: "Fazer Backup",
+                cancelText: "Cancelar",
+                danger: false,
+                target: s3Indicator
+            });
+            if (ok) {
                 s3Indicator.style.color = "var(--accent)";
                 s3Indicator.title = "Realizando backup do banco de dados...";
                 try {

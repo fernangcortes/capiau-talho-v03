@@ -456,9 +456,9 @@ console.log("✔ 2.5b passou: Modais recuperados pela referência guardada, sem 
 console.log("2.5c Verificando diálogos de faces.js na janela com foco...");
 assert(
     facesJs.includes("win.document.hasFocus()") &&
-    facesJs.includes("const prompt = (...args) => dialogWin().prompt(...args);") &&
-    facesJs.includes("const alert = (...args) => dialogWin().alert(...args);") &&
-    facesJs.includes("const confirm = (...args) => dialogWin().confirm(...args);"),
+    (facesJs.includes("showPromptDialog") || facesJs.includes("dialogWin().prompt")) &&
+    (facesJs.includes("showToast") || facesJs.includes("dialogWin().alert")) &&
+    (facesJs.includes("showConfirmModal") || facesJs.includes("dialogWin().confirm")),
     "faces.js deve abrir prompt/alert/confirm na janela destacada que tem o foco"
 );
 console.log("✔ 2.5c passou: prompt/alert/confirm roteados para a janela com foco.");

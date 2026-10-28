@@ -222,16 +222,24 @@ export class ProjectsManager {
 
     async deleteActiveProject() {
         const activeName = this.selector.options[this.selector.selectedIndex]?.text || "projeto ativo";
-        if (confirm(`ATENÇÃO: Deseja apagar o projeto "${activeName}" e deletar permanentemente TODAS as suas mídias, transcrições e timelines?`)) {
-            try {
-                await CapIAuAPI.deleteProject(STATE.currentProjectId);
-                alert("Projeto removido física e logicamente do servidor.");
-                
-                // Reseta para o primeiro da lista
-                STATE.currentProjectId = 1;
-                await this.loadProjectsList();
-            } catch (err) {
-                alert("Falha ao remover projeto.");
+        const ok = await (window.showConfirmModal || showConfirmModal)({
+            target: this.btnDeleteProject || this.selector,
+            title: "Apagar Projeto",
+            message: `⚠️ ATENÇÃO: Deseja apagar o projeto "${activeName}" e deletar permanentemente TODAS as suas mídias, transcrições e timelines?\n\nEsta ação é irreversível e excluirá todo o banco de dados local deste projeto.`,
+            confirmText: "Apagar Projeto",
+            danger: true
+        });
+        if (!ok) return;
+        try {
+            await CapIAuAPI.deleteProject(STATE.currentProjectId);
+            if (window.showToast) {
+                window.showToast("Projeto removido física e logicamente do servidor.", "info");
+            }
+            STATE.currentProjectId = 1;
+            await this.loadProjectsList();
+        } catch (err) {
+            if (window.showToast) {
+                window.showToast("Falha ao remover projeto.", "error");
             }
         }
     }

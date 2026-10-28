@@ -5067,6 +5067,201 @@ button {
     color: var(--text-primary);
 }
 
+/* ── CAPIAU NLE CONFIRM POPOVER & DIALOGS (MULTI-JANELA & SEAMLESS) ── */
+.nle-confirm-popover {
+    position: fixed;
+    z-index: 100020;
+    background: var(--t-surface-2, rgba(16, 20, 28, 0.96));
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--t-line-strong, rgba(255, 255, 255, 0.12));
+    border-radius: 8px;
+    padding: var(--sp-12, 12px) var(--sp-14, 14px);
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.75), 0 0 1px 1px rgba(255, 255, 255, 0.05);
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-10, 10px);
+    opacity: 0;
+    transform: scale(0.96);
+    pointer-events: none;
+    transition: opacity 0.15s ease, transform 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+    box-sizing: border-box;
+    font-family: var(--font-body);
+    user-select: none;
+}
+.nle-confirm-popover.visible {
+    opacity: 1;
+    transform: scale(1);
+    pointer-events: auto;
+}
+.nle-confirm-popover.theme-danger {
+    border-color: rgba(244, 63, 94, 0.45);
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.8), 0 0 20px rgba(244, 63, 94, 0.2);
+}
+.nle-confirm-popover.theme-primary {
+    border-color: rgba(6, 182, 212, 0.4);
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.8), 0 0 18px rgba(6, 182, 212, 0.15);
+}
+
+/* Setas posicionais do Popover */
+.nle-popover-arrow {
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    background: var(--t-surface-2, rgba(16, 20, 28, 0.96));
+    transform: rotate(45deg);
+    pointer-events: none;
+}
+.nle-popover-arrow.arrow-bottom {
+    bottom: -6px;
+    border-right: 1px solid var(--t-line-strong, rgba(255, 255, 255, 0.12));
+    border-bottom: 1px solid var(--t-line-strong, rgba(255, 255, 255, 0.12));
+}
+.nle-confirm-popover.theme-danger .nle-popover-arrow.arrow-bottom {
+    border-color: rgba(244, 63, 94, 0.45);
+}
+.nle-confirm-popover.theme-primary .nle-popover-arrow.arrow-bottom {
+    border-color: rgba(6, 182, 212, 0.4);
+}
+.nle-popover-arrow.arrow-top {
+    top: -6px;
+    border-left: 1px solid var(--t-line-strong, rgba(255, 255, 255, 0.12));
+    border-top: 1px solid var(--t-line-strong, rgba(255, 255, 255, 0.12));
+}
+.nle-confirm-popover.theme-danger .nle-popover-arrow.arrow-top {
+    border-color: rgba(244, 63, 94, 0.45);
+}
+.nle-confirm-popover.theme-primary .nle-popover-arrow.arrow-top {
+    border-color: rgba(6, 182, 212, 0.4);
+}
+
+.nle-popover-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--sp-8, 8px);
+}
+.nle-popover-title-row {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-8, 8px);
+    overflow: hidden;
+}
+.nle-popover-title {
+    font-size: var(--fs-12, 12px);
+    font-weight: 700;
+    color: #f8fafc;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.nle-popover-icon {
+    font-size: var(--fs-13, 13px);
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+}
+.nle-popover-btn-close {
+    background: transparent;
+    border: none;
+    color: var(--text-muted, #94a3b8);
+    font-size: var(--fs-16, 16px);
+    line-height: 1;
+    cursor: pointer;
+    padding: 0 4px;
+    transition: color 0.15s;
+}
+.nle-popover-btn-close:hover {
+    color: #f8fafc;
+}
+.nle-popover-message {
+    font-size: var(--fs-11, 11px);
+    color: var(--text-secondary, #cbd5e1);
+    line-height: 1.45;
+    word-break: break-word;
+}
+.nle-popover-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: var(--sp-6, 6px);
+    margin-top: 2px;
+}
+.nle-btn-popover {
+    font-family: var(--font-body);
+    font-size: var(--fs-11, 11px);
+    padding: 5px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s, color 0.15s, box-shadow 0.15s;
+    user-select: none;
+    outline: none;
+}
+.nle-btn-popover.nle-btn-cancel {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border-glass, rgba(255, 255, 255, 0.1));
+    color: var(--text-secondary, #cbd5e1);
+}
+.nle-btn-popover.nle-btn-cancel:hover {
+    background: rgba(255, 255, 255, 0.12);
+    color: #fff;
+    border-color: rgba(255, 255, 255, 0.25);
+}
+.nle-btn-popover.nle-btn-cancel:focus-visible {
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.3);
+}
+.nle-btn-popover.danger {
+    background: rgba(244, 63, 94, 0.2);
+    border: 1px solid rgba(244, 63, 94, 0.55);
+    color: #fda4af;
+    font-weight: 600;
+}
+.nle-btn-popover.danger:hover {
+    background: rgba(244, 63, 94, 0.4);
+    color: #fff;
+    box-shadow: 0 0 10px rgba(244, 63, 94, 0.5);
+    border-color: rgba(244, 63, 94, 0.8);
+}
+.nle-btn-popover.danger:focus-visible {
+    box-shadow: 0 0 0 2px rgba(244, 63, 94, 0.6);
+}
+.nle-btn-popover.primary {
+    background: color-mix(in srgb, var(--accent, #06b6d4) 22%, transparent);
+    border: 1px solid color-mix(in srgb, var(--accent, #06b6d4) 55%, transparent);
+    color: var(--accent, #06b6d4);
+    font-weight: 600;
+}
+.nle-btn-popover.primary:hover {
+    background: color-mix(in srgb, var(--accent, #06b6d4) 40%, transparent);
+    color: #fff;
+    box-shadow: 0 0 10px color-mix(in srgb, var(--accent, #06b6d4) 60%, transparent);
+    border-color: var(--accent, #06b6d4);
+}
+.nle-btn-popover.primary:focus-visible {
+    box-shadow: 0 0 0 2px var(--accent, #06b6d4);
+}
+
+/* Modal Centralizado estilizado */
+.nle-confirm-modal-box {
+    max-width: 440px;
+    width: 90vw;
+}
+.nle-confirm-modal-box.theme-danger {
+    border: 1px solid rgba(244, 63, 94, 0.4);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8), 0 0 25px rgba(244, 63, 94, 0.15);
+}
+.nle-confirm-modal-box.theme-primary {
+    border: 1px solid rgba(6, 182, 212, 0.4);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8), 0 0 25px rgba(6, 182, 212, 0.15);
+}
+
+/* Prompt input */
+.nle-prompt-input:focus {
+    border-color: var(--accent, #06b6d4) !important;
+    box-shadow: 0 0 8px color-mix(in srgb, var(--accent, #06b6d4) 40%, transparent) !important;
+}
+
+
 .modal-body {
     display: flex;
     flex-direction: column;

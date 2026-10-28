@@ -2,6 +2,7 @@ import { STATE } from "./state.js";
 import { CapIAuAPI } from "./api.js";
 import { parseQuery, evaluateAST } from "./searchParser.js";
 import { getActiveElement } from "./workspaceManager.js";
+import { showPromptDialog, showConfirmModal } from "./dialogs.js";
 
 // Este código roda na janela principal mesmo quando a aba de Rostos está destacada.
 // prompt/alert/confirm globais abririam no editor (atrás) — abre na janela que tem o foco.
@@ -14,9 +15,31 @@ function dialogWin() {
     }
     return window;
 }
-const prompt = (...args) => dialogWin().prompt(...args);
-const alert = (...args) => dialogWin().alert(...args);
-const confirm = (...args) => dialogWin().confirm(...args);
+const prompt = async (message, defaultValue = "", target = null) => {
+    return (window.showPromptDialog || showPromptDialog)({
+        title: "Identificação / Rótulo",
+        message: message,
+        defaultValue: defaultValue,
+        targetEl: target
+    });
+};
+const alert = (msg) => {
+    if (typeof window !== "undefined" && typeof window.showToast === "function") {
+        window.showToast(msg, "info");
+    } else {
+        dialogWin().alert(msg);
+    }
+};
+const confirm = async (message, target = null) => {
+    return (window.showConfirmModal || showConfirmModal)({
+        title: "Confirmação de Rostos & Nomes",
+        message: message,
+        confirmText: "Confirmar",
+        cancelText: "Cancelar",
+        danger: true,
+        target: target
+    });
+};
 
 // Modais que acompanham a aba de Rostos quando ela é destacada.
 const FACE_MODAL_IDS = [
@@ -502,7 +525,7 @@ export class FaceManager {
 
         const isSyncActive = btnSync.getAttribute("data-sync-active") === "true";
         if (isSyncActive) {
-            if (confirm("Deseja cancelar a sincronização de descrições em andamento?")) {
+            if (await confirm("Deseja cancelar a sincronização de descrições em andamento?")) {
                 try {
                     btnSync.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Cancelando...';
                     await CapIAuAPI.cancelEnrichment(projectId);
@@ -785,7 +808,7 @@ export class FaceManager {
                 btnApproveSelected.parentNode.replaceChild(newBtnApproveSelected, btnApproveSelected);
 
                 newBtnFuseAll.addEventListener("click", async () => {
-                    if (confirm(`Deseja realmente fundir TODOS os rostos do Grupo ${currentClusterId + 1} com o Grupo ${existingClusterId + 1} sob o nome "${targetName}"?`)) {
+                    if (await confirm(`Deseja realmente fundir TODOS os rostos do Grupo ${currentClusterId + 1} com o Grupo ${existingClusterId + 1} sob o nome "${targetName}"?`)) {
                         try {
                             await CapIAuAPI.mergeClusters(STATE.currentProjectId, currentClusterId, existingClusterId, targetName);
                             this.closeDisambiguationModal();
@@ -1003,7 +1026,7 @@ export class FaceManager {
                 e.stopPropagation();
                 if (isChanging) return;
                 
-                const objectName = prompt("Esta detecção não é um rosto. Se for um objeto relevante (ex: Abajur, Cadeira, Microfone), digite o nome do objeto. Caso contrário, deixe em branco para marcar apenas como Não Relevante:\n(Clique em Cancelar para desistir)");
+                const objectName = await prompt("Esta detecção não é um rosto. Se for um objeto relevante (ex: Abajur, Cadeira, Microfone), digite o nome do objeto. Caso contrário, deixe em branco para marcar apenas como Não Relevante:\n(Clique em Cancelar para desistir)");
                 if (objectName === null) return;
                 
                 isChanging = true;
@@ -1318,7 +1341,7 @@ export class FaceManager {
         const selectedCards = Array.from(modal ? modal.querySelectorAll(".fullscreen-face-card.selected") : document.querySelectorAll(".fullscreen-face-card.selected"));
         if (selectedCards.length === 0) return;
 
-        const objectName = prompt(`As ${selectedCards.length} detecções selecionadas não são rostos. Se forem o mesmo objeto relevante (ex: Abajur, Cadeira, Microfone), digite o nome do objeto. Caso contrário, deixe em branco para marcar todas como Não Relevante:\n(Clique em Cancelar para desistir)`);
+        const objectName = await prompt(`As ${selectedCards.length} detecções selecionadas não são rostos. Se forem o mesmo objeto relevante (ex: Abajur, Cadeira, Microfone), digite o nome do objeto. Caso contrário, deixe em branco para marcar todas como Não Relevante:\n(Clique em Cancelar para desistir)`);
         if (objectName === null) return;
 
         const btnReject = modal?.querySelector("#btn-bulk-reject") || getActiveElement("btn-bulk-reject");
@@ -1644,7 +1667,7 @@ export class FaceManager {
     static async dissolveGroup(cluster) {
         if (!cluster) return;
         const msg = `Deseja realmente dissolver o grupo "${(cluster.name && !cluster.name.startsWith('Pessoa Desconhecida')) ? cluster.name : 'Grupo ' + (cluster.cluster_id + 1)}"? Todas as ${cluster.occurrences} aparições voltarão a ser consideradas "Pessoas Desconhecidas" na tela de desambiguação rápida.`;
-        if (!confirm(msg)) return;
+        if (!await confirm(msg)) return;
         
         try {
             const faces = await CapIAuAPI.fetchClusterFaces(STATE.currentProjectId, cluster.cluster_id, cluster.name || "");
@@ -1673,12 +1696,12 @@ export class FaceManager {
         const clusterName = (cluster.name && !cluster.name.startsWith("Pessoa Desconhecida")) ? cluster.name : "";
         let targetName = clusterName;
         if (!targetName) {
-            targetName = prompt(`Digite o nome para validar todas as ${cluster.occurrences} fotos/rostos deste grupo:`);
+            targetName = await prompt(`Digite o nome para validar todas as ${cluster.occurrences} fotos/rostos deste grupo:`);
             if (!targetName || !targetName.trim()) return;
             targetName = targetName.trim();
         }
 
-        if (!confirm(`Deseja confirmar e validar TODOS os ${cluster.occurrences} rostos do grupo "${targetName}"? Todos passarão a ser reconhecimentos confirmados manualmente.`)) return;
+        if (!await confirm(`Deseja confirmar e validar TODOS os ${cluster.occurrences} rostos do grupo "${targetName}"? Todos passarão a ser reconhecimentos confirmados manualmente.`)) return;
 
         try {
             const res = await CapIAuAPI.confirmCluster(STATE.currentProjectId, cluster.cluster_id, targetName);
@@ -1705,7 +1728,7 @@ export class FaceManager {
         const faceIds = Array.from(selected).map(card => parseInt(card.dataset.faceId));
         if (faceIds.length === 0) return;
         
-        if (!confirm(`Deseja desassociar as ${faceIds.length} faces selecionadas do nome atual? Elas voltarão para a desambiguação rápida.`)) return;
+        if (!await confirm(`Deseja desassociar as ${faceIds.length} faces selecionadas do nome atual? Elas voltarão para a desambiguação rápida.`)) return;
         
         try {
             await CapIAuAPI.dissociateFaces(STATE.currentProjectId, faceIds);
@@ -1840,7 +1863,7 @@ export class FaceManager {
         const faceIds = Array.from(selected).map(card => parseInt(card.dataset.faceId));
         if (faceIds.length === 0) return;
         
-        const objectName = prompt(`As ${faceIds.length} detecções selecionadas não são rostos. Se forem o mesmo objeto relevante (ex: Abajur, Cadeira, Microfone), digite o nome do objeto. Caso contrário, deixe em branco para marcar todas como Não Relevante:\n(Clique em Cancelar para desistir)`);
+        const objectName = await prompt(`As ${faceIds.length} detecções selecionadas não são rostos. Se forem o mesmo objeto relevante (ex: Abajur, Cadeira, Microfone), digite o nome do objeto. Caso contrário, deixe em branco para marcar todas como Não Relevante:\n(Clique em Cancelar para desistir)`);
         if (objectName === null) return;
         
         try {
@@ -1984,7 +2007,7 @@ export class FaceManager {
                             alert("Não é possível mesclar um nome nele mesmo.");
                             return;
                         }
-                        if (!confirm(`Deseja realmente mesclar "${sp}" em "${targetName}"? Isso atualizará faces, falas e entidades.`)) {
+                        if (!await confirm(`Deseja realmente mesclar "${sp}" em "${targetName}"? Isso atualizará faces, falas e entidades.`)) {
                             return;
                         }
                         try {
@@ -2044,7 +2067,7 @@ export class FaceManager {
         if (checked.length === 0) return;
 
         const names = Array.from(checked).map(cb => cb.dataset.name);
-        if (!confirm(`Deseja realmente remover os ${names.length} nomes selecionados globalmente?\n\nOs rostos associados serão desassociados e as falas na transcrição voltarão a ser "Desconhecido".`)) {
+        if (!await confirm(`Deseja realmente remover os ${names.length} nomes selecionados globalmente?\n\nOs rostos associados serão desassociados e as falas na transcrição voltarão a ser "Desconhecido".`)) {
             return;
         }
 
@@ -2088,7 +2111,7 @@ export class FaceManager {
             return;
         }
 
-        if (!confirm(`Deseja realmente mesclar os ${names.length} nomes selecionados no nome de destino "${targetName}"?\nEsta ação não poderá ser desfeita.`)) {
+        if (!await confirm(`Deseja realmente mesclar os ${names.length} nomes selecionados no nome de destino "${targetName}"?\nEsta ação não poderá ser desfeita.`)) {
             return;
         }
 
@@ -2115,7 +2138,7 @@ export class FaceManager {
     }
 
     static async handleNameRename(oldName) {
-        const newName = prompt(`Digite o novo nome para substituir "${oldName}" globalmente:`, oldName);
+        const newName = await prompt(`Digite o novo nome para substituir "${oldName}" globalmente:`, oldName);
         if (newName === null) return; // Cancelled
         const trimmed = newName.trim();
         if (!trimmed) {
@@ -2145,7 +2168,7 @@ export class FaceManager {
     }
 
     static async handleNameDelete(name) {
-        if (!confirm(`Deseja realmente remover o nome "${name}" globalmente?\n\nOs rostos associados serão desassociados e as falas na transcrição voltarão a ser "Desconhecido".`)) {
+        if (!await confirm(`Deseja realmente remover o nome "${name}" globalmente?\n\nOs rostos associados serão desassociados e as falas na transcrição voltarão a ser "Desconhecido".`)) {
             return;
         }
 

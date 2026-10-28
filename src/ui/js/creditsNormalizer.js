@@ -864,12 +864,19 @@ Direção de Arte — JÚLIA LIBÂNIO · Figurino — JÚLIA STAVROS
         // Limpar toda a ficha
         const btnClear = this.modalEl.querySelector("#btn-clear-all-credits");
         if (btnClear) {
-            btnClear.onclick = () => {
-                if (confirm("Tem certeza que deseja limpar todos os nomes da Ficha Técnica Oficial?")) {
+            btnClear.onclick = async () => {
+                const ok = await (window.showConfirmPopover || showConfirmPopover)({
+                    targetEl: btnClear,
+                    title: "Limpar Ficha Técnica?",
+                    message: "Tem certeza que deseja limpar todos os nomes da Ficha Técnica Oficial?",
+                    confirmText: "Limpar Tudo",
+                    danger: true
+                });
+                if (ok) {
                     this.saveOfficialCredits([]);
                     this.render();
                     if (typeof window !== "undefined" && typeof window.showToast === "function") {
-                        window.showToast("Ficha Técnica esvaziada.", "info");
+                        window.showToast("Ficha Técnica esvaziada.", "info", btnClear);
                     }
                 }
             };
@@ -878,10 +885,21 @@ Direção de Arte — JÚLIA LIBÂNIO · Figurino — JÚLIA STAVROS
         // Adicionar único nome manual
         const btnAdd = this.modalEl.querySelector("#btn-add-single-credit");
         if (btnAdd) {
-            btnAdd.onclick = () => {
-                const name = prompt("Nome completo da pessoa:");
+            btnAdd.onclick = async () => {
+                const name = await (window.showPromptDialog || showPromptDialog)({
+                    targetEl: btnAdd,
+                    title: "Adicionar Pessoa à Ficha Técnica",
+                    message: "Digite o nome completo da pessoa:",
+                    confirmText: "Avançar"
+                });
                 if (name && name.trim()) {
-                    const role = prompt("Cargo / Função / Identificação:", "Personagem / Entrevistado(a)");
+                    const role = await (window.showPromptDialog || showPromptDialog)({
+                        targetEl: btnAdd,
+                        title: "Cargo ou Função",
+                        message: "Cargo / Função / Identificação:",
+                        defaultValue: "Personagem / Entrevistado(a)",
+                        confirmText: "Adicionar"
+                    });
                     const cleanName = toTitleCaseName(name.trim());
                     const current = this.getOfficialCredits();
                     current.push({

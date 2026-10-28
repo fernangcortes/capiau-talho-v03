@@ -1,3 +1,4 @@
+import { showConfirmModal } from "./dialogs.js";
 // Modelos locais opcionais (Configurações > Modelos locais).
 // Nada baixa sozinho: a lista mostra o que existe, quanto pesa e para que serve;
 // o usuário escolhe baixar. Backend: src/services/modelos_locais.py, /api/modelos.
@@ -89,9 +90,17 @@ export const ModelosLocais = {
             }, 3000);
         };
 
-        const baixar = async (m) => {
-            if (!confirm(`Baixar ${m.nome} (${tamanho(m.tamanho_mb)})?\n\n${m.uso}` +
-                (m.termos_url ? `\n\nEste modelo exige aceitar os termos em:\n${m.termos_url}` : ""))) return;
+        const baixar = async (m, triggerEl = null) => {
+            const ok = await showConfirmModal({
+                title: `Baixar Modelo: ${m.nome}`,
+                message: `${m.uso}\n\nTamanho: ${tamanho(m.tamanho_mb)}` +
+                    (m.termos_url ? `\n\nEste modelo exige aceitar os termos em:\n${m.termos_url}` : ""),
+                confirmText: "Baixar Modelo",
+                cancelText: "Cancelar",
+                danger: false,
+                target: triggerEl
+            });
+            if (!ok) return;
             try {
                 const r = await fetch(`/api/modelos/${encodeURIComponent(m.id)}/baixar`, { method: "POST" });
                 const corpo = await r.json().catch(() => ({}));
@@ -100,7 +109,11 @@ export const ModelosLocais = {
                 desenhar();
                 acompanhar();
             } catch (err) {
-                alert(`Não foi possível baixar ${m.nome}: ${err.message}`);
+                if (typeof window.showToast === "function") {
+                    window.showToast(`Não foi possível baixar ${m.nome}: ${err.message}`, "error", triggerEl);
+                } else {
+                    alert(`Não foi possível baixar ${m.nome}: ${err.message}`);
+                }
             }
         };
 
@@ -159,7 +172,7 @@ export const ModelosLocais = {
             const botao = document.createElement("button");
             botao.className = "prompt-btn";
             botao.innerHTML = `<i class="fa-solid fa-download"></i> Baixar (${tamanho(m.tamanho_mb)})`;
-            botao.addEventListener("click", () => baixar(m));
+            botao.addEventListener("click", () => baixar(m, botao));
             acoes.appendChild(botao);
             grupo.appendChild(acoes);
         }
