@@ -6,7 +6,7 @@
 
 [![Licença: GPL v3](https://img.shields.io/badge/Licen%C3%A7a-GPL%20v3-blue.svg)](https://github.com/fernangcortes/capiau-talho-v03/blob/main/LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
-[![Status](https://img.shields.io/badge/Status-v0.3%20Track--Based%20NLE-orange.svg)](https://github.com/fernangcortes/capiau-talho-v03)
+[![Status](https://img.shields.io/badge/Status-Track--Based%20NLE-orange.svg)](https://github.com/fernangcortes/capiau-talho-v03)
 [![CPU First](https://img.shields.io/badge/Arquitetura-CPU--First%20Local-success.svg)](01.-Visao-Geral-e-Conceito)
 
 </div>
@@ -21,7 +21,7 @@ Diferente de plugins convencionais ou ferramentas que tratam IA como uma caixa p
 
 ### 🏛️ Os Três Pilares do Sistema
 
-1. **Privacidade e CPU-First Local:** Indexação vetorial, embeddings visuais CLIP e biometria facial com clustering DBSCAN rodam **100% na máquina do usuário sem exigir placa de vídeo dedicada (GPU)**. Nenhum rosto ou metadado sensível sai do seu computador.
+1. **Privacidade e CPU-First Local:** Indexação vetorial, embeddings visuais CLIP e biometria facial com clustering DBSCAN rodam **100% na máquina do usuário sem exigir placa de vídeo dedicada (GPU)**. O módulo facial local não envia recortes ou embeddings biométricos; fluxos opcionais de nuvem podem enviar áudio, keyframes e textos, conforme a configuração.
 2. **Edição Guiada por Texto e Visão:** Depoimentos transcritos palavra por palavra são navegáveis e inseríveis na timeline com precisão atômica (`Shift+E`), enquanto a busca semântica em linguagem natural localiza planos visuais em milissegundos.
 3. **Zero Aprisionamento Tecnológico (Interoperabilidade NLE):** Monte o rough cut no Talho e exporte instantaneamente para **Kdenlive (OpenTimelineIO nativo)**, **Adobe Premiere Pro**, **DaVinci Resolve** e **Final Cut Pro (XML FCP7 / EDL)** com precisão de frames e conformação de originais.
 
@@ -47,7 +47,7 @@ Explore a documentação completa através dos módulos abaixo:
 | 📝 **Titler** | [[12. Titler NLE, Legendas e Animação\|12.-Titler-NLE-Legendas-e-Animacao]] | Gerador de títulos, Lower Thirds, legendas queimadas/SRT e animação com keyframes. |
 | 🎬 **Export** | [[13. Exportação e Interoperabilidade NLE\|13.-Exportacao-e-Interoperabilidade-NLE]] | Formatos OTIO, XML FCP7, EDL, Render MP4 e integração com Kdenlive/Premiere/Resolve. |
 | 🎹 **Atalhos** | [[14. Guia Completo de Atalhos\|14.-Guia-Completo-de-Atalhos]] | Tabela completa de atalhos de teclado (JKL, I/O/E, Shift+E, A, Ferramentas). |
-| 🔌 **API** | [[15. Arquitetura Técnica e API REST\|15.-Arquitetura-Tecnica-e-API-REST]] | FastAPI, SQLite + ChromaDB, WebSockets, streaming de logs e endpoints REST. |
+| 🔌 **API** | [[15. Arquitetura Técnica e API REST\|15.-Arquitetura-Tecnica-e-API-REST]] | FastAPI, SQLite + Qdrant, acompanhamento de progresso e endpoints REST. |
 | 🩺 **Suporte** | [[16. Solução de Problemas e FAQ\|16.-Solucao-de-Problemas-e-FAQ]] | Resolução de problemas comuns, diagnóstico de erros, logs e FAQ. |
 | 🗺️ **Futuro** | [[17. Roadmap e Guia de Contribuição\|17.-Roadmap-e-Guia-de-Contribuicao]] | Próximas versões, suíte de testes pytest e diretrizes para pull requests. |
 | 📖 **Glossário** | [[18. Glossário Visual e Terminologia\|18.-Glossario-Visual-e-Terminologia]] | Dicionário visual de termos NLE, IA, biometria facial, acústica e intercâmbio com mais de 70 verbetes didáticos e diagramas. |
