@@ -1986,7 +1986,8 @@ export class SourcePlayer {
     }
 
     renderFaces(frameFaces) {
-        return this.renderGroundingBoxes(frameFaces);
+        const mapped = (frameFaces || []).map(f => ({ ...f, is_legacy_xywh: true }));
+        return this.renderGroundingBoxes(mapped);
     }
 
     /**
@@ -2004,10 +2005,17 @@ export class SourcePlayer {
         const cHeight = this.overlayContainer.clientHeight || 1000;
 
         detections.forEach(item => {
-            const rawBox = item.bounding_box || item.box;
+            // Ignora descartes e falsos positivos rotulados como Não Relevante / Não é Rosto
+            if (item.name === "Não Relevante" || item.name === "Não é Rosto" || item.status === "rejected" || item.rejected) {
+                return;
+            }
+
+            const rawBox = item.box_2d || item.bounding_box || item.box;
             if (!rawBox || rawBox.length !== 4) return;
 
-            const pBox = canonical_to_pixel_box(rawBox, cWidth, cHeight);
+            // Suporte automático a caixas legadas de face [x, y, w, h] vs Gemini Canonical [ymin, xmin, ymax, xmax]
+            const isLegacyXywh = item.is_legacy_xywh ?? item.is_xywh ?? (item.box_2d ? false : (item.is_canonical ? false : true));
+            const pBox = canonical_to_pixel_box(rawBox, cWidth, cHeight, isLegacyXywh);
             const isProp = item.type === "prop" || item.entity_type === "prop" || item.category === "prop" || item.is_object;
             const label = item.name || item.label || item.object_name || (isProp ? "Objeto" : "Quem é?");
             const entityType = isProp ? "prop" : "person";
@@ -2032,15 +2040,20 @@ export class SourcePlayer {
                 boxDiv.style.border = "1.5px solid rgba(6, 182, 212, 0.75)";
                 boxDiv.style.background = "rgba(6, 182, 212, 0.08)";
             }
-            boxDiv.title = `Clique para buscar cenas com "${label}" no acervo`;
+            boxDiv.title = (label === "Quem é?" || label === "Objeto")
+                ? "Clique com botão direito para identificar"
+                : `Clique para buscar cenas com "${label}" no acervo (ou botão direito para editar)`;
 
             // Floating Name Tag (Outfit 10px, dark background)
+            // Desacoplado de .face-name-tag para evitar colisão com bottom:-22px e distorção de altura
+            const isNearTop = pBox.topPct < 4;
             const nameTag = document.createElement("span");
-            nameTag.className = "grounding-name-tag face-name-tag";
+            nameTag.className = isNearTop ? "grounding-name-tag is-near-top" : "grounding-name-tag";
             nameTag.style.cssText = `
                 position: absolute;
-                top: 0; left: 0;
-                transform: translateY(-100%);
+                ${isNearTop ? "top: 2px; left: 2px; transform: none;" : "top: -2px; left: 0; transform: translateY(-100%);"}
+                bottom: auto !important;
+                height: auto !important;
                 background: var(--t-surface-2, rgba(18, 18, 24, 0.95));
                 color: ${isProp ? "#6ee7b7" : "#67e8f9"};
                 font-family: 'Outfit', sans-serif;

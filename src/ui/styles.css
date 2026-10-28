@@ -5714,6 +5714,39 @@ mark.search-highlight {
     border-color: #fff;
 }
 
+/* ── Grounding Name Tag (Source Player Overlay) ─────────────────── */
+.grounding-name-tag {
+    position: absolute;
+    top: -2px;
+    left: 0;
+    bottom: auto !important;
+    height: auto !important;
+    display: inline-block;
+    transform: translateY(-100%);
+    background: var(--t-surface-2, rgba(18, 18, 24, 0.95));
+    font-family: 'Outfit', sans-serif;
+    font-size: var(--fs-10);
+    padding: 1px 5px;
+    border-radius: 3px;
+    white-space: nowrap;
+    pointer-events: none;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+    opacity: 0;
+    transition: opacity 0.15s ease;
+    z-index: 10;
+}
+
+.grounding-box:hover .grounding-name-tag,
+.face-box:hover .grounding-name-tag {
+    opacity: 1;
+}
+
+.grounding-name-tag.is-near-top {
+    top: 2px;
+    left: 2px;
+    transform: none;
+}
+
 /* ── ESTILOS DO CHATBOT DE INTELIGÊNCIA EDITORIAL ──────────────────── */
 .chat-tab-container {
     display: flex;

@@ -1269,7 +1269,7 @@ def get_face_thumbnail(face_id: int):
 
 @router.get("/video/{video_id}/faces", response_model=List[dict])
 def get_video_faces_compat(video_id: int):
-    """Retorna rostos do video com compatibilidade."""
+    """Retorna rostos do video com compatibilidade, excluindo detecções descartadas."""
     service = get_face_service()
     # Buscar projeto associado ao video
     with get_db() as conn:
@@ -1284,19 +1284,29 @@ def get_video_faces_compat(video_id: int):
     res = []
     for f in faces:
         rec = f.get("recognition")
-        if rec and rec.get("recognized_by") == "user":
-            res.append({
-                "id": f["id"],
-                "name": f["name"],
-                "bounding_box": json.loads(f["bounding_box"]),
-                "timestamp": f["timestamp"]
-            })
+        if rec and rec.get("status") == "rejected":
+            continue
+        if f.get("name") in ("Não Relevante", "Não é Rosto"):
+            continue
+        bbox_raw = f.get("bounding_box")
+        if not bbox_raw:
+            continue
+        try:
+            bbox = json.loads(bbox_raw) if isinstance(bbox_raw, str) else bbox_raw
+        except Exception:
+            continue
+        res.append({
+            "id": f["id"],
+            "name": f["name"],
+            "bounding_box": bbox,
+            "timestamp": f["timestamp"]
+        })
     return res
 
 
 @router.get("/photo/{photo_id}/faces", response_model=List[dict])
 def get_photo_faces_compat(photo_id: int):
-    """Retorna rostos da foto com compatibilidade."""
+    """Retorna rostos da foto com compatibilidade, excluindo detecções descartadas."""
     service = get_face_service()
     with get_db() as conn:
         cursor = conn.cursor()
@@ -1307,11 +1317,26 @@ def get_photo_faces_compat(photo_id: int):
         project_id = row["project_id"]
         
     faces = service.get_project_faces(project_id, "photo", photo_id)
-    return [{
-        "id": f["id"],
-        "name": f["name"],
-        "bounding_box": json.loads(f["bounding_box"])
-    } for f in faces]
+    res = []
+    for f in faces:
+        rec = f.get("recognition")
+        if rec and rec.get("status") == "rejected":
+            continue
+        if f.get("name") in ("Não Relevante", "Não é Rosto"):
+            continue
+        bbox_raw = f.get("bounding_box")
+        if not bbox_raw:
+            continue
+        try:
+            bbox = json.loads(bbox_raw) if isinstance(bbox_raw, str) else bbox_raw
+        except Exception:
+            continue
+        res.append({
+            "id": f["id"],
+            "name": f["name"],
+            "bounding_box": bbox
+        })
+    return res
 
 
 @router.post("/face/{face_id}/reject")
