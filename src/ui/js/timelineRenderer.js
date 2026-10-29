@@ -829,8 +829,10 @@ export class CapiauTimelineRenderer {
      * Suporta zoom de alta precisão até o nível de frames individuais (:00, :01, :02...).
      */
     /**
-     * Desenha a régua de tempo adaptativa com marcas de subdivisão e timecode dinâmico.
-     * Suporta zoom de alta precisão até o nível de frames individuais sem sobreposição ou poluição visual.
+     * Desenha a régua de tempo da timeline no topo do canvas (padrão DaVinci Studio Pro 3-Tier).
+     * Hierarquia rítmica de 3 níveis de ticks (10px / 6px / 3.5px), espaçamento mínimo anti-barcode de 16px,
+     * zona superior isolada para timecodes (Y: 4px) e blindagem contra truncamento no bordo direito do canvas.
+     * Suporta dinamicamente qualquer taxa de quadros (23.976, 24, 25, 29.97, 30, 50, 60, 120 fps).
      */
     drawRuler() {
         const ctx = this.ctx;
@@ -854,7 +856,8 @@ export class CapiauTimelineRenderer {
 
         const startFrame = Math.max(0, scrollLeft);
         const endFrame = startFrame + Math.ceil(this.width / zoom);
-        const forceHours = endFrame >= 3600 * fpsVal;
+        // Só força prefixo de horas se o início visível já tiver ultrapassado 1 hora (evita poluir 00:00 - 59:59)
+        const forceHours = startFrame >= 3600 * fpsVal;
 
         // 1. Células visuais e destaque de frames sob zoom microscópico (zoom >= 18px/frame)
         if (zoom >= 18) {
@@ -883,38 +886,36 @@ export class CapiauTimelineRenderer {
             }
         }
 
-        // 2. Candidatos a intervalo de rótulo (estritamente inteiros)
-        const rawCandidates = [
-            1,
-            2,
-            5,
-            10,
-            Math.max(1, Math.round(fpsBase / 4)),
-            Math.max(1, Math.round(fpsBase / 2)),
-            fpsBase * 1,
-            fpsBase * 2,
-            fpsBase * 5,
-            fpsBase * 10,
-            fpsBase * 15,
-            fpsBase * 30,
-            fpsBase * 60,
-            fpsBase * 120,
-            fpsBase * 300,
-            fpsBase * 600,
-            fpsBase * 900,
-            fpsBase * 1800,
-            fpsBase * 3600,
-            fpsBase * 7200,
-            fpsBase * 18000
+        // 2. Candidatos a intervalo de rótulo (dinâmico e agnóstico de FPS)
+        // Subdivisões inteiras de frames para qualquer taxa (24, 25, 30, 50, 60 fps, etc.)
+        const frameCandidates = [1];
+        if (fpsBase >= 4) {
+            for (let d = 2; d < fpsBase; d++) {
+                if (fpsBase % d === 0) {
+                    frameCandidates.push(d);
+                }
+            }
+            frameCandidates.push(Math.max(1, Math.round(fpsBase / 4)));
+            frameCandidates.push(Math.max(1, Math.round(fpsBase / 2)));
+        }
+
+        // Multiplicadores inteiros em segundos (1s a 10h)
+        const secondMultipliers = [
+            1, 2, 5, 10, 15, 30,
+            60, 120, 300, 600, 900, 1800,
+            3600, 7200, 18000, 36000
         ];
+        const secondCandidates = secondMultipliers.map(s => Math.round(s * fpsVal));
+
+        const rawCandidates = [...frameCandidates, ...secondCandidates];
         const candidates = [...new Set(rawCandidates.map(Math.round))].filter(c => c >= 1).sort((a, b) => a - b);
 
-        // 3. Determinar textInterval com margem de segurança generosa para garantir legibilidade absoluta
+        // 3. Determinar textInterval garantindo respiro e legibilidade tabular
         function getRequiredPx(c) {
-            if (c === 1) return 45; // Cada frame individual rotulado requer pelo menos 45px de largura para não amontoar
-            if (c === 2) return 55; // Rótulos a cada 2 frames requerem pelo menos 55px
-            if (c <= 5) return 65;
-            if (c < fpsBase) return 75;
+            if (c === 1) return 42; // Cada frame individual rotulado requer 42px
+            if (c === 2) return 50; // Rótulos a cada 2 frames requerem 50px
+            if (c <= 5) return 60;
+            if (c < fpsBase) return 70; // Frações de segundo
             return forceHours ? 95 : 85; // Timecode completo "MM:SS" ou "HH:MM:SS"
         }
 
@@ -926,106 +927,115 @@ export class CapiauTimelineRenderer {
             }
         }
 
-        // 4. Determinar subTickInterval (divisores com ticks nítidos; com zoom >= 4.5 desenha tick para cada frame)
+        // 4. Determinar subTickInterval (mínimo rigoroso de 16px para eliminar efeito código de barras)
         let subTickInterval = textInterval;
         if (textInterval > 1) {
-            if (zoom >= 4.5) {
-                subTickInterval = 1;
-            } else {
-                const minTickPx = 6;
-                const divisors = [];
-                for (let d = 1; d <= textInterval; d++) {
-                    if (textInterval % d === 0) divisors.push(d);
-                }
-                for (const d of divisors) {
-                    if (d * zoom >= minTickPx) {
-                        subTickInterval = d;
-                        break;
-                    }
+            const minTickPx = 16;
+            const divisors = [];
+            for (let d = 1; d <= textInterval; d++) {
+                if (textInterval % d === 0) divisors.push(d);
+            }
+            for (const d of divisors) {
+                if (d * zoom >= minTickPx) {
+                    subTickInterval = d;
+                    break;
                 }
             }
         }
 
         const showFrames = textInterval < fpsBase;
-
-        ctx.font = "9px 'Outfit', 'Inter', monospace";
-        ctx.textAlign = "left";
-        ctx.textBaseline = "middle";
-
         const firstTickFrame = Math.floor(startFrame / subTickInterval) * subTickInterval;
         let lastDrawnTextRight = -9999; // Guarda física de colisão contra sobreposição de números
         const ioBadge = this._currentInOutBadge || this.getInOutBadgeInfo();
+        const safeRightMargin = 12; // 12px de proteção antes da borda física do canvas
+        const halfInterval = Math.max(1, Math.round(textInterval / 2));
+        const halfSecond = Math.max(1, Math.round(fpsBase / 2));
+
+        ctx.font = "600 10px 'Outfit', 'Inter', monospace";
+        ctx.textAlign = "left";
+        ctx.textBaseline = "top";
 
         for (let f = firstTickFrame; f <= endFrame; f += subTickInterval) {
             const x = (f - startFrame) * zoom;
-            if (x < -30 || x > this.width + 30) continue;
+            if (x < -40 || x > this.width + 40) continue;
 
             const frameInt = Math.round(f);
             const isSecond = (frameInt % fpsBase === 0);
             const isTextTick = (frameInt % textInterval === 0);
-            const isFiveFrames = (frameInt % 5 === 0);
-            const isHalfSecond = (frameInt % Math.max(1, Math.round(fpsBase / 2)) === 0);
+            const isHalfSec = (frameInt % halfSecond === 0);
+            const isHalfInt = (frameInt % halfInterval === 0);
 
-            let tickSize = 4;
-            let strokeColor = "rgba(255, 255, 255, 0.16)";
+            // Hierarquia Rítmica 3-Tier (DaVinci Studio Pro)
+            let tickSize = 3.5;
+            let strokeColor = "rgba(255, 255, 255, 0.20)";
             let lineWidth = 1;
 
-            if (isSecond) {
-                tickSize = 13;
-                strokeColor = "rgba(255, 255, 255, 0.75)";
-                lineWidth = 1.5;
-            } else if (isTextTick) {
-                tickSize = 9;
+            if (isTextTick || isSecond) {
+                // Nível 1: Major Tick
+                tickSize = 10;
+                strokeColor = isSecond ? "rgba(255, 255, 255, 0.85)" : "rgba(255, 255, 255, 0.70)";
+                lineWidth = 1.25;
+            } else if (isHalfSec || isHalfInt) {
+                // Nível 2: Medium Tick
+                tickSize = 6;
                 strokeColor = "rgba(255, 255, 255, 0.45)";
-                lineWidth = 1.2;
-            } else if (isHalfSecond || isFiveFrames) {
-                tickSize = 7;
-                strokeColor = "rgba(255, 255, 255, 0.30)";
                 lineWidth = 1;
             } else {
-                tickSize = 4;
-                strokeColor = "rgba(255, 255, 255, 0.16)";
+                // Nível 3: Minor Tick
+                tickSize = 3.5;
+                strokeColor = "rgba(255, 255, 255, 0.20)";
                 lineWidth = 1;
             }
 
-            // Desenha tick (suprime se estiver sob o box do In/Out para manter o fundo limpo)
+            // Desenha tick na base (suprime se estiver sob o box do In/Out para manter fundo limpo)
             const tickX = Math.round(x) + 0.5;
             if (!(ioBadge && tickX >= ioBadge.left - 1 && tickX <= ioBadge.right + 1)) {
                 ctx.strokeStyle = strokeColor;
                 ctx.lineWidth = lineWidth;
                 ctx.beginPath();
                 ctx.moveTo(tickX, this.rulerHeight - tickSize);
-                ctx.lineTo(tickX, this.rulerHeight);
+                ctx.lineTo(tickX, this.rulerHeight - 1);
                 ctx.stroke();
             }
 
-            // Desenha texto do timecode/frame
+            // Desenha texto do timecode/frame na zona superior isolada
             if (isTextTick) {
                 let label;
                 if (isSecond) {
-                    // No segundo exato, exibe o timecode completo daquele ponto (ex: 00:01:00 ou 01:23:45)
+                    // No segundo exato, exibe o timecode completo
                     label = formatRulerTimecode(frameInt, fpsVal, showFrames, forceHours);
                 } else if (showFrames) {
                     // Tick de frame fracionário (ex: frame 1, 2, 5, 10, 15...):
-                    // Se houver espaço amplo (>= 75px por tick), exibe timecode completo MM:SS:FF
                     if (textInterval * zoom >= 75) {
                         label = formatRulerTimecode(frameInt, fpsVal, true, forceHours);
                     } else {
-                        // Formato frame compacto limpo: :FF (garantido 2 dígitos inteiros: :01, :05, :12...)
                         const frameInSec = ((frameInt % fpsBase) + fpsBase) % fpsBase;
-                        label = `:${String(frameInSec).padStart(2, '0')}`;
+                        label = `:${String(frameInSec).padStart(2, "0")}`;
                     }
                 } else {
                     label = formatRulerTimecode(frameInt, fpsVal, false, forceHours);
                 }
 
                 ctx.font = isSecond
-                    ? "600 9px 'Outfit', 'Inter', monospace"
-                    : "9px 'Outfit', 'Inter', monospace";
+                    ? "600 10px 'Outfit', 'Inter', monospace"
+                    : "10px 'Outfit', 'Inter', monospace";
 
                 const textWidth = ctx.measureText(label).width;
-                const textLeft = Math.round(x) + 4;
-                const textRight = textLeft + textWidth;
+                let textLeft = Math.round(x) + 4;
+                let textRight = textLeft + textWidth;
+
+                // Blindagem de borda direita: evita que o texto seja fatiado pelo fim do canvas
+                if (textRight > this.width - safeRightMargin) {
+                    // Tenta inverter o alinhamento para o lado esquerdo do tick
+                    const altTextLeft = Math.round(x) - textWidth - 4;
+                    if (altTextLeft >= lastDrawnTextRight + 12 && altTextLeft >= 4) {
+                        textLeft = altTextLeft;
+                        textRight = textLeft + textWidth;
+                    } else {
+                        // Sem espaço seguro sem colidir ou truncar: omite o rótulo
+                        continue;
+                    }
+                }
 
                 // Guarda anti-colisão: nenhum rótulo da régua pode colidir ou ficar sob o Box de In/Out
                 if (ioBadge && textRight >= ioBadge.left - 6 && textLeft <= ioBadge.right + 6) {
@@ -1033,11 +1043,12 @@ export class CapiauTimelineRenderer {
                     continue;
                 }
 
-                // Proteção contra amontoamento: garante pelo menos 14px de respiro entre rótulos consecutivos
-                if (textLeft >= lastDrawnTextRight + 14) {
+                // Proteção contra amontoamento: garante pelo menos 12px de respiro entre rótulos consecutivos
+                if (textLeft >= lastDrawnTextRight + 12) {
                     ctx.fillStyle = isSecond ? "#f8fafc" : this.colors.rulerText;
-                    ctx.fillText(label, textLeft, this.rulerHeight - 16);
-                    lastDrawnTextRight = textLeft + textWidth;
+                    // Zona superior dedicada (Y: 4px), mantendo 6px livres até a ponta dos ticks
+                    ctx.fillText(label, textLeft, 4);
+                    lastDrawnTextRight = textRight;
                 }
             }
         }
