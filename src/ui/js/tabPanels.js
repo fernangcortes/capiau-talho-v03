@@ -1,4 +1,4 @@
-// Abas internas que viram painéis próprios (fase F5 do plano docs/PLANO_JANELAS_DRAG_DOCK.md).
+// Abas internas que viram painéis próprios (fase F5 do plano docs/HANDOFF_JANELAS_DRAG_DOCK.md).
 // F5a: abas do Painel Lateral (Falas com o inspetor de falas, Visão, Chat, Busca, Tarefas, Logs).
 // F5b: abas da Biblioteca (Temas, Rostos, Títulos, Docs). Mídias fica: é o corpo da Biblioteca
 // (busca, filtros e rolagem virtual) — destacá-la é o mesmo que destacar a Biblioteca, que já existe.

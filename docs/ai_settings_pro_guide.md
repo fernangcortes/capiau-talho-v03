@@ -6,6 +6,8 @@ trabalhando com o **CapIAu-Talho**. No Modo Profissional, o sistema
 expõe todas as engrenagens internas de inteligência artificial, visão
 computacional, agrupamento semântico e orquestração de agentes.
 
+> **Aviso (out/2026):** nomes de modelos e preços mudam com frequência. Os slugs citados aqui batem com `src/config.py` na data desta revisão; confira os preços no OpenRouter antes de escolher um modelo.
+
 ## 1. Filosofia de Controle e a Herança de Configurações
 
 O CapIAu-Talho foi desenhado sob o princípio de que **IA não é uma caixa
@@ -57,11 +59,11 @@ modelos principais de processamento cognitivo.
 
   - *Escolha Estratégica:*
 
-    - **deepseek/deepseek-v4-flash / google/gemini-3.5-flash**: Modelos
+    - **deepseek/deepseek-v4.1-flash / google/gemini-3.5-flash**: Modelos
       rápidos de baixa latência. Excelentes para diálogos comuns de chat
       e tarefas de NLP leves como resumos.
 
-    - **anthropic/claude-5-sonnet**: Maior capacidade de raciocínio
+    - **anthropic/claude-sonnet-5.5**: Maior capacidade de raciocínio
       espacial e estrutural. Recomendado se você estiver delegando ao
       agente grandes reestruturações de timeline multipista em lote
       (rough cuts automáticos de B-roll), pois ele comete menos erros

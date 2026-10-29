@@ -575,7 +575,7 @@ SETTINGS_REGISTRY: List[Dict[str, Any]] = [
         "category": "timeline", "level": "pro", "scope": "both", "requires_reprocess": False,
     },
 
-    # -- Timeline: motor de render de vídeo (docs/PLANO_EXPORTACAO_VIDEO.md,
+    # -- Timeline: motor de render de vídeo (plano de exportação de vídeo, não versionado,
     #    seção 9; dono = pacote D). Defaults = comportamento acordado no plano;
     #    os pacotes A/B/C leem estas chaves via SettingsService em vez de
     #    hardcode -- mesma disciplina das chaves de áudio. requires_reprocess
@@ -1139,7 +1139,7 @@ SETTINGS_REGISTRY: List[Dict[str, Any]] = [
         "category": "appearance", "level": "simple", "scope": "both", "requires_reprocess": False,
     },
 
-    # -- Áudio: limiares da pré-análise (docs/PLANO_AJUSTES_DE_AUDIO.md, seção 7) --
+    # -- Áudio: limiares da pré-análise (plano de ajustes de áudio, não versionado, seção 7) --
     {
         "key": "audio.analise.alvo_lufs", "type": "float", "default": -16.0, "min": -31.0, "max": -9.0, "step": 0.5,
         "label": "Áudio: alvo de loudness (LUFS)",
@@ -1204,7 +1204,7 @@ SETTINGS_REGISTRY: List[Dict[str, Any]] = [
         "category": "audio", "level": "pro", "scope": "both", "requires_reprocess": False,
     },
 
-    # -- Áudio: denoise por IA local (docs/PLANO_AJUSTES_DE_AUDIO.md, Etapa 4) --
+    # -- Áudio: denoise por IA local (plano de ajustes de áudio, não versionado, Etapa 4) --
     {
         "key": "audio.denoise.motor", "type": "enum", "default": "dpdfnet",
         "enum": ["dpdfnet", "gtcrn"],
@@ -1242,7 +1242,7 @@ SETTINGS_REGISTRY: List[Dict[str, Any]] = [
         "category": "audio", "level": "pro", "scope": "both", "requires_reprocess": False,
     },
 
-    # -- Áudio: nuvem Auphonic (docs/PLANO_AJUSTES_DE_AUDIO.md, seção 8/Etapa 5) --
+    # -- Áudio: nuvem Auphonic (plano de ajustes de áudio, não versionado, seção 8/Etapa 5) --
     {
         "key": "audio.nuvem.alvo_minutos_mes", "type": "float", "default": 120.0, "step": 10.0,
         "label": "Nuvem (Auphonic): minutos grátis do mês",
@@ -1258,7 +1258,7 @@ SETTINGS_REGISTRY: List[Dict[str, Any]] = [
         "category": "audio", "level": "pro", "scope": "both", "requires_reprocess": False,
     },
 
-    # -- Áudio: ponte com DAW (docs/PLANO_AJUSTES_DE_AUDIO.md, seção 9/Etapa 6) --
+    # -- Áudio: ponte com DAW (plano de ajustes de áudio, não versionado, seção 9/Etapa 6) --
     {
         "key": "audio.daw.pasta_retorno", "type": "string", "default": "watch/audio_daw",
         "label": "DAW: pasta de retorno dos arquivos tratados",
@@ -1275,7 +1275,7 @@ SETTINGS_REGISTRY: List[Dict[str, Any]] = [
         "category": "audio", "level": "pro", "scope": "both", "requires_reprocess": False,
     },
 
-    # -- Áudio: defaults do ajuste ao vivo no player (docs/PLANO_AJUSTES_DE_AUDIO.md,
+    # -- Áudio: defaults do ajuste ao vivo no player (plano de ajustes de áudio, não versionado,
     #    contrato E4/Etapa 2). Estes valores são só o PONTO DE PARTIDA quando o usuário
     #    liga o ajuste num clipe; o ajuste de cada clipe fica salvo no próprio clipe
     #    (clip.effects), não aqui. Alterá-los não muda clipe já ajustado. --
@@ -1392,7 +1392,7 @@ PRESETS = {
     },
 }
 
-# -- Catálogo dos presets de áudio (docs/PLANO_AJUSTES_DE_AUDIO.md, seção 7) --
+# -- Catálogo dos presets de áudio (plano de ajustes de áudio, não versionado, seção 7) --
 # Somente catálogo: nomes + cadeia de cada preset em texto, para as Etapas 3/4
 # consumirem (montagem da cadeia ffmpeg/IA). NAO entram no PRESETS acima porque
 # esse dicionario alimenta /api/settings/preset, que grava os "values" como

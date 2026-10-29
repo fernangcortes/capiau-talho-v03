@@ -1,6 +1,6 @@
 # Plano de Implementação — Triagem da Pesquisa de 19/08/2026
 
-> Análise crítica de [`Pesquisas/Pesquisa-CapIAu-Talho-19082026.md`](Pesquisas/Pesquisa-CapIAu-Talho-19082026.md)
+> Análise crítica de `Pesquisas/Pesquisa-CapIAu-Talho-19082026.md` (arquivo de origem não versionado)
 > contra o código real do repositório. Ordenado por custo-benefício, do maior para o menor.
 > Data da análise: 19/08/2026.
 
@@ -81,7 +81,7 @@ KEYFRAME @ 16.683333
 ```
 
 **Um keyframe a cada 8,34 segundos** — 250 frames a 29,97fps, que é o `keyint` default
-do x264. [`generate_video_proxy()`](../src/media/ffmpeg.py:195) nunca passa `-g`.
+do x264. [`generate_video_proxy()`](../src/media/ffmpeg.py):195 nunca passa `-g`.
 
 Consequência: cada scrub na timeline força o browser a decodificar até 250 frames a
 partir do keyframe anterior. É essa a origem do "laggy" que a pesquisa atribui ao
@@ -94,7 +94,7 @@ partir do keyframe anterior. É essa a origem do "laggy" que a pesquisa atribui 
 
 ## Implementação
 
-Em [`src/media/ffmpeg.py`](../src/media/ffmpeg.py:208), no `cmd` de `generate_video_proxy`:
+Em [`src/media/ffmpeg.py`](../src/media/ffmpeg.py):208, no `cmd` de `generate_video_proxy`:
 
 ```python
     # GOP de ~1s: keyframe a cada N frames, sem keyframes extras por corte de cena.
@@ -155,7 +155,7 @@ timeline id 4: {'video_id': 89, 'in': 3.72589, 'out': 15.126423, 'timeline_start
 timeline id 2: {'video_id': 54, 'in': 1.425321, 'out': 6.764048}
 ```
 
-E [`otio_export.py:175`](../src/export/otio_export.py:175) converte de volta com **truncamento**:
+E [`otio_export.py:175`](../src/export/otio_export.py):175 converte de volta com **truncamento**:
 
 ```python
 start_time=otio.opentime.RationalTime(int(in_s * fps), fps),
@@ -232,7 +232,7 @@ falhar explícito a assumir 24.
 
 ## Diagnóstico
 
-[`timelineRenderer.js:714`](../src/ui/js/timelineRenderer.js:714) pede cada miniatura
+[`timelineRenderer.js:714`](../src/ui/js/timelineRenderer.js):714 pede cada miniatura
 individualmente:
 
 ```javascript
@@ -303,7 +303,7 @@ não tem GPU dedicada — só Intel UHD 630, que não serve para inferência de 
 
 Além disso, a diarização do WhisperX não é "nativa": ela chama **pyannote.audio**, que
 exige token do HuggingFace, aceite de licença e é pesada em CPU. Hoje o
-[`asr_engine.py:174`](../src/transcription/asr_engine.py:174) obtém diarização de graça
+[`asr_engine.py:174`](../src/transcription/asr_engine.py):174 obtém diarização de graça
 com `speaker_labels=True` na AssemblyAI. Trocar por local **piora** esse aspecto até
 prova em contrário.
 
@@ -430,7 +430,7 @@ nova da pesquisa que abre uma categoria de busca que não existe.
 ## Implementação
 
 O gancho já existe: [`vision_batch.py`](../src/services/vision_batch.py) e
-[`media_segment`](../src/db/schema.py:224) já processam frames-chave por segmento.
+[`media_segment`](../src/db/schema.py):224 já processam frames-chave por segmento.
 O OCR entra no mesmo laço, sobre frames que já são extraídos — custo marginal de I/O zero.
 
 1. Tabela `ocr_text` (`video_id`, `photo_id`, `timestamp`, `text`, `confidence`, `bbox`)
@@ -465,7 +465,7 @@ O que **sobraria** para o WebCodecs resolver de fato:
 - acesso a `VideoFrame` para análise de IA no cliente — não é o modelo do Talho (a IA roda no backend).
 
 Nenhum dos dois é dor atual. E o `player.js` (1923 linhas) tem lógica não trivial de
-anti-drift em playback multi-clipe ([linhas 1076-1101](../src/ui/js/player.js:1076)) que
+anti-drift em playback multi-clipe ([linhas 1076-1101](../src/ui/js/player.js)) que
 precisaria ser reescrita do zero — risco alto de regressão em algo que já funciona.
 
 Se um dia for feito, o pré-requisito é o índice de keyframes por proxy — que a Ferramenta 1
@@ -478,11 +478,11 @@ torna trivial (keyframes previsíveis a cada N frames, sem precisar de índice).
 **O custo escondido é a reindexação.**
 
 O projeto usa `clip-ViT-B-32` (512d) + `clip-ViT-B-32-multilingual-v1` no mesmo espaço
-vetorial ([`image_semantic.py:21`](../src/search/image_semantic.py:21)). Jina CLIP v2 tem
+vetorial ([`image_semantic.py:21`](../src/search/image_semantic.py):21). Jina CLIP v2 tem
 1024 dimensões — **muda o `VectorParams(size=)` da coleção**, obrigando a recriar e
 reprocessar todas as imagens e frames do acervo.
 
-Existe `reindex_all()` em [`semantic.py:556`](../src/search/semantic.py:556) para a coleção
+Existe `reindex_all()` em [`semantic.py:556`](../src/search/semantic.py):556 para a coleção
 de texto, mas o caminho de imagem precisaria do equivalente. O ganho — "melhor em conceitos
 abstratos" — é real, porém difuso e difícil de medir.
 

@@ -1,4 +1,4 @@
-// Spike F0 do plano docs/PLANO_JANELAS_DRAG_DOCK.md.
+// Spike F0 do plano docs/HANDOFF_JANELAS_DRAG_DOCK.md.
 // Responde, por navegador: (1) dá para abrir a janela ao soltar um arrasto fora do editor?
 // (2) dá para arrastar da janela destacada de volta para a principal? (3) vídeo, canvas,
 // listeners e ResizeObserver sobrevivem a ida e volta via adoptNode?

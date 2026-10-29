@@ -1,4 +1,4 @@
-"""Testes do denoise por IA local (ETAPA 4 de docs/PLANO_AJUSTES_DE_AUDIO.md).
+"""Testes do denoise por IA local (ETAPA 4 do plano de ajustes de áudio, não versionado).
 
 Por que existe: sherpa-onnx e o modelo ONNX NAO estao instalados nesta maquina
 (decisao do dono do projeto), entao TODA a logica que nao depende do modelo tem

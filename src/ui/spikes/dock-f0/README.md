@@ -1,7 +1,7 @@
 # Spike F0 · Drag & Dock
 
 Protótipo isolado da fase F0 do plano de janelas destacáveis por arrastar-e-soltar
-(`docs/PLANO_JANELAS_DRAG_DOCK.md`, versão visual: https://claude.ai/artifact/SF8tDpe1VVSy4brs938X3V).
+(`docs/HANDOFF_JANELAS_DRAG_DOCK.md`, versão visual: https://claude.ai/artifact/SF8tDpe1VVSy4brs938X3V).
 Não é carregado pelo editor. Ele mede, em cada navegador, as três incertezas técnicas antes da F1:
 
 1. Dá para **abrir a janela destacada ao soltar** um arrasto fora do editor?

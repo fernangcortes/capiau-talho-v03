@@ -1841,7 +1841,7 @@ def cancel_all_analyses(project_id: Optional[int] = None):
     return {"status": "success", "count": len(cancelled_ids), "ids": cancelled_ids}
 
 
-# -- ETAPA 1 do plano de audio: pre-analise (docs/PLANO_AJUSTES_DE_AUDIO.md, secao 5)
+# -- ETAPA 1 do plano de audio: pre-analise (plano de ajustes de áudio, não versionado, secao 5)
 
 def _hash_analise_audio(video_id: int, in_s: Optional[float], out_s: Optional[float]) -> str:
     """chain_hash fixo do contrato C2 para a pre-analise pura (ETAPA 1 ainda
@@ -1952,7 +1952,7 @@ def get_video_audio_analysis(
     refresh: bool = Query(False, description="Ignora o cache e reanalisa com ffmpeg."),
     conn: sqlite3.Connection = Depends(get_db_conn),
 ):
-    """Pre-analise de audio do clipe (docs/PLANO_AJUSTES_DE_AUDIO.md, secao 5).
+    """Pre-analise de audio do clipe (plano de ajustes de áudio, não versionado, secao 5).
 
     Um passe de ffmpeg (ebur128 + astats) devolve LUFS-I, LRA, true peak, piso
     de ruido, clipping e correlacao estereo, mais a avaliacao com selos e preset
@@ -2068,7 +2068,7 @@ def get_video_audio_analysis(
 
 
 # -- ETAPA 3 do plano de audio: cadeia ffmpeg RENDERIZADA (contrato F2) --------
-# Tipo B do plano (docs/PLANO_AJUSTES_DE_AUDIO.md, secoes 3 e 6): tratamento que
+# Tipo B do plano (plano de ajustes de áudio, não versionado, secoes 3 e 6): tratamento que
 # GERA ARQUIVO. O original nunca e tocado -- o clipe guarda um ponteiro
 # {"type":"audio_render","ref":...}, e o WAV tratado vive em
 # data/audio_tratado/<video_id>/<chain_hash>.wav. Os renders usam chain_hash do

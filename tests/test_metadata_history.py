@@ -6,7 +6,7 @@
 O motivo de existir: o pipeline chamava update_video_metadata ao final de cada
 transcrição e regravava description/summary/tags incondicionalmente. Doze títulos
 corrigidos à mão foram sobrescritos numa rodada só. Ver
-docs/PLANO_HISTORICO_METADADOS_E_WORKER_ASR.md.
+plano de histórico de metadados e worker ASR (não versionado).
 
 Banco temporário isolado. As rotas são chamadas como funções (recebem a conexão
 por Depends) para não subir TestClient nem encostar em Qdrant.

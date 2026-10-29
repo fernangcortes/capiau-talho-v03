@@ -20,17 +20,17 @@
    - [Task 3.6: Modo Inserção Ripple (`Ctrl`) com Rearrange Swap e Monitor 2-Up](#task-36-modo-inserção-ripple-ctrl-com-rearrange-swap-e-monitor-2-up)
    - [Task 4: Deslocamento com Compensação (Slide Tool — Tecla `U`)](#task-4-ferramenta-deslocamento-com-compensação-slide-tool--tecla-u)
    - [Task 5: Corte Contínuo Adjacente (Rolling Edit Tool — Tecla `N`)](#task-5-ferramenta-corte-contínuo-adjacente-rolling-edit-tool--tecla-n)
-   - [Task 6: Navegação Livre: Mão / Pan (`H`) & Zoom Tool](#task-6-ferramentas-de-navegação-mão--pan-h--zoom-tool)
+   - [Task 6: Ferramentas de Navegação: Mão / Pan (`H`), Zoom Tool, Zoom Microscópico até Frames & Zoom to Fit](#task-6-ferramentas-de-navegação-mão--pan-h-zoom-tool-zoom-microscópico-até-frames--zoom-to-fit)
 5. [📋 SESSÃO 2: Montagem de 3 e 4 Pontos & Navegação Rápida](#-sessão-2-montagem-de-3-e-4-pontos--navegação-rápida)
-   - [Task 7: Inserção Ripple (`,`) & Sobrescrita (`.`)](#task-7-montagem-de-três-pontos-inserção-ripple--sobrescrita-)
-   - [Task 8: Localizar Quadro Original na Fonte (Match Frame — `F`) & Reverse (`Shift+F`)](#task-8-localizar-quadro-original-na-fonte-match-frame--tecla-f--reverse-match-frame-shiftf)
+   - [Task 7: Montagem de Três Pontos: Inserção Ripple (`,`) & Sobrescrita (`.`)](#task-7-montagem-de-três-pontos-inserção-ripple---sobrescrita-)
+   - [Task 8: Localizar Quadro Original na Fonte (Match Frame — Tecla `Alt+F` / `F`) & Reverse Match Frame (`Shift+F`)](#task-8-localizar-quadro-original-na-fonte-match-frame--tecla-altf--f--reverse-match-frame-shiftf)
    - [Task 9: Substituição de Clipe na Timeline (Replace Edit)](#task-9-substituição-de-clipe-na-timeline-replace-edit--ctrlshiftr--drag-com-alt)
-   - [Task 10: Criação de Subclipes na Biblioteca a partir do Source (Subclips)](#task-10-criação-de-subclipes-na-biblioteca-a-partir-do-source-subclips)
+   - [Task 10: Criação de Subclipes na Biblioteca a partir do Source (Subclips — `Ctrl+U`)](#task-10-criação-de-subclipes-na-biblioteca-a-partir-do-source-subclips--ctrlu)
    - [Task 11: Display de Timecode Interativo & Navegação Numérica (`+frames`, `-frames`)](#task-11-display-de-timecode-interativo--navegação-numérica-frames--frames)
 6. [📋 SESSÃO 3: Tempo, Velocidade & Imagem Estática](#-sessão-3-tempo-velocidade--imagem-estática)
    - [Task 12: Congelar Quadro (Freeze Frame / Hold Frame — `Ctrl+Shift+F`)](#task-12-congelar-quadro-freeze-frame--hold-frame--ctrlshiftf)
    - [Task 13: Velocidade Individual do Clipe (Clip Speed / Duration) & Reverse](#task-13-velocidade-individual-do-clipe-clip-speed--duration--reverse)
-   - [Task 14: Esticar / Comprimir Taxa (Rate Stretch Tool — `R`)](#task-14-ferramenta-esticar--comprimir-taxa-rate-stretch-tool--tecla-r)
+   - [Task 14: Ferramenta Esticar / Comprimir Taxa (Rate Stretch Tool — Tecla `Shift+R` / `R`)](#task-14-ferramenta-esticar--comprimir-taxa-rate-stretch-tool--tecla-shiftr--r)
 7. [📋 SESSÃO 4: Transições de Junção, Camadas de Ajuste & Geradores](#-sessão-4-transições-de-junção-camadas-de-ajuste--geradores)
    - [Task 15: Crossfade de Áudio de Junção com Potência Constante (`Ctrl+Shift+D`)](#task-15-crossfade-de-áudio-de-junção-com-potência-constante-ctrlshiftd)
    - [Task 16: Transições de Vídeo (Cross Dissolve `Ctrl+D`, Dip to Black/White)](#task-16-transições-de-junção-de-vídeo-cross-dissolve-ctrld-dip-to-black--dip-to-white)
@@ -142,7 +142,7 @@
 | **Sessão 5** | **Task 21**| Atenuação Sonora Automática (Auto-Ducking) | Toggle Pista | Pista A2 (Música) | 📋 Planejada |
 | **Sessão 6** | **Task 22**| Rótulos de Cor para Clipes (Color Labels) | Menu Botão Direito | Timeline & Cards | 📋 Planejada |
 | **Sessão 6** | **Task 23**| Trava Total de Pista (Track Lock com Cadeado) | Clique no Header / **`Shift+L`** / **`Ctrl+Alt+Shift+L`** | Cabeçalhos de Pistas | ✅ Concluída |
-| **Sessão 6** | **Task 24**| Margens de Segurança & Overlays de Aspecto | Botão Header | Program Player | 📋 Planejada |
+| **Sessão 6** | **Task 24**| Margens de Segurança & Overlays de Aspecto | Botão Header | Program Player | ✅ Concluída |
 | **Sessão 6** | **Task 25**| Sistema de Múltiplas Timelines em Abas | Barra de Abas | Topo da Timeline | 📋 Planejada |
 
 ---
@@ -1304,7 +1304,8 @@ Durante a consolidação da Sessão 1, foi implementado o bloco ergonômico de e
 
 ---
 
-### Task 24: Margens de Segurança & Overlays de Aspecto no Player (Safe Margins) — ✅ Concluída
+### Task 24: Margens de Segurança & Overlays de Aspecto no Player (Safe Margins)
+> **Status:** ✅ Concluída (commit `3d5813c`)
 
 #### 1. Objetivo & Especificação Funcional
 * Botão toggle `#btn-program-safe-margins` (com badge `#badge-program-safe-margins` e menu `#btn-program-safe-margins-menu`) no cabeçalho do Program Player (`#program-player-panel > .player-header`).
@@ -1322,7 +1323,7 @@ Durante a consolidação da Sessão 1, foi implementado o bloco ergonômico de e
 * **Teste Manual:** Ativar o botão, conferir as guias de 80% e 90%, alternar para máscara 9:16 e ver o recorte vertical de redes sociais.
 
 > [!CAUTION]
-> **Checkpoint de Parada 24:** Aguardar aprovação do usuário antes da Task 25.
+> **Checkpoint de Parada 24:** Concluído (commit `3d5813c`; 84/84 asserções em `autoteste_safe_margins.mjs`). Teste manual: a confirmar antes da Task 25.
 
 ---
 

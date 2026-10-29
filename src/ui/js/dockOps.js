@@ -1,4 +1,4 @@
-// Operações de encaixe das colunas laterais (fase F2b do plano docs/PLANO_JANELAS_DRAG_DOCK.md).
+// Operações de encaixe das colunas laterais (fase F2b do plano docs/HANDOFF_JANELAS_DRAG_DOCK.md).
 // Funções puras sobre { order, stacks, bands?, corners? }:
 //   order   = ordem das colunas do editor (ids das laterais + "center-stage"), como columnOrder;
 //   stacks  = pilhas de laterais numa mesma coluna, de cima para baixo (ex.: [["sidebar-left", "sidebar-right"]]);

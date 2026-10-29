@@ -8,7 +8,7 @@ seguinte. Desde 22/08 a correção roda ANTES da gravação, dentro do pipeline.
 Caso real que motivou: re-transcrever o vídeo 13 trocou "Jones Schneider" por
 "Johnny Schneider" e "Thiago Moyses" por "Tiago Moisés".
 
-Ver src/nlp/name_fixer.py e docs/PLANO_HISTORICO_METADADOS_E_WORKER_ASR.md.
+Ver src/nlp/name_fixer.py e plano de histórico de metadados e worker ASR (não versionado).
 """
 import json
 import shutil

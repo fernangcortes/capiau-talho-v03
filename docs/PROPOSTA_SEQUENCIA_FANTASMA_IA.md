@@ -6,9 +6,10 @@ equipe de pós-produção e usando todas as ferramentas do NLE.
 > Levantamento feito lendo o código em 17/10/2026. Referências `arquivo:linha` em `src/`, podem
 > ter andado. Nada aqui foi implementado: o documento é diagnóstico, desenho e plano em fases.
 >
-> O plano da suíte NLE citado no README (`docs/PLANO_SUITE_NLE_CLASSICO.md`) **não está no
-> repositório** (nenhum dos 611 commits o contém). O escopo das Tasks 16 a 25 foi reconstruído a
-> partir do roadmap (`wiki/17.-Roadmap-e-Guia-de-Contribuicao.md`, README) e conferido no código.
+> O plano da suíte NLE (`docs/PLANO_SUITE_NLE_CLASSICO.md`) está versionado desde o commit
+> `7666562` (entrou com `git add -f`, pois o `.gitignore` ignora `docs/PLANO_*.md`). O escopo das
+> Tasks 16 a 25 citado aqui foi levantado a partir do roadmap (`wiki/17.-Roadmap-e-Guia-de-Contribuicao.md`)
+> e do código; antes de implementar, confira-o com o status atual do plano.
 
 ---
 
@@ -613,10 +614,9 @@ Fechadas em 18/10/2026:
 - **Node em produção**: aceito para o motor único (núcleo puro do `timelineState.js` num processo
   ao lado do backend). Pesa a partir da F3; até lá, a fantasma valida só na interface.
 - **Subsequências aninhadas** entram no roadmap da suíte NLE.
-- **Nada desta proposta é implementado** antes de `docs/PLANO_SUITE_NLE_CLASSICO.md` chegar ao
-  repositório e os dois planos serem cruzados e atualizados juntos. Atenção: o `.gitignore` ignora
-  `docs/PLANO_*.md`; o arquivo entra com `git add -f` ou depois da decisão D-01 de
-  `docs/ORDEM_DE_IMPLEMENTACAO.md`. A ordem propõe uma exceção para os defeitos D1 a D6 (decisão
+- **Nada desta proposta é implementado** antes de os dois planos (este e `docs/PLANO_SUITE_NLE_CLASSICO.md`)
+  serem cruzados e atualizados juntos. Atenção: o `.gitignore` ignora `docs/PLANO_*.md`; novos planos
+  entram com `git add -f` ou depois da decisão D-01 de `docs/ORDEM_DE_IMPLEMENTACAO.md`. A ordem propõe uma exceção para os defeitos D1 a D6 (decisão
   D-13), por serem defeitos do fluxo atual, não recurso novo.
 
 Em aberto: nenhuma decisão desta proposta. A ordem de implementação junto com os demais planos

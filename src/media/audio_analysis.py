@@ -1,6 +1,6 @@
 """Pre-analise de audio por clipe: parser dos relatorios ebur128 + astats do ffmpeg.
 
-Contrato C1 da ETAPA 1 de docs/PLANO_AJUSTES_DE_AUDIO.md. Nada aqui processa
+Contrato C1 da ETAPA 1 do plano de ajustes de áudio, não versionado. Nada aqui processa
 audio: mede e classifica, naquele passe unico de ffmpeg da secao 5 do plano,
 para alimentar o bloco "Diagnostico" do painel de Ajustes (secao 4).
 

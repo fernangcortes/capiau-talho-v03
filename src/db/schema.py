@@ -434,7 +434,7 @@ CREATE TABLE IF NOT EXISTS transcript_entity (
 -- Historico da decupagem editorial (titulo/descricao/resumo/tags) de cada video.
 -- Cada linha e uma versao ANTERIOR, arquivada automaticamente por
 -- MediaRepository antes de qualquer sobrescrita. So a versao corrente vive na
--- tabela video -- e so ela alimenta a busca. Ver docs/PLANO_HISTORICO_METADADOS_E_WORKER_ASR.md
+-- tabela video -- e so ela alimenta a busca. Ver plano de histórico de metadados e worker ASR (não versionado)
 CREATE TABLE IF NOT EXISTS video_metadata_history (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     video_id INTEGER NOT NULL REFERENCES video(id) ON DELETE CASCADE,
@@ -448,7 +448,7 @@ CREATE TABLE IF NOT EXISTS video_metadata_history (
 CREATE INDEX IF NOT EXISTS idx_vmh_video ON video_metadata_history(video_id, created_at DESC);
 
 -- Renderizacoes e analises de audio por intervalo de clipe
--- (docs/PLANO_AJUSTES_DE_AUDIO.md, secao 3 e Etapa 1). Na ETAPA 1 a linha guarda
+-- (plano de ajustes de áudio, não versionado, secao 3 e Etapa 1). Na ETAPA 1 a linha guarda
 -- so o diagnostico: chain_json='[]', status='ready' e
 -- chain_hash = sha256("analysis|<video_id>|<in>|<out>") em hexdigest.
 -- Da Etapa 3 em diante a mesma tabela passa a apontar o WAV tratado em path.

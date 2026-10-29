@@ -1,4 +1,4 @@
-"""Ponte com a DAW - ida e volta por arquivo (PLANO_AJUSTES_DE_AUDIO.md, secoes 9 e 10).
+"""Ponte com a DAW - ida e volta por arquivo (plano de ajustes de áudio, não versionado, secoes 9 e 10).
 
 O Talho nao e mixador e nao deve virar um. Este modulo so faz duas coisas:
 
