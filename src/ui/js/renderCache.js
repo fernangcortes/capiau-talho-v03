@@ -5,16 +5,27 @@
 // e composições multipista) para garantir playback a 60fps sem engasgos ou perda de quadros.
 
 import { STATE } from "./state.js";
-import { TIMELINE_STATE } from "./timelineState.js";
+import { TIMELINE_STATE, TIMELINE_HISTORY, registerRenderCacheProvider } from "./timelineState.js";
 
 export class RenderCacheManager {
     constructor() {
         this._frames = new Map(); // frame -> ImageBitmap | HTMLCanvasElement | Object
+        this._snapshots = new Map(); // token -> Map<frame, ImageBitmap>
+        this._currentToken = null;
+        this._tokenSeq = 0;
+        this._dirty = false;
         this._isRendering = false;
         this._cancelRequested = false;
         this._renderProgress = null;
         this._listenersAttached = false;
         this._canvas = null; // Canvas offscreen reutilizável
+
+        if (typeof registerRenderCacheProvider === "function") {
+            registerRenderCacheProvider(this);
+        }
+        if (typeof globalThis !== "undefined") {
+            globalThis.RENDER_CACHE_MANAGER = this;
+        }
 
         this.initAutoInvalidation();
     }
@@ -24,20 +35,95 @@ export class RenderCacheManager {
         this._listenersAttached = true;
 
         if (typeof STATE !== "undefined" && typeof STATE.on === "function") {
-            STATE.on("timelineCutsChanged", () => this.invalidateAll());
-            STATE.on("timelineTransitionsChanged", () => this.invalidateAll());
-            STATE.on("timelineTracksChanged", () => this.invalidateAll());
+            STATE.on("timelineCutsChanged", () => this._onTimelineChanged());
+            STATE.on("timelineTransitionsChanged", () => this._onTimelineChanged());
+            STATE.on("timelineTracksChanged", () => this._onTimelineChanged());
         }
     }
 
-    /**
-     * Verifica se um frame da timeline contém efeitos pesados que demandam renderização prévia.
-     * Retorna true se houver camada de ajuste, transição de junção, composição multipista
-     * simultânea ou filtros CSS complexos (blur, color grading, crop, transform).
-     *
-     * @param {number} frame - Frame da timeline
-     * @returns {boolean}
-     */
+    _onTimelineChanged() {
+        // Se estiver executando Undo ou Redo, a restauração do cache é gerida explicitamente pelo snapshot histórico
+        if (typeof TIMELINE_HISTORY !== "undefined" && TIMELINE_HISTORY && TIMELINE_HISTORY.isRestoring) {
+            return;
+        }
+        // Invalida a visualização atual do cache mantendo snapshots no histórico para possível Undo
+        this._frames.clear();
+        this._currentToken = null;
+        this._dirty = false;
+        this._notifyChanged();
+    }
+
+    _saveSnapshot() {
+        if (this._frames.size === 0) {
+            this._currentToken = null;
+            this._dirty = false;
+            return null;
+        }
+        this._tokenSeq = (this._tokenSeq || 0) + 1;
+        this._currentToken = `rc_${this._tokenSeq}_${Date.now()}`;
+        this._snapshots.set(this._currentToken, new Map(this._frames));
+        this._dirty = false;
+        return this._currentToken;
+    }
+
+    getCurrentToken() {
+        if (this._dirty) {
+            this._saveSnapshot();
+        }
+        return this._currentToken;
+    }
+
+    restoreSnapshot(token) {
+        if (!token || !this._snapshots.has(token)) {
+            this._frames.clear();
+            this._currentToken = null;
+            this._dirty = false;
+        } else {
+            const snap = this._snapshots.get(token);
+            this._frames = new Map(snap);
+            this._currentToken = token;
+            this._dirty = false;
+        }
+        this._notifyChanged();
+    }
+
+    pruneSnapshots(activeTokens) {
+        if (!activeTokens || !(activeTokens instanceof Set)) return;
+
+        const toDelete = [];
+        for (const token of this._snapshots.keys()) {
+            if (!activeTokens.has(token) && token !== this._currentToken) {
+                toDelete.push(token);
+            }
+        }
+        if (toDelete.length === 0) return;
+
+        const inUse = new Set();
+        for (const [token, map] of this._snapshots.entries()) {
+            if (!toDelete.includes(token)) {
+                for (const item of map.values()) {
+                    if (item) inUse.add(item);
+                }
+            }
+        }
+        for (const item of this._frames.values()) {
+            if (item) inUse.add(item);
+        }
+
+        for (const token of toDelete) {
+            const map = this._snapshots.get(token);
+            if (map) {
+                for (const item of map.values()) {
+                    if (item && !inUse.has(item) && typeof item.close === "function") {
+                        try { item.close(); } catch (_) {}
+                    }
+                }
+            }
+            this._snapshots.delete(token);
+        }
+    }
+
+    
     isFrameHeavy(frame) {
         const cuts = (STATE && STATE.activeTimelineCuts) || [];
         const fps = (TIMELINE_STATE && TIMELINE_STATE.fps) || 24;
@@ -281,6 +367,7 @@ export class RenderCacheManager {
             try { existing.close(); } catch (_) {}
         }
         this._frames.set(frame, data);
+        this._dirty = true;
     }
 
     invalidateRange(startFrame, endFrame) {
@@ -288,14 +375,21 @@ export class RenderCacheManager {
         const e = Math.max(startFrame, endFrame);
         const sF = Math.floor(s);
         const eF = Math.ceil(e);
+        let removed = false;
         for (let f = sF; f <= eF; f++) {
             const item = this._frames.get(f);
-            if (item && typeof item.close === "function") {
-                try { item.close(); } catch (_) {}
+            if (item) {
+                if (typeof item.close === "function") {
+                    try { item.close(); } catch (_) {}
+                }
+                this._frames.delete(f);
+                removed = true;
             }
-            this._frames.delete(f);
         }
-        this._notifyChanged();
+        if (removed) {
+            this._dirty = true;
+            this._notifyChanged();
+        }
     }
 
     invalidateAll() {
@@ -304,7 +398,17 @@ export class RenderCacheManager {
                 try { item.close(); } catch (_) {}
             }
         }
+        for (const snapMap of this._snapshots.values()) {
+            for (const item of snapMap.values()) {
+                if (item && typeof item.close === "function") {
+                    try { item.close(); } catch (_) {}
+                }
+            }
+        }
         this._frames.clear();
+        this._snapshots.clear();
+        this._currentToken = null;
+        this._dirty = false;
         this._notifyChanged();
     }
 
@@ -565,6 +669,16 @@ export class RenderCacheManager {
         const eF = Math.max(sF, Math.ceil(endFrame));
         const total = Math.max(1, eF - sF + 1);
 
+        // Registra o início no histórico de Undo/Redo para que a renderização possa ser desfeita e refeita
+        let historyBegun = false;
+        if (typeof registerRenderCacheProvider === "function") {
+            registerRenderCacheProvider(this);
+        }
+        if (typeof TIMELINE_HISTORY !== "undefined" && TIMELINE_HISTORY && typeof TIMELINE_HISTORY.begin === "function") {
+            TIMELINE_HISTORY.begin();
+            historyBegun = true;
+        }
+
         const targetWidth = (TIMELINE_STATE && TIMELINE_STATE.width) || options.width || 1920;
         const targetHeight = (TIMELINE_STATE && TIMELINE_STATE.height) || options.height || 1080;
 
@@ -613,6 +727,19 @@ export class RenderCacheManager {
         const wasCancelled = this._cancelRequested;
         this._isRendering = false;
         this._cancelRequested = false;
+
+        if (renderedCount > 0 && !wasCancelled) {
+            this._saveSnapshot();
+        }
+
+        if (historyBegun) {
+            if (renderedCount > 0 && !wasCancelled) {
+                TIMELINE_HISTORY.commit();
+            } else {
+                TIMELINE_HISTORY.pending = null;
+            }
+        }
+
         this._notifyChanged();
 
         if (!wasCancelled && typeof window.showToast === "function") {
@@ -653,6 +780,12 @@ export class RenderCacheManager {
 }
 
 export const RENDER_CACHE_MANAGER = new RenderCacheManager();
+if (typeof registerRenderCacheProvider === "function") {
+    registerRenderCacheProvider(RENDER_CACHE_MANAGER);
+}
 if (typeof window !== "undefined") {
     window.RENDER_CACHE_MANAGER = RENDER_CACHE_MANAGER;
+}
+if (typeof globalThis !== "undefined") {
+    globalThis.RENDER_CACHE_MANAGER = RENDER_CACHE_MANAGER;
 }
