@@ -1,4 +1,4 @@
-"""Ordem das análises da ingestão (docs/ORDEM_DAS_ANALISES.md).
+"""Ordem das análises da ingestão (docs/planos/ORDEM_DAS_ANALISES.md).
 
 Banco SQLite em memória com o schema do projeto; detector de rosto, ffmpeg e
 chamadas de IA são falsos. Nada aqui toca o banco real nem a rede.
@@ -490,7 +490,7 @@ def test_resumo_mescla_fala_imagem_e_categoria(banco, monkeypatch):
     assert PipelineService.generate_video_summary(7, "interview", 1) is True
     p = prompts[0]
     assert "madrugada" in p and "refletor sendo içado" in p, "fala e imagem no mesmo resumo"
-    # Com imagem, o resumo julga a categoria em vez de recebê-la (docs/REVISAO_CATEGORIAS.md, seção 11)
+    # Com imagem, o resumo julga a categoria em vez de recebê-la (docs/planos/REVISAO_CATEGORIAS.md, seção 11)
     assert "CLASSIFIQUE TAMBÉM O VÍDEO" in p and "CLASSIFICAÇÃO DO ARQUIVO" not in p
     assert banco.execute("SELECT title FROM video WHERE id = 7").fetchone()[0] == "Ensaio no galpão"
 
@@ -564,7 +564,7 @@ def test_analyze_video_all_resume_e_atribui_temas_uma_vez_no_fim(monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# Camada 1 do áudio (docs/PLANO_AUDIO_CATEGORIAS.md): áudio não passa pela visão
+# Camada 1 do áudio (docs/planos/PLANO_AUDIO_CATEGORIAS.md): áudio não passa pela visão
 # ---------------------------------------------------------------------------
 
 def _visao_proibida(monkeypatch, P, chamadas, tipo_de_som=None):

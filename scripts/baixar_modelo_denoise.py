@@ -5,7 +5,7 @@ Modelo : dpdfnet2_48khz_hr.onnx -> data/models/dpdfnet2_48khz_hr.onnx
 Origem : release do k2-fsa/sherpa-onnx (asset publicado junto dos modelos de
          speech-denoiser usados pelo OfflineSpeechDenoiser).
 
-O ponto delicado ja registrado em docs/PLANO_AJUSTES_DE_AUDIO.md (Etapa 4 e
+O ponto delicado ja registrado no plano de ajustes de áudio, não versionado (Etapa 4 e
 tabela de Riscos): **o release do k2-fsa NAO publica hash deste arquivo** -- o
 checksum.txt que acompanha so cobre o GTCRN. Entao a referencia de integridade
 e construida AQUI, na primeira copia baixada:

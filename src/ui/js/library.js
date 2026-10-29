@@ -845,7 +845,7 @@ export function cleanTitle(text) {
     return clean;
 }
 
-// Taxonomia de triagem (docs/REVISAO_CATEGORIAS.md): mesmas chaves de
+// Taxonomia de triagem (docs/planos/REVISAO_CATEGORIAS.md): mesmas chaves de
 // TRIAGE_CATEGORIES no backend. "Fora do projeto" é uma marca à parte, não categoria.
 export const CATEGORY_LABELS = {
     cena: "Cena",

@@ -76,7 +76,7 @@ class MediaRepository:
         valid_rotation = int(rotation) % 360
         conn.execute(f"UPDATE {table} SET rotation = ? WHERE id = ?", (valid_rotation, media_id))
 
-    # Colunas de cor graváveis (Fase 0 de docs/PLANO_COR_OCIO.md). Lista fechada
+    # Colunas de cor graváveis (Fase 0 de docs/planos/PLANO_COR_OCIO.md). Lista fechada
     # porque o nome da coluna entra no SQL por f-string: sem whitelist isso seria
     # injeção. Chave fora da lista é ignorada em silêncio de propósito -- o dict
     # vem do FFprobe, que ganha campos novos a cada versão.

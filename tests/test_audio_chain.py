@@ -1,4 +1,4 @@
-"""Testes da cadeia ffmpeg renderizada (contrato F1 da ETAPA 3 de PLANO_AJUSTES_DE_AUDIO).
+"""Testes da cadeia ffmpeg renderizada (contrato F1 da ETAPA 3 do plano de ajustes de áudio, não versionado).
 
 Por que existe: o Tipo B gera ARQUIVO e o clipe passa a apontar para ele, entao
 a mesma intencao precisa virar sempre a MESMA lista canonica (o cache depende

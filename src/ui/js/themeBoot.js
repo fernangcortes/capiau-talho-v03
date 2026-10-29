@@ -1,5 +1,5 @@
 // Aplica o tema da interface antes do primeiro paint (script clássico, síncrono, no <head>).
-// Plano: docs/PLANO_TEMA_NEUTRO.md. O estado calculado ({ theme, vars }) vem do cache local, gravado
+// Plano: docs/planos/PLANO_TEMA_NEUTRO.md. O estado calculado ({ theme, vars }) vem do cache local, gravado
 // por js/themeManager.js a partir das Configurações → Aparência; sem cache, Neutro.
 // Também mantém as janelas destacadas em dia: qualquer gravação do cache em outra janela reaplica aqui.
 (function () {

@@ -1,4 +1,4 @@
-"""Camada 1 do áudio: natureza do material pelo arquivo (docs/PLANO_AUDIO_CATEGORIAS.md).
+"""Camada 1 do áudio: natureza do material pelo arquivo (docs/planos/PLANO_AUDIO_CATEGORIAS.md).
 
 Fixtures geradas pelo ffmpeg na hora (tom, imagem parada, vídeo em movimento, capa
 de MP3). Sem ffmpeg no PATH os testes são pulados. Nada aqui toca o banco real.

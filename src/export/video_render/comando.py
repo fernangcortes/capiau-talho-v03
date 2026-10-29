@@ -5,7 +5,7 @@ Este modulo e PURA montagem: nao toca disco, nao sobe processo. Quem executa e
 e `midia.py`. Separar montagem de execucao permite testar a linha inteira sem
 ffmpeg nenhum na maquina.
 
-Decisoes registradas (PLANO_EXPORTACAO_VIDEO.md secoes 2, 4.3 e 9):
+Decisoes registradas (plano de exportação de vídeo, não versionado, secoes 2, 4.3 e 9):
 
 - ENCODER: reusa `resolve_encoder_pipeline` de src/media/ffmpeg.py (que ja
   detecta NVENC/QSV/AMF com cache). Em encoder por HARDWARE os argumentos

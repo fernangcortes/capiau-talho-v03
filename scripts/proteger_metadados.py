@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-APOSENTADO (Entrega A4 de docs/PLANO_HISTORICO_METADADOS_E_WORKER_ASR.md).
+APOSENTADO (Entrega A4 do plano de histórico de metadados e worker ASR, não versionado).
 
 O remendo virou funcionalidade: MediaRepository.update_video_metadata arquiva
 sozinho a versao anterior em `video_metadata_history` a cada sobrescrita, e a

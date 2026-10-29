@@ -1038,7 +1038,7 @@ class PipelineService:
     @staticmethod
     def _analisar_material_audio(video_id: int, source: Path, project_id: int, finalizar: bool,
                                  duration: float = 0.0) -> bool:
-        """Material de áudio (docs/PLANO_AUDIO_CATEGORIAS.md): sem triagem por visão,
+        """Material de áudio (docs/planos/PLANO_AUDIO_CATEGORIAS.md): sem triagem por visão,
         sem quadros, sem CLIP. Camada 2: tipo de som. Camada 3: só o que é fala vai ao
         ASR (o VAD local de transcribe_video ainda filtra quem chegar sem categoria);
         Whisper em música gera lixo."""
@@ -1077,7 +1077,7 @@ class PipelineService:
 
     @staticmethod
     def triar_video(video_id: int) -> Dict[str, Any]:
-        """Só a triagem (docs/REVISAO_CATEGORIAS.md, seção 8, passo 3), sem a análise de
+        """Só a triagem (docs/planos/REVISAO_CATEGORIAS.md, seção 8, passo 3), sem a análise de
         quadros: natureza -> (áudio: tipo de som) -> ASR se faltar fala -> planos -> Laya
         (sombra) -> triagem por visão. Mesma ordem do começo de analyze_video_vision.
         O status do vídeo volta ao que era (o ASR mexe nele), para o lote de visão não

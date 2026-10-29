@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cartão de atalhos - CapIAu Padrão</title>
+<!-- Arquivo gerado por scripts/gerar_atalhos.mjs. Não edite à mão. -->
+<style>
+  @page { size: A4; margin: 10mm; }
+  * { box-sizing: border-box; }
+  body { font-family: "Segoe UI", Arial, sans-serif; color: #111; background: #fff; font-size: 8pt; margin: 0; padding: 10mm; }
+  @media print { body { padding: 0; } }
+  header { border-bottom: 2px solid #111; margin-bottom: 4mm; padding-bottom: 2mm; }
+  h1 { font-size: 14pt; margin: 0; }
+  header p { margin: 1mm 0 0; color: #444; font-size: 7.5pt; }
+  .colunas { column-count: 3; column-gap: 6mm; }
+  section { break-inside: avoid-column; margin: 0 0 3mm; }
+  h2 { font-size: 8.5pt; margin: 0 0 1mm; padding: 0.6mm 1.5mm; background: #e8e8e8; border-left: 2mm solid #111; }
+  ul { list-style: none; margin: 0; padding: 0; }
+  li { display: flex; justify-content: space-between; gap: 2mm; padding: 0.4mm 0; border-bottom: 0.2mm dotted #bbb; break-inside: avoid; }
+  .k { flex: 0 0 auto; max-width: 52%; text-align: left; }
+  .a { text-align: right; flex: 1 1 auto; }
+  kbd { font-family: Consolas, "DejaVu Sans Mono", monospace; font-size: 7.5pt; border: 0.2mm solid #666; border-radius: 1mm; padding: 0 1mm; background: #f6f6f6; white-space: nowrap; }
+  footer { margin-top: 3mm; font-size: 7pt; color: #555; }
+</style>
+</head>
+<body>
+<header>
+  <h1>CapIAu-Talho: atalhos do perfil CapIAu Padrão</h1>
+  <p>Quando o mesmo atalho aparece em mais de uma ação, o resultado depende do contexto (painel em foco, ferramenta ativa, elemento sob o mouse, sugestão ativa).</p>
+</header>
+<div class="colunas">
+<section><h2>1. Reprodução &amp; Navegação</h2><ul>
+<li><span class="k"><kbd>Espaço</kbd></span><span class="a">Play / Pause</span></li>
+<li><span class="k"><kbd>J</kbd></span><span class="a">Shuttle Reverso (J)</span></li>
+<li><span class="k"><kbd>K</kbd></span><span class="a">Shuttle Play / Pause (K)</span></li>
+<li><span class="k"><kbd>L</kbd></span><span class="a">Shuttle Avanço (L)</span></li>
+<li><span class="k"><kbd>Shift + →</kbd></span><span class="a">Shuttle Acelerado / Avanço Rápido (Shift + →)</span></li>
+<li><span class="k"><kbd>Shift + ←</kbd></span><span class="a">Shuttle Acelerado / Recuo Rápido (Shift + ←)</span></li>
+<li><span class="k"><kbd>Ctrl + →</kbd></span><span class="a">Câmera Lenta Avanço (Ctrl + →)</span></li>
+<li><span class="k"><kbd>Ctrl + ←</kbd></span><span class="a">Câmera Lenta Recuo (Ctrl + ←)</span></li>
+<li><span class="k"><kbd>K + J</kbd></span><span class="a">Jog Recuar 1 Frame (K + J)</span></li>
+<li><span class="k"><kbd>K + L</kbd></span><span class="a">Jog Avançar 1 Frame (K + L)</span></li>
+<li><span class="k"><kbd>I</kbd></span><span class="a">Marcar Ponto de Entrada (IN)</span></li>
+<li><span class="k"><kbd>O</kbd></span><span class="a">Marcar Ponto de Saída (OUT)</span></li>
+<li><span class="k"><kbd>Alt + I</kbd></span><span class="a">Limpar Ponto IN</span></li>
+<li><span class="k"><kbd>Alt + O</kbd></span><span class="a">Limpar Ponto OUT</span></li>
+<li><span class="k"><kbd>Alt + X</kbd></span><span class="a">Limpar Pontos IN e OUT</span></li>
+<li><span class="k"><kbd>X</kbd></span><span class="a">Marcar Clipe (IN / OUT)</span></li>
+<li><span class="k"><kbd>Shift + I</kbd></span><span class="a">Ir para o Ponto IN</span></li>
+<li><span class="k"><kbd>Shift + O</kbd></span><span class="a">Ir para o Ponto OUT</span></li>
+<li><span class="k"><kbd>Shift + Espaço</kbd> ou <kbd>Alt + /</kbd></span><span class="a">Tocar de IN até OUT</span></li>
+<li><span class="k"><kbd>Ctrl + L</kbd> ou <kbd>Ctrl + Shift + Espaço</kbd></span><span class="a">Alternar Reprodução em Loop</span></li>
+<li><span class="k"><kbd>Shift + E</kbd></span><span class="a">Inserir na Timeline (Append)</span></li>
+<li><span class="k"><kbd>←</kbd></span><span class="a">Navegar 1 Frame para Trás</span></li>
+<li><span class="k"><kbd>→</kbd></span><span class="a">Navegar 1 Frame para Frente</span></li>
+<li><span class="k"><kbd>↑</kbd> ou <kbd>A</kbd></span><span class="a">Pular para Ponto Anterior / Início</span></li>
+<li><span class="k"><kbd>↓</kbd> ou <kbd>S</kbd></span><span class="a">Pular para Próximo Ponto / Fim</span></li>
+<li><span class="k"><kbd>Ctrl + G</kbd></span><span class="a">Ir para Timecode / Navegação Numérica</span></li>
+</ul></section>
+<section><h2>2. Ferramentas &amp; Modos</h2><ul>
+<li><span class="k"><kbd>V</kbd></span><span class="a">Ferramenta de Seleção</span></li>
+<li><span class="k"><kbd>Shift + V</kbd></span><span class="a">Seleção por Caixa / Retângulo (Marquee)</span></li>
+<li><span class="k"><kbd>C</kbd></span><span class="a">Ferramenta Lâmina / Gilete (Blade)</span></li>
+<li><span class="k"><kbd>Shift + C</kbd></span><span class="a">Lâmina Global na Agulha</span></li>
+<li><span class="k"><kbd>Y</kbd></span><span class="a">Deslizar Conteúdo Interno (Slip Tool)</span></li>
+<li><span class="k"><kbd>U</kbd></span><span class="a">Deslizar Posição na Timeline (Slide Tool)</span></li>
+<li><span class="k"><kbd>Shift + N</kbd></span><span class="a">Corte Contínuo Adjacente (Rolling Edit)</span></li>
+<li><span class="k"><kbd>Shift + R</kbd> ou <kbd>X</kbd></span><span class="a">Esticar / Comprimir Taxa de Velocidade (Rate Stretch)</span></li>
+<li><span class="k"><kbd>T</kbd></span><span class="a">Selecionar Faixa para Frente</span></li>
+<li><span class="k"><kbd>Shift + T</kbd></span><span class="a">Selecionar Faixa para Trás</span></li>
+<li><span class="k"><kbd>N</kbd> ou <kbd>Shift + S</kbd></span><span class="a">Alternar Snapping Magnético</span></li>
+<li><span class="k"><kbd>H</kbd></span><span class="a">Ferramenta Mão / Pan</span></li>
+<li><span class="k"><kbd>Esc</kbd></span><span class="a">Desmarcar Seleção / Fechar Caixas</span></li>
+<li><span class="k"><kbd>R</kbd></span><span class="a">Girar Mídia sob Cursor (+90°)</span></li>
+</ul></section>
+<section><h2>3. Edição, Cortes &amp; Trims</h2><ul>
+<li><span class="k"><kbd>,</kbd></span><span class="a">Inserir na Agulha (Ripple Insert)</span></li>
+<li><span class="k"><kbd>.</kbd></span><span class="a">Sobrescrever na Agulha (Overwrite Edit)</span></li>
+<li><span class="k"><kbd>Ctrl + Alt + A</kbd></span><span class="a">Alternar Canais na Inserção (AV / V / A)</span></li>
+<li><span class="k"><kbd>Alt + F</kbd></span><span class="a">Localizar Quadro Original na Fonte (Match Frame)</span></li>
+<li><span class="k"><kbd>Shift + F</kbd></span><span class="a">Localizar Quadro na Timeline (Reverse Match Frame)</span></li>
+<li><span class="k"><kbd>Ctrl + Shift + R</kbd></span><span class="a">Substituir Clipe na Timeline (Replace Edit)</span></li>
+<li><span class="k"><kbd>Ctrl + U</kbd></span><span class="a">Criar Subclipe na Biblioteca (Make Subclip)</span></li>
+<li><span class="k"><kbd>Ctrl + Shift + F</kbd></span><span class="a">Congelar Quadro (Freeze Frame)</span></li>
+<li><span class="k"><kbd>Ctrl + R</kbd></span><span class="a">Velocidade / Duração do Clipe (Speed / Duration)</span></li>
+<li><span class="k"><kbd>Ctrl + Alt + R</kbd></span><span class="a">Preencher Espaço na Trilha (Fit to Gap)</span></li>
+<li><span class="k"><kbd>Ctrl + Shift + D</kbd></span><span class="a">Crossfade de Áudio (Potência Constante)</span></li>
+<li><span class="k"><kbd>Ctrl + D</kbd></span><span class="a">Transição de Vídeo Padrão (Cross Dissolve)</span></li>
+<li><span class="k"><kbd>Enter</kbd></span><span class="a">Renderizar Efeitos In para Out (Cache NLE)</span></li>
+<li><span class="k"><kbd>E</kbd> ou <kbd>Z</kbd> ou <kbd>Alt + E</kbd> ou <kbd>Alt + Z</kbd></span><span class="a">Dividir Clipe no Playhead (Split)</span></li>
+<li><span class="k"><kbd>Q</kbd></span><span class="a">Ripple Trim Início (Até a Agulha)</span></li>
+<li><span class="k"><kbd>W</kbd></span><span class="a">Ripple Trim Fim (Da Agulha ao Fim)</span></li>
+<li><span class="k"><kbd>Del</kbd> ou <kbd>Alt + R</kbd></span><span class="a">Lift Delete (Apagar Clipe)</span></li>
+<li><span class="k"><kbd>R</kbd> ou <kbd>Backspace</kbd> ou <kbd>Shift + Del</kbd></span><span class="a">Ripple Delete (Apagar e Fechar Espaço)</span></li>
+<li><span class="k"><kbd>Semicolon</kbd> ou <kbd>Alt + Del</kbd></span><span class="a">Lift no Intervalo IN–OUT</span></li>
+<li><span class="k"><kbd>Alt + Del</kbd></span><span class="a">Apagar Faixa Única (Desvincular Par)</span></li>
+<li><span class="k"><kbd>Quote</kbd> ou <kbd>Alt + Shift + Del</kbd></span><span class="a">Extract (Ripple Delete) no Intervalo IN–OUT</span></li>
+<li><span class="k"><kbd>Ctrl + L</kbd> ou <kbd>Ctrl + Shift + U</kbd></span><span class="a">Desvincular Par Áudio/Vídeo</span></li>
+<li><span class="k"><kbd>←</kbd></span><span class="a">Nudge: Deslocar 1 Frame para Trás</span></li>
+<li><span class="k"><kbd>→</kbd></span><span class="a">Nudge: Deslocar 1 Frame para Frente</span></li>
+<li><span class="k"><kbd>Alt + ←</kbd> ou <kbd>[</kbd></span><span class="a">Trim Ponto IN: Recuar 1 Frame</span></li>
+<li><span class="k"><kbd>Alt + Shift + ←</kbd> ou <kbd>[</kbd></span><span class="a">Trim Ponto OUT: Recuar 1 Frame</span></li>
+<li><span class="k"><kbd>Alt + →</kbd></span><span class="a">Trim Ponto IN: Avançar 1 Frame</span></li>
+<li><span class="k"><kbd>Alt + Shift + →</kbd> ou <kbd>]</kbd></span><span class="a">Trim Ponto OUT: Avançar 1 Frame</span></li>
+<li><span class="k"><kbd>D</kbd></span><span class="a">Selecionar Clipe sob a Agulha</span></li>
+<li><span class="k"><kbd>Shift + D</kbd></span><span class="a">Multi-Seleção na Agulha (Adicionar à Seleção)</span></li>
+<li><span class="k"><kbd>F</kbd></span><span class="a">Ativar / Desativar Clipe (Mute / Bypass)</span></li>
+</ul></section>
+<section><h2>4. Marcadores</h2><ul>
+<li><span class="k"><kbd>M</kbd></span><span class="a">Adicionar / Editar Marcador</span></li>
+<li><span class="k"><kbd>Shift + M</kbd></span><span class="a">Pular para o Próximo Marcador</span></li>
+<li><span class="k"><kbd>Alt + M</kbd></span><span class="a">Pular para o Marcador Anterior</span></li>
+<li><span class="k"><kbd>Ctrl + Shift + K</kbd> ou <kbd>Ctrl + Shift + M</kbd></span><span class="a">Alternar Momento Crucial (Player / Galeria)</span></li>
+</ul></section>
+<section><h2>5. Assistência de IA &amp; Tomadas</h2><ul>
+<li><span class="k"><kbd>Ctrl + Alt + B</kbd></span><span class="a">Alternar Detecção Facial no Source</span></li>
+<li><span class="k"><kbd>Alt + A</kbd></span><span class="a">Alternar Tomadas / Alternativas de IA</span></li>
+<li><span class="k"><kbd>Enter</kbd> ou <kbd>Y</kbd></span><span class="a">Aceitar Sugestão de IA</span></li>
+<li><span class="k"><kbd>Del</kbd> ou <kbd>N</kbd></span><span class="a">Rejeitar Sugestão de IA</span></li>
+</ul></section>
+<section><h2>6. Canvas, Zoom &amp; Histórico</h2><ul>
+<li><span class="k"><kbd>\</kbd> ou <kbd>Shift + Z</kbd></span><span class="a">Ajustar Sequência na Tela (Zoom to Fit)</span></li>
+<li><span class="k"><kbd>+ / =</kbd> ou <kbd>Num +</kbd></span><span class="a">Aumentar Zoom na Linha do Tempo</span></li>
+<li><span class="k"><kbd>-</kbd> ou <kbd>Num -</kbd></span><span class="a">Diminuir Zoom na Linha do Tempo</span></li>
+<li><span class="k"><kbd>Ctrl + 1</kbd></span><span class="a">Restaurar Zoom Padrão (1:1 / 0.5 px/f)</span></li>
+<li><span class="k"><kbd>Ctrl + Alt + P</kbd></span><span class="a">Alternar 'Seleção Acompanha a Agulha'</span></li>
+<li><span class="k"><kbd>Ctrl + Alt + F</kbd></span><span class="a">Alternar 'Timeline Segue a Agulha' (Auto-Scroll)</span></li>
+<li><span class="k"><kbd>Shift + L</kbd></span><span class="a">Travar / Destravar Pista Ativa (Track Lock)</span></li>
+<li><span class="k"><kbd>Ctrl + Alt + Shift + L</kbd></span><span class="a">Travar / Destravar Todas as Pistas</span></li>
+<li><span class="k"><kbd>Ctrl + Shift + G</kbd></span><span class="a">Alternar Margens de Segurança &amp; Guias no Player (Safe Margins)</span></li>
+<li><span class="k"><kbd>Ctrl + Alt + G</kbd></span><span class="a">Alternar Máscara de Proporção no Player (16:9 / 9:16 / 1:1 / 2.39:1)</span></li>
+<li><span class="k"><kbd>Ctrl + Z</kbd></span><span class="a">Desfazer Ação (Undo)</span></li>
+<li><span class="k"><kbd>Ctrl + Shift + Z</kbd> ou <kbd>Ctrl + Y</kbd></span><span class="a">Refazer Ação (Redo)</span></li>
+<li><span class="k"><kbd>Ctrl + Shift + S</kbd></span><span class="a">Salvar Preset de Workspace</span></li>
+</ul></section>
+<section><h2>7. Layout &amp; Workspace (Numpad)</h2><ul>
+<li><span class="k"><kbd>Ctrl + Alt + Z</kbd></span><span class="a">Desfazer Mudança de Layout</span></li>
+<li><span class="k"><kbd>Ctrl + Alt + Shift + Z</kbd></span><span class="a">Refazer Mudança de Layout</span></li>
+<li><span class="k"><kbd>Num 1</kbd></span><span class="a">Timeline: Expansão Direcional Esquerda</span></li>
+<li><span class="k"><kbd>Alt + Num 1</kbd></span><span class="a">Timeline: Toggle Cabeçalho de Pistas</span></li>
+<li><span class="k"><kbd>Num 2</kbd></span><span class="a">Timeline: Alternar Centro ↔ Faixa Total</span></li>
+<li><span class="k"><kbd>Alt + Num 2</kbd></span><span class="a">Timeline: Recolher / Restaurar Verticalmente</span></li>
+<li><span class="k"><kbd>Ctrl + Num 2</kbd></span><span class="a">Timeline: Destacar / Reanexar Janela</span></li>
+<li><span class="k"><kbd>Num 3</kbd></span><span class="a">Timeline: Expansão Direcional Direita</span></li>
+<li><span class="k"><kbd>Alt + Num 3</kbd></span><span class="a">Timeline: Toggle Barra de Ferramentas</span></li>
+<li><span class="k"><kbd>Num 4</kbd></span><span class="a">Biblioteca: Ocultar / Exibir</span></li>
+<li><span class="k"><kbd>Alt + Num 4</kbd></span><span class="a">Biblioteca: Layout Estúdio (Maximizar)</span></li>
+<li><span class="k"><kbd>Ctrl + Num 4</kbd></span><span class="a">Biblioteca: Destacar / Reanexar Janela</span></li>
+<li><span class="k"><kbd>Num 5</kbd></span><span class="a">Inspetor: Ocultar / Exibir</span></li>
+<li><span class="k"><kbd>Alt + Num 5</kbd></span><span class="a">Inspetor: Maximizar / Restaurar</span></li>
+<li><span class="k"><kbd>Ctrl + Num 5</kbd></span><span class="a">Inspetor: Destacar / Reanexar Janela</span></li>
+<li><span class="k"><kbd>Num 6</kbd></span><span class="a">Painel Direito: Ocultar / Exibir</span></li>
+<li><span class="k"><kbd>Alt + Num 6</kbd></span><span class="a">Painel Direito: Maximizar / Restaurar</span></li>
+<li><span class="k"><kbd>Ctrl + Num 6</kbd></span><span class="a">Painel Direito: Destacar / Reanexar Janela</span></li>
+<li><span class="k"><kbd>Num 7</kbd></span><span class="a">Source Player: Ocultar / Exibir</span></li>
+<li><span class="k"><kbd>Alt + Num 7</kbd></span><span class="a">Source Player: Maximizar / Restaurar</span></li>
+<li><span class="k"><kbd>Ctrl + Num 7</kbd></span><span class="a">Source Player: Destacar / Reanexar Janela</span></li>
+<li><span class="k"><kbd>Num 8</kbd></span><span class="a">Header Geral: Ocultar / Exibir</span></li>
+<li><span class="k"><kbd>Num 9</kbd></span><span class="a">Program Player: Ocultar / Exibir</span></li>
+<li><span class="k"><kbd>Alt + Num 9</kbd></span><span class="a">Program Player: Maximizar / Restaurar</span></li>
+<li><span class="k"><kbd>Ctrl + Num 9</kbd></span><span class="a">Program Player: Destacar / Reanexar Janela</span></li>
+<li><span class="k"><kbd>Num 0</kbd></span><span class="a">Modo Foco / Cinema / Zen</span></li>
+<li><span class="k"><kbd>Num .</kbd></span><span class="a">Timeline: Toggle Cabeçalho Superior</span></li>
+<li><span class="k"><kbd>Num +</kbd></span><span class="a">Timeline: Aumentar Altura das Pistas</span></li>
+<li><span class="k"><kbd>Num -</kbd></span><span class="a">Timeline: Diminuir Altura das Pistas</span></li>
+<li><span class="k"><kbd>Num /</kbd></span><span class="a">Monitores: Alternar Lado a Lado / Empilhados</span></li>
+<li><span class="k"><kbd>Num *</kbd></span><span class="a">Monitores: Swap / Alternar Foco</span></li>
+<li><span class="k"><kbd>Num Enter</kbd></span><span class="a">Maximizar / Restaurar Painel sob Foco</span></li>
+<li><span class="k"><kbd>Ctrl + Alt + 1</kbd> ou <kbd>Ctrl + Alt + Num 1</kbd></span><span class="a">Workspace: Carregar Slot 1</span></li>
+<li><span class="k"><kbd>Ctrl + Alt + 2</kbd> ou <kbd>Ctrl + Alt + Num 2</kbd></span><span class="a">Workspace: Carregar Slot 2</span></li>
+<li><span class="k"><kbd>Ctrl + Alt + 3</kbd> ou <kbd>Ctrl + Alt + Num 3</kbd></span><span class="a">Workspace: Carregar Slot 3</span></li>
+<li><span class="k"><kbd>Ctrl + Alt + 4</kbd> ou <kbd>Ctrl + Alt + Num 4</kbd></span><span class="a">Workspace: Carregar Slot 4</span></li>
+<li><span class="k"><kbd>Ctrl + Alt + 5</kbd> ou <kbd>Ctrl + Alt + Num 5</kbd></span><span class="a">Workspace: Carregar Slot 5</span></li>
+<li><span class="k"><kbd>Ctrl + Alt + 6</kbd> ou <kbd>Ctrl + Alt + Num 6</kbd></span><span class="a">Workspace: Carregar Slot 6</span></li>
+<li><span class="k"><kbd>Ctrl + Alt + 7</kbd> ou <kbd>Ctrl + Alt + Num 7</kbd></span><span class="a">Workspace: Carregar Slot 7</span></li>
+<li><span class="k"><kbd>Ctrl + Alt + 8</kbd> ou <kbd>Ctrl + Alt + Num 8</kbd></span><span class="a">Workspace: Carregar Slot 8</span></li>
+<li><span class="k"><kbd>Ctrl + Alt + 9</kbd> ou <kbd>Ctrl + Alt + Num 9</kbd></span><span class="a">Workspace: Carregar Slot 9</span></li>
+<li><span class="k"><kbd>Ctrl + Alt + Shift + 1</kbd> ou <kbd>Ctrl + Alt + Shift + Num 1</kbd></span><span class="a">Workspace: Salvar no Slot 1</span></li>
+<li><span class="k"><kbd>Ctrl + Alt + Shift + 2</kbd> ou <kbd>Ctrl + Alt + Shift + Num 2</kbd></span><span class="a">Workspace: Salvar no Slot 2</span></li>
+<li><span class="k"><kbd>Ctrl + Alt + Shift + 3</kbd> ou <kbd>Ctrl + Alt + Shift + Num 3</kbd></span><span class="a">Workspace: Salvar no Slot 3</span></li>
+<li><span class="k"><kbd>Ctrl + Alt + Shift + 4</kbd> ou <kbd>Ctrl + Alt + Shift + Num 4</kbd></span><span class="a">Workspace: Salvar no Slot 4</span></li>
+<li><span class="k"><kbd>Ctrl + Alt + Shift + 5</kbd> ou <kbd>Ctrl + Alt + Shift + Num 5</kbd></span><span class="a">Workspace: Salvar no Slot 5</span></li>
+<li><span class="k"><kbd>Ctrl + Alt + Shift + 6</kbd> ou <kbd>Ctrl + Alt + Shift + Num 6</kbd></span><span class="a">Workspace: Salvar no Slot 6</span></li>
+<li><span class="k"><kbd>Ctrl + Alt + Shift + 7</kbd> ou <kbd>Ctrl + Alt + Shift + Num 7</kbd></span><span class="a">Workspace: Salvar no Slot 7</span></li>
+<li><span class="k"><kbd>Ctrl + Alt + Shift + 8</kbd> ou <kbd>Ctrl + Alt + Shift + Num 8</kbd></span><span class="a">Workspace: Salvar no Slot 8</span></li>
+<li><span class="k"><kbd>Ctrl + Alt + Shift + 9</kbd> ou <kbd>Ctrl + Alt + Shift + Num 9</kbd></span><span class="a">Workspace: Salvar no Slot 9</span></li>
+</ul></section>
+</div>
+<footer>Gerado a partir de src/ui/js/keymapService.js. Perfil ativo e personalização: botão de teclado na barra da timeline.</footer>
+</body>
+</html>

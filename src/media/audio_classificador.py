@@ -1,4 +1,4 @@
-"""Camada 2 do áudio: que tipo de som é (docs/PLANO_AUDIO_CATEGORIAS.md, seção 3).
+"""Camada 2 do áudio: que tipo de som é (docs/planos/PLANO_AUDIO_CATEGORIAS.md, seção 3).
 
 Local, em CPU. Um classificador AudioSet (PANNs Cnn10, 25 MB) dá a probabilidade
 de 527 classes em janelas do arquivo; heurísticas de nível (RMS), duração e nome

@@ -836,7 +836,7 @@ def get_agent_models():
 
 
 # ===========================================================================
-# Render de vídeo da timeline (docs/PLANO_EXPORTACAO_VIDEO.md, seções 5 e 6;
+# Render de vídeo da timeline (plano de exportação de vídeo, não versionado, seções 5 e 6;
 # pacote D). Três rotas:
 #   POST .../render/preflight  -> o que o modal chama AO ABRIR (barato: só banco
 #                                 e metadado, nada de abrir mídia nem ffmpeg).

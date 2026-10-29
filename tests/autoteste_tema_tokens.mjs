@@ -1,5 +1,5 @@
 // ======================================================================
-// Autoteste: tokens de tema (F0 do plano docs/PLANO_TEMA_NEUTRO.md)
+// Autoteste: tokens de tema (F0 do plano docs/planos/PLANO_TEMA_NEUTRO.md)
 // Execução: node tests/autoteste_tema_tokens.mjs
 //
 // Trava contra regressão: nenhuma cor de fundo/linha/glow da interface pode entrar escrita direto.

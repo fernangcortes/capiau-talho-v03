@@ -1,4 +1,4 @@
-"""Natureza do material: vídeo ou áudio (docs/PLANO_AUDIO_CATEGORIAS.md, camada 1).
+"""Natureza do material: vídeo ou áudio (docs/planos/PLANO_AUDIO_CATEGORIAS.md, camada 1).
 
 Determinística, sem IA. É áudio quando o arquivo não tem imagem (nenhuma faixa de
 vídeo; capa de MP3 não conta) ou quando a imagem é parada (trilha exportada com um
