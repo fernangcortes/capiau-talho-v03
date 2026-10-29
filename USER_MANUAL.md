@@ -1,1473 +1,1200 @@
-# Manual do Usuário --- CapIAu-Talho Making Of Editor
+# Manual do Usuário: CapIAu-Talho Making Of Editor
 
-Bem-vindo ao **CapIAu-Talho Making Of Editor**! Este guia prático
-descreve o passo a passo de como importar suas mídias, transcrever
-depoimentos, mapear imagens semanticamente, interagir com o agente de
-edição e realizar a pré-edição do seu documentário de forma
-profissional.
+Bem-vindo ao **CapIAu-Talho Making Of Editor**. Este guia mostra, passo a passo, como importar suas mídias, transcrever depoimentos, buscar imagens por significado, conversar com o agente de edição, montar a timeline e exportar o resultado.
 
 ---
 
-## 📑 Índice do Manual
+## Como usar este manual
 
-1. [📂 1. Estrutura de Pastas e Organização das Mídias](#1-estrutura-de-pastas-e-organização-das-mídias)
-2. [🎬 2. Fluxo de Trabalho Passo a Passo](#2-fluxo-de-trabalho-passo-a-passo)
-   - [Passo A: Ingestão de Mídias](#passo-a-ingestão-de-mídias)
-   - [Passo B: Transcrição (ASR), Diarização e Waveform](#passo-b-transcrição-asr-e-diarização-de-entrevistas)
-   - [Passo C: Decupagem Visual de B-Rolls e Fotos (CLIP Local)](#passo-c-decupagem-visual-de-b-rolls-e-fotos)
-   - [Passo D: Agrupamento em Temas (Clustering)](#passo-d-agrupamento-em-temas-clustering)
-   - [Passo E: Busca Semântica Híbrida e Playlist](#passo-e-busca-semântica-híbrida-e-controles-de-playlist)
-3. [🤖 3. Assistente Conversacional de Edição (Chat-Agente) & Ghost Clips](#3-assistente-conversacional-de-edição-chat-agente--ghost-clips)
-4. [👥 4. Mapeamento de Rostos, Objetos e Desambiguação Rápida](#4-mapeamento-de-rostos-objetos-e-desambiguação-rápida)
-5. [🎛️ 5. Arquitetura Track-Based NLE, Gaps, Sync Lock e J/L-Cuts Nativos](#5-arquitetura-track-based-nle-gaps-sync-lock-e-jl-cuts-nativos)
-   - [Montagem Clássica de 3 e 4 Pontos & Roteamento de Canais](#p-montagem-clássica-de-3-e-4-pontos--roteamento-de-canais-insert--overwrite)
-   - [Localizar Quadro na Fonte (Match Frame & Reverse)](#q-localizar-quadro-original-na-fonte-match-frame--reverse-match-frame)
-   - [Navegação Numérica e Timecode Interativo](#r-navegação-e-entrada-numérica-de-timecode-task-11)
-   - [Rolagem Automática (Follow Playhead)](#s-rolagem-automática-que-segue-a-agulha-playhead-follow--auto-scroll)
-   - [Congelar Quadro (Freeze Frame Tool)](#t-ferramenta-de-congelamento-de-quadro-freeze-frame---task-12)
-   - [Velocidade, Reverso e Fit to Gap](#u-velocidade-do-clipe-reprodução-reversa-e-preenchimento-de-lacunas-task-13)
-   - [Ferramenta Rate Stretch](#v-ferramenta-de-estiramento-de-taxa-de-velocidade-rate-stretch-tool)
-   - [Subclipes Virtuais Não-Destrutivos](#w-subclipes-virtuais-não-destrutivos-virtual-subclips)
-   - [Substituição de Clipe (Replace Edit)](#x-substituição-de-clipe-replace-edit-via-altdrop-e-ctrlshiftr)
-   - [Indicadores de Sincronia A/V e Ressincronização](#y-indicadores-de-sincronia-av-xf---xf-e-opções-de-ressincronização)
-6. [🎚️ 6. Tratamento de Áudio: Diagnóstico, Presets e Comparação A/B](#6-tratamento-de-áudio-diagnóstico-presets-e-comparação-ab)
-7. [🔄 7. Carrossel de Alternativas da IA (Atalho A)](#7-carrossel-de-alternativas-da-ia-atalho-a)
-8. [💾 8. Salvando, Auto-Salvamento & Logs com IA](#8-salvando-auto-salvamento--logs-com-ia)
-9. [🖥️ 9. Layout e Organização Avançada (Inspetor de Mídia, Players e Estúdio)](#9-layout-e-organização-avançada)
-10. [⚙️ 10. Configurações da Sequência, Auto-Configuração e Zoom do Preview](#10-configurações-da-sequência-auto-configuração-e-zoom-do-preview)
-11. [📐 11. Viewport Estável, Alças de Transformação e Recorte (Crop)](#11-viewport-estável-alças-de-transformação-e-recorte-crop)
-12. [🤖 12. Resiliência de IA, Seleção de Modelos e Gestão de Tarefas](#12-resiliência-de-ia-seleção-de-modelos-e-gestão-de-tarefas)
-13. [🖥️ 13. Execução Resiliente sem Janela de Console no Windows](#13-execução-resiliente-sem-janela-de-console-no-windows)
-14. [⚡ 14. Configurações de Hardware, Aceleração por GPU e Fallback Automático](#14-configurações-de-hardware-aceleração-por-gpu-e-fallback-automático)
-15. [🎹 15. Mapa de Atalhos de Teclado NLE](#15-mapa-de-atalhos-de-teclado-nle)
-16. [🌊 16. Formas de Onda Reais (Waveforms)](#16-formas-de-onda-reais-waveforms)
-17. [🎬 17. Exportar Vídeo: Render da Timeline em MP4](#17-exportar-vídeo-render-da-timeline-em-mp4)
-18. [📝 18. Gerador e Editor de Títulos, Legendas e Cartelas (NLE Titler)](#18-gerador-e-editor-de-títulos-legendas-e-cartelas-nle-titler)
-19. [🎧 19. Restauração e Tratamento Avançado de Áudio (Auphonic & Denoise IA)](#19-restauração-e-tratamento-avançado-de-áudio-auphonic--denoise-ia)
-20. [🚀 20. Atalho Inteligente e Inicialização do Sistema (Windows Launcher)](#20-atalho-inteligente-e-inicialização-do-sistema-windows-launcher)
+- **Está começando?** Leia o caminho [Do ingest à exportação](#do-ingest-à-exportação) logo abaixo e depois as seções 1 e 2.
+- **Já edita em outro programa?** Procure as caixas **Vindo do Premiere/Resolve/FCP/Kdenlive** ao longo da seção 5 e a seção 14 (atalhos).
+- **Algo deu errado?** Vá direto para [Problemas comuns por sintoma](#problemas-comuns-por-sintoma).
+- **Convenções:** as caixas abaixo aparecem ao longo do texto.
+
+> **Dica:** atalhos e truques que economizam tempo.
+
+> **Atenção:** situações em que você pode perder trabalho ou obter um resultado diferente do esperado.
+
+> **Vindo do Premiere/Resolve/FCP/Kdenlive:** comparações com o que você já conhece.
+
+**Jargão.** Alguns termos de edição e de IA aparecem com frequência. Cada um tem explicação no [Glossário Visual e Terminologia](https://github.com/fernangcortes/capiau-talho-v03/wiki/18.-Glossario-Visual-e-Terminologia):
+[ripple](https://github.com/fernangcortes/capiau-talho-v03/wiki/18.-Glossario-Visual-e-Terminologia),
+[gap](https://github.com/fernangcortes/capiau-talho-v03/wiki/18.-Glossario-Visual-e-Terminologia),
+[overwrite](https://github.com/fernangcortes/capiau-talho-v03/wiki/18.-Glossario-Visual-e-Terminologia),
+[J/L-cut](https://github.com/fernangcortes/capiau-talho-v03/wiki/18.-Glossario-Visual-e-Terminologia),
+[diarização](https://github.com/fernangcortes/capiau-talho-v03/wiki/18.-Glossario-Visual-e-Terminologia),
+[LUFS](https://github.com/fernangcortes/capiau-talho-v03/wiki/18.-Glossario-Visual-e-Terminologia),
+[proxy](https://github.com/fernangcortes/capiau-talho-v03/wiki/18.-Glossario-Visual-e-Terminologia) e
+[RAG](https://github.com/fernangcortes/capiau-talho-v03/wiki/18.-Glossario-Visual-e-Terminologia).
 
 ---
 
-## 📂 1. Estrutura de Pastas e Organização das Mídias
+## Novidades (10/2026)
 
-Para processar seu material de forma limpa, o CapIAu-Talho utiliza a
-seguinte estrutura local criada no seu computador:
+| Novidade | O que muda para você | Onde ler |
+|---|---|---|
+| **Trava de pista (cadeado)** | Cada pista ganhou um cadeado que bloqueia qualquer edição nela. Não é o mesmo que o Sync Lock. | [5.11](#511-controles-nativos-de-pistas-mute-solo-sync-lock-e-trava) |
+| **Margens de segurança e máscaras de proporção** | O Program Player pode mostrar guias de Action Safe e Title Safe e máscaras 16:9, 9:16, 1:1 e 2.39:1. | [9.2](#92-operação-dos-players) |
+| **Camada facial no Source Player** | Um botão liga as caixas de rostos no Source; segurar `Alt` espia as caixas por um instante. | [4.1](#41-exibição-e-desenho-livre-no-player) |
+| **Diálogos próprios** | Confirmações e campos de nome agora são janelas do próprio CapIAu e também funcionam em painéis destacados em outro monitor. | [9.6](#96-janelas-destacadas-em-vários-monitores) |
 
-- **watch/:** A porta de entrada do sistema. Qualquer mídia (vídeo,
-  áudio ou foto) colocada aqui será identificada para processamento.
+---
 
-- **data/originals/:** Armazena as mídias originais copiadas de forma
-  segura pelo sistema.
+## Do ingest à exportação
 
-- **data/proxies/:** Onde ficam os proxies leves em 720p/360p gerados
-  automaticamente para reprodução suave no player Web.
+O caminho completo, do material bruto ao arquivo final:
 
-- **data/exports/:** Onde são gravados seus arquivos finais de edição
-  (XML, EDL, OTIO).
+| Etapa | O que fazer | Onde |
+|---|---|---|
+| 1. Preparar | Dê nomes úteis aos arquivos e coloque-os em `watch/` | [Seção 1](#1-estrutura-de-pastas-e-organização-das-mídias) |
+| 2. Ingerir | Menu **Importar** › **Escanear a pasta watch/** | [2.1](#21-ingestão-de-mídias) |
+| 3. Transcrever | **Transcrever Vídeo Atual** e corrigir falantes | [2.2](#22-transcrição-e-diarização-de-entrevistas) |
+| 4. Decupar | Análise visual dos B-rolls e fotos, rostos e temas | [2.3](#23-decupagem-visual-de-b-rolls-e-fotos), [Seção 4](#4-mapeamento-de-rostos-objetos-e-desambiguação-rápida) |
+| 5. Buscar | Busca por significado e playlist de resultados | [2.5](#25-busca-semântica-híbrida-e-controles-de-playlist) |
+| 6. Montar | Arraste para a timeline, use 3 e 4 pontos, peça ajuda ao agente | [Seção 3](#3-assistente-conversacional-de-edição-chat-agente-e-ghost-clips), [Seção 5](#5-timeline-multipista-gaps-sync-lock-e-jl-cuts) |
+| 7. Refinar | Velocidade, congelar quadro, recorte, títulos | [5.19](#519-velocidade-do-clipe-reprodução-reversa-e-preenchimento-de-lacunas), [Seção 11](#11-viewport-estável-alças-de-transformação-e-recorte-crop), [Seção 17](#17-gerador-e-editor-de-títulos-legendas-e-cartelas) |
+| 8. Tratar o áudio | Diagnóstico, preset, prévia de 15 s | [Seção 6](#6-tratamento-de-áudio-diagnóstico-presets-e-comparação-ab) |
+| 9. Salvar | Dê nome à sequência e clique em **Salvar** | [8.2](#82-salvamento-permanente-e-exportação) |
+| 10. Entregar | **Exportar vídeo** (MP4) ou enviar XML/OTIO/EDL ao seu editor | [Seção 16](#16-exportar-vídeo-render-da-timeline-em-mp4), [8.2](#82-salvamento-permanente-e-exportação) |
 
-### Regra de Ouro para Nomenclatura de Arquivos:
+---
 
-Para ajudar a IA a identificar seus clipes de forma inteligente na
-ingestão:
+## Índice
 
-- Arquivos que contenham depoimentos falados de equipe/elenco devem ter
-  **entrevista** ou **depoimento** no nome (ex:
-  entrevista_diretor_lentes.mp4). Eles serão categorizados como
-  **Entrevistas (ASR)**.
+1. [Estrutura de pastas e organização das mídias](#1-estrutura-de-pastas-e-organização-das-mídias)
+2. [Fluxo de trabalho passo a passo](#2-fluxo-de-trabalho-passo-a-passo)
+   - [2.1 Ingestão de mídias](#21-ingestão-de-mídias)
+   - [2.2 Transcrição e diarização de entrevistas](#22-transcrição-e-diarização-de-entrevistas)
+   - [2.3 Decupagem visual de B-rolls e fotos](#23-decupagem-visual-de-b-rolls-e-fotos)
+   - [2.4 Agrupamento em temas](#24-agrupamento-em-temas)
+   - [2.5 Busca semântica híbrida e controles de playlist](#25-busca-semântica-híbrida-e-controles-de-playlist)
+3. [Assistente conversacional de edição (Chat-Agente) e Ghost Clips](#3-assistente-conversacional-de-edição-chat-agente-e-ghost-clips)
+4. [Mapeamento de rostos, objetos e desambiguação rápida](#4-mapeamento-de-rostos-objetos-e-desambiguação-rápida)
+5. [Timeline multipista, gaps, Sync Lock e J/L-cuts](#5-timeline-multipista-gaps-sync-lock-e-jl-cuts)
+6. [Tratamento de áudio: diagnóstico, presets e comparação A/B](#6-tratamento-de-áudio-diagnóstico-presets-e-comparação-ab)
+7. [Carrossel de alternativas da IA](#7-carrossel-de-alternativas-da-ia)
+8. [Salvando, auto-salvamento, importação e logs](#8-salvando-auto-salvamento-importação-e-logs)
+9. [Layout e organização avançada](#9-layout-e-organização-avançada)
+10. [Configurações da sequência e zoom do preview](#10-configurações-da-sequência-e-zoom-do-preview)
+11. [Viewport estável, alças de transformação e recorte (Crop)](#11-viewport-estável-alças-de-transformação-e-recorte-crop)
+12. [Seleção de modelos de IA e gestão de tarefas](#12-seleção-de-modelos-de-ia-e-gestão-de-tarefas)
+13. [Hardware, aceleração por GPU e fallback automático](#13-hardware-aceleração-por-gpu-e-fallback-automático)
+14. [Atalhos de teclado e perfis NLE](#14-atalhos-de-teclado-e-perfis-nle)
+15. [Formas de onda (waveforms)](#15-formas-de-onda-waveforms)
+16. [Exportar vídeo: render da timeline em MP4](#16-exportar-vídeo-render-da-timeline-em-mp4)
+17. [Gerador e editor de títulos, legendas e cartelas](#17-gerador-e-editor-de-títulos-legendas-e-cartelas)
+18. [Instalação e inicialização (resumo)](#18-instalação-e-inicialização-resumo)
+19. [Problemas comuns por sintoma](#problemas-comuns-por-sintoma)
 
-- Cliques de bastidores ou set devem ter outros nomes (ex:
-  set_bastidores_vfx_take1.mp4). Eles serão catalogados como
-  **Bastidores (B-Roll)**.
+---
 
-## 🎬 2. Fluxo de Trabalho Passo a Passo
+## 1. Estrutura de pastas e organização das mídias
 
-### Passo A: Ingestão de Mídias
+O CapIAu-Talho usa a seguinte estrutura local no seu computador:
 
-1.  Copie alguns vídeos de entrevistas, B-rolls ou fotos do set para a
-    pasta watch/.
+| Pasta | Para que serve |
+|---|---|
+| `watch/` | Porta de entrada. Qualquer vídeo, áudio ou foto colocado aqui é identificado para processamento. |
+| `data/originals/` | Mídias originais copiadas com segurança pelo sistema. |
+| `data/proxies/` | Proxies leves (720p/360p) gerados automaticamente para a reprodução fluida no navegador. |
+| `data/exports/` | Arquivos finais de edição (XML, EDL, OTIO). |
 
-2.  No cabeçalho do Dashboard Web, clique no botão **Escanear watch/**.
+### Regra de ouro para nomear arquivos
 
-3.  O FastAPI lerá a pasta, calculará o hash de segurança (evitando
-    duplicatas), extrairá os metadados via FFprobe e iniciará a
-    compressão do proxy H.264 em background no seu processador i7.
+Para a IA classificar seus clipes logo na ingestão:
 
-4.  As mídias aparecerão na barra lateral esquerda nas abas **Vídeos** e
-    **Fotos**.
+- Depoimentos falados de equipe ou elenco devem ter **entrevista** ou **depoimento** no nome (ex.: `entrevista_diretor_lentes.mp4`). Entram como **Entrevistas (ASR)**.
+- Cenas de bastidores ou do set devem ter outros nomes (ex.: `set_bastidores_vfx_take1.mp4`). Entram como **Bastidores (B-Roll)**.
 
-### Passo B: Transcrição (ASR) e Diarização de Entrevistas
+---
 
-1.  Na aba **Vídeos**, clique em uma entrevista carregada (ela começará
-    a tocar no player).
+## 2. Fluxo de trabalho passo a passo
 
-2.  No menu lateral direito, clique no botão **Transcrever Vídeo
-    Atual**.
+### 2.1 Ingestão de mídias
 
-3.  A API AssemblyAI fará o processamento na nuvem em segundos (usando
-    seu Free Tier).
+1. Copie vídeos de entrevistas, B-rolls ou fotos do set para a pasta `watch/`.
+2. No cabeçalho, abra o menu **Importar** e clique em **Escanear a pasta watch/**. No mesmo menu há a opção **HD externo em modo link…** para catalogar mídias sem copiá-las.
+3. O sistema lê a pasta, calcula uma assinatura de cada arquivo (evitando duplicatas), extrai os metadados e começa a gerar os proxies em segundo plano.
+4. As mídias aparecem na barra lateral esquerda, nas abas **Vídeos** e **Fotos**.
 
-4.  O diálogo completo aparecerá no painel direito, dividido por
-    falantes (ex: *Speaker A, Speaker B*) com timestamps atômicos.
+### 2.2 Transcrição e diarização de entrevistas
 
-5.  **Dica de ouro:** Clique em qualquer palavra ou frase do texto e o
-    player de vídeo pulará exatamente para aquele segundo da fala!
+1. Na aba **Vídeos**, clique em uma entrevista (ela começa a tocar no player).
+2. No menu lateral direito, clique em **Transcrever Vídeo Atual**.
+3. A transcrição roda na nuvem (AssemblyAI, usando a sua chave) e o texto completo aparece no painel direito, dividido por falantes (ex.: *Speaker A*, *Speaker B*) com marcas de tempo.
+4. **Dica de ouro:** clique em qualquer palavra ou frase e o player pula exatamente para aquele ponto da fala.
+5. **Assistente de diarização.** Na parte superior direita da transcrição está a **Gaveta de Pistas**, que aponta possíveis erros de atribuição de falante (falas muito longas com silêncio no meio, ou um rosto diferente do falante indicado).
+6. **Inspetor de Balão (waveform).** Clique com o botão direito sobre o nome de um falante em um balão de transcrição. Uma gaveta lateral mostra o **Inspetor de Fala**, com uma forma de onda interativa:
+   - **Dividir falas:** clique duas vezes em qualquer ponto da onda para dividir a fala naquele instante. O player navega direto para o trecho.
+   - **Atribuição rápida de rosto:** o inspetor detecta quem aparece no vídeo naquele trecho e sugere o nome em um menu suspenso, para você corrigir o falante com um clique.
 
-6.  **Assistente de Diarização:** A transcrição agora conta com um
-    assistente robusto para corrigir falantes. Na lateral direita
-    superior da transcrição, você verá a \"Gaveta de Pistas\" que aponta
-    possíveis erros da inteligência artificial (como falas muito longas
-    com silêncio no meio, ou um rosto diferente falando).
+> **Atenção:** a transcrição local (sem nuvem) é experimental e pode ser bem lenta em máquinas modestas. A nuvem segue como caminho recomendado.
 
-7.  **Inspetor de Balão (Waveform):** Clique com o botão direito sobre o
-    nome de qualquer falante em um balão de transcrição. Uma gaveta
-    lateral se abrirá exibindo o **Inspetor de Fala**, com uma *waveform
-    interativa*. Com ela você pode:
+### 2.3 Decupagem visual de B-rolls e fotos
 
-    - **Dividir falas:** Dê um clique duplo em qualquer ponto da onda de
-      áudio (waveform) para dividir a fala naquele exato milissegundo. O
-      player navegará direto para o trecho.
+1. Os vídeos de B-roll são **segmentados em cortes reais** (shots). Planos-sequência longos são subdivididos em *beats* quando o conteúdo visual muda, e o sistema classifica o movimento de câmera (estático, pan, tilt, caminhando, mão livre). Um quadro representativo de cada segmento é enviado ao modelo de visão configurado (padrão: Gemini 2.5 Flash, via OpenRouter). Cada resultado de busca abre exatamente o trecho do corte, não um intervalo arbitrário.
+2. A IA gera descrições narrativas e etiquetas visuais automáticas (ex.: câmera, luz, dolly).
+3. As fotos de set passam pela mesma análise e ficam catalogadas na aba **Fotos** com descrições ricas.
+4. **Busca visual e "Encontrar Similares"** (sem custo de API): todo quadro de vídeo e foto também é indexado localmente por um modelo CLIP multilíngue. Isso permite buscar por conceito puramente visual (ex.: *"contraluz na janela"*) e usar o botão **Encontrar Similares**, disponível ao passar o mouse sobre os cartões de foto, no rodapé do visualizador (lightbox) e na aba **IA** do Inspetor de Mídia (que usa o quadro atual do player como referência).
 
-    - **Atribuição Rápida de Rosto:** O inspetor detecta quem está
-      aparecendo no vídeo naquele trecho e já sugere o nome da pessoa em
-      um menu suspenso para você corrigir o falante com 1 clique.
+### 2.4 Agrupamento em temas
 
-### Passo C: Decupagem Visual de B-Rolls e Fotos
+1. Depois de transcrever as entrevistas principais, clique em **Organizar com IA** no cabeçalho.
+2. A IA lê as transcrições e propõe de 5 a 10 temas sobre o making of (ex.: *Lentes Anamórficas*, *Fotografia*, *Roteiro*), usando o modelo de texto configurado (veja a [seção 12](#12-seleção-de-modelos-de-ia-e-gestão-de-tarefas)).
+3. Os temas aparecem na aba **Temas** da barra lateral esquerda.
 
-1.  Os vídeos de B-roll não usam mais um relógio fixo de frames: o
-    sistema primeiro **segmenta o vídeo em cortes reais** (shots) e
-    subdivide planos-sequência longos em *beats* por mudança de
-    conteúdo visual, classificando também o movimento de câmera
-    (estático, pan, tilt, caminhando, mão livre). Um keyframe
-    representativo de cada segmento é extraído e enviado para o Gemini
-    2.5 Flash no OpenRouter — isso reduz o número de chamadas de IA e
-    faz cada resultado de busca abrir exatamente o trecho do corte, não
-    um recorte de tempo arbitrário.
+### 2.5 Busca semântica híbrida e controles de playlist
 
-2.  A IA gera descrições narrativas de bastidores e cria tags visuais
-    automáticas (ex: câmera, luz, dolly).
+No campo de busca do topo, pesquise por conceitos (ex.: *"diretor falando sobre iluminação"* ou *"câmeras no set"*). A busca por significado retorna falas de entrevistas, quadros de B-roll e fotos no painel direito. Clicar em um resultado abre a mídia correspondente.
 
-3.  Para as fotos de set, o mesmo acontece: elas são analisadas
-    visualmente e catalogadas na aba **Fotos** com descrições ricas.
+- **Agrupamento por arquivo.** Os resultados são deduplicados por mídia. Ocorrências adicionais do mesmo vídeo ficam numa seção expansível sob o cartão principal (**Ver mais ocorrências**).
+- **Pré-visualização ao passar o mouse.** Após 400 ms sobre um resultado, aparece um popover com um loop mudo de 5 segundos do trecho (ou a foto).
+- **Playlist e autoplay.** No topo dos resultados há os botões Retroceder, Autoplay e Avançar. Clicar em um cartão o destaca e ativa a playlist. No Autoplay, os vídeos tocam nos pontos certos e passam sozinhos ao próximo; as fotos ficam 4 segundos dentro da área do player.
+- **Abrir fotos no player.** Marque **Abrir fotos no player de vídeo** (na aba de fotos da biblioteca ou na barra de opções da busca; as duas caixas ficam sincronizadas) para que o clique em uma foto abra no player, e não no visualizador.
+- **Busca por similaridade em lote.** Selecione vários cartões na biblioteca e dispare a busca por similaridade visual; o sistema lista as mídias do acervo que mais se parecem com o conjunto.
+- **Explicações da busca (RAG).** Nos resultados da busca e nas recomendações da IA, uma breve justificativa diz *por que* aquele corte foi considerado relevante.
+- **Filtro por status.** O botão de status da barra da biblioteca alterna, a cada clique, entre *Todos os arquivos*, *Apenas analisados (IA)*, *Não analisados (pendentes)* e *Arquivos com erro*.
 
-4.  **Busca Visual e "Encontrar Similares" (CLIP local, sem custo de
-    API):** todo keyframe de vídeo e foto é também embedado localmente
-    por um modelo CLIP multilíngue. Isso habilita duas coisas: buscar por
-    conceito puramente visual mesmo sem palavra correspondente na
-    descrição (ex: *"contraluz na janela"*), e o botão **Encontrar
-    Similares** — disponível no hover dos cards de foto, no rodapé do
-    visualizador (lightbox) e na aba **IA** do Inspetor de Mídia (usa o
-    frame atual do player como referência) — que retorna instantaneamente
-    as mídias visualmente mais parecidas no painel de busca à direita.
+---
 
-### Passo D: Agrupamento em Temas (Clustering)
+## 3. Assistente conversacional de edição (Chat-Agente) e Ghost Clips
 
-1.  Após transcrever suas entrevistas principais, clique no botão
-    **Agrupamento Temático** (ou *Agrupar Temas*) no cabeçalho.
+O painel de Chat funciona como um **agente editor ativo**: ele altera a sua timeline a partir de ordens em texto (ex.: *"insira o clipe 2 na pista V1"*, *"aplique um fade de 1 s no primeiro clipe"*, *"cubra o depoimento do diretor com B-rolls do set"*).
 
-2.  O DeepSeek V3 lerá as transcrições das entrevistas e proporá de 5 a
-    10 temas estruturados sobre o making of (ex: *Lentes Anamórficas,
-    Fotografia, Roteiro*).
+### Modo direto e modo rascunho (Ghost Clips)
 
-3.  Esses temas aparecerão na aba **Temas** na barra lateral esquerda,
-    facilitando a navegação temática.
+- Edições pontuais (inserir ou ajustar um único clipe) são aplicadas **diretamente na timeline** e podem ser desfeitas com `Ctrl+Z`.
+- Edições em massa ou destrutivas (substituições amplas, rough cuts automáticos) aparecem como **clipes fantasmas (ghost clips)** hachurados: verde para inserções e substituições, vermelho para remoções.
 
-### Passo E: Busca Semântica Híbrida e Controles de Playlist
+### Ações sobre Ghost Clips
 
-No campo de busca no topo, pesquise por conceitos (ex: *\"diretor
-falando sobre iluminação\"* ou *\"câmeras no set\"*). O Qdrant embutido
-na sua CPU fará uma busca vetorial instantânea e retornará falas de
-entrevistas, frames de B-roll ou fotos de set correspondentes no painel
-direito. Clicar no resultado abre a mídia correspondente.
+- **Aceitar:** selecione o clipe fantasma e pressione `Enter` (ou `Y`), ou clique no botão de confirmar do popup.
+- **Rejeitar:** selecione o clipe fantasma e pressione `Delete` (ou `N`), ou clique no botão de descartar do popup.
 
-- **Agrupamento & Ocorrências Secundárias:** Os resultados são
-  desduplicados por arquivo de mídia. Trechos e falas secundárias
-  adicionais do mesmo vídeo são agrupados em uma seção sanfonada abaixo
-  do card principal. Clique em *\"Ver mais ocorrências (X)\"* para
-  expandir os sub-cards correspondentes.
+> **Dica:** como o mesmo atalho pode ter outro papel fora desse contexto (por exemplo, `Delete` apaga clipes normais), as teclas de aceitar e rejeitar só valem com um ghost clip selecionado. Veja a regra de contexto na [seção 14](#14-atalhos-de-teclado-e-perfis-nle).
 
-- **Pre-visualização Rápida (Hover Previews):** Posicione o cursor do
-  mouse sobre qualquer card ou sub-card de resultado da busca. Após
-  400ms, um popover lateral surgirá mostrando um preview em loop mudo de
-  5 segundos do trecho exato (para vídeos) ou a imagem da foto.
+### O agente também entende de áudio
 
-- **Playlist de Busca e Autoplay Sequencial:** Uma barra de controle de
-  playlist com botões de Retroceder (⏮), Autoplay (Play / Parar) e
-  Avançar (⏭) é injetada no topo do feed de resultados.
-
-  - Ao clicar em um card ou sub-card, ele é selecionado e destacado com
-    uma borda brilhante e a playlist é ativada.
-
-  - Ative o **Autoplay** clicando no botão correspondente. Os vídeos
-    tocarão nos timestamps corretos e pularão automaticamente para o
-    próximo resultado. No modo Autoplay, as fotos são exibidas
-    diretamente dentro da área do player de vídeo por 4 segundos antes
-    de avançar, sem abrir popups ou modais.
-
-  - **Opção de Exibição de Fotos no Player:** Caso queira que o clique
-    manual em fotos abra diretamente no player de vídeo em vez do
-    Lightbox tradicional, marque a opção \"Abrir fotos no player de
-    vídeo\" (disponível na aba de fotos da biblioteca à esquerda e na
-    barra de opções de busca à direita). Ambas as caixas de seleção
-    permanecem sincronizadas.
-
-- **Busca por Similaridade em Lote (Batch Similarity):** Você pode selecionar múltiplos cards de mídias ou fotos na biblioteca e disparar a busca por similaridade visual em lote. O sistema processará os embeddings dos arquivos selecionados em paralelo no Qdrant local, listando todas as mídias visualmente congruentes no acervo.
-
-- **Explicações Didáticas do RAG:** Nos resultados da busca RAG ou recomendações da IA, o sistema exibe uma breve justificativa explicando *por que* aquele corte ou depoimento foi selecionado como relevante para o termo pesquisado.
-
-- **Filtro por Ciclo de Status (Status Cycle Filter):** Na barra de ferramentas da biblioteca, o botão de filtro de status permite alternar ciclicamente com cliques simples entre a exibição de *Todos os Arquivos*, *Apenas Analisados (IA)*, *Não Analisados (Pendentes)* e *Arquivos com Erro*, facilitando a auditagem rápida do acervo.
-
-## 🤖 3. Assistente Conversacional de Edição (Chat-Agente) & Ghost Clips
-
-O painel de Chat agora funciona como um **Agente Editor Ativo** que pode
-realizar modificações físicas na sua timeline a partir de ordens
-textuais simples (ex: *\"insira o clipe 2 na pista V1\"*, *\"aplique um
-fade de 1s no primeiro clipe\"*, *\"cubra o depoimento do diretor com
-B-rolls do set\"*).
-
-- **Modo Direto vs. Modo Rascunho (Ghost Clips):**
-
-  - Edições pontuais e não-destrutivas (como inserir ou ajustar um único
-    clipe) são aplicadas **diretamente na timeline** (e podem ser
-    desfeitas com Ctrl+Z).
-
-  - Edições em massa ou destrutivas (como substituições amplas ou rough
-    cuts automáticos) são exibidas na timeline como **clipes fantasmas
-    (ghost clips)** hachurados em verde (para inserções/substituições)
-    ou vermelho (para remoções).
-
-- **Ações sobre Ghost Clips:**
-
-  - Para **aceitar** uma sugestão e torná-la definitiva: selecione o
-    clipe fantasma na timeline e pressione **Enter** (ou a tecla **Y**,
-    ou clique no botão ✓ do popup correspondente).
-
-  - Para **rejeitar** e descartar a sugestão: selecione o clipe fantasma
-    e pressione **Delete** (ou **Backspace**, ou clique no botão ✗ do
-    popup correspondente).
-
-### 🎚️ O agente também entende de áudio
-
-Quando você pergunta sobre som, ele deixa de ser montador e vira técnico de
-áudio — mas continua montador no resto da conversa. A diferença em relação a um
-assistente genérico é que ele **mede antes de opinar**, em vez de responder por
-impressão.
+Quando você pergunta sobre som, ele vira técnico de áudio, mas continua montador no resto da conversa. A diferença para um assistente genérico é que ele **mede antes de opinar**.
 
 O que dá para pedir:
 
-- *"esse clipe está estourado?"* — ele roda a análise e responde com os números
-  medidos, não com um palpite.
-- *"o que você faria com esse áudio?"* — diz qual preset resolve, quanto custa
-  em tempo e o que aquele preset **não** resolve.
-- *"aplica aí"* — trata uma prévia de 15 s, não o clipe inteiro.
-- *"tira o chiado desse trecho"* — mexe nos ajustes ao vivo (EQ, gate,
-  compressor), que são reversíveis e não geram arquivo.
+- *"esse clipe está estourado?"*: ele roda a análise e responde com os números medidos.
+- *"o que você faria com esse áudio?"*: diz qual preset resolve, quanto custa em tempo e o que aquele preset **não** resolve.
+- *"aplica aí"*: trata uma prévia de 15 s, não o clipe inteiro.
+- *"tira o chiado desse trecho"*: mexe nos ajustes ao vivo (EQ, gate, compressor), que são reversíveis e não geram arquivo.
 
 Três coisas ele **não** faz sozinho, de propósito:
 
-1. **Não compromete um render longo** por iniciativa própria. Prévia de 15 s é o
-   padrão; para tratar o clipe inteiro ele pede a sua confirmação.
-2. **Não aciona o Auphonic.** Gastaria a sua cota mensal. Se o material pedir
-   nuvem, ele recomenda e explica — quem aperta o botão é você.
-3. **Não liga corte automático** de silêncio ou de hesitação. É a regra do
-   documentário, e não vira negociável só porque quem pediu foi a IA.
-
-## 👥 4. Mapeamento de Rostos, Objetos e Desambiguação Rápida
-
-O CapIAu-Talho conta com uma interface completa de decupagem visual para
-gerenciar as marcações de pessoas e elementos do set de filmagem.
-
-### A. Exibição e Desenho Livre (Drag-and-Draw) no Player
-
-- **Visualização Inteligente:** As caixas delimitadoras de rostos e
-  objetos (face-box) ficam ocultas por padrão no player para não poluir
-  a visualização. Elas aparecem instantaneamente ao passar o mouse perto
-  do rosto ou objeto quando o player estiver **pausado**.
-
-- **Desenhar novas caixas:** Se quiser cadastrar um objeto do cenário
-  (ex: Abajur, Microfone de Lapela) ou uma pessoa não detectada
-  automaticamente:
-
-  1.  Pause o vídeo no frame desejado.
-
-  2.  Clique com o botão esquerdo e arraste o mouse sobre o objeto para
-      desenhar um retângulo pontilhado roxo.
-
-  3.  Ao soltar, uma janela de prompt surgirá. Digite o nome do objeto
-      ou pessoa (ou escolha um nome sugerido na lista) e confirme.
-
-  4.  O retângulo se fixará na tela e atualizará automaticamente as tags
-      na aba **Visão IA**.
-
-### B. Desambiguação Rápida em Tela Cheia
-
-Na aba **Grupos de Rostos**, clique em **Desambiguação Rápida** para
-abrir o gerenciador em tela cheia. Aqui, você verá todas as detecções
-ainda sem nome ou não validadas do seu projeto:
-
-- **Preview de Contexto Instantâneo (Hover):** Algumas miniaturas podem
-  estar desfocadas ou muito aproximadas. Para ver o contexto original
-  completo, basta **deixar o mouse posicionado em cima do card**. O
-  sistema carregará instantaneamente um popover flutuante com a foto
-  original completa ou um trecho de vídeo de 5 segundos rodando em loop
-  ao redor daquele frame.
-
-- **Marcar como Objeto ou Rejeitar (Não Relevante):**
-
-  - Clique no ícone de banir (vermelho) no canto do card.
-
-  - Um prompt perguntará se o elemento é um objeto relevante do cenário.
-    Se for (ex: Câmera), digite o nome do objeto. Se for apenas ruído
-    visual, deixe em branco e confirme. O elemento será rotulado como
-    Não Relevante e ignorado pelas descrições do RAG.
-
-<!-- -->
-
-- **Seleção em Massa (Bulk Actions):**
-
-  - Selecione múltiplos cards clicando neles.
-
-  - Na barra de ações inferior, digite um nome e clique em **Aplicar**
-    para nomear todos ao mesmo tempo. Se o nome já pertencer a outro
-    grupo, o sistema mesclará os grupos em background.
-
-  - Clique em **Descartar** para rejeitar todas as marcações
-    selecionadas de uma vez.
-
-## 🎛️ 5. Arquitetura Track-Based NLE, Gaps, Sync Lock e J/L-Cuts Nativos
-
-O CapIAu-Talho adota a **arquitetura clássica track-based de NLEs profissionais** (similar ao Premiere Pro e DaVinci Resolve), com suporte a múltiplas pistas de vídeo (V1, V2...) e áudio (A1, A2...) independentes.
-
-### A. Posicionamento Absoluto e Livre (Sem Magnetismo Forçado)
-- **Liberdade de Montagem:** Cada clipe possui posição temporal absoluta (`timelineStartFrame`). Arrastar um vídeo ou foto para a timeline coloca o clipe exatamente no frame onde você soltou, permitindo criar pausas e espaçamentos naturais sem que os clipes sejam forçados para o frame zero.
-- **Camadas Transparentes:** Vídeos secundários (B-Roll) ou fotos posicionados em V2 sobrepõem visualmente o material de V1 nos trechos correspondentes.
-
-### B. Gaps como Entidades de Primeira Classe & Ripple Delete
-- **Seleção de Gaps:** Dê um clique simples em qualquer espaço vazio entre clipes na timeline. O Gap será destacado com um retângulo tracejado ciano.
-- **Ripple Delete de Gap:** Com o Gap selecionado, pressione **`Delete`** ou **`Backspace`**. O espaço vazio é imediatamente eliminado, e os clipes subsequentes nas pistas com Sync Lock ativo avançam para fechar o buraco.
-
-### C. Dupla Camada: Overwrite vs. Ripple Insert
-- **Arraste Padrão (Modo Overwrite / Livre):** Mover clipes na timeline ou soltar da biblioteca posiciona o elemento livremente na coordenada do cursor, respeitando o snapping magnético e sem empurrar clipes à direita.
-- **Modo Inserção (`Ctrl` + Arraste ou Drop):** Ao segurar **`Ctrl`** (ou **`Cmd`** no Mac) enquanto arrasta um clipe ou solta uma mídia da biblioteca, o cursor exibe uma linha guia vertical roxa com setas direcionais. Ao soltar, a timeline executa um **Ripple Insert**, abrindo espaço e empurrando automaticamente os clipes posteriores nas pistas com Sync Lock ativo.
-
-### D. Controle de Sync Lock por Pista
-- **Sincronismo Granular:** Cada cabeçalho de pista possui o botão de **Sync Lock** (`btn-track-sync-lock`). Pistas com Sync Lock ativo (cor ciano) acompanham todas as operações de ripple (fechamento de gaps, ripple delete e ripple insert). Pistas desativadas (cor cinza) permanecem travadas no tempo, garantindo que trilhas musicais ou efeitos sonoros não percam sincronia indesejada.
-
-### E. Snapping Magnético (`N` ou `Shift+S`) e Guias Visuais
-- **Atalho `N` / `Shift+S`:** Pressione a tecla **`N`** (ou **`Shift + S`**) para ativar ou desativar o encaixe magnético global (padrão DaVinci Resolve / Final Cut Pro). Essa reorganização libera a tecla `S` para a navegação ergonômica de pontos de corte.
-- **Linhas Guias:** Durante o arrasto de clipes, marcadores ou playhead, uma linha guia vertical tracejada ciano é projetada através de todas as pistas no instante em que as bordas se alinham perfeitamente.
-
-### F. Lift Delete (`Delete` / `Alt+R`) vs. Ripple Delete (`Backspace` / `R` / `Shift+Delete`)
-- **Ripple Delete (`Backspace` ou `R`):** Remove o clipe selecionado, o Gap selecionado ou o elemento sob a agulha de reprodução, puxando imediatamente todos os cortes posteriores nas pistas com Sync Lock ativo para fechar o espaço.
-- **Lift Delete (`Delete` ou `Alt+R`):** Remove o clipe selecionado ou o clipe sob a agulha deixando um espaço vazio (Gap) no seu lugar, sem alterar a posição temporal dos demais clipes.
-
-### G. Suíte de Edição Rápida com Uma Mão (Q-W-E-R & A-S-D-F)
-Para maximizar a produtividade e permitir montagem ultraveloz na mão esquerda sem dependência contínua do mouse:
-- **`Q` (Ripple Trim Head):** Corta do início do clipe até a agulha de reprodução e fecha o vão puxando os clipes seguintes.
-- **`W` (Ripple Trim Tail):** Corta da agulha de reprodução até o final do clipe e fecha o vão com ripple.
-- **`E` (Split no Playhead):** Fatia o clipe sob a agulha instantaneamente, sem exigir seleção prévia (se houver clipe selecionado, fatia o selecionado).
-- **`R` (Ripple Delete Inteligente):** Apaga o clipe ou Gap selecionado (ou o elemento sob a agulha) e fecha a lacuna com ripple.
-- **`Alt + R` (Lift Delete Rápido):** Apaga o clipe selecionado ou sob a agulha mantendo o vão vazio intacto.
-- **`A` / `S` (Previous / Next Edit Point):** Salta a agulha imediatamente para o ponto de corte anterior (`A`) ou seguinte (`S`).
-- **`D` (Select Clip at Playhead):** Seleciona o clipe posicionado sob a agulha na trilha ativa com um único toque.
-- **`Shift + D` (Multi-Select at Playhead):** Seleciona todos os clipes sob a agulha em todas as pistas destravadas e adiciona cumulativamente à seleção atual.
-- **`F` (Toggle Disable / Mute Clip):** Alterna o estado ativo/desativado do clipe. Clipes desativados ganham hachura diagonal, etiqueta `⊘ [DESATIVADO]`, ganho de áudio zerado no player e bypass na exportação.
-
-### H. Modo "Seleção Acompanha a Agulha" (Selection Follows Playhead)
-- **Atalho `Ctrl + Alt + P` & Botão na Barra:** Ativo por padrão na timeline (padrão NLE profissional). Pode ser ativado ou desativado a qualquer momento pelo atalho **`Ctrl + Alt + P`** ou pelo botão com indicador LED ciano na barra de ferramentas (`#btn-selection-follows-playhead`).
-- **Comportamento Dinâmico:** Ao navegar pela timeline (via J-K-L, setas, A/S ou arrasto na régua), o clipe que cruza a agulha de reprodução na trilha ativa é selecionado automaticamente. Isso permite aplicar trims, splits, desativações ou ajustes no Inspetor de forma contínua sem tocar no mouse.
-
-### I. Vínculo de Clipes (Link A/V) e Edição de J/L-Cuts (Tecla U)
-- **Vínculo Automático:** Por padrão, os clipes de vídeo e seus respectivos áudios são importados de forma acoplada (`link_id`). Ao arrastar o vídeo na timeline, o áudio correspondente o acompanha de forma sincronizada.
-- **Edição de J-Cuts e L-Cuts:** Para desvincular o par de áudio e vídeo e fazer edições independentes (por exemplo, estender o áudio de uma fala sobre a cena do B-roll seguinte), selecione o clipe e pressione a tecla **`U`** (Desvincular). Após desvincular, você pode mover ou ajustar as bordas (*trim*) de cada faixa de forma independente na timeline.
-- **Ripple Trim (`Ctrl` + Trim):** Arrastar a borda de corte segurando **`Ctrl`** ajusta a duração do clipe enquanto puxa ou empurra os clipes seguintes nas pistas com Sync Lock.
-
-### J. Dividir Clipe no Playhead (Split - Teclas E e Z)
-- Pressione **`E`** ou **`Z`** para cortar instantaneamente o clipe posicionado sob a agulha de reprodução (playhead), sem precisar de seleção prévia. Se um clipe estiver previamente selecionado, o corte é aplicado a ele. Se o clipe de vídeo possuir um áudio vinculado (`link_id`), o corte é aplicado a ambos de forma sincronizada (`Alt + E` ou `Alt + Z` fatia apenas a pista selecionada).
-
-### K. Controles Nativos de Pistas (Mute, Solo, Sync Lock e Visibilidade)
-Cada cabeçalho de pista na timeline (V1/V2 para vídeos e A1/A2 para áudios) possui botões individuais de controle:
-- **Mute (M):** Silencia o áudio da pista correspondente.
-- **Solo (S):** Isola a pista ativa, silenciando/ocultando temporariamente todas as demais.
-- **Sync Lock:** Alterna se a pista deve acompanhar operações de ripple.
-- **Visibilidade (Ícone de Olho):** Oculta a renderização de vídeo da pista selecionada no Program Player.
-
-### L. Marcadores de Timeline & Clipe de Vídeo (Teclado-First, Popover Compacto & Seleção em Lote)
-O sistema suporta dois tipos de marcadores visuais altamente integrados com a timeline:
-- **Marcadores de Régua:** Ancorados à régua de tempo para notações globais de estrutura.
-- **Marcadores Vinculados ao Clipe de Vídeo:** Se a agulha estiver sobre um clipe de vídeo na timeline (seja na pista V1 ou na pista B-Roll V2), o marcador é automaticamente fixado no retângulo do clipe de vídeo (`clipId`). Se o clipe for arrastado ou se a timeline for alterada, o marcador acompanha o vídeo perfeitamente. O marcador de clipe é desenhado exclusivamente dentro da pista do vídeo (sem stems verticais cruzando a tela).
-- **Box de Edição Flutuante Compacto:** Pressionar a tecla **M** abre um cartão compacto de 310px no canto inferior direito da tela. O vídeo **continua reproduzindo sem pausa** enquanto o editor digita.
-- **Fluxo Ultra-Rápido via Teclado:**
-  - Digite o nome do marcador.
-  - Pressione **Tab** para navegar para a Descrição.
-  - Pressione **Tab** para selecionar a Cor.
-  - Pressione **Enter** ou **Esc** para salvar e fechar o box.
-  - Pressione **M** novamente para salvar o atual e abrir o marcador no novo ponto da agulha.
-- **Seleção Múltipla & Exclusão em Lote:** Segure **Shift + Clique** sobre múltiplos marcadores para selecioná-los (destacados com uma borda brilhante branca). Pressione a tecla **Delete** (ou **Backspace**) para excluir todos os marcadores selecionados de uma só vez.
-- **Navegação Rápida entre Marcadores:** Pressione **Shift + M** para saltar para o próximo marcador ou **Alt + M** para retroceder ao marcador anterior.
-
-### K. Compatibilidade de Efeitos de Volume em Sobreposições (B-Rolls e JL-Cuts)
-- **Suporte Intercambiável a `level` e `gain`:** Clipes de áudio com efeito de volume (`type: "volume"`) aceitam tanto o parâmetro `level` quanto `gain` (ex.: clipes de B-Roll com atenuação sonora gerados pela IA ou importados de montagens externas).
-- **Estabilidade do Playhead (Agulha):** O laço de animação e reprodução conta com proteção contra falhas e validação numérica estrita, garantindo que o arraste (*scrubbing*) e o playback atravessem sobreposições multipistas, fades e crossfades sem risco de travamento da agulha.
-
-### L. Pontos de Entrada e Saída (In/Out), Loop Contínuo e Operações Lift/Extract
-A timeline e os monitores de vídeo contam com o conjunto completo de corte profissional baseado em pontos [In–Out]:
-- **Marcação Cirúrgica de Intervalos:** Pressione **`I`** para marcar o Ponto de Entrada (In) e **`O`** para marcar o Ponto de Saída (Out) na timeline ou no monitor Source. Para limpar as marcações, pressione **`Alt + X`** (ou **`Option + X`**).
-- **Navegação Rápida:** Pressione **`Shift + I`** para saltar a agulha diretamente para o ponto In e **`Shift + O`** para o ponto Out.
-- **Reprodução em Loop Contínuo (`Ctrl + L` / `Cmd + L`):** Alterna o modo de repetição cíclica. Ao chegar ao ponto Out, o player retrocede instantaneamente para o ponto In, ideal para refinar transições e diálogos.
-- **Operações NLE Lift e Extract:**
-  - **Lift (`;` - Ponto e Vírgula):** Remove o trecho contido no intervalo [In–Out] das pistas ativas preservando o espaço vazio (Gap), sem deslocar os clipes posteriores.
-  - **Extract (`'` - Aspas Simples):** Remove o trecho contido no intervalo [In–Out] e executa o fechamento com Ripple, puxando os clipes à direita nas pistas com Sync Lock ativo.
-- **Priorização de Hitboxes da Régua & Cursores Temáticos em Alta Resolução:**
-  - A agulha de reprodução (Playhead) tem prioridade absoluta de clique e arraste no topo da régua mesmo quando sobreposta exatamente a marcadores de In ou Out.
-  - A cabeça da agulha recebe um contorno sutil automático quando posicionada próxima a marcadores para máxima clareza visual.
-  - Cursores gráficos temáticos em SVG indicam a ferramenta ativa sob o mouse: **Vermelho** para Playhead, **Ciano** para Ponto IN, **Rosa** para Ponto OUT e cursor bidirecional para transladar todo o intervalo In/Out segurando **`Alt`** ou **`Shift`** mantendo a duração constante.
-
-### M. Zoom Microscópico até Nível de Frames (80 px/f), Régua Adaptativa e Zoom to Fit
-A timeline do CapIAu-Talho suporta uma amplitude extraordinária de zoom horizontal (de **0.01 px/frame** até **80.0 px/frame**):
-- **Zoom em Nível de Frames e Sub-frames:** Ao aproximar ao máximo, a régua de tempo transiciona dinamicamente para exibir células visuais de quadros individuais numerados, ticks de sub-frames e formatação limpa protegida contra sobreposição de timecodes — inclusive em taxas de quadros fracionárias como 23.976 fps e 59.94 fps.
-- **Ajustar Sequência na Tela (Zoom to Fit Toggle):**
-  - Pressione **`\`** (no CapIAu e Premiere) ou **`Shift + Z`** (no DaVinci Resolve e Final Cut Pro) ou clique no botão rápido **`#btn-timeline-zoom-fit`** na régua da timeline.
-  - O sistema calcula a duração total de todos os clipes e ajusta a escala com margem de respiro para preencher 100% da largura da timeline.
-  - Um segundo acionamento restaura instantaneamente o nível de zoom e a rolagem de trabalho anterior (*mecanismo NLE de Toggle com memória de estado*).
-- **Restauração Rápida de Zoom Padrão (1:1 / 0.5 px/f):** Pressione a tecla **`.` (Ponto)** (no CapIAu/Kdenlive), **`Ctrl + 1`** (no Premiere) ou **`Shift + 1`** (no Resolve/Final Cut) para redefinir o zoom de trabalho padrão.
-- **Navegação Contínua com Ferramenta Mão (`H`) e Roda na Régua:**
-  - Pressione **`H`**, mantenha pressionada a barra de **`Espaço`** na timeline ou use o **botão do meio do mouse** para ativar a Ferramenta Mão e navegar por arrasto (*pan*).
-  - Rolar a **roda do mouse diretamente sobre a régua da timeline** aplica zoom horizontal centralizado no cursor do mouse, sem exigir teclas modificadoras.
-
-### N. Modos de Visualização de Miniaturas nas Faixas e Popover Reativo
-Para equilibrar ergonomia visual e performance em sequências densas, a timeline oferece 3 modos clássicos de miniaturas de vídeo:
-- **Proporção Real de Aspecto Preservada:** A largura de cada miniatura é calculada dinamicamente com base na altura real da pista (`clipHeight * aspectRatio`). Vídeos panorâmicos (16:9), verticais (9:16 reels/shorts/tiktok) e fotos quadradas (1:1) mantêm sua geometria nativa sem corte ou fatiamento vertical em faixas altas.
-- **Os 3 Modos Clássicos:**
-  1. **Rolo de Filme / Contínuo (Filmstrip):** As miniaturas repetem-se ao longo de todo o clipe com intervalo proporcional à escala de zoom.
-  2. **Apenas Início (Head Only):** Uma única miniatura de abertura é desenhada na borda esquerda do corte, deixando a pista limpa para visualização rápida.
-  3. **Desativar Miniaturas (None):** Remove todas as miniaturas das pistas de vídeo, liberando 100% do poder de processamento da CPU para formas de onda de áudio e edição ultrarrápida.
-- **Popover de Opções com Auto-Flip Inteligente:** Ao clicar no botão de opções de visualização (`#btn-timeline-view-options`), o menu popover é desacoplado do contêiner da timeline com posicionamento `fixed`. Se a timeline estiver localizada na base da tela, o popover inverte sua abertura automaticamente para cima (*auto-flip vertical*), evitando qualquer corte de tela.
-
-### O. Redimensionamento Vertical de Pistas: Individual (Shift+Roda) vs. Global
-O controle vertical das pistas de vídeo e áudio conta com granularidade dupla:
-- **Redimensionamento de Pista Específica (`Shift + Roda do Mouse` sobre o cabeçalho da pista):** Posicione o cursor do mouse sobre o cabeçalho de uma pista específica (ex.: `V1` ou `A1`) e gire a roda mantendo **`Shift`** pressionado. Apenas aquela pista terá sua altura ajustada de forma cirúrgica (entre 22px e 240px em incrementos de 8px), permitindo inspecionar uma forma de onda ou miniatura detalhada sem inflar as demais pistas da timeline.
-- **Redimensionamento Global da Timeline (`Shift + Roda` sobre o Canvas ou `Numpad +` / `Numpad -`):** Girar a roda com **`Shift`** sobre a área livre dos clipes ou régua ajusta a escala vertical uniforme (`trackHeightScale` de 0.5x a 1.7x) de todas as faixas simultaneamente.
-
-### P. Montagem Clássica de 3 e 4 Pontos & Roteamento de Canais (Insert & Overwrite)
-A montagem de 3 e 4 pontos permite transferir trechos do monitor de origem (Source Player) diretamente para a agulha da timeline com máxima rapidez:
-- **Inserção Ripple / Insert (Tecla `,` - Vírgula):**
-  - Divide os clipes sob a agulha na timeline ativa e insere o trecho demarcado entre os pontos [In–Out] do Source Player.
-  - Empurra automaticamente todos os clipes subsequentes para a direita, preservando a sincronia das pistas com Sync Lock ativo.
-  - A agulha de reprodução avança exatamente até o término do trecho inserido, preparando a próxima inserção contínua.
-- **Sobrescrita / Overwrite (Tecla `.` - Ponto ou `F10`):**
-  - Substitui o trecho da timeline a partir da agulha pela duração do trecho [In–Out] do Source Player, sem empurrar a timeline nem alterar a duração total da sequência.
-- **Seletor Cíclico de Canais de Destino (`AV` ➔ `V` ➔ `A`):**
-  - Alterne o modo de canais pressionando **`Ctrl + Alt + A`** ou clicando no botão dinâmico `#btn-source-toggle-audio` no Source Player.
-  - **`AV` (Áudio + Vídeo):** Insere vídeo na pista V ativa e áudio na pista A pareada, com vinculação de corte ativada.
-  - **`V` (Apenas Vídeo):** Grava exclusivamente o vídeo na pista de vídeo ativa, ideal para B-Rolls e inserts sem poluir as trilhas de som.
-  - **`A` (Apenas Áudio):** Grava exclusivamente a faixa sonora na pista de áudio pareada, ideal para narrações e depoimentos em off (inclui proteção contra inserção de fotos no modo áudio).
-- **Desfazer / Refazer com Memória de Agulha:** As operações de 3 pontos são 100% atômicas no histórico (`Ctrl+Z` / `Ctrl+Y`), restaurando tanto os clipes quanto a coordenada exata da agulha.
-
-### Q. Localizar Quadro Original na Fonte (Match Frame & Reverse Match Frame)
-A navegação bidirecional de frames conecta de forma transparente a timeline montada e os arquivos originais da biblioteca:
-- **Match Frame (`Alt + F` no CapIAu / `F` no Premiere e Resolve / `Shift + F` no Final Cut):**
-  - Posicione a agulha sobre qualquer clipe na timeline. Ao acionar o comando (ou clicar no botão com mira `#btn-match-frame` no Program Player), o sistema localiza a mídia bruta na biblioteca e abre instantaneamente o Source Player no mesmo instante temporal exato:
-    $$\text{sourceTime} = \frac{\text{inFrame} + (\text{playheadFrame} - \text{timelineStartFrame})}{\text{fps}}$$
-  - Os limites [IN–OUT] do corte da timeline são projetados no mini-slider do Source Player para conferência visual de sobras e handles de filmagem.
-  - O sistema respeita a pista selecionada pelo usuário ou desempata priorizando a pista superior de vídeo visível (**V2 > V1 > A2 > A1**).
-  - O foco é transferido para o Source Player para controle imediato via teclado.
-- **Reverse Match Frame (`Shift + F` no CapIAu, Premiere, Resolve e Kdenlive / `Alt + F` no Final Cut):**
-  - A partir de qualquer posição no Source Player, acione o atalho (ou clique no botão `#btn-source-reverse-match` no Source Player).
-  - O sistema varre a timeline ativa e localiza onde aquele quadro específico está sendo utilizado:
-    $$\text{targetPlayheadFrame} = \text{timelineStartFrame} + (\text{sourceFrame} - \text{inFrame})$$
-  - Caso a mesma mídia bruta tenha sido fatiada em múltiplos cortes pela timeline, o algoritmo seleciona inicialmente a ocorrência mais próxima da agulha.
-  - **Navegação Cíclica entre Múltiplas Ocorrências (`Shift+F` contínuo):** Ao manter a tecla `Shift` pressionada e tocar `F` repetidas vezes, o sistema cicla sequencialmente por todos os cortes da montagem onde a mídia foi usada ($1 \to 2 \to 3 \to \dots \to 1$).
-  - **Deduplicação Inteligente de Trilhas A/V:** Cortes que possuem vídeo e áudio vinculados (`link_id`) são contados como uma única ocorrência física, eliminando saltos duplicados e exibindo a contagem real de tomadas.
-  - **Mini-HUD Flutuante no Source:** Durante a navegação de ocorrências, um HUD minimalista translúcido surge no Source Player (`#source-reverse-match-hud`) mostrando o contador de tomada e pista (ex.: `2 / 3 · V1`), botões de salto anterior/próximo e atalho para a listagem completa. O HUD se oculta automaticamente ao soltar a tecla `Shift`.
-  - **Menu Popover de Ocorrências com Retenção em Hover:** O botão `#btn-source-reverse-match` exibe um badge ciano com o total de cortes e um menu suspenso (`#popover-reverse-match-list`) com todos os pontos da timeline. O menu permanece aberto enquanto o cursor do mouse estiver sobre ele (com tolerância suave de 250ms), permitindo clicar em ocorrências para navegar na timeline sem fechar a lista acidentalmente.
-  - A agulha salta para a coordenada calculada, o clipe é selecionado e realçado com pulso ciano temporário na timeline.
-  - Caso o quadro inspecionado não esteja presente na timeline, um aviso não-intrusivo via toast notifica o editor.
-
-### R. Navegação e Entrada Numérica de Timecode (Task 11)
-Para garantir velocidade cirúrgica na navegação temporal, os displays de timecode do Source Player, Program Player e do cabeçalho da timeline funcionam como **entradas numéricas interativas inline** (`.interactive-timecode`):
-- **Entrada Direta e Atalho Universal (`Ctrl + G` / `Ctrl + P`):**
-  - Clique diretamente em qualquer exibição de timecode na interface ou pressione **`Ctrl + G`** (no CapIAu, Premiere, Resolve e Kdenlive) ou **`Ctrl + P`** (no Final Cut Pro) para ativar a caixa de entrada numérica com seleção automática do texto. O comando intercepta e previne a abertura indevida do diálogo de busca do navegador.
-- **Sintaxes Flexíveis do Parser Numérico Universal:**
-  - **Deslocamentos Relativos em Quadros (`+50`, `-24`):** Digite `+50` para avançar 50 frames a partir da agulha atual ou `-24` para recuar 24 frames. Um toast informativo transparente exibe o cálculo exato (ex.: `+50f = 1s 20f`).
-  - **Deslocamentos Relativos em Segundos (`+2s`, `-1.5s`):** Converte frações temporais diretamente para frames conforme a taxa da sequência.
-  - **Notação de Ponto NLE (`1.`, `10.`, `1..`):** Padrão consagrado da indústria — digite `1.` para saltar 1 segundo à frente, `10.` para 10 segundos e `1..` para 1 minuto exato.
-  - **Notação Numérica Abreviada (`1200`, `100`, `50`):** `1200` navega para `00:00:12:00`, `100` para `00:00:01:00` e `50` para o frame 50.
-  - **Timecode SMPTE Tradicional (`HH:MM:SS:FF`):** Aceita timecodes absolutos com ou sem separadores de dois pontos.
-- **Precisão Matemática em Taxas Fracionárias (29.97 fps / NDF):**
-  - O cálculo utiliza a base inteira nominal ($\text{fpsBase} = \operatorname{round}(\text{fps})$), eliminando ticks duplicados na régua e garantindo alinhamento pixel-perfect da agulha de reprodução.
-- **Histórico Atômico de Saltos:** Todo salto numérico é registrado no histórico da timeline, permitindo desfazer com **`Ctrl + Z`** ou refazer com **`Ctrl + Y`**.
-
-### S. Rolagem Automática que Segue a Agulha (Playhead Follow / Auto-Scroll)
-A timeline inclui mecanismo nativo de auto-scroll para manter a agulha sempre visível durante a reprodução contínua:
-- **Ativação por Teclado e Botão Dedicado:**
-  - Pressione **`Ctrl + Alt + F`** ou clique no botão de acesso rápido com indicador LED ciano na barra de ferramentas (`#btn-timeline-follow-playhead`).
-- **Dois Modos de Rolagem NLE:**
-  1. **Modo Página (`page`):** Ao atingir a borda direita da viewport durante a reprodução (com margem de segurança de 5%), a timeline avança uma página completa posicionando a agulha no início da nova tela, com suporte idêntico para reprodução reversa (Shuttle J).
-  2. **Modo Suave (`smooth`):** A visualização acompanha a agulha de forma contínua e amortecida com interpolação suave (*lerp*), mantendo o playhead ancorado no ponto percentual configurado pelo editor.
-- **Âncora de Câmera Ajustável (30% a 70%):**
-  - No menu de Opções de Visualização da Timeline (`#btn-timeline-view-options`), deslize o controle de âncora para escolher se a agulha deve correr mais à esquerda (30%), no centro (50%) ou mais à direita (70%), com preview interativo em tempo real.
-- **Persistência Universal:** O estado de ativação, o modo e o percentual de âncora são gravados no `workspaceManager` e mantidos entre sessões no `localStorage`.
-
-### T. Ferramenta de Congelamento de Quadro (Freeze Frame - Task 12)
-Permite criar quadros congelados instantâneos na timeline a partir de qualquer instante da mídia de vídeo:
-- **Acionamento Rápido (`Ctrl + Shift + F`):**
-  - Posicione a agulha sobre o quadro desejado e pressione **`Ctrl + Shift + F`** (em todos os 5 perfis NLE), clique no botão `#btn-freeze-frame` na barra de ferramentas ou selecione **"Congelar Quadro"** no menu de contexto do clipe.
-- **Técnica Tail Hold e Imunidade a Limites de Mídia (Bounds Immunity):**
-  - Clipes congelados gerados pelo sistema utilizam a técnica *tail hold* com o frame estático congelado (`freeze_time`).
-  - Possuem **imunidade completa às fronteiras da mídia bruta original** (`is_freeze: true`), permitindo ao editor esticar a duração do quadro congelado na timeline indefinidamente sem esbarrar na duração física do arquivo original gravado pela câmera.
-- **Modos Ripple e Overwrite:**
-  - Suporta abertura de espaço empurrando a timeline (*Ripple Freeze Frame*) ou substituição do trecho (*Overwrite Freeze Frame*).
-- **Tratamento Sonoro e Identidade Visual Ice Cyan:**
-  - A pista pareada de áudio recebe uma lacuna silenciosa (Gap) correspondente à duração do congelamento.
-  - No canvas da timeline, o clipe ganha visual temático **Ice Cyan**, rótulo identificador claro e miniaturas de filmstrip estáticas repetindo o mesmo quadro congelado.
-
-### U. Velocidade do Clipe, Reprodução Reversa e Preenchimento de Lacunas (Task 13)
-O controle de velocidade e timing da timeline disponibiliza controle numérico e paramétrico completo:
-- **Diálogo Flutuante e Arrastável de Velocidade e Duração (`Ctrl + R`):**
-  - Com um clipe selecionado na timeline, pressione **`Ctrl + R`** (ou clique com botão direito ➔ **"Velocidade e Duração..."**).
-  - Um modal flutuante e arrastável abre no centro da tela. A barra de **Espaço** continua operando prioritariamente o Play/Pause do Program Player, permitindo testar o andamento da cena sem fechar o diálogo.
-- **Conversão Bidirecional Proporcional:**
-  - Digite a velocidade em porcentagem (ex.: `50%`, `200%`) ou digite a duração desejada em timecode (`00:00:04:12`) ou frames. O sistema recalcula o valor complementar instantaneamente.
-  - Duplo clique no campo de porcentagem restaura a velocidade padrão (100%).
-- **Modo Ripple (Deslocar Posteriores) vs. Modo Cortar (Manter Duração):**
-  - **Deslocar Clipes Posteriores (Ripple):** Ao acelerar ou desacelerar o clipe, os cortes subsequentes nas pistas com Sync Lock avançam ou recuam para fechar o espaço ou acomodar a nova extensão.
-  - **Manter Duração da Timeline (Cortar):** Altera a velocidade interna sem mudar a duração física ocupada na timeline, fatiando ou repetindo frames dentro da caixa existente.
-- **Reprodução Reversa (Reverse Play):**
-  - Marque a opção **Inverter Reprodução (Reverso)** ou digite valores negativos. O clipe reproduz de trás para frente, as miniaturas do filmstrip são invertidas espacialmente da direita para a esquerda e o canvas exibe o badge de velocidade em **vermelho neon** (ex.: `-100%`).
-- **Preenchimento Instantâneo de Lacunas (Fit to Gap - `Ctrl + Alt + R`):**
-  - Pressione **`Ctrl + Alt + R`** para ajustar a velocidade do clipe selecionado de forma que ele preencha perfeitamente a lacuna vazia vizinha sem empurrar a montagem.
-  - **Menu de Contexto de Gaps:** Ao clicar com botão direito sobre clipes adjacentes a espaços vazios, utilize as opções com cálculo automático:
-    - **Preencher Lacunas (Ambos):** Expande o clipe recalculando a velocidade para cobrir lacunas antes e depois.
-    - **Preencher Lacuna à Frente:** Ajusta a velocidade para colar na cabeça do próximo corte.
-    - **Preencher Lacuna Atrás:** Ajusta a velocidade para colar na cauda do corte anterior.
-
-### V. Ferramenta de Estiramento de Taxa de Velocidade (Rate Stretch Tool)
-A Ferramenta de Estiramento de Taxa permite alterar a velocidade de clipes de forma tátil e visual diretamente na timeline:
-- **Seleção da Ferramenta e Paridade de Atalhos NLE:**
-  - Pressione **`Shift + R`** (ou **`X`**) no perfil CapIAu Padrão, **`R`** nos perfis Adobe Premiere Pro, DaVinci Resolve e Apple Final Cut Pro, ou **`Shift + R`** no Kdenlive.
-  - Também pode ser ativada clicando no botão `#btn-tool-rate-stretch` na barra vertical de ferramentas da timeline.
-- **Cursores Direcionais SVG & HUD Flutuante em Tempo Real:**
-  - O cursor do mouse assume formato vetorial temático com colchetes direcionais (`CURSOR_RATE_STRETCH_RIGHT` e `LEFT`).
-  - Durante o arraste da borda do clipe, um HUD flutuante translúcido (`#timeline-rate-stretch-tooltip`) acompanha o ponteiro exibindo em tempo real:
-    - A nova porcentagem de velocidade calculada (faixa permitida de 10% a 1000%).
-    - O multiplicador de velocidade (ex.: `0.50x`, `2.00x`).
-    - A nova duração resultante em timecode e total de quadros.
-- **Estiramento (Slow Motion) e Compressão (Fast Motion):**
-  - **Arrastar a borda para fora (esticar):** Reduz a porcentagem de velocidade (câmera lenta), respeitando barreiras físicas de gaps ou o término de mídia.
-  - **Arrastar a borda para dentro (comprimir):** Aumenta a porcentagem de velocidade (aceleração).
-  - O arraste respeita o **snapping magnético**, alinhando com agulha, marcadores e bordas vizinhas.
-- **Pares Vinculados A/V com Pitch Correction & Tecla Alt:**
-  - Por padrão, esticar ou comprimir o clipe altera áudio e vídeo vinculados de forma rigorosamente sincronizada, ativando preservação e correção tonal de pitch no áudio.
-  - Mantenha pressionada a tecla **`Alt`** durante o arraste para esticar exclusivamente a pista clicada (por exemplo, esticar apenas o vídeo mantendo a duração do áudio intacta para criar um insert visual estendido).
-- **Cancelamento e Retorno Ágil:**
-  - Pressione **`Escape`** durante o arraste para cancelar imediatamente e restaurar o clipe ao estado original.
-  - Pressione **`V`** a qualquer momento para retornar à Ferramenta de Seleção Padrão.
-
-### W. Subclipes Virtuais Não-Destrutivos (Virtual Subclips)
-Subclipes virtuais permitem fatiar e catalogar trechos seletos de arquivos brutos extensos sem duplicar arquivos de mídia nem gerar novos proxies:
-- **Criação Rápida a partir do Source Player (`Ctrl + U`):**
-  - No monitor Source Player, marque os limites desejados com **`I`** (In) e **`O`** (Out).
-  - Pressione **`Ctrl + U`** (em todos os 5 perfis NLE) ou clique no botão dedicado de criar subclipe com ícone de tesoura `#btn-source-create-subclip`.
-- **Modal de Criação com Sugestões Inteligentes de IA:**
-  - Um modal flutuante exibe os timecodes de entrada, saída e duração total do trecho.
-  - Chips inteligentes oferecem sugestões automáticas de nomes baseadas na decupagem narrativa de IA ou transcrição fonética daquele trecho específico.
-- **Limites Rígidos (Hard Boundaries) de Proteção:**
-  - O subclipe gerado possui barreiras rígidas em suas pontas: na timeline, as alças de trim impedem o estiramento acidental para fora do intervalo demarcado pelo editor.
-- **Identificação Visual na Biblioteca e Timeline:**
-  - Na biblioteca (tanto no modo Grade quanto na Galeria Clean), o subclipe recebe badge identificador `SUB`, miniaturas nítidas do ponto de entrada e hover preview delimitado estritamente ao intervalo [In–Out].
-  - Ao ser inserido na timeline (via arrastar e soltar ou duplo clique), o clipe recebe o prefixo gráfico **`✂`** em seu título para clareza imediata na montagem.
-
-### X. Substituição de Clipe (Replace Edit via Alt+Drop e Ctrl+Shift+R)
-Permite trocar a mídia bruta de um clipe posicionado na timeline sem perder o trabalho de montagem já executado:
-- **Substituição via Drag & Drop com Alt (`Alt + Arraste`):**
-  - Arraste uma mídia da biblioteca ou do monitor Source diretamente sobre um clipe existente na timeline mantendo a tecla **`Alt`** pressionada.
-  - A timeline projeta um realce visual **`[REPLACE]`** sobre o clipe alvo. Ao soltar, a mídia é substituída imediatamente.
-- **Substituição via Atalho Universal (`Ctrl + Shift + R`):**
-  - Selecione o clipe alvo na timeline, navegue até o quadro desejado no Source Player (ou marque o ponto In) e tecle **`Ctrl + Shift + R`**.
-- **Preservação Rigorosa de Parâmetros:**
-  - A operação de Replace Edit mantém 100% inalterados: a posição temporal na timeline (`timelineStartFrame`), a duração física exata, a velocidade do clipe, o alinhamento de pares de áudio e vídeo, a cor e efeitos de enquadramento (inclusive parâmetros Ken Burns).
-
-### Y. Indicadores de Sincronia A/V (+Xf / -Xf) e Opções de Ressincronização
-Ao trabalhar com áudio e vídeo vinculados que foram deslocados no tempo (por exemplo, após trims assimétricos de J-Cut ou L-Cut), a timeline mantém o editor orientado com precisão milimétrica:
-- **Badges Visuais de Descompasso:**
-  - Sempre que a relação temporal entre o vídeo e o áudio divergir da filmagem original, badges sutis surgem sobre as bordas dos clipes na timeline indicando o descompasso exato em frames (ex.: `+2f`, `-5f`).
-- **Comandos de Ressincronização no Menu de Contexto:**
-  - Clique com o botão direito sobre o clipe ou badge para acessar as opções de restauração:
-    - **Mover para Sincronia:** Translada o clipe fisicamente na timeline para realinhar com seu par original.
-    - **Deslizar Conteúdo (Slip) para Sincronia:** Executa uma compensação interna de Slip nos pontos In/Out da mídia bruta, recuperando a sincronia perfeita sem mover o clipe nem abrir lacunas na timeline.
-- **Blindagem Automática no Ripple Delete:**
-  - O motor de ripple delete conta com proteção bidirecional para pares A/V vinculados: se a pista de vídeo sofrer uma extração, a pista de áudio associada avança em perfeita paridade atômica, impedindo a criação involuntária de descompassos labiais.
+1. **Não compromete um render longo** por iniciativa própria. Para tratar o clipe inteiro, pede a sua confirmação.
+2. **Não aciona o Auphonic.** Gastaria a sua cota mensal. Se o material pedir nuvem, ele recomenda e explica; quem aperta o botão é você.
+3. **Não liga corte automático** de silêncio ou de hesitação. É a regra do documentário.
 
 ---
 
-## 🎚️ 6. Tratamento de Áudio: Diagnóstico, Presets e Comparação A/B
+## 4. Mapeamento de rostos, objetos e desambiguação rápida
 
-Editar vídeo e editar áudio são ofícios diferentes. Esta seção existe para você
-não precisar do segundo: o programa **mede** o áudio do clipe e diz o que fazer,
-em vez de esperar que você reconheça o problema de ouvido.
+O CapIAu-Talho tem uma interface completa para gerenciar as marcações de pessoas e elementos do set.
 
-### A. As duas naturezas de ajuste (entenda antes de mexer)
+### 4.1 Exibição e desenho livre no player
+
+- **Caixas de rostos e objetos.** Ficam ocultas por padrão, para não poluir o vídeo. Aparecem ao passar o mouse perto do rosto ou objeto quando o player está **pausado**.
+- **Camada facial no Source Player (novo).** O botão de detecção facial na barra do Source Player (tooltip *Alternar Detecção Facial no Source*) liga e desliga a camada de caixas de rostos de forma permanente; o atalho padrão é `Ctrl+Alt+B`. A escolha é lembrada pelo navegador. Com a camada desligada, ainda dá para espiar: **segure `Alt` com o mouse sobre o Source Player** e as caixas aparecem enquanto você mantiver a tecla (alt-peek).
+- **Desenhar novas caixas.** Para cadastrar um objeto do cenário (ex.: abajur, microfone de lapela) ou uma pessoa não detectada:
+  1. Pause o vídeo no quadro desejado.
+  2. Clique com o botão esquerdo e arraste sobre o objeto para desenhar um retângulo pontilhado roxo.
+  3. Ao soltar, o CapIAu abre um diálogo pedindo o nome. Digite o nome do objeto ou da pessoa (ou escolha uma sugestão da lista) e confirme.
+  4. O retângulo se fixa na tela e as etiquetas da aba **Visão IA** são atualizadas.
+
+### 4.2 Desambiguação rápida em tela cheia
+
+Na aba **Grupos de Rostos**, clique em **Desambiguação Rápida** para abrir o gerenciador em tela cheia, com todas as detecções ainda sem nome ou não validadas:
+
+- **Contexto ao passar o mouse.** Se uma miniatura estiver desfocada ou muito próxima, deixe o mouse sobre o cartão: um popover mostra a foto original completa ou um trecho de vídeo de 5 s em loop ao redor daquele quadro.
+- **Marcar como objeto ou rejeitar.** Clique no ícone vermelho de banir no canto do cartão. O diálogo pergunta se o elemento é um objeto relevante do cenário. Se for (ex.: câmera), digite o nome. Se for só ruído visual, deixe em branco e confirme: o elemento fica como *Não Relevante* e é ignorado pelas descrições da IA.
+- **Seleção em massa.** Selecione vários cartões e, na barra inferior, digite um nome e clique em **Aplicar** para nomear todos de uma vez. Se o nome já pertencer a outro grupo, os grupos são mesclados em segundo plano. **Descartar** rejeita todas as marcações selecionadas.
+
+---
+
+## 5. Timeline multipista, gaps, Sync Lock e J/L-cuts
+
+O CapIAu-Talho usa a organização clássica por pistas dos editores profissionais, com várias pistas de vídeo (V1, V2...) e de áudio (A1, A2...) independentes.
+
+> **Vindo do Premiere/Resolve/FCP/Kdenlive:** a lógica é a mesma das pistas do Premiere e do Resolve. Se você vem do Final Cut Pro, pense em cada pista como uma "via" fixa, sem a linha magnética: nada empurra nada sem que você peça (veja 5.3).
+
+### 5.1 Posicionamento livre
+
+- Cada clipe tem posição temporal absoluta. Arrastar um vídeo ou foto para a timeline o coloca exatamente onde você soltou, o que permite criar pausas e respiros naturais.
+- Vídeos e fotos em V2 sobrepõem visualmente o material de V1 nos trechos correspondentes.
+
+### 5.2 Gaps como objetos selecionáveis
+
+- Clique em qualquer espaço vazio entre clipes para selecionar o **gap**; ele fica com um retângulo tracejado ciano.
+- Com o gap selecionado, `Delete` ou `Backspace` elimina o espaço: os clipes seguintes, nas pistas com Sync Lock ativo, avançam para fechar o buraco.
+
+### 5.3 Overwrite e ripple insert
+
+- **Arraste padrão (overwrite / livre):** mover um clipe ou soltar uma mídia da biblioteca o posiciona onde está o cursor, respeitando o snapping, sem empurrar os clipes à direita.
+- **Modo inserção (`Ctrl` + arrastar ou soltar):** com `Ctrl` (`Cmd` no Mac) pressionado, aparece uma linha guia vertical roxa com setas. Ao soltar, o **ripple insert** abre espaço e empurra os clipes posteriores nas pistas com Sync Lock ativo.
+
+### 5.4 Snapping magnético
+
+- A tecla `N` (ou `Shift+S`) liga e desliga o encaixe magnético global.
+- Durante o arrasto de clipes, marcadores ou da agulha (playhead), uma linha guia vertical tracejada ciano cruza todas as pistas no instante em que as bordas se alinham.
+
+### 5.5 Lift delete e ripple delete
+
+| Operação | Atalho (perfil CapIAu) | O que faz |
+|---|---|---|
+| **Ripple delete** | `Backspace`, `R` ou `Shift+Delete` | Remove o clipe selecionado, o gap selecionado ou o elemento sob a agulha e **fecha o espaço**, puxando os cortes posteriores das pistas com Sync Lock. |
+| **Lift delete** | `Delete` ou `Alt+R` | Remove o clipe e deixa um **gap** no lugar, sem mexer nos demais. |
+
+### 5.6 Edição rápida com uma mão (Q-W-E-R e A-S-D-F)
+
+Para montar rápido com a mão esquerda, sem depender do mouse:
+
+- `Q` (ripple trim head): corta do início do clipe até a agulha e fecha o vão.
+- `W` (ripple trim tail): corta da agulha até o fim do clipe e fecha o vão.
+- `E`: divide o clipe sob a agulha, sem seleção prévia (se houver clipe selecionado, divide o selecionado).
+- `R`: ripple delete do clipe ou gap selecionado (ou do que estiver sob a agulha).
+- `A` e `S`: levam a agulha ao ponto de corte anterior e ao seguinte.
+- `D`: seleciona o clipe sob a agulha na pista ativa. `Shift+D` seleciona todos os clipes sob a agulha nas pistas destravadas, somando à seleção.
+- `F`: ativa ou desativa o clipe. Clipes desativados ganham hachura diagonal e a etiqueta `[DESATIVADO]`, ficam sem áudio no player e são ignorados na exportação.
+
+> **Atenção:** `A` tem papéis diferentes conforme o contexto. Com o foco na timeline, pula para o corte anterior; com a biblioteca ou o Source Player em foco, abre o Inspetor de Mídia (seção 9.1).
+
+### 5.7 Seleção acompanha a agulha
+
+Ativo por padrão. Ao navegar (`J`/`K`/`L`, setas, `A`/`S` ou arrastando na régua), o clipe que cruza a agulha na pista ativa é selecionado automaticamente, o que permite fazer trims, divisões e ajustes no Inspetor sem tocar no mouse. Alterne com `Ctrl+Alt+P` ou pelo botão com indicador ciano na barra de ferramentas.
+
+### 5.8 Vínculo de clipes (A/V) e J/L-cuts
+
+- **Vínculo automático.** Vídeo e seu áudio entram acoplados: ao mover o vídeo, o áudio acompanha em sincronia.
+- **J-cut e L-cut.** Para fazer edições independentes (por exemplo, estender o áudio de uma fala sobre o B-roll seguinte), selecione o clipe e desvincule o par com `Ctrl+Shift+U`. Depois disso, você pode mover e aparar cada pista separadamente.
+- **Ripple trim.** Arraste a borda de corte segurando `Ctrl` para ajustar a duração e empurrar ou puxar os clipes seguintes nas pistas com Sync Lock.
+
+> **Atenção:** a tecla `U` sozinha não desvincula: ela seleciona a ferramenta **Slide**. Em alguns contextos `Ctrl+L` também desvincula, mas ele serve ao loop de reprodução; prefira `Ctrl+Shift+U`.
+
+### 5.9 Dividir o clipe na agulha
+
+`E` ou `Z` cortam o clipe sob a agulha, sem seleção prévia. Se o vídeo tem áudio vinculado, o corte vale para os dois; `Alt+E` ou `Alt+Z` dividem só a pista selecionada.
+
+### 5.10 Compatibilidade de volume em sobreposições
+
+Efeitos de volume em B-rolls e J/L-cuts, inclusive os gerados pela IA ou vindos de montagens externas, são reconhecidos normalmente. Arrastar a agulha e reproduzir atravessam sobreposições, fades e crossfades sem travar.
+
+### 5.11 Controles nativos de pistas (mute, solo, sync lock e trava)
+
+Cada cabeçalho de pista (V1/V2 para vídeo, A1/A2 para áudio) tem botões próprios:
+
+- **Mute:** silencia o áudio da pista.
+- **Solo:** isola a pista, silenciando ou ocultando temporariamente as demais.
+- **Sync Lock:** define se a pista acompanha as operações de ripple (cor ciano = ativo).
+- **Trava (cadeado):** protege a pista contra qualquer edição.
+- **Visibilidade (olho):** oculta a imagem da pista no Program Player.
+
+#### Trava de pista × Sync Lock
+
+Os dois são "travas", mas fazem o oposto um do outro:
+
+| | **Sync Lock** | **Trava de pista (cadeado)** |
+|---|---|---|
+| Pergunta que responde | "Esta pista **acompanha** o ripple?" | "Esta pista **pode ser editada**?" |
+| Quando ligado | A pista se desloca junto com fechamentos de gap, ripple delete e ripple insert, mantendo a sincronia com o resto. | **Nada** na pista pode ser movido, aparado, dividido ou apagado, nem por você, nem em ripple, nem pelas ferramentas de seleção. |
+| Quando desligado | A pista fica parada no tempo durante o ripple (bom para música e ambiente). | A pista volta a ser editável. |
+| Uso típico | Manter trilha musical no lugar enquanto o diálogo é encurtado. | Proteger uma pista já aprovada (ex.: música, narração fechada). |
+
+Atalhos no perfil CapIAu:
+
+- `Shift+L`: trava ou destrava a **pista ativa**.
+- `Ctrl+Alt+Shift+L`: trava ou destrava **todas** as pistas (vídeo, áudio e texto).
+
+O botão de cadeado mostra o cadeado fechado quando a pista está travada, e o tooltip indica o atalho em uso. Pistas travadas também são ignoradas pelos comandos que agem "em todas as pistas", como o `Shift+D`.
+
+> **Dica:** combine os dois. Uma trilha musical pode estar com **Sync Lock desligado** (não se move durante os ripples) e **trava ligada** (você não a desloca sem querer ao mexer em outras coisas).
+
+> **Vindo do Premiere/Resolve/FCP/Kdenlive:** o Sync Lock é equivalente ao "Sync Lock" do Premiere e ao "Auto Select" invertido do Resolve; a trava de pista corresponde ao cadeado "Lock Track" (Premiere/Resolve).
+
+### 5.12 Marcadores de timeline e de clipe
+
+- **Marcadores de régua:** presos à régua, para anotações globais de estrutura.
+- **Marcadores de clipe:** se a agulha estiver sobre um clipe de vídeo (em V1 ou V2), o marcador fica preso ao clipe e acompanha o vídeo se ele for movido.
+- **Edição rápida pelo teclado.** `M` abre um cartão compacto no canto inferior direito. O vídeo **continua tocando** enquanto você digita:
+  1. Digite o nome do marcador.
+  2. `Tab` vai para a Descrição e `Tab` de novo para a Cor.
+  3. `Enter` ou `Esc` salva e fecha.
+  4. `M` outra vez salva o atual e abre um novo na posição da agulha.
+- **Seleção múltipla.** `Shift+clique` seleciona vários marcadores (borda branca brilhante); `Delete` ou `Backspace` apaga todos de uma vez.
+- **Navegação.** `Shift+M` salta para o próximo marcador e `Alt+M` volta ao anterior.
+
+### 5.13 Pontos de entrada e saída (In/Out), loop, lift e extract
+
+- **Marcar intervalos.** `I` marca a entrada (In) e `O` a saída (Out), na timeline ou no Source. `Alt+X` limpa as duas marcações.
+- **Navegar.** `Shift+I` leva a agulha ao ponto In e `Shift+O` ao Out.
+- **Loop contínuo (`Ctrl+L`).** Ao chegar no Out, o player volta ao In: ideal para refinar transições e diálogos.
+- **Lift (`;`).** Remove o trecho In–Out das pistas ativas deixando um gap, sem deslocar o resto.
+- **Extract (`'`).** Remove o trecho In–Out e fecha o espaço com ripple nas pistas com Sync Lock.
+- **Agulha e marcadores.** A agulha tem prioridade de clique no topo da régua, mesmo sobre marcadores In/Out. O cursor muda conforme o alvo: vermelho para a agulha, ciano para o ponto In, rosa para o ponto Out, e um cursor bidirecional para deslocar todo o intervalo mantendo a duração (segure `Alt` ou `Shift`).
+
+### 5.14 Zoom até o nível de quadro e zoom to fit
+
+- O zoom horizontal vai de uma visão ampla de sequências longas até o **quadro individual**. No zoom máximo, a régua mostra os quadros numerados, inclusive em taxas fracionárias como 23,976 e 59,94 fps.
+- **Ajustar a sequência na tela (zoom to fit).** `\` ou `Shift+Z`, ou o botão de zoom to fit na régua. Um segundo acionamento restaura o zoom e a rolagem anteriores.
+- **Zoom padrão.** `Ctrl+1` restaura o zoom de trabalho padrão no perfil CapIAu.
+- **Mover pela timeline.** `H`, a barra de `Espaço` pressionada ou o botão do meio do mouse ativam a ferramenta Mão (arrastar para navegar).
+- **Roda do mouse sobre a régua** aplica zoom centrado no cursor, sem teclas modificadoras.
+
+### 5.15 Miniaturas nas pistas
+
+Para equilibrar visual e desempenho em sequências densas, há três modos de miniatura de vídeo, escolhidos no botão de opções de visualização da timeline:
+
+1. **Rolo de filme (filmstrip):** miniaturas repetidas ao longo do clipe, em intervalo proporcional ao zoom.
+2. **Só o início:** uma miniatura na borda esquerda, deixando a pista limpa.
+3. **Nenhuma:** sem miniaturas, deixando a máquina livre para formas de onda e edição ágil.
+
+As miniaturas mantêm a proporção real (16:9, 9:16 ou 1:1) sem cortes. O menu de opções se abre para cima automaticamente quando a timeline está na base da tela.
+
+### 5.16 Altura das pistas
+
+- **Uma pista:** `Shift` + roda do mouse sobre o cabeçalho da pista (altura de 22 a 240 px).
+- **Todas as pistas:** `Shift` + roda sobre a área dos clipes ou a régua, ou `Numpad +` e `Numpad -`.
+- Também é possível arrastar a borda inferior do cabeçalho de uma pista.
+
+### 5.17 Montagem de 3 e 4 pontos e canais de destino
+
+Leve trechos do Source Player (marcados com In/Out) direto para a agulha da timeline:
+
+- **Insert (`,`):** divide os clipes sob a agulha e insere o trecho, empurrando os seguintes nas pistas com Sync Lock. A agulha avança até o fim do trecho inserido, pronta para o próximo.
+- **Overwrite (`.`):** substitui o trecho da timeline, a partir da agulha, pela duração do In–Out do Source, sem alterar a duração total.
+- **Canais de destino (`Ctrl+Alt+A`):** alterna entre `AV` (vídeo e áudio vinculados), `V` (só vídeo, ideal para B-rolls) e `A` (só áudio, ideal para narração e depoimentos em off; fotos são protegidas no modo áudio). Há também um botão no Source Player.
+- **Desfazer e refazer** (`Ctrl+Z`, `Ctrl+Y`) restauram os clipes e a posição exata da agulha.
+
+### 5.18 Localizar o quadro original (Match Frame e Reverse Match Frame)
+
+- **Match Frame (`Alt+F`).** Com a agulha sobre um clipe da timeline, abre o Source Player no mesmo instante da mídia original, mostrando no controle deslizante os limites do corte (para ver sobras e handles). Se há mais de uma pista sob a agulha, vale a pista selecionada; sem seleção, a de vídeo mais alta visível (V2 antes de V1, depois A2 e A1). O foco passa para o Source.
+- **Reverse Match Frame (`Shift+F`).** A partir de qualquer ponto do Source, localiza onde aquele quadro foi usado na timeline. Se a mídia foi usada em vários cortes, começa pela ocorrência mais próxima da agulha e, a cada novo `Shift+F`, cicla pelas demais (vídeo e áudio vinculados contam como uma ocorrência só).
+  - Durante a navegação aparece um mini painel no Source (ex.: `2 / 3 · V1`) com botões de anterior e próximo.
+  - O botão de reverse match mostra um selo com o total de usos e abre uma lista; ela fica aberta enquanto o mouse estiver sobre ela.
+  - A agulha salta para o ponto, o clipe é selecionado e pulsa em ciano. Se o quadro não está na timeline, um aviso (toast) informa.
+
+### 5.19 Velocidade do clipe, reprodução reversa e preenchimento de lacunas
+
+- **Diálogo de velocidade e duração (`Ctrl+R`).** Com um clipe selecionado, pressione `Ctrl+R` (ou botão direito › **Velocidade e Duração...**). A janela é arrastável e a barra de `Espaço` continua controlando o Play/Pause do Program Player, para você testar sem fechar o diálogo.
+- **Conversão em ambos os sentidos.** Digite a velocidade em porcentagem (`50%`, `200%`) ou a duração desejada em timecode ou quadros, e o outro valor é recalculado. Duplo clique no campo de porcentagem volta a 100%.
+- **Deslocar posteriores (ripple) × manter duração.** No primeiro modo, os cortes seguintes avançam ou recuam; no segundo, a velocidade muda sem alterar o espaço ocupado.
+- **Reverso.** Marque **Inverter Reprodução** ou digite valores negativos. O clipe toca de trás para frente e o selo de velocidade fica vermelho (ex.: `-100%`).
+- **Fit to Gap (`Ctrl+Alt+R`).** Ajusta a velocidade do clipe selecionado para preencher exatamente a lacuna vizinha, sem empurrar a montagem. No botão direito, ao lado de gaps: **Preencher Lacunas (Ambos)**, **Preencher Lacuna à Frente** e **Preencher Lacuna Atrás**.
+
+### 5.20 Rate Stretch: velocidade arrastando a borda
+
+Altere a velocidade de forma tátil, diretamente na timeline:
+
+- **Ferramenta:** `Shift+R` ou `X` (perfil CapIAu), ou o botão na barra vertical de ferramentas. `V` volta à seleção.
+- **Durante o arraste**, uma dica flutuante mostra a velocidade (de 10% a 1000%), o multiplicador (ex.: `0.50x`) e a nova duração.
+- **Esticar** a borda deixa o clipe mais lento; **comprimir** o deixa mais rápido. O arraste respeita o snapping e as barreiras de gaps ou do fim da mídia.
+- **Áudio e vídeo vinculados** são esticados juntos, com correção de tom (pitch) no áudio. Com `Alt` pressionado, só a pista clicada é esticada.
+- `Esc` durante o arraste cancela e restaura o clipe.
+
+### 5.21 Congelar quadro (Freeze Frame)
+
+Cria um quadro congelado a partir de qualquer instante do vídeo:
+
+- **Como acionar:** posicione a agulha e pressione `Ctrl+Shift+F`, clique no botão de congelar quadro ou escolha **Congelar Quadro** no menu de contexto do clipe.
+- O quadro congelado pode ser **esticado livremente** na timeline, sem limite da duração do arquivo original.
+- Funciona em modo **ripple** (abre espaço) ou **overwrite** (substitui o trecho).
+- A pista de áudio pareada recebe um gap silencioso da mesma duração. Na timeline, o clipe ganha visual ciano-gelo e miniaturas fixas.
+
+### 5.22 Subclipes virtuais
+
+Subclipes recortam trechos de arquivos longos sem duplicar mídia nem gerar novos proxies:
+
+- **Criar:** no Source Player, marque In (`I`) e Out (`O`) e pressione `Ctrl+U`, ou clique no botão de tesoura.
+- Um diálogo mostra os timecodes e a duração, e oferece **sugestões de nome** baseadas na decupagem da IA ou na transcrição daquele trecho.
+- Os limites do subclipe são firmes: na timeline, o trim não passa do intervalo que você definiu.
+- Na biblioteca o subclipe ganha o selo `SUB` e o hover mostra só o intervalo In–Out. Na timeline, o título recebe o prefixo `✂`.
+
+### 5.23 Substituição de clipe (Replace Edit)
+
+Troque a mídia de um clipe da timeline sem perder o trabalho de montagem:
+
+- **Alt + arrastar:** solte uma mídia da biblioteca ou do Source sobre um clipe segurando `Alt`; o destaque `[REPLACE]` aparece e, ao soltar, a mídia é trocada.
+- **Atalho:** selecione o clipe, escolha o quadro no Source (ou marque o In) e pressione `Ctrl+Shift+R`.
+- Ficam inalterados: posição, duração, velocidade, ligação áudio/vídeo, cor e enquadramento (inclusive Ken Burns).
+
+### 5.24 Entrada numérica de timecode
+
+Os displays de timecode do Source, do Program e da timeline aceitam digitação direta. Clique neles ou use `Ctrl+G`:
+
+| Digite | Efeito |
+|---|---|
+| `+50`, `-24` | Avança ou recua 50 ou 24 quadros a partir da agulha |
+| `+2s`, `-1.5s` | Avança ou recua em segundos |
+| `1.`, `10.`, `1..` | Salta 1 segundo, 10 segundos, 1 minuto |
+| `1200`, `100`, `50` | Vai a `00:00:12:00`, `00:00:01:00` e ao quadro 50 |
+| `HH:MM:SS:FF` | Timecode absoluto, com ou sem separadores |
+
+Cada salto entra no histórico e pode ser desfeito com `Ctrl+Z`.
+
+### 5.25 Rolagem automática que segue a agulha
+
+Mantém a agulha sempre visível durante a reprodução. Ative com `Ctrl+Alt+F` ou pelo botão com indicador ciano na barra de ferramentas.
+
+- **Modo página:** ao chegar perto da borda direita, a timeline avança uma tela inteira (também em reprodução reversa).
+- **Modo suave:** a visualização acompanha a agulha continuamente.
+- **Âncora ajustável (30% a 70%):** no menu de opções de visualização, escolha se a agulha corre mais à esquerda, no centro ou mais à direita.
+- A configuração é lembrada entre sessões.
+
+### 5.26 Indicadores de sincronia A/V e ressincronização
+
+Quando vídeo e áudio vinculados saem de sincronia (por exemplo, após trims de J-cut ou L-cut), selos discretos nas bordas dos clipes mostram o descompasso em quadros (ex.: `+2f`, `-5f`). Clique com o botão direito no clipe ou no selo:
+
+- **Mover para Sincronia:** desloca o clipe na timeline para realinhar com o par.
+- **Deslizar Conteúdo (Slip) para Sincronia:** compensa dentro da própria mídia, sem mover o clipe nem abrir lacunas.
+
+O ripple delete também protege os pares vinculados: se o vídeo sofre uma extração, o áudio associado acompanha na mesma medida, evitando descompassos de lábio.
+
+### 5.27 Ferramentas Rolling, Slip e Slide
+
+Além da seleção e da lâmina (`C` corta uma pista; `Shift+C` corta todas), três ferramentas de ajuste fino mexem em emendas sem alterar a duração total da montagem. Escolha pela barra vertical de ferramentas da timeline ou pelo teclado (perfil CapIAu):
+
+| Ferramenta | Atalho | O que faz |
+|---|---|---|
+| **Rolling Edit** | `Shift+N` | Move a emenda entre dois clipes: um ganha o que o outro perde, com o tempo total constante. |
+| **Slip** | `Y` | Desliza o conteúdo dentro do clipe (muda qual trecho da mídia aparece) sem mover o clipe nem alterar sua duração. |
+| **Slide** | `U` | Desliza o clipe entre os vizinhos, que se ajustam para compensar. |
+
+> **Atenção:** `U` seleciona a ferramenta Slide; ela não desvincula áudio e vídeo (para isso, veja 5.8). `V` volta à ferramenta de seleção.
+
+---
+
+## 6. Tratamento de áudio: diagnóstico, presets e comparação A/B
+
+Editar vídeo e editar áudio são ofícios diferentes. Esta seção existe para você não precisar do segundo: o programa **mede** o áudio do clipe e diz o que fazer, em vez de esperar que você reconheça o problema de ouvido.
+
+### 6.1 As duas naturezas de ajuste
 
 O painel **Ajustes** separa duas coisas que se comportam de formas opostas:
 
-- **Ao vivo** — Equalizador e Dinâmica. Muda na hora, enquanto o clipe toca, e
-  você desfaz quando quiser. **Não gera arquivo nenhum.** É o lugar de
-  experimentar.
-- **Renderizado** — a seção Tratamento. Gera um arquivo novo, demora, e entra
-  numa fila. O arquivo derivado fica em
-  `data/audio_tratado/{id_do_video}/{hash}.wav`; o nome é um código de 64
-  caracteres porque é ele que evita reprocessar quando você reaplica a mesma
-  receita. **O seu arquivo original nunca é tocado** — o clipe só passa a
-  apontar para o tratado.
+- **Ao vivo:** Equalizador e Dinâmica. Mudam na hora, enquanto o clipe toca, e você desfaz quando quiser. **Não geram arquivo.** É o lugar de experimentar.
+- **Renderizado:** a seção Tratamento. Gera um arquivo novo, demora e entra em uma fila. O arquivo derivado fica em `data/audio_tratado/` e **o seu arquivo original nunca é tocado**: o clipe passa a apontar para o tratado. Se você reaplicar a mesma receita, o resultado volta instantaneamente.
 
-### B. Passo 1: diagnosticar
+### 6.2 Passo 1: diagnosticar
 
-1. Clique num clipe de áudio na timeline (ou num vídeo com áudio vinculado).
-2. Na seção **Diagnóstico de Áudio**, clique em **Analisar**. Leva ~3 segundos
-   num clipe de um minuto.
-3. Leia as cinco linhas. Cada uma vem com um selo: **verde** está bom, **âmbar**
-   pede atenção, **vermelho** é problema sério.
+1. Clique em um clipe de áudio na timeline (ou em um vídeo com áudio vinculado).
+2. Na seção **Diagnóstico de Áudio**, clique em **Analisar**. Leva cerca de 3 segundos para um clipe de um minuto.
+3. Leia as cinco linhas. Cada uma vem com um selo: **verde** está bom, **âmbar** pede atenção, **vermelho** é problema sério.
 
 | Linha | O que quer dizer | Quando incomoda |
 |---|---|---|
-| Loudness | volume médio do trecho | longe do alvo −16 LUFS, o clipe soa mais alto ou mais baixo que os vizinhos |
-| Pico real | o instante mais alto | acima de 0 dBTP é distorção; baixar o volume depois não desfaz |
-| Clipping | fração de amostras no talo | quase nunca acende neste acervo; confie no Pico real |
-| Ruído | som de fundo entre as falas | acima de −35 dB o chiado aparece na montagem |
-| Dinâmica | diferença entre o alto e o baixo | LRA abaixo de 5 já está esmagado: **não comprima de novo** |
+| Loudness | Volume médio do trecho, em [LUFS](https://github.com/fernangcortes/capiau-talho-v03/wiki/18.-Glossario-Visual-e-Terminologia) | Longe do alvo de −16 LUFS, o clipe soa mais alto ou mais baixo que os vizinhos |
+| Pico real | O instante mais alto | Acima de 0 dBTP é distorção; baixar o volume depois não desfaz |
+| Clipping | Fração de amostras no limite | Quase nunca acende; confie no Pico real |
+| Ruído | Som de fundo entre as falas | Acima de −35 dB o chiado aparece na montagem |
+| Dinâmica | Diferença entre o alto e o baixo | LRA abaixo de 5 já está esmagado: **não comprima de novo** |
 
-4. Se houver o ícone **(i)** ao lado de uma linha, clique nele: abre uma
-   explicação detalhada com um bloco **Na prática** dizendo o que fazer.
-5. Ao final aparece a **sugestão de preset**. Ela sai da medição, não de chute.
+4. Se houver o ícone **(i)** ao lado de uma linha, clique nele: abre uma explicação com um bloco **Na prática** dizendo o que fazer.
+5. Ao final aparece a **sugestão de preset**, que sai da medição, não de chute.
 
-### C. Passo 2: ver *onde* está o problema
+### 6.3 Passo 2: ver onde está o problema
 
-Depois de analisar, o clipe ganha uma **faixa fina na base** com marcas
-vermelhas onde o som estourou, e a seção lista os **piores momentos com
-timecode**. Clicar num momento leva o playhead até lá para você ouvir.
+Depois de analisar, o clipe ganha uma **faixa fina na base** com marcas vermelhas onde o som estourou, e a seção lista os **piores momentos com timecode**. Clicar em um momento leva a agulha até lá para você ouvir.
 
-> Quando o material estoura de ponta a ponta — captação ruim de verdade — a
-> faixa é quem informa; a lista fica cheia demais para servir. Em material com
-> estouro ocasional (uma pancada, uma risada), a lista é o atalho.
+> **Dica:** quando o material estoura de ponta a ponta (captação ruim de verdade), a faixa informa melhor que a lista. Em material com estouro ocasional (uma pancada, uma risada), a lista é o atalho.
 
-### D. Passo 3: escolher o preset
+### 6.4 Passo 3: escolher o preset
 
 | Preset | Para quê | Espera (entrevista de 22 min) |
 |---|---|---|
-| **Só entrega** | áudio já limpo, só falta o volume certo | ~43 s |
-| **Resgate de captação estourada** | o caso comum: distorcido e barulhento | ~43 s |
-| **Ambiência preservada** | rua, feira, som direto — limpar sem matar o ambiente | ~43 s |
-| **Prévia rápida** | só normalizar para ouvir | ~43 s |
-| **Resgate com IA (lento)** | quando o filtro clássico deixou artefato | **~16 min** |
-| **Voz limpa com IA (lento)** | boa captação em que só o chiado incomoda | **~16 min** |
+| **Só entrega** | Áudio já limpo, só falta o volume certo | cerca de 43 s |
+| **Resgate de captação estourada** | O caso comum: distorcido e barulhento | cerca de 43 s |
+| **Ambiência preservada** | Rua, feira, som direto: limpar sem matar o ambiente | cerca de 43 s |
+| **Prévia rápida** | Só normalizar para ouvir | cerca de 43 s |
+| **Resgate com IA (lento)** | Quando o filtro clássico deixou artefato | cerca de 16 min |
+| **Voz limpa com IA (lento)** | Boa captação em que só o chiado incomoda | cerca de 16 min |
 
-Os dois de IA usam uma rede neural rodando no seu computador. Limpam bem melhor
-— o piso de ruído desce cerca de 13 dB a mais — mas são **cerca de 45 vezes mais
-lentos** que os outros. Precisam de instalação (veja o README) e o programa avisa
-se faltar.
+Os presets clássicos usam cadeias de filtros do FFmpeg (remoção de ruído contínuo, de-click, equalização de voz e limitador suave). Os dois de IA usam uma rede neural de denoise (DPDFNet) rodando no seu computador: limpam bem melhor (o piso de ruído desce cerca de 13 dB a mais), mas são **cerca de 45 vezes mais lentos**. Os tempos acima são de referência e variam com a máquina. O modelo de denoise precisa ser baixado uma vez (veja a [Instalação e Configuração](https://github.com/fernangcortes/capiau-talho-v03/wiki/02.-Instalacao-e-Configuracao)) e o programa avisa se estiver faltando.
 
-### E. Passo 4: prever antes de comprometer
+### 6.5 Passo 4: prever antes de comprometer
 
-**Sempre clique em "Prever 15 s" primeiro.** Ele trata só 15 segundos a partir
-do ponto de entrada do clipe:
+**Sempre clique em "Prever 15 s" primeiro.** Ele trata só 15 segundos a partir do ponto de entrada do clipe:
 
 - com preset clássico, responde em cerca de 1 segundo;
-- com preset de IA, em cerca de 10 segundos — contra os 16 minutos do clipe
-  inteiro.
+- com preset de IA, em cerca de 10 segundos, contra os 16 minutos do clipe inteiro.
 
-Ouça o A/B (**Tratado** × **Original**) e só então decida. É a diferença entre
-descobrir em 10 segundos que a receita não serve, ou em 16 minutos.
+Ouça o A/B (**Tratado** × **Original**) e só então decida. É a diferença entre descobrir em 10 segundos que a receita não serve, ou em 16 minutos.
 
-### F. Passo 5: aplicar, comparar e descartar
+### 6.6 Passo 5: aplicar, comparar e descartar
 
-1. Clique em **Aplicar**. O tratamento entra numa fila e o painel mostra o
-   progresso; você continua montando.
-2. Quando ficar pronto, a seção **Resultado** mostra os números de antes e
-   depois lado a lado, e o caminho do arquivo gerado.
+1. Clique em **Aplicar**. O tratamento entra em uma fila e o painel mostra o progresso; você continua montando.
+2. Quando ficar pronto, a seção **Resultado** mostra os números de antes e depois lado a lado.
 3. Alterne **Tratado** × **Original** para comparar de ouvido.
-4. **Descartar** remove o tratamento do clipe. O arquivo continua no disco — se
-   você reaplicar a mesma receita, ele volta instantaneamente, sem reprocessar.
+4. **Descartar** remove o tratamento do clipe. O arquivo continua no disco: se você reaplicar a mesma receita, ele volta na hora.
 
-### G. Ajustes ao vivo (Equalizador e Dinâmica)
+### 6.7 Ajustes ao vivo (Equalizador e Dinâmica)
 
-Estes você mexe **durante a reprodução** e ouve na hora:
+Você mexe **durante a reprodução** e ouve na hora:
 
-- **Corte de graves (HPF)** — 80 Hz elimina ruído de mesa, vento e pisada sem
-  tocar na voz. É o primeiro a tentar.
-- **Graves / Médios / Agudos** — correção de timbre.
-- **Gate** — silencia o fundo quando ninguém fala.
-- **Compressor** e **ganho de compensação** — emparelham os picos da fala.
+- **Corte de graves (HPF):** 80 Hz elimina ruído de mesa, vento e pisada sem tocar na voz. É o primeiro a tentar.
+- **Graves / Médios / Agudos:** correção de timbre.
+- **Gate:** silencia o fundo quando ninguém fala.
+- **Compressor** e **ganho de compensação:** emparelham os picos da fala.
 
-Cada seção tem o olho (**bypass**, para comparar com e sem) e a seta
-(**reset**). Os valores ficam salvos no clipe e vão junto na exportação — mas
-como EQ e compressor **não atravessam FCPXML nem EDL**, eles são declarados num
-arquivo `.txt` gerado ao lado do export, para o mixador reproduzir na DAW.
+Cada seção tem o olho (**bypass**, para comparar com e sem) e a seta (**reset**). Os valores ficam salvos no clipe e vão junto na exportação. Como EQ e compressor **não atravessam XML (FCPXML) nem EDL**, eles são descritos em um arquivo `.txt` gerado ao lado do export, para quem faz a mixagem reproduzir na estação de áudio.
 
-### H. Se você tem conta no Auphonic (nuvem)
+### 6.8 Restauração avançada com Auphonic (nuvem)
 
-Com a chave configurada em **Configurações › Modelos & Chaves**, o motor
-**Auphonic** fica disponível. Ele faz o que o processamento local não faz:
-remoção de reverberação, realce automático de voz e limpeza preservando a
-ambiência.
+Com a chave informada no campo **Chave Auphonic**, em **Configurações › Modelos & Chaves** (ou na variável `AUPHONIC_API_KEY` do `.env`; o painel tem prioridade sobre o `.env`), o motor **Auphonic** fica disponível. Ele faz o que o processamento local não faz: remoção de reverberação, realce automático de voz, nivelamento dinâmico, AutoEQ e limpeza preservando a ambiência.
 
-O plano gratuito são **2 horas por mês**. O painel mostra quanto resta e avisa
-quando está acabando. Duas proteções: sem cota suficiente o programa recusa
-**antes** de enviar qualquer coisa, e a prévia de 15 s nunca vai para a nuvem —
-gastaria cota para responder o que o motor local responde de graça.
+O plano gratuito oferece **2 horas por mês**. O painel mostra quanto resta e avisa quando está acabando. Há duas proteções: sem cota suficiente o programa recusa **antes** de enviar qualquer coisa, e a prévia de 15 s nunca vai para a nuvem (gastaria cota para responder o que o motor local responde de graça).
 
-> **Conta prática:** não mande a entrevista bruta. Mande o trecho que entra no
-> filme. Com o aproveitamento típico de um documentário, as suas horas de bruto
-> viram menos de uma hora de material usado — cabe no mês com folga.
+> **Dica:** não mande a entrevista bruta. Mande o trecho que entra no filme. Com o aproveitamento típico de um documentário, as suas horas de bruto viram menos de uma hora de material usado, e isso cabe no mês com folga.
 
-Em **Ajustes da nuvem** você vê o que a medição decidiu campo a campo e pode
-discordar de qualquer um. Só o que você alterar vai como manual; o resto
-continua automático. Uma coisa não é negociável nem ali: **corte automático de
-silêncio e de hesitação fica sempre desligado** — documentário não corta
-sozinho.
+Em **Ajustes da nuvem** você vê o que a medição decidiu campo a campo e pode discordar de qualquer um; só o que você alterar vai como manual. Uma coisa não é negociável nem ali: **corte automático de silêncio e de hesitação fica sempre desligado**. Para o guia detalhado do Auphonic, consulte [docs/AUPHONIC_AUDIO_RESTORATION_GUIDE.md](docs/AUPHONIC_AUDIO_RESTORATION_GUIDE.md).
 
 ---
 
-## 🔄 7. Carrossel de Alternativas da IA (Atalho A)
+## 7. Carrossel de alternativas da IA
 
-Sempre que a IA propuser e inserir um vídeo na timeline, ela indexará
-trechos alternativos parecidos do acervo. Isso permite que você
-substitua clipes de forma extremamente dinâmica:
+Sempre que a IA propõe e insere um vídeo na timeline, ela guarda trechos alternativos parecidos do acervo. Isso permite trocar clipes de forma dinâmica:
 
-1.  **Selecionar e Abrir:** Clique em qualquer clipe gerado pela IA
-    (identificado com borda diferenciada) na timeline para selecioná-lo
-    e pressione a tecla **A** no teclado.
+1. **Abrir.** Selecione um clipe gerado pela IA (com borda diferenciada) e pressione `Alt+A` no perfil CapIAu.
+2. **Modal com prévias.** Aparece um modal com um cartão por alternativa, cada um tocando em loop mudo de 5 segundos o trecho exato recomendado.
+3. **Substituir.** Sob a justificativa de cada cartão há dois botões:
+   - **Slot fixo:** troca a mídia ajustando In e Out para caber exatamente na mesma duração da timeline.
+   - **Ripple:** troca aplicando a duração ideal recomendada do candidato e empurra ou puxa os clipes seguintes da pista.
+4. **Desfazer.** Todas as trocas entram no histórico e podem ser revertidas com `Ctrl+Z`.
 
-2.  **Modal com Vídeo Previews:** Um modal com fundo desfocado surgirá
-    no centro da tela, exibindo um card para cada clipe alternativo.
-    Cada card mostra o vídeo correspondente rodando automaticamente em
-    loop silencioso de 5 segundos daquele trecho exato da recomendação.
-
-3.  **Mecanismo de Substituição (Swap):** Abaixo da justificativa de uso
-    do clipe, você encontrará dois ícones de linha para substituição:
-
-    - **↔ Slot Fixo:** Substitui a mídia atual pelo candidato
-      selecionado, ajustando os pontos de entrada e saída para caber
-      exatamente na mesma duração da timeline.
-
-    - **↠ Ripple:** Substitui o clipe aplicando a duração ideal
-      recomendada do candidato e empurra (ou puxa) automaticamente todos
-      os clipes subsequentes da mesma trilha.
-
-4.  **Desfazer:** Todas as trocas são salvas no histórico local e podem
-    ser revertidas com Ctrl+Z.
-
-## 🎬 8. Salvando, Auto-Salvamento & Logs com IA
-
-### A. Auto-Salvamento Automático
-
-Você não precisa se preocupar em salvar manualmente a cada modificação.
-O sistema possui um mecanismo de **auto-salvamento em segundo plano**
-super otimizado (debounce de 1s) que grava automaticamente no
-localStorage do seu navegador:
-
-- **Resiliência Total:** Se você fechar a aba ou atualizar a página com
-  F5 ou Ctrl+F5, toda a timeline (cortes, pistas, ghosts) e preferências
-  de visualização (zoom, scrolls, playhead, seleções) serão restauradas
-  instantaneamente.
-
-- **Histórico Retido:** A pilha completa de Undo/Redo (Ctrl+Z / Ctrl+Y)
-  também é restaurada, permitindo continuar desfazendo ações livremente.
-
-- **Por Projeto:** Os auto-salvamentos são salvos individualmente por ID
-  de projeto, evitando misturar timelines de trabalhos diferentes.
-
-### B. Salvamento Permanente e Exportação
-
-1.  Para criar uma versão fixa no banco de dados, dê um nome para a sua
-    sequência no campo de texto (ex: *Montagem Inicial*).
-
-2.  Clique em **Salvar** para gravar a timeline no SQLite.
-
-3.  Escolha o formato de saída no seletor (XML para
-    Premiere/Resolve/FCP, OpenTimelineIO .otio ou EDL).
-
-4.  **Exportação com Proxies Locais:** Se desejar transferir a timeline para outro
-    computador sem carregar discos de mídias originais pesadas, marque a opção
-    **"Usar proxies locais"**. O sistema gerará o arquivo (ex: `montagem_proxy.otio`)
-    apontando diretamente para os vídeos leves em `data/proxies/`.
-
-5.  Clique em **Exportar**. O download iniciará no seu navegador e o
-    arquivo estará pronto para ser importado no seu editor NLE
-    profissional.
-
-### C. Importação de Timelines (o caminho inverso)
-
-O CapIAu também importa timelines criadas em editores externos
-(Kdenlive, Premiere, Resolve, Final Cut) ou exportadas por ele mesmo:
-
-1.  Na barra de ferramentas da timeline, clique no ícone
-    **Importar Timeline** (ao lado do Exportar).
-
-2.  Escolha o arquivo: **.otio** (OpenTimelineIO), **.xml**
-    (Premiere/Resolve/FCP) ou **.edl**. O nome da nova timeline é
-    preenchido automaticamente com o nome do arquivo — ajuste se quiser.
-
-3.  Clique em **Importar**. Cada clipe é **religado à mídia já
-    ingerida** no projeto pelo caminho do arquivo (se o caminho mudou,
-    o sistema tenta casar pelo nome único do arquivo). Nada é copiado
-    nem re-ingerido.
-
-4.  Se algum arquivo não existir no acervo, o clipe vira uma **lacuna
-    na posição original** e o diálogo lista tudo o que ficou ausente
-    para você religar manualmente depois.
-
-5.  Com a opção **"Carregar na tela após importar"** marcada, a
-    timeline importada abre direto na linha do tempo, com pistas,
-    posições e lacunas preservadas.
-
-> **Dica:** o formato `.otio` abre sem nenhuma dependência extra. Já
-> `.xml` e `.edl` usam os mesmos adaptadores do export — se o Python do
-> sistema não tiver o pacote `opentimelineio`, converta a timeline para
-> `.otio` no editor de origem ou provisione o venv de exportação
-> (`data/venv312`).
-
-### D. Painel de Logs Avançado com IA
-
-Se você encontrar algum erro, quiser auditar as ações de sua edição ou
-queira gerar relatórios de forma assistida:
-
-1.  Abra a aba **Logs** na barra lateral direita (ícone de terminal
-    \>\_).
-
-2.  Lá você verá o console do sistema registrando ações, requisições de
-    APIs e erros em tempo real.
-
-3.  **Assistente de Logs (IA):**
-
-    - **Relatório Humano:** Clique neste botão para que a IA analise os
-      logs do terminal e crie uma lista resumida, não-técnica, de tudo o
-      que você fez durante a sessão.
-
-    - **Análise Técnica (OR):** Clique neste botão para acionar o
-      OpenRouter e realizar uma auditoria técnica profunda nos logs para
-      encontrar erros ou sugerir melhorias de desempenho.
-
-    - **Copiar & Limpar:** Use os botões de ação superior para copiar os
-      logs formatados para área de transferência ou limpar o histórico
-      atual.
-
-## 🎛️ 9. Layout e Organização Avançada
-
-### 📺 Inspetor de Mídia Integrado (Atalho A na Biblioteca)
-
-O sistema conta com um **Inspetor de Mídia Integrado** no menu lateral
-esquerdo, projetado para decupagens e análises profundas sem a poluição
-de popups flutuantes.
-
-- **Ativação Dinâmica:** Com uma mídia selecionada na biblioteca de
-  arquivos, pressione a tecla **A** (ou clique no card/lista). A barra
-  lateral direita é ocultada, a barra esquerda se expande para uma área
-  maior de destaque (recuperada do localStorage, padrão 650px) e o
-  **Source Player** é maximizado automaticamente para inspeção.
-
-- **Abas do Inspetor:**
-
-  - **Índice:** Exibe resumos IA e capítulos navegáveis (seeking no
-    player clássico).
-
-  - **Legenda:** Transcrição atômica e falantes editáveis (com dropdown
-    inteligente e criação de novos falantes), além de função para
-    fatiar/dividir diálogos no ponto da agulha.
-
-  - **Temas:** Adicione e remova temas narrativos diretamente e filtre
-    trechos com ponto de In/Out capturados em tempo real.
-
-  - **Rostos:** Galeria de rostos detectados com marcações temporais e
-    caixas de texto premium para rotular e desambiguar a identidade dos
-    personagens.
-
-  - **IA:** Gatilhos rápidos para processamento individual de ASR, Visão
-    (Gemini) e Rostos.
-
-- **Restauração de Estado:** Pressionar a tecla **A** novamente, a tecla
-  **Esc** ou clicar em **\"Voltar\"** fecha o Inspetor e restaura a
-  biblioteca exatamente como estava (sua aba ativa anterior, a barra
-  direita é reaberta e o clipe ativo anterior fica focado e com rolagem
-  automática).
-
-### 🎬 Operação e Interatividade Avançada dos Players
-
-Os painéis de monitor de vídeo (Source & Program) foram otimizados com
-controles intuitivos rápidos:
-
-- **Play / Pause:** Clique simples na área de vídeo de qualquer player
-  ativa ou pausa a reprodução.
-
-- **Maximizar / Minimizar:** Clique duplo rápido na área de vídeo de
-  qualquer player expande-o em tela cheia na área de visualização (ou
-  restaura a visualização dupla).
-
-- **Atalho de Swap (Q):** Quando um dos players estiver maximizado,
-  pressione a tecla **Q** ou clique no ícone de troca (⇄) no cabeçalho
-  do player para alternar instantaneamente entre a visualização
-  maximizada do Source e do Program.
-
-- **Exibição Inteligente do Program:** Se o Source Player estiver
-  maximizado e você interagir com a timeline (clicando em um clipe), o
-  sistema detecta que seu foco mudou para a montagem e **abre/maximiza o
-  Program Player automaticamente**, garantindo que você veja o resultado
-  do corte na linha do tempo.
-
-### Layouts Modulares de Edição e Workspace "Estúdio"
-
-- **Disposição dos Monitores (Source & Program):**
-  - **Lado a Lado (`side-by-side`):** Formato clássico horizontal com Source à esquerda e Program à direita.
-  - **Empilhados (`stacked`):** Source no topo e Program na base. Neste formato, cabeçalhos e controles de transporte flutuam no *hover* do mouse (`position: absolute`), permitindo aproveitamento de 100% da área útil do vídeo.
-  - Alterne instantaneamente pelo seletor no Header (`Monitores`) ou pelos botões nos cabeçalhos dos players.
-
-- **Posição e Expansão Direcional da Linha do Tempo (Timeline):**
-  - **Entre os Menus Laterais (`center`):** Timeline contida estritamente na coluna central, com as barras laterais estendidas verticalmente.
-  - **Expandida para a Esquerda (`bottom-left`):** Timeline passa por baixo dos menus esquerdos (Biblioteca e Inspetor), mantendo o painel direito estendido até a base.
-  - **Expandida para a Direita (`bottom-right`):** Timeline passa por baixo do menu lateral direito, mantendo os painéis esquerdos estendidos verticalmente.
-  - **Faixa de Baixo Completa (`bottom-full`):** Timeline estendida em 100% de largura total no rodapé da janela (Modo Estúdio panorâmico).
-  - Alterne dinamicamente pelos botões com setas direcionais (<i class="fa-solid fa-arrow-left"></i> / <i class="fa-solid fa-arrow-right"></i>) no Header, pelo modal de configuração de workspace ou pelas teclas rápidas do teclado numérico (**`Numpad 1`**, **`Numpad 2`** e **`Numpad 3`**).
-
-- **Desacoplamento e Persistência:**
-  - Ambas as opções funcionam de forma totalmente independente em qualquer workspace ativa (Padrão, Montagem, Decupagem ou personalizadas), sendo salvas automaticamente no `localStorage` e nos presets customizados de workspace.
-
-### 🗂️ Gestão e Reorganização de Workspaces (Modal Visual, Drag & Drop e Nudge)
-
-O CapIAu-Talho dispõe de um sistema flexível e robusto de **Workspaces Modulares**, permitindo reorganizar as colunas superiores da interface com precisão cirúrgica:
-
-1. **Modal de Configuração de Workspace (`#btn-config-workspace`):**
-   - No cabeçalho superior, ao lado do seletor de workspaces, clique no botão de controles deslizantes (<i class="fa-solid fa-sliders"></i>) para abrir o modal visual de configuração.
-   - O trilho de cartões interativos exibe a sequência física das colunas: **Biblioteca de Mídias**, **Ajustes & Efeitos (Inspetor)**, **Preview & Program (Monitores)** e **Painel Lateral (Transcrição/Áudio/Rostos)**.
-
-2. **Reordenação com Drag & Drop e Botões de Nudge (`◀` e `▶`):**
-   - **Arraste Livre:** Clique e arraste qualquer cartão para soltá-lo na posição desejada.
-   - **Botões de Nudge:** Use os botões `◀` e `▶` nos cartões para deslocar colunas uma a uma — ideal para touchpads e trackballs.
-   - **Badges de Ancoragem:** Cada cartão indica em tempo real sua direção de recolhimento:
-     - `Dock: Esquerda ◀` (para painéis posicionados antes do Preview).
-     - `Centro (Âncora)` (para o contêiner central dos monitores).
-     - `Dock: Direita ▶` (para painéis posicionados após o Preview).
-
-3. **Presets Rápidos de 1 Clique:**
-   - **Padrão:** `Biblioteca ➔ Ajustes & Efeitos ➔ Monitores ➔ Painel Lateral` (Timeline entre menus e Monitores lado a lado).
-   - **Inspetor à Direita:** `Biblioteca ➔ Monitores ➔ Ajustes & Efeitos ➔ Painel Lateral` (Inspetor adjacente às ferramentas de corte).
-   - **Foco em Decupagem:** Monitores empilhados para visualização ampla da biblioteca e metadados.
-   - **Foco em Montagem:** Timeline na faixa de baixo em largura total (100% de tela) para sequências longas.
-
-4. **Workspaces Personalizadas & Slots Numéricos Rápidos (1 a 9):**
-   - **Gravação Rápida por Atalho:** Pressione **`Ctrl + Alt + Shift + [1-9]`** para salvar o layout exato atual instantaneamente no slot numérico correspondente.
-   - **Carregamento Instantâneo:** Pressione **`Ctrl + Alt + [1-9]`** a qualquer momento para alternar instantaneamente para o layout gravado naquele slot.
-   - **Vinculação Visual:** No modal de salvamento de workspace, selecione o slot desejado no dropdown *"Vincular a Slot Rápido"*. Os slots configurados são identificados visualmente com badges como `[1] Workspace: Padrão`, `[2] Workspace: Decupagem`, etc., tanto no seletor do cabeçalho quanto nos menus.
-
-5. **Motor de Direcionalidade Inteligente dos Botões de Recolher:**
-   - Quando um painel reside à esquerda do Preview, seu botão de recolher migra automaticamente para o **canto esquerdo** do cabeçalho com chevron apontando para a esquerda (`<`), colapsando em uma **linha restauradora ciano de 4px** na borda esquerda.
-   - Quando movido para a direita do Preview, seu botão de recolher migra automaticamente para o **canto direito** com chevron apontando para a direita (`>`), colapsando na borda direita.
-   - A área central dos monitores expande-se elasticamente (`flex: 1 1 0%`), mantendo o vídeo e a timeline sempre visíveis e eliminando completamente bugs de tela preta.
-
-6. **Janelas Destacadas Multi-Monitor (Popouts) & Botão Reanexar:**
-   - Qualquer painel (`Biblioteca`, `Ajustes & Efeitos`, `Painel Lateral`, `Timeline` ou `Players`) pode ser destacado para um segundo monitor clicando no botão de destaque (<i class="fa-solid fa-up-right-from-square"></i>) ou via atalhos **`Ctrl + Numpad [2, 4, 5, 6, 7, 9]`**.
-   - Na janela destacada externa, o botão transforma-se dinamicamente em **"Reanexar ao Editor Principal"** (<i class="fa-solid fa-down-left-and-up-right-to-center"></i>).
-   - Ao clicar em Reanexar (ou fechar a janela externa), o painel retorna instantaneamente para o editor principal em sua posição exata definida pela `columnOrder`, sem desvios de tela ou duplicação de janelas.
-
-7. **Modo Zen / Cinema (`Numpad 0`):**
-   - Pressione **`Numpad 0`** para ocultar com um único toque o cabeçalho superior e todas as barras laterais, deixando apenas os monitores e a timeline visíveis para visualização de corte em tela limpa.
-   - Pressione **`Numpad 0`** novamente para restaurar fielmente o estado anterior exato de cada componente.
-
-- **Altura das Pistas:** Tanto no layout Padrão quanto no Estúdio, você
-  pode ajustar a altura das trilhas da timeline de duas formas:
-
-  1.  Usando o slider vertical global na barra de ferramentas superior.
-
-  2.  Clicando e arrastando a borda inferior do cabeçalho de uma trilha
-      individual à esquerda (para redimensionamentos independentes que
-      são salvos na sessão local).
-
-### Reposicionamento dos Controles de Zoom e Modo de Exibição
-
-- Os botões de **Modo de Visualização** (Lista ou Cards) e o controle
-  deslizante de **Zoom** das miniaturas foram movidos para a linha
-  inferior da barra de ferramentas da biblioteca (Linha 3).
-
-- Todos os controles dessa linha (Zoom, Visualização, Expandir Tudo,
-  Recolher Tudo e Abrir Fotos no Player) foram otimizados como ícones
-  simples (*line-icons*) livres de contornos e boxes, minimizando a
-  poluição visual na biblioteca.
-
-- **Zoom Dinâmico via Teclado e Roda do Mouse (`Shift + Wheel`):**
-  Passe o cursor sobre a grade de mídias, segure **`Shift`** e gire a roda do
-  mouse para ampliar ou reduzir o tamanho dos cards de forma contínua e suave,
-  sincronizando as variáveis visuais instantaneamente.
-
-### Inserção de Mídias na Timeline
-
-Você pode adicionar mídias à timeline de diversas formas altamente ergonômicas:
-
-1. **Modos de Ingestão por Duplo Clique & Modificadores:**
-   - **`2x Clique`** ➔ **No Final da Timeline (Append):** Localiza o término da timeline e anexa a mídia no final. Protege contra pistas ocultas e sempre prefere a Pista 1 (V1) caso ambas as pistas estejam abertas e seus finais forem iguais (incluindo timeline vazia).
-   - **`Shift + 2x Clique`** ➔ **Na Posição da Agulha (Playhead):** Insere a mídia na posição atual do cursor de reprodução e move a agulha para o término do clipe inserido.
-   - **`Ctrl + 2x Clique`** *(ou `Cmd`)* ➔ **No 1º Espaço Vazio (Primeiro Gap):** Localiza o primeiro gap a partir do frame 0 e insere no início dele, **posicionando a agulha no começo da mídia**.
-   - **`Ctrl + Shift + 2x Clique`** ➔ **No Próximo Espaço Vazio (Após Agulha):** Encontra o primeiro gap à frente da agulha atual e insere no início dele, **posicionando a agulha no começo da mídia**.
-   - **`Alt + Shift + 2x Clique`** ➔ **No Início da Timeline (Frame 0):** Insere no frame 0 da pista de destino.
-   - **`Alt + 2x Clique`** ➔ **Inserir Empurrando (Ripple Insert):** Divide clipes intersectados sob a agulha e empurra todos os cortes subsequentes pela duração do novo clipe.
-   - **`Ctrl + Alt + 2x Clique`** ➔ **Sobrepor em Pista Superior (Overlay):** Insere na pista superior livre (ex: V2/B-Roll) na posição da agulha.
-
-2. **Submenu de Contexto no Botão Direito (`Adicionar à Timeline`):**
-   - Ao clicar com o botão direito sobre qualquer card de vídeo ou foto na biblioteca, passe o cursor sobre **"Adicionar à Timeline"** para abrir um submenu com todas as opções acima e seus atalhos correspondentes.
-   - Se houver um clipe selecionado na timeline, o submenu inclui a opção **"Substituir Clipe Selecionado"** para trocar a mídia preservando o posicionamento na timeline.
-   - Clicar diretamente no item pai aciona a inserção padrão no final da timeline.
-
-3. **Arrastar-e-Soltar (Drag-and-Drop):**
-   - Clique e arraste qualquer vídeo ou foto para a trilha desejada na timeline (segure **`Ctrl`** durante o drop para fazer *Ripple Insert*).
-
-4. **Inserção Rápida de Fotos:**
-   - Passe o mouse sobre qualquer miniatura de foto para revelar o botão flutuante `+`, inserindo a imagem como still (5s padrão) na agulha.
-
-### 🪟 Janelas Destacadas Multi-monitor com Persistência & Auto-Reconexão
-
-Para ilhas de edição com 2 ou mais monitores, o CapIAu-Talho permite desacoplar a Biblioteca de Mídias e outros painéis em janelas flutuantes nativas do navegador:
-
-- **Desacoplamento Limpo:** Clique no ícone de popout (<i class="fa-solid fa-arrow-up-right-from-square"></i>) no cabeçalho da biblioteca. O painel é movido para uma janela dedicada nomeada (`CapIAu_Library_Window`).
-- **Persistência de Coordenadas de Tela:** O sistema grava no `localStorage` a posição exata (`screenX`, `screenY`) e dimensões (`outerWidth`, `outerHeight`) da janela em monitores secundários. Ao reabrir o painel ou recarregar a página, a janela destacada é reposicionada automaticamente via `moveTo` e `resizeTo`.
-- **Handshake Bidirecional (`BroadcastChannel`):** A comunicação entre a janela principal e a janela popout é bidirecional e em tempo real: seleção de clipes, reprodução no Source Player, zoom de miniaturas e alteração de metadados ocorrem em perfeita sincronia.
-- **Sincronização Global de Miniaturas:** Ao definir um novo frame de pôster/miniatura para um vídeo (`setVideoThumbnail`), a nova imagem é atualizada simultaneamente nos cards da janela principal, da janela destacada e no gerenciador de tarefas.
-- **Imunidade a Troca de Workspaces:** Alternar presets de workspace ou reposicionar a timeline não fecha nem quebra elementos do DOM que estão na janela popout. Ao fechar a janela externa, o painel retorna perfeitamente para sua coluna original no layout.
-
-## ⚙️ 10. Configurações da Sequência, Auto-Configuração e Zoom do Preview
-
-### A. Auto-Configuração Inteligente da Timeline
-Para agilizar o início do trabalho e garantir a consistência técnica, o CapIAu-Talho conta com um sistema de **auto-configuração automática no primeiro clipe**.
-- Ao arrastar ou inserir o primeiro clipe de vídeo em uma timeline totalmente vazia, o sistema lê as propriedades técnicas desse vídeo (extraídas via FFprobe na ingestão) e configura automaticamente a resolução (largura e altura) e o FPS da timeline para coincidir com os do vídeo.
-- A inserção de imagens estáticas (fotos stills) não dispara a auto-configuração, permitindo que a timeline permaneça nos valores padrão ou nas configurações manuais que você escolher.
-
-### B. Painel de Configurações da Sequência
-Sempre que não houver nenhum clipe selecionado na timeline (ou ao acessar a aba **Ajustes** com a seleção limpa), o painel lateral direito exibirá as **Configurações da Sequência**:
-- **Presets de Resolução:** Selecione proporções comuns através do menu suspenso, como *1920×1080 (16:9)*, *1080×1920 (9:16 - Vertical)*, *3840×2160 (4K)*, *1080×1080 (1:1)* ou *Personalizado*.
-- **Dimensões Customizadas:** Ao selecionar o preset *Personalizado*, os campos de largura e altura numéricos são habilitados para você definir qualquer resolução (como resoluções específicas de redes sociais ou formatos panorâmicos). A proporção da tela é calculada e exibida em tempo real.
-- **Controle de FPS:** Altere a taxa de quadros da timeline selecionando opções de *23.976 a 60 FPS*.
-- **Aviso e Reescalagem de Frames:** Se você alterar o FPS de uma timeline que já contém clipes de vídeo ou áudio, o sistema exibirá um aviso informando que as posições em frames serão recalculadas. O CapIAu-Talho reajusta os pontos de início e fim dos clipes para **preservar exatamente a sua duração e tempo em segundos**, evitando desalinhamentos. Toda a alteração é gravada no histórico como um único passo e pode ser desfeita pressionando **Ctrl+Z**.
-
-### C. Acesso Rápido e Persistência
-- Você pode abrir as configurações da sequência a qualquer momento clicando no botão de **Engrenagem** localizado no cabeçalho do Program Player (ao lado do botão de Popout) ou na barra de ferramentas lateral da timeline (`#timeline-actions-sidebar`).
-- As propriedades da sequência são persistidas automaticamente em segundo plano tanto no *localStorage* (autosave) quanto no banco de dados SQLite principal ao salvar a timeline.
-
-### D. Zoom de Visualização do Program Player
-No painel do Program Player, ao lado do seletor de resolução, há um seletor de zoom com as opções: **Fit, 25%, 50%, 75% e 100%**:
-- **Fit:** Redimensiona dinamicamente a área de renderização para se ajustar perfeitamente ao tamanho da janela e dos splitters do painel, garantindo que toda a sequência fique visível.
-- **Percentuais Fixos:** Força o viewport a adotar um tamanho de escala estrito da sequência. Se o clipe escalado exceder o viewport, o transbordo será cortado/escurecido pela máscara, facilitando o alinhamento de detalhes finos sem que a janela de reprodução se desloque.
+> **Atenção:** nos perfis Kdenlive, Premiere, Resolve e Final Cut, o carrossel abre com `A`; no perfil CapIAu, `A` pula para o corte anterior, por isso o atalho é `Alt+A`.
 
 ---
 
-## 📐 11. Viewport Estável, Alças de Transformação e Recorte (Crop)
+## 8. Salvando, auto-salvamento, importação e logs
 
-### A. Viewport Estável e Máscara de Transbordo
-A área de visualização da montagem no Program Player agora funciona dentro de um **Viewport Estável** (`#program-player-viewport`):
-- O enquadramento visível não é mais afetado pelo tamanho físico da janela do seu navegador ou pela posição das barras divisorias de painéis. O viewport possui dimensões baseadas na proporção real da sequência (ex.: 16:9 ou 9:16).
-- **Máscara de Transbordo (Shade Overlay):** Todo conteúdo visual que ultrapassar os limites do enquadramento da sequência (como um clipe escalado ou transladado) fica visível além das bordas pontilhadas, mas é suavizado por uma máscara escura com opacidade de 70%. Isso permite que o editor veja o transbordo e posicione as mídias de forma precisa, sabendo exatamente o que será cortado na exportação.
+### 8.1 Auto-salvamento
 
-### B. Alças de Transformação Interativa (Bounding Box)
-Ao selecionar qualquer clipe de vídeo ou foto na timeline e posicionar a agulha de reprodução (playhead) sobre ele, uma caixa delimitadora (*bounding box*) ciano se acenderá ao redor da imagem ativa no Program Player:
-- **Cálculo Preciso da Imagem:** A caixa delimita o retângulo real do conteúdo visível (*content rect*), compensando faixas pretas ou letterboxes geradas pelo modo *fit/contain*.
-- **Mover (Translação X/Y):** Clique e arraste em qualquer parte do interior do clipe selecionado para reposicioná-lo na tela. Os valores de posição X e Y serão atualizados dinamicamente.
-- **Escalar (Redimensionamento Uniforme):** Clique e arraste qualquer uma das 4 alças quadradas brancas nos cantos da caixa delimitadora para aumentar ou diminuir a escala do clipe de maneira uniforme.
-- **Rotacionar:** Arraste a alça de rotação estendida no topo da caixa para rotacionar o clipe livremente ao redor de seu centro.
-- **Integração com o Histórico e Sliders:** 
-  - Durante o arraste com o mouse/ponteiro, a imagem se move de forma fluida.
-  - Ao soltar o clique, o gesto é consolidado no histórico. Os sliders de transformação na aba **Ajustes** são atualizados automaticamente para refletir os valores finais obtidos pelo gesto.
-  - Pressionar **Ctrl+Z** reverte o arraste completo (posição, rotação ou escala) e atualiza o player e a interface de sliders instantaneamente.
-  - Cliques curtos sem arrasto na caixa delimitadora do clipe selecionado continuam funcionando normalmente como comando de *Play/Pause* do vídeo.
+Você não precisa salvar a cada modificação. Um mecanismo em segundo plano grava a cada segundo, no armazenamento do seu navegador:
 
-### C. Efeito de Recorte (Crop)
-O CapIAu-Talho suporta o efeito nativo de **Recorte (Crop)** por clipe:
-- Na aba **Ajustes**, localize a seção **Recorte (Crop)** (abaixo das transformações geométricas) para ajustar as bordas do clipe individualmente (*Esquerda*, *Direita*, *Topo*, *Base*) de 0% a 90%.
-- **Corte Relativo à Imagem:** O recorte é relativo ao conteúdo visível do clipe, o que significa que o ajuste de 10% na esquerda cortará 10% da imagem útil, e não a borda ou a faixa preta de preenchimento.
-- **Compatibilidade com Transformações:** O crop é aplicado no pipeline gráfico via CSS `clip-path` antes das rotações e posições do clipe, fazendo com que a área recortada acompanhe perfeitamente a escala, rotação e movimento definidos para o clipe.
-- **Preservação de Foco:** O painel de ajustes possui preservação automática de scroll, garantindo que o scroll não pule de volta ao topo quando você interage com os sliders de Crop localizados no rodapé do painel.
+- **Resiliência.** Se você fechar a aba ou atualizar a página (`F5`), a timeline inteira (cortes, pistas, ghosts) e as preferências de visualização (zoom, rolagem, agulha, seleções) são restauradas.
+- **Histórico retido.** A pilha de desfazer e refazer também volta.
+- **Por projeto.** Cada projeto tem o seu auto-salvamento, sem misturar timelines de trabalhos diferentes.
 
-### D. Reset de Ajustes por Duplo Clique
-Para agilizar o fluxo de edição sem a necessidade de digitar valores numéricos manualmente:
-- **Reset Rápido de Sliders:** Dê um **duplo clique** sobre o nome do parâmetro ou sobre qualquer controle deslizante (slider) no painel **Ajustes** (Posição X/Y, Rotação, Escala, Crop, Volume, Fades).
-- O parâmetro retornará instantaneamente ao seu valor padrão (ex.: Posição X/Y em 0, Escala em 100%, Rotação em 0°, Crop em 0%, Volume em 100%).
-- A alteração é registrada no histórico de edição e pode ser desfeita pressionando **Ctrl+Z**.
+> **Atenção:** o auto-salvamento fica **no navegador**, não no banco de dados. Limpar os dados do site ou trocar de navegador perde essa cópia. Para uma versão fixa, salve a sequência (8.2). A exportação de vídeo também usa a versão salva, não a da tela.
 
----
+### 8.2 Salvamento permanente e exportação
 
-## 🤖 12. Resiliência de IA, Seleção de Modelos e Gestão de Tarefas
+1. Dê um nome à sequência no campo de texto (ex.: *Montagem Inicial*).
+2. Clique em **Salvar** para gravar a timeline no banco de dados.
+3. Escolha o formato de saída no seletor: XML (Premiere, Resolve, FCP), OpenTimelineIO (`.otio`) ou EDL.
+4. **Exportar com proxies locais.** Para levar a timeline a outro computador sem carregar discos de mídias pesadas, marque **Usar proxies locais**. O arquivo (ex.: `montagem_proxy.otio`) aponta para os vídeos leves em `data/proxies/`.
+5. Clique em **Exportar**. O download começa no navegador e o arquivo está pronto para abrir no seu editor.
 
-### A. Seleção e Fallback Automático de Modelos de Visão
-No painel de Configurações de IA, você pode definir o modelo de visão utilizado para decodificar e descrever os frames do acervo:
-- **Seleção de Modelos Gratuitos e Pagos:** Escolha entre o **Nvidia Nemotron 70B Vision** (gratuito e de alto desempenho) ou os modelos **Gemini 2.5 Flash / 3.1 Flash Lite**.
-- **Mecanismo de Fallback em Cascata:** Em caso de indisponibilidade temporária da API escolhida (ex.: erro de cota ou instabilidade de rede), o sistema tenta automaticamente o modelo substituto em cascata (Nemotron → Gemini 2.5 Flash → Gemini 3.1 Flash Lite).
-- **Proteção Anti-Sobrescrita:** Se todas as chamadas de API falharem por algum motivo, o sistema preserva integralmente as descrições e categorias boas que já foram salvas anteriormente no banco de dados, evitando a perda de metadados.
-- **Gestão de Tokens (`max_tokens`):** As chamadas de IA utilizam um teto explícito de tokens de saída para evitar que o provedor de nuvem (OpenRouter) reserve créditos excessivos, garantindo máxima economia e evitando erros 402 ("requires more credits").
+> **Vindo do Premiere/Resolve/FCP/Kdenlive:** o Kdenlive abre o `.otio` direto. Veja [docs/kdenlive_workflow.md](docs/kdenlive_workflow.md).
 
-### B. Gerenciador de Tarefas de Miniaturas
-No painel de monitoramento de tarefas e status da mídia:
-- **Controle Total de Miniaturas:** Visualize o progresso da geração de miniaturas progressivas.
-- **Ações Rápidas:** Botões dedicados para **Pausar**, **Cancelar**, **Remover** e **Sincronizar** a geração de miniaturas para liberar recursos do sistema quando necessário.
+### 8.3 Importação de timelines (o caminho inverso)
+
+O CapIAu também importa timelines criadas em editores externos (Kdenlive, Premiere, Resolve, Final Cut) ou exportadas por ele mesmo:
+
+1. Na barra de ferramentas da timeline, clique em **Importar Timeline** (ao lado do Exportar).
+2. Escolha o arquivo: `.otio`, `.xml` ou `.edl`. O nome da nova timeline vem do arquivo; ajuste se quiser.
+3. Clique em **Importar**. Cada clipe é **religado à mídia já ingerida**, pelo caminho do arquivo (se mudou, o sistema tenta casar pelo nome único). Nada é copiado nem re-ingerido.
+4. Se algum arquivo não existir no acervo, o clipe vira um **gap na posição original** e o diálogo lista o que ficou ausente, para você religar depois.
+5. Com **Carregar na tela após importar** marcado, a timeline abre direto, com pistas, posições e gaps preservados.
+
+> **Dica:** `.otio` abre sem dependências extras. `.xml` e `.edl` dependem do pacote `opentimelineio` do ambiente do servidor; se o importador reclamar, converta a timeline para `.otio` no editor de origem. Para mais detalhes, veja a [Instalação e Configuração](https://github.com/fernangcortes/capiau-talho-v03/wiki/02.-Instalacao-e-Configuracao).
+
+### 8.4 Painel de logs com IA
+
+Para auditar suas ações, investigar um erro ou gerar relatórios:
+
+1. Abra a aba **Logs** na barra lateral direita (ícone de terminal).
+2. Ali o sistema registra ações, chamadas de IA e erros em tempo real.
+3. **Assistente de Logs (IA):**
+   - **Relatório Humano:** a IA lê os logs e monta uma lista resumida, não técnica, do que você fez na sessão.
+   - **Análise Técnica (OR):** aciona o OpenRouter para uma auditoria técnica dos logs, em busca de erros e de melhorias de desempenho.
+   - **Copiar e Limpar:** copiam os logs formatados para a área de transferência ou limpam o histórico atual.
 
 ---
 
-## 🖥️ 13. Execução Resiliente sem Janela de Console no Windows
+## 9. Layout e organização avançada
 
-Para evitar que o servidor FastAPI ou os workers de background sejam encerrados por acidentes no Windows (como ao fechar a janela do prompt de comando, o que envia um sinal `CTRL_CLOSE_EVENT` que interrompe o runtime Fortran/MKL do PyTorch):
+### 9.1 Inspetor de Mídia integrado
 
-1. **Utilize o Lançador Autônomo:**
-   No terminal na pasta do projeto, execute:
-   ```bash
-   python scripts/launch_detached.py
-   ```
-2. **Operação Desvinculada:** O lançador cria o processo do backend de forma totalmente desvinculada do console pai (`DETACHED_PROCESS`). O servidor continuará rodando de forma segura em background na porta 8000 mesmo se o terminal for fechado.
+O Inspetor de Mídia, no menu lateral esquerdo, serve para decupagens e análises profundas sem popups flutuantes.
 
----
+- **Abrir.** Com uma mídia selecionada na biblioteca (ou com o Source Player em foco), pressione `A` ou clique no cartão ou item da lista. A barra direita se oculta, a esquerda se expande e o **Source Player** é maximizado para a inspeção.
+- **Abas:**
+  - **Índice:** resumos da IA e capítulos navegáveis.
+  - **Legenda:** transcrição por falante, com menu para trocar falantes ou criar novos e função para dividir diálogos na agulha.
+  - **Temas:** adicione e remova temas diretamente e filtre trechos com In/Out capturados em tempo real.
+  - **Rostos:** galeria de rostos detectados com marcações de tempo e campos para rotular e desambiguar as pessoas.
+  - **IA:** gatilhos rápidos para transcrição, visão e rostos de uma mídia individual.
+- **Fechar.** `A` outra vez, `Esc` ou o botão **Voltar** restauram a biblioteca como estava (aba anterior, barra direita reaberta e o clipe ativo em foco).
 
-## ⚡ 14. Configurações de Hardware, Aceleração por GPU e Fallback Automático
+### 9.2 Operação dos players
 
-O CapIAu-Talho inclui uma aba dedicada de **Hardware & GPU** no Painel de Configurações (ícone de engrenagem no cabeçalho), permitindo extrair o máximo de desempenho da sua placa gráfica (Intel QuickSync, AMD Radeon, Nvidia) enquanto protege o computador contra travamentos com **fallback automático para CPU**.
+- **Play / Pause.** Clique simples na área de vídeo de qualquer player.
+- **Maximizar / Minimizar.** Clique duplo na área de vídeo expande o player; outro clique duplo restaura a visão dupla.
+- **Trocar o player maximizado.** Quando um dos players está maximizado, o ícone de troca (⇄) no cabeçalho alterna entre o Source e o Program maximizados. O atalho `Numpad *` (perfil CapIAu) também alterna o foco entre os dois monitores.
+- **Program automático.** Se o Source está maximizado e você clica em um clipe da timeline, o Program é aberto e maximizado sozinho, para você ver o resultado do corte.
 
-### A. Opções Disponíveis na Aba Hardware & GPU
+#### Margens de segurança e máscaras de proporção (Program Player)
 
-1. **Codificador de Vídeo (Proxies / Exportação):**
-   - **Automático (Detectar GPU com fallback CPU)** *(Padrão recomendado)*: Detecta automaticamente o melhor acelerador de vídeo instalado no seu computador.
-   - **Intel QuickSync Video (`h264_qsv`)**: Utiliza o motor de codificação de vídeo integrado dos processadores Intel para gerar proxies ultrarrápidos com quase 0% de uso da CPU.
-   - **AMD Advanced Media Framework (`h264_amf`)**: Utiliza a GPU dedicada AMD Radeon para processamento de vídeo.
-   - **Nvidia NVENC (`h264_nvenc`)**: Utiliza os núcleos NVENC dedicados das placas Nvidia GeForce/RTX.
-   - **Software CPU (`libx264`)**: Codificação clássica por processador para compatibilidade universal.
+O Program Player pode mostrar guias vetoriais por cima da imagem, sem afetar a exportação:
 
-2. **Decodificação de Vídeo por Hardware:**
-   - **Automático (Direct3D 11 / DXVA2)** *(Padrão)*: Usa a GPU para descompactar vídeos 1080p/4K durante a extração de miniaturas e navegação de frames, reduzindo o aquecimento e o consumo da CPU.
-   - **Direct3D 11 (`d3d11va`)** / **DirectX 9 (`dxva2`)** / **Nvidia CUDA (`cuda`)** / **Desativado (CPU pura)**.
+- **Ligar e desligar:** botão de margens de segurança ao lado dos controles do Program Player (tooltip *Margens de Segurança & Guias de Proporção*) ou `Ctrl+Shift+G`.
+- **Opções:** clique com o botão direito no botão, ou na seta ao lado dele, para abrir o menu de guias:
+  - **Action Safe (90%)** e **Title Safe (80%)**: as áreas seguras para ação e para texto.
+  - **Cruz central**: marca o centro do quadro.
+  - **Máscaras de proporção:** 16:9, 9:16, 1:1 e 2.39:1. A máscara escurece o que ficaria fora daquele formato, útil para enquadrar já pensando em redes sociais ou em tela de cinema.
+- **Trocar a máscara pelo teclado:** `Ctrl+Alt+G` alterna entre as máscaras. Um selo no botão indica a máscara ativa.
+- As escolhas são lembradas entre sessões.
 
-3. **Aceleração OpenCL no OpenCV:**
-   - Ativa o processamento gráfico paralelo (`cv2.ocl.setUseOpenCL(True)`) para operações de matrizes, filtros de nitidez, realce de contraste CLAHE e redimensionamento de fotos, liberando a CPU sem gastar memória de vídeo dedicada (VRAM).
+> **Dica:** monte em 16:9 e use a máscara 9:16 para conferir se um corte vertical para Reels ou TikTok mantém o rosto dentro da área útil. Para exportar de fato em 9:16, mude a resolução da sequência (seção 10).
 
-4. **Dispositivo para Modelos de IA (CLIP / Embeddings):**
-   - **Automático (Seguro para economizar VRAM)** *(Padrão)*: Mantém os modelos de busca semântica (CLIP e MiniLM) operando de forma leve, preservando os 2.0 GB de VRAM dedicados da GPU para o trabalho pesado de decodificação e codificação de vídeo.
-   - **Opções de DirectML e CUDA**: Disponíveis para máquinas com GPUs de maior capacidade (4 GB+ de VRAM).
+### 9.3 Disposição dos monitores e da timeline
 
-### B. Como Funciona o Fallback Automático e Silencioso
-O sistema opera com tolerância total a falhas:
-- Se você importar dezenas de vídeos ao mesmo tempo e o chip de vídeo atingir o limite físico de sessões de codificação simultâneas, ou se um arquivo de vídeo com perfil exótico for rejeitado pela GPU, o FFmpeg avisa o backend.
-- O CapIAu-Talho realiza uma **transição instantânea para a CPU (`libx264`)** sem interromper a fila de tarefas, sem emitir erros na tela e garantindo que todos os proxies e miniaturas sejam gerados com sucesso.
+- **Monitores:** **lado a lado** (Source à esquerda, Program à direita) ou **empilhados** (Source no topo, Program na base; nesse formato os cabeçalhos e controles aparecem ao passar o mouse, liberando 100% da área de vídeo). Alterne pelo seletor **Monitores** do cabeçalho, pelos botões nos players ou com `Numpad /`.
+- **Timeline:**
+  - **Entre os menus laterais:** contida na coluna central.
+  - **Expandida à esquerda:** passa sob a biblioteca e o inspetor.
+  - **Expandida à direita:** passa sob o menu lateral direito.
+  - **Faixa de baixo completa:** 100% da largura, o modo "Estúdio" panorâmico.
+  - Alterne pelos botões de seta no cabeçalho, pelo modal de workspace ou por `Numpad 1`, `Numpad 2` e `Numpad 3`.
+- As duas opções funcionam de forma independente em qualquer workspace e são lembradas.
 
-### C. Tooltips Didáticas e Técnicas (Ícone ⓘ)
-Ao lado de cada configuração no painel, passe o mouse sobre o ícone **ⓘ** para visualizar uma tooltip técnica aprofundada com os detalhes de codecs, flags internas do FFmpeg e gerenciamento de memória.
+### 9.4 Workspaces modulares
 
----
+1. **Modal de configuração.** No cabeçalho, ao lado do seletor de workspaces, o botão de controles deslizantes abre um modal visual. Os cartões mostram a sequência das colunas: **Biblioteca de Mídias**, **Ajustes & Efeitos (Inspetor)**, **Preview & Program (Monitores)** e **Painel Lateral (Transcrição/Áudio/Rostos)**.
+2. **Reordenar.** Arraste os cartões ou use os botões ◀ e ▶ (úteis em touchpads). Cada cartão indica a direção de recolhimento: *Dock: Esquerda*, *Centro (Âncora)* ou *Dock: Direita*.
+3. **Presets de um clique:**
+   - **Padrão:** Biblioteca, Ajustes & Efeitos, Monitores, Painel Lateral.
+   - **Inspetor à direita:** Biblioteca, Monitores, Ajustes & Efeitos, Painel Lateral.
+   - **Foco em decupagem:** monitores empilhados, com ampla área para biblioteca e metadados.
+   - **Foco em montagem:** timeline na faixa de baixo em largura total.
+4. **Workspaces personalizadas e slots (1 a 9).** `Ctrl+Alt+Shift+[1-9]` grava o layout atual no slot; `Ctrl+Alt+[1-9]` carrega o layout do slot. No modal de salvamento, o menu **Vincular a Slot Rápido** associa o layout a um número, e os slots aparecem identificados (ex.: `[1] Workspace: Padrão`).
+5. **Botões de recolher inteligentes.** Painéis à esquerda do Preview recolhem para a esquerda; os da direita, para a direita. O centro dos monitores se expande para ocupar o espaço, mantendo vídeo e timeline sempre visíveis.
+6. **Modo Zen / Cinema (`Numpad 0`).** Oculta o cabeçalho e todas as barras laterais; um novo toque restaura tudo como estava.
 
-## 🎹 15. Sistema de Keymap, Perfis NLE & Teclado Visual 1:1
+### 9.5 Controles da biblioteca
 
-O **CapIAu-Talho** conta com um motor completo de atalhos e perfis NLE, permitindo que montadores operem o sistema com a ergonomia de seu software de preferência ou customizem teclas livremente.
+- Os botões de **Modo de Visualização** (lista ou cartões) e o controle de **Zoom** das miniaturas ficam na linha inferior da barra da biblioteca, junto com Expandir Tudo, Recolher Tudo e Abrir Fotos no Player, todos como ícones simples.
+- **Zoom com a roda:** passe o mouse sobre a grade, segure `Shift` e gire a roda para aumentar ou reduzir os cartões.
 
-### 🎛️ Perfis NLE Suportados
-No cabeçalho do Guia de Atalhos (<kbd>⌨️</kbd> na barra da timeline), selecione o perfil ativo:
-1. **🎬 CapIAu Padrão (Default):** Híbrido moderno ultrarrápido com suíte QWER/ASDF na mão esquerda (`Q`/`W` Ripple Trims, `E` Split, `R` Ripple Delete, `Alt+R` Lift Delete, `A`/`S` Ponto Anterior/Seguinte, `D` Selecionar na Agulha, `Shift+D` Multi-seleção, `F` Desativar Clipe, `N`/`Shift+S` Snapping, `Shift+N` Rolling Edit, `Backspace` Ripple Delete, `Delete` Lift Delete, `Ctrl+Alt+P` Seleção Acompanha Agulha, `Alt+A` Alternativas IA).
-2. **🐧 Kdenlive:** Padrão clássico Open Source (`Shift+R` / `X` Split Razor, `S` Seleção, `M` Espaçador, `V` Inserção, `F10` Snapping, `J`/`K`/`L` Shuttle).
-3. **🟣 Adobe Premiere Pro:** Padrão Adobe (`Ctrl+K` / `C` Razor, `A` Seleção de Trilha, `V` Seleção, `S` Snapping, `Q`/`W` Ripple Trims).
-4. **🟡 DaVinci Resolve:** Padrão Blackmagic Design (`Ctrl+\` / `B` Blade, `A` Seleção, `N` Snapping, `Shift+Backspace` Ripple Delete).
-5. **🍏 Apple Final Cut Pro:** Padrão Apple NLE (`Cmd+B` / `B` Blade, `A` Seleção, `N` Snapping, `E` Append, `Alt+[` / `Alt+]` Trims).
-6. **⚙️ Personalizado (Custom):** Mapeamento livre com gravador de teclas, detector de conflitos e exportação/importação JSON.
+#### Galeria: atalhos de mouse e painel de detalhes
 
-### ⌨️ Teclado Visual Esquemático 1:1 & Teste ao Vivo
-- **Layout ANSI TKL Mecânico:** Teclado visual responsivo com keycaps proporcionais e pontos indicadores de categoria coloridos.
-- **Destaque Bidirecional:** Passar o mouse sobre uma tecla ilumina a linha correspondente no manual esquemático e faz o scroll automático até ela; passar o mouse no manual ilumina a tecla no teclado virtual.
-- **Camadas de Modificadores:** Botões para alternar entre as camadas `Padrão`, `+ Shift`, `+ Ctrl` e `+ Alt` (com transição em tempo real ao segurar os modificadores no teclado físico).
-- **Live Testing HUD:** Digite qualquer atalho com o modal aberto para ver a tecla acender em neon e o nome e a descrição do comando serem exibidos instantaneamente no rodapé.
-- **Modo Tela Cheia:** Botão de maximizar (<i class="fa-solid fa-expand"></i>) para visualização imersiva em `100vw × 100vh`.
+No modo galeria da biblioteca, passar o mouse sobre um cartão já toca uma prévia. Segurando uma tecla enquanto o mouse está sobre o cartão:
 
-### 📋 Tabela Resumida de Comandos Principais
+- **`Ctrl`:** percorre o vídeo ao mover o mouse (scrubbing).
+- **`Alt`:** inspeciona os momentos cruciais do vídeo em sequência (slideshow).
+- **`Shift`:** abre um painel flutuante com título, nome do arquivo, metadados, resumo e etiquetas, com os botões **Girar** (`R` gira 90° para a direita e `Shift+R` para a esquerda), **Crucial** (marca um momento crucial, em vídeos) e **Abrir**. O painel também funciona em janelas destacadas.
 
-| Categoria | Atalho (CapIAu) | Ação & Descrição |
-| :--- | :---: | :--- |
-| **Reprodução & Shuttle** | **`Espaço`** | Play / Pause no player ativo |
-| | **`Ctrl + L` / `Cmd + L`** | Alternar Loop Contínuo no intervalo [In–Out] |
-| | **`J` / `K` / `L`** | Shuttle Reverso (-1x..-8x), Parar, Avanço (+1.5x..+8x) |
-| | **`K + J` / `K + L`** | Jog frame a frame (Recuar / Avançar 1 frame) |
-| | **`Shift + ←` / `Shift + →`** | Shuttle Acelerado contínuo (2x, 4x, 8x, 16x) |
-| | **`Ctrl + ←` / `Ctrl + →`** | Câmera Lenta suave (0.25x / -0.25x) |
-| | **`←` / `→`** | Navegar quadro a quadro (1 frame) |
-| | **`A` / `S`** *(ou `↑` / `↓`)* | Saltar pontos de corte anteriores (`A`) ou seguintes (`S`) |
-| | **`Shift + I` / `Shift + O`** | Saltar agulha diretamente para ponto IN ou ponto OUT |
-| | **`Ctrl + G`** *(ou `Ctrl+P` no FCP)* | Ir para Timecode / Entrada Numérica Direta (.interactive-timecode) |
-| **Pontos de Corte & Inserção** | **`I` / `O`** | Marcar ponto de Entrada (In) e Saída (Out) |
-| | **`Alt + X`** | Limpar pontos de In e Out ativos |
-| | **`,` (Vírgula)** | Inserção Ripple / Insert (3 Pontos a partir do Source) |
-| | **`.` (Ponto)** *(ou `F10`)* | Sobrescrita / Overwrite (3 Pontos a partir do Source) |
-| | **`Ctrl + Alt + A`** | Alternar Canais de Inserção (AV $\rightarrow$ V $\rightarrow$ A) |
-| | **`;` (Ponto e Vírgula)** | Lift: extrai intervalo [In–Out] mantendo Gap vazio |
-| | **`'` (Aspas Simples)** | Extract: extrai intervalo [In–Out] e fecha Gap com Ripple |
-| | **`E`** | Dividir Clipe no Playhead (*Split* na agulha) ou Append do Source |
-| | **`Shift + E`** | Inserir fala selecionada na transcrição na timeline |
-| | **`Ctrl + U`** | Criar Subclipe Virtual no Source Player com títulos sugeridos por IA |
-| **Ingestão na Timeline (Biblioteca)** | **`Duplo Clique`** | Inserir no final da timeline (*Append* - prefere V1; ignora pistas ocultas) |
-| | **`Shift + Duplo Clique`** | Inserir na posição da agulha (*Playhead*) |
-| | **`Ctrl + Duplo Clique`** | Inserir no 1º espaço vazio (*First Gap*) e mover agulha pro início |
-| | **`Ctrl + Shift + Duplo Clique`** | Inserir no próximo espaço vazio (*Next Gap*) e mover agulha pro início |
-| | **`Alt + Shift + Duplo Clique`** | Inserir no início da timeline (*Frame 0*) |
-| | **`Alt + Duplo Clique`** | Inserir empurrando cortes subsequentes (*Ripple Insert*) |
-| | **`Ctrl + Alt + Duplo Clique`** | Sobrepor em pista superior (*Overlay B-Roll*) |
-| | **`Ctrl + Shift + R`** *(ou `Alt + Arraste`)* | Substituir clipe selecionado na timeline (*Replace Edit*) mantendo duração e efeitos |
-| | **`R` / `Shift + R`** *(na Biblioteca/Galeria)* | Girar mídia 90° horário ou anti-horário |
-| **Suíte de Edição Rápida (Mão Esquerda)** | **`Q`** | Ripple Trim Head (corta do início do clipe até a agulha e fecha o vão) |
-| | **`W`** | Ripple Trim Tail (corta da agulha até o fim do clipe e fecha o vão) |
-| | **`E`** *(ou `Z`)* | Dividir Clipe no Playhead (*Split* instantâneo sob a agulha sem seleção prévia) |
-| | **`R`** *(ou `Backspace`)* | Ripple Delete (apaga clipe ou gap sob a agulha e fecha a lacuna) |
-| | **`Alt + R`** | Lift Delete com a mão esquerda (apaga clipe mantendo o gap vazio) |
-| | **`A` / `S`** | Saltar para o ponto de corte anterior (`A`) ou próximo (`S`) |
-| | **`D`** | Selecionar clipe sob a agulha na trilha ativa com 1 toque (*Select at Playhead*) |
-| | **`Shift + D`** | Multi-seleção na agulha (adiciona todos os clipes sob a agulha à seleção) |
-| | **`F`** | Ativar / Desativar clipe selecionado ou na agulha (*Mute / Bypass / Disable*) |
-| | **`Backspace`** | Ripple Delete de clipe selecionado, gap selecionado ou sob o playhead |
-| | **`Delete`** | Lift Delete (apaga clipe mantendo o gap vazio) |
-| | **`Ctrl + Alt + P`** | Alternar modo "Seleção Acompanha a Agulha" (*Selection Follows Playhead*) |
-| **Velocidade, Tempo & Modos** | **`Ctrl + R`** | Velocidade e Duração do Clipe (diálogo com Ripple, Cortar e Reverse) |
-| | **`Ctrl + Alt + R`** | Preencher Lacuna com Velocidade (*Fit to Gap*) |
-| | **`Ctrl + Shift + F`** | Congelar Quadro (*Freeze Frame* com tail hold e bounds immunity) |
-| | **`Ctrl + Alt + F`** | Alternar Rolagem Automática da Agulha (*Follow Playhead* - Page / Smooth) |
-| **Ferramentas NLE & Canvas** | **`V`** | Ferramenta de Seleção Padrão |
-| | **`Shift + R`** *(ou `X` no CapIAu / `R` nos outros)* | Ferramenta Estiramento de Taxa de Velocidade (*Rate Stretch Tool* - 10% a 1000%) |
-| | **`C`** *(ou `B` no Resolve/Final Cut)* | Ferramenta Lâmina / Gilete (*Blade Tool* - corte simples ou `Shift+C` global) |
-| | **`Y`** *(ou `Shift+Y` no Resolve)* | Deslizar Conteúdo Interno (*Slip Tool* - mantém tamanho na timeline) |
-| | **`U`** | Deslocamento com Compensação (*Slide Tool* - ajusta vizinhos adjacentes) |
-| | **`Shift + N`** *(ou `T` no Resolve/Final Cut)* | Corte Contínuo Adjacente (*Rolling Edit Tool* - ajusta emenda com tempo constante) |
-| | **`N`** *(ou `Shift+S` / `F10`)* | Alternar Snapping magnético global |
-| | **`T` / `Shift + T`** | Selecionar Faixa para Frente / Trás (*Shift = 1 faixa*) |
-| | **`H`** *(ou segurar `Espaço` / botão do meio)* | Ferramenta Mão / Pan (arrasto contínuo da timeline) |
-| | **Ícone na toolbar** *(ou `Z` no Premiere/Resolve/FCP)* | Ferramenta Zoom / Lupa (Clique aproxima 1.4x, Alt+Clique afasta 0.7x) |
-| | **`+` / `=`** *(ou `Ctrl+=` no Resolve/FCP/Kdenlive)* | Aumentar Zoom na Timeline (ancorado na agulha / playhead) |
-| | **`-`** *(ou `Ctrl+-` no Resolve/FCP/Kdenlive)* | Diminuir Zoom na Timeline (ancorado na agulha / playhead) |
-| | **`\`** *(ou `Shift+Z` / `Ctrl+Shift+Espaço`)* | Ajustar Sequência na Tela (*Zoom to Fit Toggle*) |
-| | **`.` (Ponto)** *(ou `Ctrl+1` / `Shift+1`)* | Restaurar Zoom Padrão da Régua (1:1 / 0.5 px/frame) |
-| | **`Roda do Mouse (sobre a Régua)`** | Zoom horizontal dinâmico contínuo na régua |
-| | **`Ctrl + Roda (sobre o Canvas)`** | Zoom horizontal centralizado no cursor do mouse |
-| | **`Shift + Roda (sobre Cabeçalho de Pista)`** | Redimensionar altura daquela pista específica (22px a 240px) |
-| | **`Shift + Roda (sobre Canvas/Régua)`** | Ajustar escala de altura global de todas as pistas (0.5x a 1.7x) |
-| | **`Alt + ←` / `Alt + →`** | Ajustar ponto de entrada (Trim In em 1 frame) |
-| | **`Shift + ←` / `Shift + →`** | Ajustar ponto de saída (Trim Out em 1 frame) |
-| | **`Ctrl + Z` / `Ctrl + Y`** | Desfazer (*Undo*) / Refazer (*Redo*) |
-| **Biblioteca & Visualização** | **`Shift + Roda`** | Zoom dinâmico contínuo nos cards de mídia |
-| | **`A` (na Biblioteca)** | Abrir Inspetor de Metadados da mídia selecionada |
-| **Marcadores** | **`M`** | Criar ou editar marcador na agulha (popover rápido) |
-| | **`Shift + M` / `Alt + M`** | Pular para o próximo / anterior marcador |
-| | **`Shift + Clique`** | Selecionar múltiplos marcadores para exclusão em lote |
-| **IA & Inspetor** | **`Alt + A`** | Carrossel de alternativas da IA para o clipe ativo |
-| | **`Enter` / `Y`** | Aceitar sugestão da IA (*Ghost Clip*) |
-| | **`Del` (sobre Ghost)** | Rejeitar sugestão da IA |
-| | **`Esc`** | Fechar modais, desmarcar ou sair de campos de texto |
-| **Layout & Workspace (Numpad)** | **`Numpad 1`** | Timeline: Alternar expansão para a esquerda (`bottom-left` $\leftrightarrow$ `center`) |
-| | **`Alt + Numpad 1`** | Timeline: Alternar cabeçalhos de pistas (*Track Headers*) |
-| | **`Numpad 2`** | Timeline: Alternar entre largura total (`bottom-full`) e entre menus (`center`) |
-| | **`Alt + Numpad 2`** | Timeline: Alternar recolhimento vertical da área inteira da timeline |
-| | **`Ctrl + Numpad 2`** | Timeline: Destacar em janela externa flutuante (*Popout*) / Reanexar |
-| | **`Numpad 3`** | Timeline: Alternar expansão para a direita (`bottom-right` $\leftrightarrow$ `center`) |
-| | **`Alt + Numpad 3`** | Timeline: Alternar barra de ferramentas da timeline (*Toolbar*) |
-| | **`Numpad 4`** | Biblioteca: Alternar visibilidade (recolher/expandir sidebar esquerda) |
-| | **`Alt + Numpad 4`** | Biblioteca: Maximizar em Modo Estúdio completo |
-| | **`Ctrl + Numpad 4`** | Biblioteca: Destacar em janela externa flutuante (*Popout*) / Reanexar |
-| | **`Numpad 5`** | Inspetor: Alternar visibilidade de Ajustes e Efeitos |
-| | **`Alt + Numpad 5`** | Inspetor: Maximizar / Restaurar largura do painel |
-| | **`Ctrl + Numpad 5`** | Inspetor: Destacar em janela externa flutuante (*Popout*) / Reanexar |
-| | **`Numpad 6`** | Painel Direito: Alternar visibilidade (Ferramentas, IA, Exportação) |
-| | **`Alt + Numpad 6`** | Painel Direito: Maximizar / Restaurar largura do painel |
-| | **`Ctrl + Numpad 6`** | Painel Direito: Destacar em janela externa flutuante (*Popout*) / Reanexar |
-| | **`Numpad 7`** | Source Player: Alternar visibilidade do player |
-| | **`Alt + Numpad 7`** | Source Player: Maximizar / Restaurar monitor |
-| | **`Ctrl + Numpad 7`** | Source Player: Destacar em janela externa flutuante (*Popout*) / Reanexar |
-| | **`Numpad 8`** | Cabeçalho: Alternar visibilidade do cabeçalho superior (*Header*) |
-| | **`Numpad 9`** | Program Player: Alternar visibilidade do player |
-| | **`Alt + Numpad 9`** | Program Player: Maximizar / Restaurar monitor |
-| | **`Ctrl + Numpad 9`** | Program Player: Destacar em janela externa flutuante (*Popout*) / Reanexar |
-| | **`Numpad 0`** | Modo Zen / Cinema: Ocultar/restaurar cabeçalho e todas as barras laterais |
-| | **`Numpad .`** | Timeline: Alternar cabeçalho superior (barra de timecode, zoom e sliders) |
-| | **`Numpad +`** | Timeline: Aumentar altura das pistas (+10%) |
-| | **`Numpad -`** | Timeline: Reduzir altura das pistas (-10%) |
-| | **`Numpad /`** | Monitores: Alternar disposição Lado a Lado $\leftrightarrow$ Empilhados |
-| | **`Numpad *`** | Monitores: Alternar foco ativo / Fazer swap entre Source e Program Player |
-| | **`Numpad Enter`** | Painel: Maximizar/restaurar painel focado ou sob o cursor do mouse |
-| **Slots de Workspace** | **`Ctrl + Alt + [1-9]`** | Carregar instantaneamente a workspace vinculada ao Slot numérico [1..9] |
-| | **`Ctrl + Alt + Shift + [1-9]`** | Salvar e vincular o layout exato atual ao Slot numérico [1..9] |
+#### Inserir mídias na timeline
+
+1. **Duplo clique e modificadores:**
+
+   | Gesto | Onde a mídia entra |
+   |---|---|
+   | Duplo clique | No final da timeline (prefere V1 e ignora pistas ocultas) |
+   | `Shift` + duplo clique | Na posição da agulha, que vai para o fim do clipe inserido |
+   | `Ctrl` (ou `Cmd`) + duplo clique | No primeiro gap a partir do quadro 0, agulha no início da mídia |
+   | `Ctrl+Shift` + duplo clique | No próximo gap à frente da agulha, agulha no início da mídia |
+   | `Alt+Shift` + duplo clique | No início da timeline (quadro 0) |
+   | `Alt` + duplo clique | Ripple insert: divide os clipes sob a agulha e empurra os seguintes |
+   | `Ctrl+Alt` + duplo clique | Sobreposição na pista superior livre (ex.: V2 / B-roll), na agulha |
+
+2. **Botão direito › Adicionar à Timeline.** Mostra as mesmas opções com seus atalhos. Se há um clipe selecionado na timeline, aparece também **Substituir Clipe Selecionado**. Clicar no item principal faz a inserção padrão no final.
+3. **Arrastar e soltar.** Arraste qualquer vídeo ou foto para a pista desejada (com `Ctrl` no soltar, vira ripple insert).
+4. **Fotos.** Passe o mouse sobre uma miniatura de foto e clique no botão `+` para inserir como still (5 s por padrão) na agulha.
+
+### 9.6 Janelas destacadas em vários monitores
+
+Para ilhas de edição com dois ou mais monitores, qualquer painel (Biblioteca, Ajustes & Efeitos, Painel Lateral, Timeline ou Players) pode ser destacado para uma janela do navegador em outro monitor:
+
+- **Destacar:** botão de destaque no cabeçalho do painel ou `Ctrl+Numpad [2, 4, 5, 6, 7, 9]`. Na janela externa, o botão vira **Reanexar ao Editor Principal**; fechar a janela também devolve o painel ao lugar original.
+- **Posição lembrada.** Ao reabrir ou recarregar, a janela destacada volta à posição e ao tamanho anteriores no monitor secundário.
+- **Sincronia em tempo real.** Seleção de clipes, reprodução no Source, zoom das miniaturas e alterações de metadados aparecem iguais nas duas janelas. Trocar de workspace ou mover a timeline não fecha nem quebra o painel destacado.
+- **Diálogos também acompanham.** As confirmações e campos de nome (ex.: nomear um rosto, confirmar uma exclusão) abrem na janela em que você está trabalhando, inclusive em um painel destacado em outro monitor, e não somem atrás da janela principal.
 
 ---
 
-## 🌊 16. Formas de Onda Reais (Waveforms)
+## 10. Configurações da sequência e zoom do preview
 
-A forma de onda desenhada nos clipes de áudio **não é enfeite**: são os picos verdadeiros do
-arquivo. Isso muda o que você consegue fazer com os olhos — achar a respiração antes da fala, o
-estalo do microfone, o ponto exato onde a frase começa — sem precisar dar play.
+### 10.1 Configuração automática no primeiro clipe
+
+Ao colocar o primeiro clipe de **vídeo** em uma timeline totalmente vazia, o sistema lê a resolução e o FPS do arquivo e configura a timeline para coincidir. Fotos não disparam essa configuração, para que a timeline fique nos valores padrão ou nos que você escolher.
+
+### 10.2 Painel de configurações da sequência
+
+Com nenhum clipe selecionado (ou ao abrir a aba **Ajustes** sem seleção), o painel lateral direito mostra as **Configurações da Sequência**:
+
+- **Presets de resolução:** 1920×1080 (16:9), 1080×1920 (9:16 vertical), 3840×2160 (4K), 1080×1080 (1:1) ou *Personalizado*.
+- **Dimensões personalizadas:** em *Personalizado*, largura e altura são editáveis e a proporção é calculada na hora.
+- **FPS:** de 23,976 a 60.
+- **Aviso e reescalagem.** Se você muda o FPS de uma timeline que já tem clipes, o sistema avisa e recalcula as posições para **preservar a duração em segundos**. A alteração é um único passo no histórico e pode ser desfeita com `Ctrl+Z`.
+
+### 10.3 Acesso rápido
+
+Abra as configurações pelo botão de **engrenagem** no cabeçalho do Program Player ou pela barra de ferramentas lateral da timeline. As propriedades são lembradas no auto-salvamento e gravadas no banco ao salvar a timeline.
+
+### 10.4 Zoom de visualização do Program Player
+
+Ao lado do seletor de resolução há um seletor de zoom: **Fit, 25%, 50%, 75% e 100%**.
+
+- **Fit:** ajusta a imagem ao tamanho disponível, para ver a sequência inteira.
+- **Percentuais fixos:** mostram a sequência em escala estrita. O que passar do enquadramento é escurecido, o que facilita alinhar detalhes finos.
+
+---
+
+## 11. Viewport estável, alças de transformação e recorte (Crop)
+
+### 11.1 Viewport estável e máscara de transbordo
+
+A área de visualização do Program Player mantém a **proporção real da sequência** (ex.: 16:9 ou 9:16), sem ser afetada pelo tamanho da janela do navegador ou pelas barras divisórias.
+
+Tudo o que ultrapassa o enquadramento (um clipe ampliado ou deslocado) continua visível além das bordas pontilhadas, mas escurecido por uma máscara de 70%. Assim você vê o transbordo e sabe exatamente o que será cortado na exportação.
+
+### 11.2 Alças de transformação
+
+Com um clipe de vídeo ou foto selecionado e a agulha sobre ele, uma caixa ciano aparece ao redor da imagem no Program Player. A caixa acompanha o conteúdo visível, descontando faixas pretas (letterbox).
+
+- **Mover:** arraste o interior da caixa. Os valores X e Y são atualizados.
+- **Escalar:** arraste os quadrados brancos dos cantos para ampliar ou reduzir uniformemente.
+- **Rotacionar:** arraste a alça no topo da caixa.
+- **Histórico e sliders.** Ao soltar, o gesto vira um passo único no histórico e os sliders da aba **Ajustes** mostram os valores finais. `Ctrl+Z` desfaz o arraste inteiro.
+- Um clique curto, sem arrastar, continua funcionando como Play/Pause.
+
+### 11.3 Recorte (Crop)
+
+Na aba **Ajustes**, a seção **Recorte (Crop)** (abaixo das transformações) ajusta as bordas **Esquerda**, **Direita**, **Topo** e **Base**, de 0% a 90%.
+
+- O recorte é relativo à imagem útil: 10% na esquerda corta 10% do conteúdo, não da faixa preta.
+- Ele acompanha escala, rotação e posição do clipe.
+- A rolagem do painel é preservada enquanto você mexe nos sliders.
+
+### 11.4 Reset com duplo clique
+
+Dê **duplo clique** no nome de um parâmetro ou no seu slider (Posição X/Y, Rotação, Escala, Crop, Volume, Fades) para voltar ao valor padrão (posição 0, escala 100%, rotação 0°, crop 0%, volume 100%). A alteração pode ser desfeita com `Ctrl+Z`.
+
+> **Dica:** as margens de segurança e as máscaras de proporção ([9.2](#92-operação-dos-players)) ajudam a conferir o enquadramento enquanto você ajusta posição e escala.
+
+---
+
+## 12. Seleção de modelos de IA e gestão de tarefas
+
+### 12.1 Modelos de visão e de texto
+
+Em **Configurações**, você escolhe os modelos usados pela IA:
+
+- **Visão** (descrição de quadros do acervo). O padrão é **Gemini 2.5 Flash**. A lista inclui também Gemini 3.8 Flash, Gemini 3.1 Pro (prévia), Gemini 3.1 Flash Lite, Perceptron MK1 e **Nemotron 3 Nano Omni (grátis)**.
+- **Texto e agente** (chat, temas, relatórios). O padrão é **DeepSeek V4.1 Flash**, com opções como DeepSeek V4 Pro, Gemini, Claude Sonnet 5.5 e GPT-5.5 (a lista exata aparece nas Configurações).
+- **Modelo reserva.** Se o modelo de visão escolhido falhar (cota, instabilidade de rede), o sistema tenta automaticamente o modelo reserva, que por padrão é o Nemotron grátis.
+- **Proteção contra sobrescrita.** Se todas as chamadas falharem, as descrições e categorias boas já salvas são preservadas.
+- **Limite de saída.** As chamadas usam um teto de tokens para evitar que o provedor reserve créditos além do necessário e responda com erro de saldo insuficiente (402).
+
+> **Atenção:** os modelos gratuitos têm limites do provedor (o OpenRouter limita o uso diário de modelos gratuitos e pode demorar a responder). Para lotes grandes, prefira o modelo pago padrão.
+
+### 12.2 Gerenciador de tarefas de miniaturas
+
+No painel de tarefas e status da mídia, você acompanha a geração das miniaturas e pode **Pausar**, **Cancelar**, **Remover** e **Sincronizar** para liberar recursos do computador quando precisar.
+
+---
+
+## 13. Hardware, aceleração por GPU e fallback automático
+
+A aba **Hardware & GPU** do Painel de Configurações (engrenagem no cabeçalho) permite aproveitar sua placa gráfica (Intel QuickSync, AMD, Nvidia) e protege o computador com **fallback automático para CPU**.
+
+### 13.1 Opções da aba
+
+1. **Codificador de vídeo (proxies e exportação):**
+   - **Automático** (padrão recomendado): detecta o melhor acelerador instalado e usa a CPU se não houver.
+   - **Intel QuickSync (`h264_qsv`)**, **AMD AMF (`h264_amf`)**, **Nvidia NVENC (`h264_nvenc`)**.
+   - **Software CPU (`libx264`)**: compatibilidade universal.
+2. **Decodificação de vídeo por hardware:** o modo automático usa a GPU para descompactar vídeos 1080p e 4K na extração de miniaturas e na navegação, reduzindo calor e uso da CPU. Há opções específicas (Direct3D 11, DirectX 9, CUDA) e **Desativado** (só CPU).
+3. **Aceleração OpenCL no OpenCV:** acelera operações em fotos (filtros, realce de contraste e redimensionamento) sem consumir memória de vídeo dedicada.
+4. **Dispositivo para os modelos de busca (CLIP e embeddings):** o modo automático mantém esses modelos leves, poupando a memória da placa para a codificação de vídeo. DirectML e CUDA ficam disponíveis para placas com mais memória.
+
+### 13.2 Fallback automático e silencioso
+
+Se a placa atingir o limite de codificações simultâneas, ou rejeitar um arquivo de perfil incomum, o sistema muda **na hora para a CPU** sem interromper a fila e sem exibir erros, garantindo que todos os proxies e miniaturas sejam gerados.
+
+### 13.3 Dicas dentro do painel
+
+Passe o mouse sobre o ícone **ⓘ** ao lado de cada opção para ver uma explicação técnica mais detalhada.
+
+---
+
+## 14. Atalhos de teclado e perfis NLE
+
+O CapIAu-Talho tem um sistema completo de atalhos, com **perfis** que reproduzem a ergonomia de outros editores:
+
+| Perfil | Pensado para |
+|---|---|
+| **CapIAu Padrão** | Híbrido moderno, com a suíte QWER/ASDF para a mão esquerda |
+| **Kdenlive** | Quem vem do editor open source |
+| **Adobe Premiere Pro** | Quem vem do ecossistema Adobe |
+| **DaVinci Resolve** | Quem vem da pós-produção Blackmagic |
+| **Apple Final Cut Pro** | Quem vem do ecossistema Apple |
+| **Personalizado** | Mapeamento livre, com gravador de teclas, detector de conflitos e exportação e importação em JSON |
+
+Para trocar de perfil, abra o **Guia de Atalhos** (ícone de teclado na barra da timeline) e escolha em **Perfil**. Este manual cita os atalhos do perfil **CapIAu Padrão**; nos outros perfis, algumas teclas mudam.
+
+### Regra de contexto
+
+Um mesmo atalho pode agir de forma diferente conforme o contexto. É intencional: o programa decide pelo que está acontecendo no momento. O que conta é:
+
+- **o painel em foco** (timeline, Source Player, Program Player, biblioteca);
+- **a ferramenta ativa** na barra de ferramentas;
+- **o que está sob o mouse** (hover);
+- **se há uma sugestão ativa** da IA (ghost clip selecionado).
+
+Exemplos: `A` abre o Inspetor de Mídia na biblioteca e pula para o corte anterior na timeline; `Delete` apaga um clipe normal, mas rejeita um ghost clip selecionado; `Ctrl+L` liga o loop de reprodução e, em certos contextos, também desvincula áudio e vídeo (para desvincular, prefira `Ctrl+Shift+U`).
+
+### Teclado visual e teste ao vivo
+
+O Guia de Atalhos traz um teclado esquemático em tamanho real:
+
+- Passar o mouse sobre uma tecla destaca o comando correspondente na lista, e vice-versa.
+- Botões alternam as camadas **Padrão**, **+ Shift**, **+ Ctrl** e **+ Alt**, também ao segurar os modificadores no teclado físico.
+- **Teste ao vivo:** com o guia aberto, digite qualquer atalho para ver a tecla acender e o nome e a descrição do comando aparecerem no rodapé.
+- Modo tela cheia para visualização imersiva.
+
+### Lista completa de atalhos
+
+- Lista completa e atualizada, gerada a partir do mapa de teclas do programa: [docs/shortcuts.md](docs/shortcuts.md).
+- Cartões imprimíveis por perfil (para deixar ao lado do teclado): pasta [docs/atalhos/](docs/atalhos/).
+- Versão da wiki: [Guia Completo de Atalhos](https://github.com/fernangcortes/capiau-talho-v03/wiki/14.-Guia-Completo-de-Atalhos).
+
+<!-- GERADO:ATALHOS:INICIO -->
+
+#### Perfil CapIAu Padrão
+
+> Alguns atalhos aparecem em mais de uma ação neste perfil. Isso é intencional: a ação executada depende do contexto (painel em foco, ferramenta ativa, elemento sob o mouse, sugestão ou clipe fantasma ativo). A coluna de observação indica com quais ações o atalho é compartilhado.
+
+##### 1. Reprodução & Navegação
+
+| Atalho | Ação | Contexto/observação |
+| :--- | :--- | :--- |
+| `Espaço` | Play / Pause | Inicia ou pausa a reprodução no player ativo (Source ou Program) |
+| `J` | Shuttle Reverso (J) | Reproduz para trás. Pressionar repetidamente acelera a velocidade (1x, 2x, 4x, 8x) |
+| `K` | Shuttle Play / Pause (K) | Alterna entre reproduzir e pausar a reprodução (segure K com J ou L para avançar/recuar quadro a quadro) |
+| `L` | Shuttle Avanço (L) | Reproduz para frente. Pressionar repetidamente acelera a velocidade (1x, 2x, 4x, 8x) |
+| `Shift + →` | Shuttle Acelerado / Avanço Rápido (Shift + →) | Reproduz acelerado para frente. Toques repetidos aumentam a velocidade (igual JKL); segurar reproduz acelerado enquanto pressionado |
+| `Shift + ←` | Shuttle Acelerado / Recuo Rápido (Shift + ←) | Reproduz acelerado para trás. Toques repetidos aumentam a velocidade reversa; segurar reproduz acelerado enquanto pressionado |
+| `Ctrl + →` | Câmera Lenta Avanço (Ctrl + →) | Reproduz em câmera lenta para frente (0.25x). Segurar reproduz enquanto pressionado |
+| `Ctrl + ←` | Câmera Lenta Recuo (Ctrl + ←) | Reproduz em câmera lenta reversa (-0.25x). Segurar reproduz enquanto pressionado |
+| `K + J` | Jog Recuar 1 Frame (K + J) | Segure K e pressione J para recuar exatamente 1 frame |
+| `K + L` | Jog Avançar 1 Frame (K + L) | Segure K e pressione L para avançar exatamente 1 frame |
+| `I` | Marcar Ponto de Entrada (IN) | Define o ponto inicial de corte no Player ou Linha do Tempo |
+| `O` | Marcar Ponto de Saída (OUT) | Define o ponto final de corte no Player ou Linha do Tempo |
+| `Alt + I` | Limpar Ponto IN | Remove o ponto de entrada (IN) no Player ou Linha do Tempo |
+| `Alt + O` | Limpar Ponto OUT | Remove o ponto de saída (OUT) no Player ou Linha do Tempo |
+| `Alt + X` | Limpar Pontos IN e OUT | Remove ambos os pontos de entrada e saída (IN e OUT) |
+| `X` | Marcar Clipe (IN / OUT) | Define pontos IN e OUT nos limites do clipe selecionado ou sob a agulha<br>**Atalho compartilhado, depende do contexto:** Esticar / Comprimir Taxa de Velocidade (Rate Stretch) (X). |
+| `Shift + I` | Ir para o Ponto IN | Move a agulha de reprodução diretamente para o ponto IN |
+| `Shift + O` | Ir para o Ponto OUT | Move a agulha de reprodução diretamente para o ponto OUT |
+| `Shift + Espaço` ou `Alt + /` | Tocar de IN até OUT | Reproduz o trecho delimitado entre os pontos IN e OUT e pausa |
+| `Ctrl + L` ou `Ctrl + Shift + Espaço` | Alternar Reprodução em Loop | Liga ou desliga a reprodução contínua em loop entre os pontos IN e OUT<br>**Atalho compartilhado, depende do contexto:** Desvincular Par Áudio/Vídeo (Ctrl + L). |
+| `Shift + E` | Inserir na Timeline (Append) | Insere o trecho marcado (IN ➔ OUT) na timeline |
+| `←` | Navegar 1 Frame para Trás | Move a agulha 1 frame para trás (quando nenhum clipe estiver selecionado)<br>**Atalho compartilhado, depende do contexto:** Nudge: Deslocar 1 Frame para Trás (←). |
+| `→` | Navegar 1 Frame para Frente | Move a agulha 1 frame para frente (quando nenhum clipe estiver selecionado)<br>**Atalho compartilhado, depende do contexto:** Nudge: Deslocar 1 Frame para Frente (→). |
+| `↑` ou `A` | Pular para Ponto Anterior / Início | Program: move a agulha para o corte anterior; Source: vai para IN ou Início |
+| `↓` ou `S` | Pular para Próximo Ponto / Fim | Program: move a agulha para o corte seguinte; Source: vai para OUT ou Fim |
+| `Ctrl + G` | Ir para Timecode / Navegação Numérica | Ativa a entrada de timecode para salto absoluto ou navegação relativa (+/- frames) |
+
+##### 2. Ferramentas & Modos
+
+| Atalho | Ação | Contexto/observação |
+| :--- | :--- | :--- |
+| `V` | Ferramenta de Seleção | Ativa a ferramenta de seleção padrão da timeline (Seta) |
+| `Shift + V` | Seleção por Caixa / Retângulo (Marquee) | Ativa a ferramenta de seleção por retângulo (arraste para selecionar clipes e marcadores) |
+| `C` | Ferramenta Lâmina / Gilete (Blade) | Ativa a ferramenta de corte de precisão por cursor na trilha |
+| `Shift + C` | Lâmina Global na Agulha | Fatia todas as pistas destravadas na coordenada da agulha de reprodução |
+| `Y` | Deslizar Conteúdo Interno (Slip Tool) | Desliza os pontos IN e OUT da mídia bruta mantendo a posição e duração na timeline<br>**Atalho compartilhado, depende do contexto:** Aceitar Sugestão de IA (Y). |
+| `U` | Deslizar Posição na Timeline (Slide Tool) | Move o clipe na timeline mantendo seu conteúdo intacto e compensando nos vizinhos adjacentes |
+| `Shift + N` | Corte Contínuo Adjacente (Rolling Edit) | Ajusta o ponto de corte entre dois clipes contíguos sem alterar a duração total da sequência |
+| `Shift + R` ou `X` | Esticar / Comprimir Taxa de Velocidade (Rate Stretch) | Altera a velocidade do clipe arrastando suas bordas para esticar ou comprimir a taxa temporal<br>**Atalho compartilhado, depende do contexto:** Marcar Clipe (IN / OUT) (X). |
+| `T` | Selecionar Faixa para Frente | Ativa a ferramenta de seleção de todos os clipes à direita |
+| `Shift + T` | Selecionar Faixa para Trás | Ativa a ferramenta de seleção de todos os clipes à esquerda |
+| `N` ou `Shift + S` | Alternar Snapping Magnético | Liga ou desliga o alinhamento magnético inteligente de bordas e agulha<br>**Atalho compartilhado, depende do contexto:** Rejeitar Sugestão de IA (N). |
+| `H` | Ferramenta Mão / Pan | Ativa a ferramenta de navegação e arrasto contínuo da timeline (Pan) |
+| `Esc` | Desmarcar Seleção / Fechar Caixas | Limpa a seleção de clipes ou fecha pop-ups contextuais e modais |
+| `R` | Girar Mídia sob Cursor (+90°) | Rotaciona a mídia sob o cursor (hover) na biblioteca ou no monitor de origem<br>**Atalho compartilhado, depende do contexto:** Ripple Delete (Apagar e Fechar Espaço) (R). |
+
+##### 3. Edição, Cortes & Trims
+
+| Atalho | Ação | Contexto/observação |
+| :--- | :--- | :--- |
+| `,` | Inserir na Agulha (Ripple Insert) | Insere o trecho marcado no monitor Source na coordenada da agulha empurrando os clipes subsequentes |
+| `.` | Sobrescrever na Agulha (Overwrite Edit) | Insere o trecho marcado no monitor Source na coordenada da agulha substituindo o material sob o intervalo |
+| `Ctrl + Alt + A` | Alternar Canais na Inserção (AV / V / A) | Alterna os canais transferidos do monitor Source para a Timeline: Áudio+Vídeo (AV), Somente Vídeo (V) ou Somente Áudio (A) |
+| `Alt + F` | Localizar Quadro Original na Fonte (Match Frame) | Localiza a mídia bruta correspondente ao quadro sob a agulha da timeline e abre no Source Player marcando os pontos IN–OUT originais |
+| `Shift + F` | Localizar Quadro na Timeline (Reverse Match Frame) | Localiza onde o quadro atual sob a agulha do Source Player está sendo utilizado na timeline ativa e salta a agulha para a posição correspondente |
+| `Ctrl + Shift + R` | Substituir Clipe na Timeline (Replace Edit) | Substitui a mídia do clipe alvo (selecionado, sob a agulha ou sob o cursor com Alt no arraste) preservando duração exata, efeitos (Ken Burns), cor e velocidade |
+| `Ctrl + U` | Criar Subclipe na Biblioteca (Make Subclip) | Gera um novo item virtual na biblioteca a partir do intervalo [IN–OUT] delimitado no monitor Source |
+| `Ctrl + Shift + F` | Congelar Quadro (Freeze Frame) | Captura o quadro sob a agulha e insere um segmento estático na timeline (Ctrl+Shift+F) |
+| `Ctrl + R` | Velocidade / Duração do Clipe (Speed / Duration) | Abre o diálogo de velocidade percentual, duração proporcional e reversão do clipe selecionado (Ctrl+R) |
+| `Ctrl + Alt + R` | Preencher Espaço na Trilha (Fit to Gap) | Estende a duração do clipe ajustando a velocidade para preencher automaticamente o espaço vazio adjacente na pista (Ctrl+Alt+R) |
+| `Ctrl + Shift + D` | Crossfade de Áudio (Potência Constante) | Aplica transição de crossfade de áudio de potência constante (Equal-Power) na emenda entre clipes contíguos ou no clipe selecionado (Ctrl+Shift+D) |
+| `Ctrl + D` | Transição de Vídeo Padrão (Cross Dissolve) | Aplica transição de vídeo (Cross Dissolve, Dip to Black ou Dip to White) na emenda contígua sob a agulha ou entre os clipes selecionados (Ctrl+D) |
+| `Enter` | Renderizar Efeitos In para Out (Cache NLE) | Pré-renderiza o intervalo da timeline (In-Out ou trechos pesados) para playback suave em cache (Enter)<br>**Atalho compartilhado, depende do contexto:** Aceitar Sugestão de IA (Enter). |
+| `E` ou `Z` ou `Alt + E` ou `Alt + Z` | Dividir Clipe no Playhead (Split) | Fatia o clipe sob a agulha de reprodução (ou o clipe selecionado) |
+| `Q` | Ripple Trim Início (Até a Agulha) | Corta o início do clipe até a agulha e fecha o espaço na timeline |
+| `W` | Ripple Trim Fim (Da Agulha ao Fim) | Corta da agulha até o final do clipe e fecha o espaço na timeline |
+| `Del` ou `Alt + R` | Lift Delete (Apagar Clipe) | Apaga o clipe selecionado deixando o espaço vazio (gap) intacto<br>**Atalho compartilhado, depende do contexto:** Rejeitar Sugestão de IA (Del). |
+| `R` ou `Backspace` ou `Shift + Del` | Ripple Delete (Apagar e Fechar Espaço) | Apaga o clipe e puxa todos os clipes posteriores para fechar a lacuna<br>**Atalho compartilhado, depende do contexto:** Girar Mídia sob Cursor (+90°) (R). |
+| `Semicolon` ou `Alt + Del` | Lift no Intervalo IN–OUT | Apaga o conteúdo dentro do intervalo IN–OUT nas pistas ativas deixando o espaço vazio (gap)<br>**Atalho compartilhado, depende do contexto:** Apagar Faixa Única (Desvincular Par) (Alt + Del). |
+| `Alt + Del` | Apagar Faixa Única (Desvincular Par) | Apaga apenas o vídeo ou o áudio selecionado, preservando o outro fluxo<br>**Atalho compartilhado, depende do contexto:** Lift no Intervalo IN–OUT (Alt + Del). |
+| `Quote` ou `Alt + Shift + Del` | Extract (Ripple Delete) no Intervalo IN–OUT | Apaga o conteúdo dentro do intervalo IN–OUT e puxa os clipes posteriores para fechar o espaço |
+| `Ctrl + L` ou `Ctrl + Shift + U` | Desvincular Par Áudio/Vídeo | Quebra a vinculação estrita entre o vídeo e seu par de áudio correspondente<br>**Atalho compartilhado, depende do contexto:** Alternar Reprodução em Loop (Ctrl + L). |
+| `←` | Nudge: Deslocar 1 Frame para Trás | Move o clipe selecionado 1 frame para a esquerda na timeline<br>**Atalho compartilhado, depende do contexto:** Navegar 1 Frame para Trás (←). |
+| `→` | Nudge: Deslocar 1 Frame para Frente | Move o clipe selecionado 1 frame para a direita na timeline<br>**Atalho compartilhado, depende do contexto:** Navegar 1 Frame para Frente (→). |
+| `Alt + ←` ou `[` | Trim Ponto IN: Recuar 1 Frame | Expande ou contrai a ponta inicial do clipe selecionado em 1 frame<br>**Atalho compartilhado, depende do contexto:** Trim Ponto OUT: Recuar 1 Frame ([). |
+| `Alt + Shift + ←` ou `[` | Trim Ponto OUT: Recuar 1 Frame | Recua a ponta final do clipe selecionado em 1 frame<br>**Atalho compartilhado, depende do contexto:** Trim Ponto IN: Recuar 1 Frame ([). |
+| `Alt + →` | Trim Ponto IN: Avançar 1 Frame | Avança a ponta inicial do clipe selecionado em 1 frame |
+| `Alt + Shift + →` ou `]` | Trim Ponto OUT: Avançar 1 Frame | Avança a ponta final do clipe selecionado em 1 frame |
+| `D` | Selecionar Clipe sob a Agulha | Seleciona o clipe na trilha ativa posicionado sob a agulha de reprodução (D) |
+| `Shift + D` | Multi-Seleção na Agulha (Adicionar à Seleção) | Seleciona todos os clipes sob a agulha em todas as pistas e adiciona à seleção existente (Shift+D) |
+| `F` | Ativar / Desativar Clipe (Mute / Bypass) | Alterna se o clipe selecionado (ou sob a agulha) está ativo ou desativado |
+
+##### 4. Marcadores
+
+| Atalho | Ação | Contexto/observação |
+| :--- | :--- | :--- |
+| `M` | Adicionar / Editar Marcador | Cria um novo marcador ou abre o popover de edição rápida no playhead |
+| `Shift + M` | Pular para o Próximo Marcador | Avança a agulha de reprodução até o marcador seguinte na timeline |
+| `Alt + M` | Pular para o Marcador Anterior | Recua a agulha de reprodução até o marcador anterior na timeline |
+| `Ctrl + Shift + K` ou `Ctrl + Shift + M` | Alternar Momento Crucial (Player / Galeria) | Marca ou desmarca o quadro atual como Momento Crucial para reprodução rápida em hover |
+
+##### 5. Assistência de IA & Tomadas
+
+| Atalho | Ação | Contexto/observação |
+| :--- | :--- | :--- |
+| `Ctrl + Alt + B` | Alternar Detecção Facial no Source | Exibe ou oculta a camada visual de caixas de detecção facial e grounding no Monitor de Origem (Source) |
+| `Alt + A` | Alternar Tomadas / Alternativas de IA | Abre o seletor de tomadas alternativas em clipes gerados por IA / Inspetor |
+| `Enter` ou `Y` | Aceitar Sugestão de IA | Aprova a sugestão da faixa fantasma de IA, tornando-a clipe real na trilha<br>**Atalho compartilhado, depende do contexto:** Renderizar Efeitos In para Out (Cache NLE) (Enter); Deslizar Conteúdo Interno (Slip Tool) (Y). |
+| `Del` ou `N` | Rejeitar Sugestão de IA | Descarta e remove a sugestão fantasma da timeline<br>**Atalho compartilhado, depende do contexto:** Lift Delete (Apagar Clipe) (Del); Alternar Snapping Magnético (N). |
+
+##### 6. Canvas, Zoom & Histórico
+
+| Atalho | Ação | Contexto/observação |
+| :--- | :--- | :--- |
+| `\` ou `Shift + Z` | Ajustar Sequência na Tela (Zoom to Fit) | Enquadra perfeitamente todos os clipes na timeline ou restaura o zoom anterior (Toggle) |
+| `+ / =` ou `Num +` | Aumentar Zoom na Linha do Tempo | Aproxima o zoom horizontal da régua e clipes da timeline<br>**Atalho compartilhado, depende do contexto:** Timeline: Aumentar Altura das Pistas (Num +). |
+| `-` ou `Num -` | Diminuir Zoom na Linha do Tempo | Afasta o zoom horizontal da régua e clipes da timeline<br>**Atalho compartilhado, depende do contexto:** Timeline: Diminuir Altura das Pistas (Num -). |
+| `Ctrl + 1` | Restaurar Zoom Padrão (1:1 / 0.5 px/f) | Restaura a escala da régua e dos clipes para o zoom padrão de 0.5 pixels por frame |
+| `Ctrl + Alt + P` | Alternar 'Seleção Acompanha a Agulha' | Ativa ou desativa a seleção automática do clipe sob a agulha ao se mover |
+| `Ctrl + Alt + F` | Alternar 'Timeline Segue a Agulha' (Auto-Scroll) | Ativa ou desativa a rolagem automática da timeline para acompanhar o cursor de reprodução |
+| `Shift + L` | Travar / Destravar Pista Ativa (Track Lock) | Ativa ou desativa o cadeado físico de proteção total na pista selecionada |
+| `Ctrl + Alt + Shift + L` | Travar / Destravar Todas as Pistas | Alterna o cadeado físico em todas as pistas de vídeo, áudio e texto da timeline |
+| `Ctrl + Shift + G` | Alternar Margens de Segurança & Guias no Player (Safe Margins) | Exibe ou oculta o overlay vetorial de Action Safe (90%), Title Safe (80%), Cruz Central e Máscaras de Proporção no Monitor de Programa |
+| `Ctrl + Alt + G` | Alternar Máscara de Proporção no Player (16:9 / 9:16 / 1:1 / 2.39:1) | Alterna ciclicamente entre as máscaras de proporção de aspecto (16:9, 9:16, 1:1, 2.39:1, 4:5, 4:3, Sem Máscara) no Monitor de Programa |
+| `Ctrl + Z` | Desfazer Ação (Undo) | Desfaz a última alteração realizada na timeline |
+| `Ctrl + Shift + Z` ou `Ctrl + Y` | Refazer Ação (Redo) | Refaz a edição desfeita anteriormente |
+| `Ctrl + Shift + S` | Salvar Preset de Workspace | Abre o diálogo para salvar o layout visual atual da interface |
+
+##### 7. Layout & Workspace (Numpad)
+
+| Atalho | Ação | Contexto/observação |
+| :--- | :--- | :--- |
+| `Ctrl + Alt + Z` | Desfazer Mudança de Layout | Desfaz a última mudança na disposição dos painéis (histórico separado do da timeline) |
+| `Ctrl + Alt + Shift + Z` | Refazer Mudança de Layout | Refaz a mudança de layout desfeita anteriormente |
+| `Num 1` | Timeline: Expansão Direcional Esquerda | Alterna a expansão da timeline sob a sidebar esquerda (bottom-left ↔ center) |
+| `Alt + Num 1` | Timeline: Toggle Cabeçalho de Pistas | Oculta ou exibe a área de faixas e timecode da timeline (Track Headers) |
+| `Num 2` | Timeline: Alternar Centro ↔ Faixa Total | Alterna a timeline entre entre menus (center) e largura total na base (bottom-full) |
+| `Alt + Num 2` | Timeline: Recolher / Restaurar Verticalmente | Recolhe ou expande o painel da timeline para a linha restauradora na base |
+| `Ctrl + Num 2` | Timeline: Destacar / Reanexar Janela | Abre a timeline em janela flutuante para o segundo monitor ou a reanexa |
+| `Num 3` | Timeline: Expansão Direcional Direita | Alterna a expansão da timeline sob a sidebar direita (bottom-right ↔ center) |
+| `Alt + Num 3` | Timeline: Toggle Barra de Ferramentas | Recolhe ou expande a barra vertical de ferramentas de corte (V, C, Trims) |
+| `Num 4` | Biblioteca: Ocultar / Exibir | Recolhe ou expande a sidebar esquerda (Biblioteca de mídias, temas, rostos) |
+| `Alt + Num 4` | Biblioteca: Layout Estúdio (Maximizar) | Maximiza a biblioteca no layout estúdio com timeline e players empilhados |
+| `Ctrl + Num 4` | Biblioteca: Destacar / Reanexar Janela | Abre a biblioteca em janela flutuante externa ou a reanexa |
+| `Num 5` | Inspetor: Ocultar / Exibir | Recolhe ou expande o painel de Ajustes & Efeitos (Inspetor) |
+| `Alt + Num 5` | Inspetor: Maximizar / Restaurar | Maximiza o painel de Ajustes & Efeitos no espaço disponível |
+| `Ctrl + Num 5` | Inspetor: Destacar / Reanexar Janela | Abre o Inspetor em janela flutuante externa ou o reanexa |
+| `Num 6` | Painel Direito: Ocultar / Exibir | Recolhe ou expande a sidebar direita (Transcrição, Visão IA, Tarefas, Logs) |
+| `Alt + Num 6` | Painel Direito: Maximizar / Restaurar | Maximiza a sidebar direita no espaço disponível |
+| `Ctrl + Num 6` | Painel Direito: Destacar / Reanexar Janela | Abre a sidebar direita em janela flutuante externa ou a reanexa |
+| `Num 7` | Source Player: Ocultar / Exibir | Oculta ou exibe o monitor de origem (Source Player) |
+| `Alt + Num 7` | Source Player: Maximizar / Restaurar | Maximiza o monitor de origem no palco central |
+| `Ctrl + Num 7` | Source Player: Destacar / Reanexar Janela | Abre o monitor de origem em janela flutuante externa ou o reanexa |
+| `Num 8` | Header Geral: Ocultar / Exibir | Recolhe ou expande o cabeçalho superior da aplicação para ganhar espaço vertical |
+| `Num 9` | Program Player: Ocultar / Exibir | Oculta ou exibe o monitor de programa (Program Player) |
+| `Alt + Num 9` | Program Player: Maximizar / Restaurar | Maximiza o monitor de programa no palco central |
+| `Ctrl + Num 9` | Program Player: Destacar / Reanexar Janela | Abre o monitor de programa em janela flutuante externa ou o reanexa |
+| `Num 0` | Modo Foco / Cinema / Zen | Macro global: recolhe ou restaura Header e todas as Sidebars simultaneamente |
+| `Num .` | Timeline: Toggle Cabeçalho Superior | Recolhe ou restaura a barra superior de nome, zoom e sequência da timeline |
+| `Num +` | Timeline: Aumentar Altura das Pistas | Aumenta a altura das faixas de áudio e vídeo na timeline (+10px)<br>**Atalho compartilhado, depende do contexto:** Aumentar Zoom na Linha do Tempo (Num +). |
+| `Num -` | Timeline: Diminuir Altura das Pistas | Diminui a altura das faixas de áudio e vídeo na timeline (-10px)<br>**Atalho compartilhado, depende do contexto:** Diminuir Zoom na Linha do Tempo (Num -). |
+| `Num /` | Monitores: Alternar Lado a Lado / Empilhados | Alterna a disposição dos monitores entre horizontal e vertical |
+| `Num *` | Monitores: Swap / Alternar Foco | Alterna o foco ativo entre o Monitor Source e o Monitor Program |
+| `Num Enter` | Maximizar / Restaurar Painel sob Foco | Maximiza ou restaura o painel ativo ou sob o cursor |
+| `Ctrl + Alt + 1` ou `Ctrl + Alt + Num 1` | Workspace: Carregar Slot 1 | Carrega instantaneamente o layout salvo no slot numérico 1 (Ctrl + Alt + 1) |
+| `Ctrl + Alt + 2` ou `Ctrl + Alt + Num 2` | Workspace: Carregar Slot 2 | Carrega instantaneamente o layout salvo no slot numérico 2 (Ctrl + Alt + 2) |
+| `Ctrl + Alt + 3` ou `Ctrl + Alt + Num 3` | Workspace: Carregar Slot 3 | Carrega instantaneamente o layout salvo no slot numérico 3 (Ctrl + Alt + 3) |
+| `Ctrl + Alt + 4` ou `Ctrl + Alt + Num 4` | Workspace: Carregar Slot 4 | Carrega instantaneamente o layout salvo no slot numérico 4 (Ctrl + Alt + 4) |
+| `Ctrl + Alt + 5` ou `Ctrl + Alt + Num 5` | Workspace: Carregar Slot 5 | Carrega instantaneamente o layout salvo no slot numérico 5 (Ctrl + Alt + 5) |
+| `Ctrl + Alt + 6` ou `Ctrl + Alt + Num 6` | Workspace: Carregar Slot 6 | Carrega instantaneamente o layout salvo no slot numérico 6 (Ctrl + Alt + 6) |
+| `Ctrl + Alt + 7` ou `Ctrl + Alt + Num 7` | Workspace: Carregar Slot 7 | Carrega instantaneamente o layout salvo no slot numérico 7 (Ctrl + Alt + 7) |
+| `Ctrl + Alt + 8` ou `Ctrl + Alt + Num 8` | Workspace: Carregar Slot 8 | Carrega instantaneamente o layout salvo no slot numérico 8 (Ctrl + Alt + 8) |
+| `Ctrl + Alt + 9` ou `Ctrl + Alt + Num 9` | Workspace: Carregar Slot 9 | Carrega instantaneamente o layout salvo no slot numérico 9 (Ctrl + Alt + 9) |
+| `Ctrl + Alt + Shift + 1` ou `Ctrl + Alt + Shift + Num 1` | Workspace: Salvar no Slot 1 | Grava a disposição atual diretamente no slot numérico 1 (Ctrl + Alt + Shift + 1) |
+| `Ctrl + Alt + Shift + 2` ou `Ctrl + Alt + Shift + Num 2` | Workspace: Salvar no Slot 2 | Grava a disposição atual diretamente no slot numérico 2 (Ctrl + Alt + Shift + 2) |
+| `Ctrl + Alt + Shift + 3` ou `Ctrl + Alt + Shift + Num 3` | Workspace: Salvar no Slot 3 | Grava a disposição atual diretamente no slot numérico 3 (Ctrl + Alt + Shift + 3) |
+| `Ctrl + Alt + Shift + 4` ou `Ctrl + Alt + Shift + Num 4` | Workspace: Salvar no Slot 4 | Grava a disposição atual diretamente no slot numérico 4 (Ctrl + Alt + Shift + 4) |
+| `Ctrl + Alt + Shift + 5` ou `Ctrl + Alt + Shift + Num 5` | Workspace: Salvar no Slot 5 | Grava a disposição atual diretamente no slot numérico 5 (Ctrl + Alt + Shift + 5) |
+| `Ctrl + Alt + Shift + 6` ou `Ctrl + Alt + Shift + Num 6` | Workspace: Salvar no Slot 6 | Grava a disposição atual diretamente no slot numérico 6 (Ctrl + Alt + Shift + 6) |
+| `Ctrl + Alt + Shift + 7` ou `Ctrl + Alt + Shift + Num 7` | Workspace: Salvar no Slot 7 | Grava a disposição atual diretamente no slot numérico 7 (Ctrl + Alt + Shift + 7) |
+| `Ctrl + Alt + Shift + 8` ou `Ctrl + Alt + Shift + Num 8` | Workspace: Salvar no Slot 8 | Grava a disposição atual diretamente no slot numérico 8 (Ctrl + Alt + Shift + 8) |
+| `Ctrl + Alt + Shift + 9` ou `Ctrl + Alt + Shift + Num 9` | Workspace: Salvar no Slot 9 | Grava a disposição atual diretamente no slot numérico 9 (Ctrl + Alt + Shift + 9) |
+
+As tabelas dos demais perfis (Adobe Premiere Pro, DaVinci Resolve, Apple Final Cut Pro, Kdenlive) ficam em [docs/shortcuts.md](https://github.com/fernangcortes/capiau-talho-v03/blob/main/docs/shortcuts.md).
+
+<!-- GERADO:ATALHOS:FIM -->
+
+---
+
+## 15. Formas de onda (waveforms)
+
+A forma de onda desenhada nos clipes de áudio **não é enfeite**: são os picos reais do arquivo. Isso deixa você achar a respiração antes da fala, o estalo do microfone e o ponto exato onde a frase começa, sem precisar dar play.
 
 ### Como as ondas são geradas
 
-O FFmpeg decodifica o áudio e entrega os valores brutos; o motor guarda, para cada fatia de **10 ms**
-(100 fatias por segundo), o **menor** e o **maior** valor daquele trecho. O resultado vira um arquivo
-de cache em `data/waveforms/waveform_<id>.json`, gerado uma vez e reaproveitado para sempre.
+O áudio é decodificado e o programa guarda, para cada 10 ms, o menor e o maior valor daquele trecho. O resultado fica em `data/waveforms/` e é gerado uma única vez, sendo reaproveitado depois.
 
-**Botão "Ondas"** (verde, na barra da Biblioteca): gera as formas de onda de **todos** os vídeos do
-projeto de uma vez. Vídeo sem trilha de áudio é detectado e pulado, sem erro.
+**Botão "Ondas"** (verde, na barra da biblioteca): gera as formas de onda de **todos** os vídeos do projeto de uma vez. Vídeos sem trilha de áudio são pulados sem erro.
 
-### Por que min/máx e não média — a decisão que importa
+### Por que isso importa para a edição
 
-Este é o ponto que separa uma forma de onda utilizável de uma bonita.
+Com a timeline afastada, cada pixel da tela representa muito áudio. Em vez de tirar uma média (que apagaria um estalo curto no meio de muitos trechos baixos), a onda sempre mostra os extremos de cada trecho. Resultado: você enxerga um defeito com a timeline inteira na tela, dá zoom **no lugar certo** e conserta.
 
-Quando a timeline está afastada, uma tela de 1000 pixels precisa representar talvez 30 minutos de
-áudio: milhares de fatias por pixel. Há duas maneiras de resolver:
+### Desempenho
 
-| Método | O que acontece com um estalo de 20 ms |
-|---|---|
-| **Média** dos valores | Some. Ele é um pico curto no meio de milhares de amostras baixas — a média o dilui até virar nada |
-| **Mínimo e máximo** (o daqui) | Sobrevive. O balde inteiro é representado pelo seu extremo, então o pico continua desenhado |
-
-O efeito prático: você enxerga o problema com a timeline inteira na tela, dá zoom **no lugar certo**
-e conserta. Com média, o defeito só aparece depois que você já ampliou — e para ampliar, precisaria
-saber onde ele está.
-
-### Funções avançadas
-
-Estas são as peças que fazem a onda parecer instantânea mesmo em acervo grande:
-
-- **Reamostragem por resolução de tela (`getSampledEnvelope`).** A onda não é desenhada "inteira e
-  depois encolhida". O motor recebe quantos pontos horizontais cabem na tela naquele zoom e
-  reagrupa os picos exatamente nessa quantidade, preservando min/máx de cada grupo. Um clipe de 8
-  segundos numa faixa de 200 px e o mesmo clipe ocupando 2000 px produzem desenhos com a mesma
-  fidelidade — muda a densidade, não a verdade.
-
-- **Cache em dois andares.** Disco (JSON, sobrevive a reinício) e memória (`Float32Array`, acesso
-  imediato). O desenho da timeline lê da memória, sem tocar em rede nem disco.
-
-- **Deduplicação de requisições em voo.** Se dez clipes do mesmo vídeo aparecem na tela ao mesmo
-  tempo, sai **uma** requisição, não dez. As outras nove esperam a mesma promessa.
-
-- **Pré-carga pelos clipes da timeline (`preloadForClips`).** Ao abrir uma timeline, o motor já
-  busca as ondas das mídias que ela usa, antes de você rolar até elas.
-
-- **Aviso por evento, sem varredura.** Quando uma onda termina de carregar, os componentes
-  interessados são avisados (`waveformLoaded`) e se redesenham sozinhos. Ninguém fica perguntando
-  "já chegou?" em laço.
+As ondas aparecem de forma instantânea mesmo em acervos grandes: ficam em cache no disco e na memória, são pré-carregadas para os clipes da timeline que você abre e cada onda é pedida só uma vez, mesmo que o mesmo vídeo apareça em vários clipes.
 
 ---
 
-## 🎬 17. Exportar Vídeo: Render da Timeline em MP4
+## 16. Exportar vídeo: render da timeline em MP4
 
-O botão de claquete na barra da timeline abre o painel de exportação. Ele transforma a sua montagem
-num arquivo — com o compromisso declarado de que o arquivo seja **igual ao que o monitor de Programa
-mostra**, e de nunca degradar nada em silêncio.
+O botão de claquete na barra da timeline abre o painel de exportação. Ele transforma a sua montagem em um arquivo, com o compromisso de que o resultado seja **igual ao que o monitor de Programa mostra** e de nunca degradar nada em silêncio.
 
 ### Antes de exportar: salve
 
-> ⚠️ **A exportação usa a versão SALVA no banco, não a que está na tela.**
+> **Atenção:** a exportação usa a versão **salva** no banco, não a que está na tela.
 
-O auto-salvamento da timeline grava no navegador (`localStorage`), não no banco. Quem ajusta cor ou
-enquadramento e exporta sem salvar renderiza a versão **anterior**. O painel compara as duas e, se
-diferirem, mostra uma faixa âmbar dizendo exatamente o que muda — com o botão **"Salvar e usar esta
-versão"**, que salva a montagem da tela e já passa a exportar ela.
+O auto-salvamento grava no navegador, não no banco. Quem ajusta cor ou enquadramento e exporta sem salvar renderiza a versão **anterior**. O painel compara as duas e, se diferirem, mostra uma faixa âmbar dizendo exatamente o que muda, com o botão **Salvar e usar esta versão**.
 
 ### O painel, de cima para baixo
 
-1. **Timeline** — qual versão salva exportar (a mais recente vem selecionada).
-2. **Preset** — `Master 1080p`, `YouTube`, `Reels/TikTok 9:16`, `WhatsApp leve`.
-3. **Avançado** — resolução, fps, container, codec, qualidade (CRF), bitrate de áudio. Campo em
-   branco significa "usa o do preset".
-4. **Faixa** — timeline inteira ou apenas o intervalo marcado [IN–OUT].
-5. **Usar Proxies Locais** — opção explícita para renderizar o vídeo utilizando exclusivamente os proxies locais em `data/proxies/` (ideal para exportações ultrarrápidas de rascunho/revisão ou quando o disco original estiver desconectado). O nome do arquivo sugerido recebe o sufixo `_proxy.mp4`.
-6. **Incluir no render** — por categoria (cor, transições, movimento, ajustes de áudio) e **por
-   pista**, montado a partir das pistas reais da sua timeline. Desmarcar aqui é escolha sua e não
-   gera aviso.
-7. **Banner de fidelidade** (âmbar) — o que o motor ainda não reproduz igual (ou aviso informativo `RENDER_COM_PROXIES`), com a lista de clipes.
-8. **Destino** — pasta e nome do arquivo.
-9. **Após concluir** — abrir pasta, copiar caminho, salvar como, ingerir na biblioteca.
+1. **Timeline:** qual versão salva exportar (a mais recente vem selecionada).
+2. **Preset:** `Master 1080p`, `YouTube`, `Reels/TikTok 9:16`, `WhatsApp leve`.
+3. **Avançado:** resolução, fps, container, codec, qualidade (CRF) e bitrate de áudio. Campo em branco significa "usa o do preset".
+4. **Faixa:** a timeline inteira ou só o intervalo marcado In–Out.
+5. **Usar Proxies Locais:** renderiza usando só os proxies de `data/proxies/` (ideal para rascunho e revisão, ou quando o disco original está desconectado). O nome sugerido recebe o sufixo `_proxy.mp4`.
+6. **Incluir no render:** por categoria (cor, transições, movimento, ajustes de áudio) e **por pista**. Desmarcar aqui é escolha sua e não gera aviso.
+7. **Banner de fidelidade** (âmbar): o que o motor ainda não reproduz igual, ou o aviso informativo `RENDER_COM_PROXIES`, com a lista de clipes.
+8. **Destino:** pasta e nome do arquivo.
+9. **Após concluir:** abrir a pasta, copiar o caminho, salvar como ou ingerir na biblioteca.
 10. **Exportar Rascunho** ou **Exportar Master**.
 
-### Rascunho x Master
+### Aceleração por hardware e verificação prévia (preflight)
+
+- **Aceleração:** o render usa o mesmo codificador escolhido na aba **Hardware & GPU** ([seção 13](#13-hardware-aceleração-por-gpu-e-fallback-automático)): NVENC (Nvidia), QuickSync (Intel) ou AMF (AMD), com a CPU como alternativa automática.
+- **Preflight:** ao abrir o painel e a cada mudança de preset ou de faixa, o programa confere a timeline antes de gastar tempo de render e mostra **avisos** (o render segue, mas algo pode ficar diferente do monitor; ficam no banner âmbar) e **bloqueios** (o render não pode começar até você resolver; os botões de exportar ficam desabilitados e o motivo aparece no painel).
+
+### Rascunho × Master
 
 | | Rascunho | Master |
 |---|---|---|
 | Mídia | Proxies locais | **Originais** (HD externo) |
 | Altura | 540p | Resolução da sequência |
-| Qualidade | CRF alto, encode rápido | CRF baixo |
+| Qualidade | Compressão alta, rápido | Compressão baixa |
 | Serve para | Conferir montagem e efeitos | Entrega |
 
-**Os dois usam o mesmo grafo de efeitos.** O rascunho não é menos fiel — é mais barato.
+**Os dois usam os mesmos efeitos.** O rascunho não é menos fiel, é só mais barato.
 
-Se o HD dos originais estiver desconectado, o master **não cai calado para o proxy**: ou recusa
-listando os clipes órfãos, ou (com a permissão explícita / opção `Usar Proxies Locais` marcada) segue em proxy, exibe o aviso informativo de fidelidade e marca `_proxy` no
-nome do arquivo gerado.
+Se o HD dos originais estiver desconectado, o master **não cai calado para o proxy**: ou recusa e lista os clipes sem arquivo, ou (com a opção **Usar Proxies Locais** marcada) segue em proxy, exibe o aviso de fidelidade e põe `_proxy` no nome do arquivo.
 
 ### Enquanto roda, e depois
 
-A fila é **sequencial**: um render por timeline por vez. O progresso aparece no rodapé do painel e na
-aba Tarefas, com percentual real e ETA. **Fechar o modal não cancela** — o trabalho continua.
-Cancelar encerra o FFmpeg e apaga o arquivo parcial (um MP4 truncado que parece pronto é pior que
-nenhum).
+A fila é **sequencial**: um render por timeline por vez. O progresso aparece no rodapé do painel e na aba Tarefas, com percentual real e tempo estimado. **Fechar o modal não cancela** o trabalho. Cancelar encerra o processo e apaga o arquivo parcial (um MP4 truncado que parece pronto é pior que nenhum).
 
-Terminado, aparecem **Abrir pasta** (abre o explorador com o arquivo já selecionado) e **Copiar
-caminho**.
+Ao terminar, aparecem **Abrir pasta** (com o arquivo já selecionado) e **Copiar caminho**.
 
 ### Quando algo dá errado
 
-O painel distingue os casos em vez de dar um diagnóstico genérico:
-
 | Situação | O que aparece |
 |---|---|
-| Motor não instalado (404/503) | "O motor de render ainda não está instalado nesta versão" |
-| Pedido recusado (400/422) | Qual campo foi recusado e por quê |
-| Já tem render dessa timeline (409) | Explica a fila sequencial e o que fazer |
-| Sem falar com o servidor | "Não consegui falar com o servidor" |
+| Motor de render não instalado | "O motor de render ainda não está instalado nesta versão" |
+| Pedido recusado | Qual campo foi recusado e por quê |
+| Já existe um render dessa timeline | Explica a fila sequencial e o que fazer |
+| Sem resposta do servidor | "Não consegui falar com o servidor" |
 
 ---
 
-## 📝 18. Gerador e Editor de Títulos, Legendas e Cartelas (NLE Titler)
+## 17. Gerador e editor de títulos, legendas e cartelas
 
-O CapIAu-Talho conta com um subsistema completo de titulação, cartelas cinematográficas, GC (Lower Thirds) e legendagem nativo da timeline, integrado ao canvas e aos formatos profissionais de intercâmbio.
+O CapIAu-Talho tem um sistema completo de títulos, cartelas, GCs (lower thirds) e legendas na própria timeline.
 
-### Tipos de Clipes de Texto e Títulos
-1. **Lower Thirds (GCs / Identificação):** Nomes, cargos, funções de entrevistados e créditos inferiores com alinhamento visual inteligente e caixas de contraste (*pill* / fundo translúcido).
-2. **Títulos de Abertura & Capítulos:** Grandes títulos estilizados para introduções de atos narrativos e capítulos temáticos.
-3. **Cartelas de Contexto & Citações:** Textos centralizados com quebras de linha e tipografia cinematográfica para ambientação histórica ou contextualização documental.
-4. **Créditos de Encerramento (End Credits):** Formatação em duas colunas (Função / Nome) ou blocos normalizados gerados a partir do banco de dados ou do roteiro.
-5. **Subtítulos e Legendas:** Falas transcritas convertidas em clipes de legenda com temporização frame-a-frame.
+### Tipos de clipes de texto
 
-### Manipulação Direta no Player (Text Overlay Interativo)
-- **Arrastar e Posicionar:** Ao pausar o player sobre um clipe de texto na timeline, o *Text Overlay* exibe caixas delimitadoras interativas. Clique e arraste para posicionar o GC ou título livremente.
-- **Redimensionamento:** Alças de canto permitem escalonar o tamanho da fonte e a largura da caixa de texto diretamente no monitor de Programa.
-- **Edição no Lugar (In-Place Edit):** Duplo clique no texto sobre a tela de vídeo ativa a digitação direta do conteúdo.
+1. **Lower thirds (GCs):** nomes, cargos e funções dos entrevistados, com caixas de contraste (fundo translúcido).
+2. **Títulos de abertura e capítulos:** grandes títulos estilizados.
+3. **Cartelas de contexto e citações:** texto centralizado, com tipografia cinematográfica.
+4. **Créditos de encerramento:** duas colunas (função e nome) ou blocos normalizados a partir do banco de dados ou do roteiro.
+5. **Legendas:** falas transcritas convertidas em clipes de legenda com tempo quadro a quadro.
 
-### Catálogo de Fontes & Google Fonts
-- Integração nativa com o **Catálogo de Fontes**: explore tipografias divididas por categorias (*Serif*, *Sans-Serif*, *Display*, *Handwriting*, *Monospace*).
-- Pré-visualização tipográfica em tempo real com carregamento sob demanda assíncrono via Web Fonts.
+### Edição direta no player
 
-### Motor de Animação e Keyframes
-- **Interpolação Suave:** Animação de posição X/Y, escala, opacidade, fade-in e fade-out.
-- **Curvas de Aceleração (Easing):** Suporte a curvas *Linear*, *Ease-In*, *Ease-Out* e *Ease-In-Out*.
-- **Presets Cinematográficos:** Modelos prontos de animação (ex: *Typewriter*, *Slide & Fade*, *Minimal Clean*, *Documentary Gold*).
+- **Arrastar e posicionar.** Com o player pausado sobre um clipe de texto, caixas interativas permitem arrastar o título livremente.
+- **Redimensionar.** As alças dos cantos mudam o tamanho da fonte e a largura da caixa.
+- **Editar no lugar.** Duplo clique no texto sobre o vídeo permite digitar direto.
 
-### Normalizador e Gerador de Créditos
-- Na aba de **Títulos & Créditos**, cole o texto bruto da equipe/elenco ou use os dados de personagens do projeto. O normalizador padroniza espaçamentos, hierarquias e gera a minutagem correta para a timeline.
+### Fontes
 
-### Exportação Profissional de Legendas e Títulos
-- **SRT e WebVTT:** Exporte as faixas de texto diretamente como arquivos `.srt` e `.vtt` com códigos de tempo rigorosos em milissegundos.
-- **OpenTimelineIO (OTIO Generator Titles):** Clipes de texto são exportados como `otio.schema.GeneratorReference` do tipo `Title`, preservando metadados de fontes, cores, keyframes e posições para Kdenlive, Premiere, DaVinci Resolve e Final Cut Pro.
+O **Catálogo de Fontes** reúne tipografias por categoria (*Serif*, *Sans-Serif*, *Display*, *Handwriting*, *Monospace*), com prévia em tempo real e carregamento sob demanda. As famílias vêm do **Google Fonts** e são baixadas quando usadas, então a prévia e o render de títulos precisam de conexão com a internet na primeira vez que uma fonte aparece.
 
----
+### Animação
 
-## 🎧 19. Restauração e Tratamento Avançado de Áudio (Auphonic & Denoise IA)
+- Animação de posição X/Y, escala, opacidade, fade-in e fade-out, com curvas *Linear*, *Ease-In*, *Ease-Out* e *Ease-In-Out*.
+- Presets prontos, como *Typewriter*, *Slide & Fade*, *Minimal Clean* e *Documentary Gold*.
 
-Para produções documentais gravadas em condições acústicas adversas (ruído de vento, reverberação de salas vazias, desbalanceamento de ganho), o CapIAu-Talho oferece um fluxo estruturado de tratamento de áudio:
+### Normalizador de créditos
 
-1. **Diagnóstico Espectral:** Análise em tempo real de picos, faixas de frequência e nível de loudness integrado (LUFS).
-2. **Cadeias de Filtros FFmpeg Nativas:** Presets instantâneos de remoção de ruído contínuo (`afftdn`), de-click (`adeclip`), equalização de voz e limitador suave (`alimiter`).
-3. **Denoise Neural por IA:** Remoção de ruído residual utilizando redes neurais DPDFNet via `sherpa-onnx`.
-4. **Integração com Auphonic:** Workflow completo para masterização de diálogos, nivelamento dinâmico inteligente (Leveler), AutoEQ e remoção de eco/reverberação. *(Consulte o guia técnico detalhado em `docs/AUPHONIC_AUDIO_RESTORATION_GUIDE.md`)*.
+Na aba **Títulos & Créditos**, cole o texto bruto da equipe e do elenco, ou use os dados dos personagens do projeto. O normalizador padroniza espaçamentos e hierarquias e calcula a duração correta na timeline.
+
+### Exportação de legendas e títulos
+
+- **SRT e WebVTT:** exporte as faixas de texto como `.srt` e `.vtt`, com tempos em milissegundos.
+- **OpenTimelineIO:** os clipes de texto vão como títulos genéricos (`GeneratorReference`), preservando fonte, cor, animação e posição para Kdenlive, Premiere, Resolve e Final Cut. Na prática, a aparência pode variar de acordo com o programa de destino.
 
 ---
 
-## 🚀 20. Atalho Inteligente e Inicialização do Sistema (Windows Launcher)
+## 18. Instalação e inicialização (resumo)
 
-Para proporcionar uma experiência de aplicativo nativo no Windows:
+O passo a passo completo (Docker, instalação local, chaves de API, modelos de denoise e outros opcionais) está na wiki: **[Instalação e Configuração](https://github.com/fernangcortes/capiau-talho-v03/wiki/02.-Instalacao-e-Configuracao)**.
 
-### Inicialização com 1 Clique (`criar-atalho.bat`)
-1. Dê duplo clique no arquivo **`criar-atalho.bat`** na raiz do projeto.
-2. O script detecta a pasta de instalação e cria o atalho oficial **`CapIAu`** na sua **Área de Trabalho** com o ícone do projeto.
-3. Para fixar na Barra de Tarefas: clique com o botão direito no atalho na Área de Trabalho e selecione **"Fixar na barra de tarefas"** (*Pin to taskbar*).
+Em resumo:
 
-### Lógica do Launcher Inteligente
-Quando acionado pela Barra de Tarefas ou Área de Trabalho:
-- **Se a porta 8000 já estiver ativa:** Abre imediatamente o navegador em `http://localhost:8000`.
-- **Se a porta 8000 estiver fechada e o Docker estiver rodando:** Executa `docker compose up -d`, aguarda a inicialização do container e abre o navegador.
-- **Se o Docker não estiver aberto:** Inicia o servidor automaticamente via Python local (`uvicorn src.api.server:app --port 8000 --reload`) em um console dedicado e abre o navegador.
+- **Docker (caminho mais simples):** copie `.env.example` para `.env`, preencha `OPENROUTER_API_KEY` (e `ASSEMBLYAI_API_KEY` para a transcrição na nuvem) e rode `docker compose up --build`. Abra `http://localhost:8000`.
+- **Sem Docker:** use Python 3.12 (recomendado, é o usado na imagem Docker; versões anteriores à 3.14, pois o OpenTimelineIO ainda não suporta a 3.14).
+- **Atalho no Windows:** dê duplo clique em `criar-atalho.bat` para criar o ícone **CapIAu** na Área de Trabalho (depois, botão direito › **Fixar na barra de tarefas**). Ao abrir o atalho, ele usa o servidor já ativo, ou sobe o Docker, ou inicia o servidor local, e abre o navegador em `http://localhost:8000`.
+- **Servidor que não fecha com o terminal (Windows):** `python scripts/launch_detached.py` inicia o servidor desvinculado do terminal; ele continua rodando mesmo que a janela seja fechada.
 
+> **Atenção:** nesta versão o servidor não exige login e aceita conexões de qualquer origem na porta 8000. Use apenas em uma máquina ou rede de confiança e não exponha a porta à internet. Um plano de autenticação e restrição de rede está previsto, mas ainda não foi implementado.
+
+---
+
+## Problemas comuns por sintoma
+
+| Sintoma | O que verificar |
+|---|---|
+| Cliquei em **Escanear a pasta watch/** e nada apareceu | Confira se os arquivos estão em `watch/` e se o formato é de vídeo, áudio ou foto comum. Espere o fim da geração de proxies e veja a aba **Tarefas** e a aba **Logs**. |
+| A transcrição falha ou não começa | Verifique a chave `ASSEMBLYAI_API_KEY` (no `.env` ou nas Configurações) e a conexão com a internet. A transcrição local é experimental e pode ser muito lenta. |
+| Descrições de B-roll e fotos vazias ou com erro | Verifique `OPENROUTER_API_KEY` e o saldo da conta. Se estiver usando um modelo gratuito, troque para o padrão pago; veja a [seção 12](#12-seleção-de-modelos-de-ia-e-gestão-de-tarefas). |
+| O vídeo da timeline engasga na reprodução | Gere os proxies, desative as miniaturas das pistas ([5.15](#515-miniaturas-nas-pistas)) e confira a aba **Hardware & GPU** ([seção 13](#13-hardware-aceleração-por-gpu-e-fallback-automático)). |
+| Não consigo mover, aparar ou apagar um clipe | A pista pode estar travada pelo cadeado. Clique no cadeado da pista ou use `Shift+L` ([5.11](#511-controles-nativos-de-pistas-mute-solo-sync-lock-e-trava)). |
+| A exportação saiu diferente do que vejo na tela | A exportação usa a versão **salva**. Clique em **Salvar e usar esta versão** no painel ([seção 16](#16-exportar-vídeo-render-da-timeline-em-mp4)). |
+| Um atalho "não funciona" | Ele pode depender do contexto (painel em foco, ferramenta ativa, hover) ou do perfil escolhido. Veja a [seção 14](#14-atalhos-de-teclado-e-perfis-nle). |
+| O tratamento de áudio com IA não aparece ou avisa que falta algo | O modelo de denoise precisa ser baixado uma vez. Veja a [Instalação e Configuração](https://github.com/fernangcortes/capiau-talho-v03/wiki/02.-Instalacao-e-Configuracao). |
+
+Para os demais casos, consulte a [Solução de Problemas e FAQ](https://github.com/fernangcortes/capiau-talho-v03/wiki/16.-Solucao-de-Problemas-e-FAQ) na wiki.
