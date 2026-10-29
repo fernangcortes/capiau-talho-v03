@@ -1,251 +1,966 @@
-# 🎹 Cheat Sheet de Atalhos de Teclado, Perfis NLE e Manual
+# Atalhos de teclado e perfis
 
-O **CapIAu-Talho** possui um **Sistema Central de Keymap e Perfis NLE** de alta performance, projetado para oferecer ergonomia de edição profissional tanto para quem utiliza o mapeamento nativo quanto para quem vem de outros softwares consagrados de mercado (*Kdenlive, Adobe Premiere Pro, DaVinci Resolve e Apple Final Cut Pro*).
+O CapIAu-Talho tem um sistema central de atalhos com cinco perfis prontos e um perfil personalizado. As tabelas deste guia são geradas automaticamente a partir de `src/ui/js/keymapService.js`, a fonte única de verdade, portanto sempre refletem o que o programa faz.
 
----
+## Perfis disponíveis
 
-## 🎛️ 1. Perfis NLE Integrados de Fábrica
+| Perfil | Para quem |
+| :--- | :--- |
+| CapIAu Padrão | Perfil nativo, pensado para corte documental rápido com a mão esquerda no teclado. É o perfil inicial. |
+| Adobe Premiere Pro | Quem vem do ecossistema Adobe. |
+| DaVinci Resolve | Quem vem do Resolve. |
+| Apple Final Cut Pro | Quem vem do Final Cut. |
+| Kdenlive | Quem vem do Kdenlive. |
+| Personalizado | Mapeamento livre, definido por você. |
 
-Você pode alternar o perfil ativo a qualquer momento através do menu **Perfil** no cabeçalho do **Guia de Atalhos** (<kbd>⌨️</kbd> na barra de ferramentas da timeline):
+## Como mudar de perfil
 
-| Perfil NLE | Foco & Ergonomia | Destaques de Mapeamento |
+1. Clique no botão de teclado na barra da timeline (dica: "Guia e Cheat Sheet de Atalhos").
+2. No cabeçalho da janela, escolha o perfil no seletor **Perfil**.
+3. A escolha fica salva no navegador e é aplicada na hora.
+
+A janela tem três abas: **Teclado Visual & Índice Esquemático** (teclado na tela com destaque dos atalhos), **Guia Rápido Dinâmico** (lista do perfil ativo) e **Personalizar Atalhos & Tabela**.
+
+## Como personalizar
+
+Na aba **Personalizar Atalhos & Tabela** você grava uma nova combinação para cada comando. Ao editar, o perfil passa a ser **Personalizado**. Os botões da janela permitem exportar os atalhos para um arquivo JSON, importar um arquivo e restaurar os padrões de fábrica. A personalização fica salva localmente, no navegador.
+
+## Regra de contexto
+
+O mesmo atalho pode aparecer em mais de uma ação dentro de um perfil. Isso é intencional: a ação executada depende do contexto, como o painel em foco (Source, Program, timeline, biblioteca), a ferramenta ativa, o elemento sob o mouse e a presença de uma sugestão ou clipe fantasma ativo. Nas tabelas, a coluna de observação lista as ações que compartilham o atalho.
+
+## Cartões imprimíveis
+
+Cartões A4 de uma página, em tema claro, para imprimir ou salvar em PDF pelo navegador:
+
+| Perfil | Cartão |
+| :--- | :--- |
+| CapIAu Padrão | [cartao-capiau.html](atalhos/cartao-capiau.html) |
+| Adobe Premiere Pro | [cartao-premiere.html](atalhos/cartao-premiere.html) |
+| DaVinci Resolve | [cartao-resolve.html](atalhos/cartao-resolve.html) |
+| Apple Final Cut Pro | [cartao-finalcut.html](atalhos/cartao-finalcut.html) |
+| Kdenlive | [cartao-kdenlive.html](atalhos/cartao-kdenlive.html) |
+
+## Prevenção de conflitos de digitação
+
+O sistema monitora o foco de digitação:
+
+* Ao focar em caixas de texto (chatbot de IA, busca semântica, renomeação de mídias, edição de legendas e GCs), os atalhos de reprodução e de timeline ficam temporariamente suspensos.
+* Ao pressionar `Esc` ou clicar fora do campo, os atalhos de edição são reativados.
+
+## Tabelas por perfil
+
+Gerado por `node scripts/gerar_atalhos.mjs`. Não edite o bloco abaixo à mão.
+
+<!-- GERADO:ATALHOS:INICIO -->
+
+### Perfil CapIAu Padrão
+
+> Alguns atalhos aparecem em mais de uma ação neste perfil. Isso é intencional: a ação executada depende do contexto (painel em foco, ferramenta ativa, elemento sob o mouse, sugestão ou clipe fantasma ativo). A coluna de observação indica com quais ações o atalho é compartilhado.
+
+#### 1. Reprodução & Navegação
+
+| Atalho | Ação | Contexto/observação |
 | :--- | :--- | :--- |
-| 🎬 **CapIAu Padrão** | Híbrido moderno com suíte QWER/ASDF na mão esquerda para corte documental ultrarrápido. | `Q`/`W` Ripple Trims, `E`/`Z` Split, `R` / `Backspace` Ripple Delete, `Alt+R` / `Delete` Lift Delete, `A`/`S` Ponto Anterior/Seguinte, `D` Selecionar na Agulha, `Shift+D` Multi-seleção, `F` Desativar Clipe, `,` Insert, `.` Overwrite, `Ctrl+Alt+A` Canais AV/V/A, `Shift+R` / `X` Rate Stretch Tool, `Ctrl+R` Velocidade/Duração, `Ctrl+Alt+R` Fit to Gap, `Ctrl+Shift+F` Freeze Frame, `Ctrl+Alt+F` Follow Playhead, `Ctrl+G` Ir para Timecode, `Ctrl+U` Subclipe, `Ctrl+Shift+R` / `Alt+Drop` Replace Edit, `Alt+F` Match Frame, `Shift+F` Reverse Match Frame, `Ctrl+Shift+D` Crossfade de Áudio, `N`/`Shift+S` Snapping, `Shift+N` Rolling Edit, `Ctrl+Alt+P` Seleção Acompanha Agulha, `Alt+A` Alternativas IA. |
-| 🐧 **Kdenlive** | Padrão clássico do ecossistema Open Source e Linux NLE. | `Shift+R` / `X` Razor Split, `Shift+R` Rate Stretch Tool, `Ctrl+R` Velocidade, `Ctrl+Shift+F` Freeze Frame, `Ctrl+G` Ir para Timecode, `Ctrl+U` Subclipe, `S` Seleção, `M` / `Shift+M` Espaçador, `V` Inserção, `Ctrl+Shift+D` Crossfade de Áudio, `F10` Snapping, `Ctrl+Shift+Espaço` Zoom to Fit, `Ctrl+=`/`Ctrl+-` Zoom, `.` Zoom Reset, `Z` Zoom Tool, `H` Mão, `Alt+F` Match Frame, `Shift+F` Reverse Match Frame, `B` Desativar Clipe, `J`/`K`/`L` Shuttle. |
-| 🟣 **Adobe Premiere Pro** | Ergonomia familiar para editores acostumados ao ecossistema Adobe. | `Ctrl+K` / `C` Razor Split, `R` Rate Stretch Tool, `Ctrl+R` Velocidade/Duração, `Ctrl+Shift+F` Freeze Frame, `Ctrl+G` Ir para Timecode, `Ctrl+U` Subclipe, `Ctrl+Shift+R` Replace Edit, `A` / `Shift+A` Seleção de Trilha, `V` Seleção, `S` Snapping, `Q`/`W` Ripple Trims, `,` Insert, `.` Overwrite, `Ctrl+Shift+D` Crossfade de Áudio Padrão, `F` Match Frame, `Shift+F` Reverse Match Frame, `Shift+E` Desativar Clipe, `\` Zoom to Fit, `+`/`-` Zoom na Agulha, `Ctrl+1` Zoom Reset, `Z` Zoom Tool, `H` Mão. |
-| 🟡 **DaVinci Resolve** | Padrão Blackmagic Design para ilhas de edição e pós-produção. | `Ctrl+\` / `B` Blade Split, `R` Rate Stretch Tool, `Ctrl+R` Velocidade/Duração, `Ctrl+Shift+F` Freeze Frame, `Ctrl+G` Ir para Timecode, `Ctrl+U` Subclipe, `A` Seleção, `N` Snapping, `Shift+Backspace` Ripple Delete, `Alt+[` / `Alt+]` Trims, `F9` Insert, `F10` Overwrite, `Ctrl+Shift+D` Crossfade de Áudio, `F` Match Frame, `Shift+F` Reverse Match Frame, `D` Desativar Clipe, `Shift+Z` Zoom to Fit, `Ctrl+=`/`Ctrl+-` Zoom, `Shift+1` Zoom Reset, `Z` Zoom Tool, `H` Mão. |
-| 🍏 **Apple Final Cut Pro** | Ergonomia magnética e atalhos otimizados para fluxo contínuo. | `Cmd+B` / `B` Blade Split, `R` Rate Stretch Tool, `Ctrl+R` Velocidade/Duração, `Ctrl+Shift+F` Freeze Frame, `Ctrl+P` Ir para Timecode, `Ctrl+U` Subclipe, `A` Seleção, `N` Snapping, `W` Insert, `E` Append, `Shift+Delete` Ripple Delete, `Ctrl+Shift+D` Crossfade de Áudio, `Shift+F` Match Frame, `Alt+F` Reverse Match Frame, `V` Desativar Clipe, `Shift+Z` Zoom to Fit, `Cmd+=`/`Cmd+-` Zoom, `Shift+1` Zoom Reset, `Z` Zoom Tool, `H` Mão. |
-| ⚙️ **Personalizado (Custom)** | Mapeamento livre configurado pelo usuário. | Totalmente editável pela aba **Personalizar Atalhos & Tabela**, com persistência local e exportação JSON. |
+| `Espaço` | Play / Pause | Inicia ou pausa a reprodução no player ativo (Source ou Program) |
+| `J` | Shuttle Reverso (J) | Reproduz para trás. Pressionar repetidamente acelera a velocidade (1x, 2x, 4x, 8x) |
+| `K` | Shuttle Play / Pause (K) | Alterna entre reproduzir e pausar a reprodução (segure K com J ou L para avançar/recuar quadro a quadro) |
+| `L` | Shuttle Avanço (L) | Reproduz para frente. Pressionar repetidamente acelera a velocidade (1x, 2x, 4x, 8x) |
+| `Shift + →` | Shuttle Acelerado / Avanço Rápido (Shift + →) | Reproduz acelerado para frente. Toques repetidos aumentam a velocidade (igual JKL); segurar reproduz acelerado enquanto pressionado |
+| `Shift + ←` | Shuttle Acelerado / Recuo Rápido (Shift + ←) | Reproduz acelerado para trás. Toques repetidos aumentam a velocidade reversa; segurar reproduz acelerado enquanto pressionado |
+| `Ctrl + →` | Câmera Lenta Avanço (Ctrl + →) | Reproduz em câmera lenta para frente (0.25x). Segurar reproduz enquanto pressionado |
+| `Ctrl + ←` | Câmera Lenta Recuo (Ctrl + ←) | Reproduz em câmera lenta reversa (-0.25x). Segurar reproduz enquanto pressionado |
+| `K + J` | Jog Recuar 1 Frame (K + J) | Segure K e pressione J para recuar exatamente 1 frame |
+| `K + L` | Jog Avançar 1 Frame (K + L) | Segure K e pressione L para avançar exatamente 1 frame |
+| `I` | Marcar Ponto de Entrada (IN) | Define o ponto inicial de corte no Player ou Linha do Tempo |
+| `O` | Marcar Ponto de Saída (OUT) | Define o ponto final de corte no Player ou Linha do Tempo |
+| `Alt + I` | Limpar Ponto IN | Remove o ponto de entrada (IN) no Player ou Linha do Tempo |
+| `Alt + O` | Limpar Ponto OUT | Remove o ponto de saída (OUT) no Player ou Linha do Tempo |
+| `Alt + X` | Limpar Pontos IN e OUT | Remove ambos os pontos de entrada e saída (IN e OUT) |
+| `X` | Marcar Clipe (IN / OUT) | Define pontos IN e OUT nos limites do clipe selecionado ou sob a agulha<br>**Atalho compartilhado, depende do contexto:** Esticar / Comprimir Taxa de Velocidade (Rate Stretch) (X). |
+| `Shift + I` | Ir para o Ponto IN | Move a agulha de reprodução diretamente para o ponto IN |
+| `Shift + O` | Ir para o Ponto OUT | Move a agulha de reprodução diretamente para o ponto OUT |
+| `Shift + Espaço` ou `Alt + /` | Tocar de IN até OUT | Reproduz o trecho delimitado entre os pontos IN e OUT e pausa |
+| `Ctrl + L` ou `Ctrl + Shift + Espaço` | Alternar Reprodução em Loop | Liga ou desliga a reprodução contínua em loop entre os pontos IN e OUT<br>**Atalho compartilhado, depende do contexto:** Desvincular Par Áudio/Vídeo (Ctrl + L). |
+| `Shift + E` | Inserir na Timeline (Append) | Insere o trecho marcado (IN ➔ OUT) na timeline |
+| `←` | Navegar 1 Frame para Trás | Move a agulha 1 frame para trás (quando nenhum clipe estiver selecionado)<br>**Atalho compartilhado, depende do contexto:** Nudge: Deslocar 1 Frame para Trás (←). |
+| `→` | Navegar 1 Frame para Frente | Move a agulha 1 frame para frente (quando nenhum clipe estiver selecionado)<br>**Atalho compartilhado, depende do contexto:** Nudge: Deslocar 1 Frame para Frente (→). |
+| `↑` ou `A` | Pular para Ponto Anterior / Início | Program: move a agulha para o corte anterior; Source: vai para IN ou Início |
+| `↓` ou `S` | Pular para Próximo Ponto / Fim | Program: move a agulha para o corte seguinte; Source: vai para OUT ou Fim |
+| `Ctrl + G` | Ir para Timecode / Navegação Numérica | Ativa a entrada de timecode para salto absoluto ou navegação relativa (+/- frames) |
 
----
+#### 2. Ferramentas & Modos
 
-## ⌨️ 2. Teclado Visual Esquemático 1:1 & Área de Teste em Tempo Real
-
-No modal de atalhos (<kbd>⌨️</kbd> na timeline), a aba principal **Teclado Visual & Índice Esquemático** oferece uma experiência interativa completa:
-
-* **Abertura Direta em Tela Cheia (100% Fullscreen)**: O modal abre instantaneamente em `100vw × 100vh` sem bordas ou compressão inicial, aproveitando a resolução máxima do monitor sem necessidade de botões de maximizar.
-* **Proporções Mecânicas 1:1 Calibradas (ANSI 100% com Numpad)**: Keycaps físicos com proporção geométrica balanceada entre os três blocos (Alfanumérico `flex: 15`, Navegação `flex: 3.2` e Teclado Numérico `flex: 4.2`), impedindo o achatamento ou estiramento de teclas (`PrtSc`, `ScrLk`, `Pause`, setas e numpad).
-* **Cluster Numérico Físico (Numpad 100%)**: Bloco dedicado de 5 linhas × 4 colunas mapeado para comandos espaciais de layout e manipulação de pistas.
-* **Destaque Bidirecional em 4 Colunas**:
-  * Passar o mouse no **Teclado** ➔ Ilumina a linha correspondente nas 4 colunas esquemáticas abaixo (*A. Reprodução*, *B. Edição*, *C. Ferramentas & IA*, *D. Layout & Workspace*) e rola até ela.
-  * Passar o mouse no **Índice Esquemático** ➔ Ilumina a tecla correspondente no teclado virtual.
-* **Camadas de Modificadores Completas**: Alterne entre as camadas `Padrão`, `+ Shift`, `+ Ctrl`, `+ Alt` e `+ Ctrl+Alt` (ou segure os modificadores no teclado físico para alternância instantânea).
-* **Live Testing HUD**: Digite qualquer tecla física com o modal aberto para testar atalhos ao vivo com feedback de iluminação neon e descrição instantânea.
-* **Filtros por Categoria**: Tabela com botões pílula incluindo a nova categoria **Layout & Numpad**.
-
----
-
-## 🎬 3. Controles de Reprodução e Shuttle (Monitor Source & Program)
-
-| Tecla / Combinação | Ação | Descrição |
+| Atalho | Ação | Contexto/observação |
 | :--- | :--- | :--- |
-| **`Espaço`** | **Play / Pause Geral** | Alterna entre tocar e pausar no player atualmente focado (*Source* ou *Program*). |
-| **`Ctrl + L` / `Cmd + L`** | **Alternar Loop Contínuo** | Liga ou desliga a reprodução contínua em loop no intervalo marcado [In–Out]. |
-| **`J`** | **Shuttle Reverso** | Pressione consecutivamente para acelerar a velocidade de retrocesso (-1x, -2x, -4x, -8x). |
-| **`K`** | **Shuttle Parar** | Pausa a reprodução imediata ou redefine a velocidade normal. |
-| **`L`** | **Shuttle Avanço** | Pressione consecutivamente para acelerar a velocidade de avanço (1.5x, 2x, 4x, 8x). |
-| **`K + J`** | **Jog Recuar 1 Frame** | Pressione K mantendo pressionado J para recuar exatamente 1 frame. |
-| **`K + L`** | **Jog Avançar 1 Frame** | Pressione K mantendo pressionado L para avançar exatamente 1 frame. |
-| **`Shift + ←` / `Shift + →`** | **Shuttle Acelerado Contínuo** | Segurar reproduz acelerado e soltar pausa; toques rápidos ciclam velocidade (2x, 4x, 8x, 16x). |
-| **`Ctrl + ←` / `Ctrl + →`** | **Câmera Lenta Suave** | Reproduz em câmera lenta suave (0.25x / -0.25x), pausando imediatamente ao soltar a tecla. |
-| **`←` / `→`** | **Navegar Frames** | Retrocede ou avança exatamente 1 frame do vídeo para cortes cirúrgicos. |
-| **`Ctrl + G`** *(ou `Ctrl+P` no FCP)* | **Ir para Timecode / Entrada Numérica** | Ativa entrada numérica inline (.interactive-timecode) para saltos relativos (`+50`, `-24`), notação de ponto (`1.`), segundos (`+2s`) ou timecode absoluto. |
-| **`A` / `S`** *(ou `↑` / `↓`)* | **Navegar Pontos de Corte (Edit Points)** | **Na Timeline:** Move a agulha para o corte anterior (`A`/↑) ou próximo (`S`/↓).<br>**No Source:** Pula para o ponto In/Início (↑) ou ponto Out/Fim (↓). |
-| **`Shift + I`** | **Ir para Ponto IN** | Posiciona a agulha de reprodução exatamente no ponto de entrada marcado. |
-| **`Shift + O`** | **Ir para Ponto OUT** | Posiciona a agulha de reprodução exatamente no ponto de saída marcado. |
-| **`Alt + F`** *(ou `F` no Premiere/Resolve / `Shift+F` no FCP)* | **Localizar Quadro na Fonte (Match Frame)** | Localiza a mídia original do clipe sob o playhead na timeline e abre no Source Player no mesmo instante exato, projetando os marcadores [IN-OUT]. |
-| **`Shift + F`** *(ou `Alt+F` no Final Cut)* | **Localizar Quadro na Timeline (Reverse Match Frame)** | Do Source Player, localiza onde o quadro atual foi utilizado na timeline ativa, salta a agulha para o corte e seleciona o clipe. Segurando `Shift` e teclando `F` sucessivamente, cicla sequencialmente por todas as ocorrências na montagem com Mini-HUD flutuante e menu popover. |
-| **`Duplo Clique` (Player)** | **Maximizar / Minimizar Player** | Expande o monitor ativo para tela cheia ou restaura o layout. |
-| **`Shift + Roda` (Cabeçalho de Pista)** | **Altura Individual da Pista** | Aumenta ou diminui a altura vertical daquela pista específica em passos de 8px (22px a 240px). |
-| **`Shift + Roda` (Timeline / Canvas)** | **Altura Global das Pistas** | Ajusta progressivamente a escala vertical de todas as pistas da timeline. |
-| **`Shift + Roda` (Biblioteca)** | **Zoom Dinâmico de Cards** | Ajusta progressivamente o tamanho dos cards e miniaturas da biblioteca. |
+| `V` | Ferramenta de Seleção | Ativa a ferramenta de seleção padrão da timeline (Seta) |
+| `Shift + V` | Seleção por Caixa / Retângulo (Marquee) | Ativa a ferramenta de seleção por retângulo (arraste para selecionar clipes e marcadores) |
+| `C` | Ferramenta Lâmina / Gilete (Blade) | Ativa a ferramenta de corte de precisão por cursor na trilha |
+| `Shift + C` | Lâmina Global na Agulha | Fatia todas as pistas destravadas na coordenada da agulha de reprodução |
+| `Y` | Deslizar Conteúdo Interno (Slip Tool) | Desliza os pontos IN e OUT da mídia bruta mantendo a posição e duração na timeline<br>**Atalho compartilhado, depende do contexto:** Aceitar Sugestão de IA (Y). |
+| `U` | Deslizar Posição na Timeline (Slide Tool) | Move o clipe na timeline mantendo seu conteúdo intacto e compensando nos vizinhos adjacentes |
+| `Shift + N` | Corte Contínuo Adjacente (Rolling Edit) | Ajusta o ponto de corte entre dois clipes contíguos sem alterar a duração total da sequência |
+| `Shift + R` ou `X` | Esticar / Comprimir Taxa de Velocidade (Rate Stretch) | Altera a velocidade do clipe arrastando suas bordas para esticar ou comprimir a taxa temporal<br>**Atalho compartilhado, depende do contexto:** Marcar Clipe (IN / OUT) (X). |
+| `T` | Selecionar Faixa para Frente | Ativa a ferramenta de seleção de todos os clipes à direita |
+| `Shift + T` | Selecionar Faixa para Trás | Ativa a ferramenta de seleção de todos os clipes à esquerda |
+| `N` ou `Shift + S` | Alternar Snapping Magnético | Liga ou desliga o alinhamento magnético inteligente de bordas e agulha<br>**Atalho compartilhado, depende do contexto:** Rejeitar Sugestão de IA (N). |
+| `H` | Ferramenta Mão / Pan | Ativa a ferramenta de navegação e arrasto contínuo da timeline (Pan) |
+| `Esc` | Desmarcar Seleção / Fechar Caixas | Limpa a seleção de clipes ou fecha pop-ups contextuais e modais |
+| `R` | Girar Mídia sob Cursor (+90°) | Rotaciona a mídia sob o cursor (hover) na biblioteca ou no monitor de origem<br>**Atalho compartilhado, depende do contexto:** Ripple Delete (Apagar e Fechar Espaço) (R). |
 
----
+#### 3. Edição, Cortes & Trims
 
-## 📥 4. Ingestão e Inserção de Mídias na Timeline (Biblioteca & Duplo Clique)
-
-O CapIAu-Talho suporta múltiplos modos de ingestão instantânea via **combinações de teclas no duplo clique** e pelo **submenu "Adicionar à Timeline"** no menu de contexto (botão direito):
-
-| Tecla / Combinação | Modo de Ingestão | Ação e Comportamento na Timeline | Posição da Agulha |
-| :--- | :--- | :--- | :--- |
-| **`Duplo Clique`** | **No Final da Timeline (Append)** | Localiza o término da timeline e anexa no final (prefere Pista 1 em empate; ignora pistas ocultas). | Final do clipe inserido |
-| **`Shift + Duplo Clique`** | **Na Posição da Agulha (Playhead)** | Insere no frame exato onde a agulha está na pista ativa/padrão. | Final do clipe inserido |
-| **`Ctrl + Duplo Clique`** *(ou `Cmd`)* | **No 1º Espaço Vazio (Primeiro Gap)** | Encontra o primeiro espaço vazio (gap) a partir do frame 0 e insere no início dele. | **Início do clipe inserido** |
-| **`Ctrl + Shift + Duplo Clique`** | **No Próximo Espaço Vazio (Após Agulha)** | Encontra o primeiro gap à frente da agulha atual e insere no início dele. | **Início do clipe inserido** |
-| **`Alt + Shift + Duplo Clique`** | **No Início da Timeline (Frame 0)** | Insere no frame 0 da pista de destino. | Início (Frame 0) |
-| **`Alt + 2x Clique`** | **Inserir Empurrando (Ripple Insert)** | Divide clipes sob a agulha e empurra todos os cortes subsequentes pela duração do novo clipe. | Final do clipe inserido |
-| **`Ctrl + Alt + 2x Clique`** | **Sobrepor em Pista Superior (Overlay)** | Insere na pista superior livre (ex: V2/B-Roll) na posição da agulha. | Final do clipe inserido |
-| **`Ctrl + Shift + R`** *(ou `Alt + Arraste`)* | **Substituir Clipe (Replace Edit)** | Substitui a mídia do clipe atualmente selecionado na timeline mantendo rigorosamente sua duração, velocidade, cor e efeitos. | Mantém posição |
-| **`Ctrl + U`** *(no Source Player)* | **Criar Subclipe Virtual** | Gera subclipe virtual não-destrutivo com hard boundaries a partir dos pontos [In–Out] com sugestões de títulos por IA. | Inalterada |
-| **`R` / `Shift + R`** *(na Biblioteca/Galeria)* | **Girar Mídia 90°** | Gira a orientação da mídia em 90° no sentido horário (`R`) ou anti-horário (`Shift+R`). | Inalterada |
-
-### 4.1 Navegação & Decupagem Visual na Biblioteca (Barra de Decupagem & Fita Cromática)
-
-| Gesto / Atalho | Onde | Ação Executada |
+| Atalho | Ação | Contexto/observação |
 | :--- | :--- | :--- |
-| **`Clique Simples`** | Chip da Régua | Descarta filtros ativos e rola suavemente até o bloco correspondente, disparando pulso visual nos clipes. |
-| **`Alt + Clique`** | Chip da Régua ou Fita | **Filtra exclusivamente** a biblioteca para exibir apenas aquele bloco/cena cromática (`[X Todas]` fica ativo). |
-| **`Clique Normal pós-Filtro`** | Chip da Régua ou Fita | **Descarta o filtro exclusivo automaticamente** e navega direto para o novo bloco selecionado. |
-| **`Escape`** *(ou botão `[X Todas]`)* | Qualquer lugar | Limpa o filtro de decupagem ativo e restaura a visualização integral do acervo. |
-| **`Duplo Clique` (Cabeçalho)** | Cabeçalho Sticky de Cena | **Padrão universal CapIAu:** recolhe ou expande o mosaico de clipes daquele grupo. |
-| **`Botão [⌄ Expandir / Recolher]`** | Régua de Decupagem | Alterna entre visualização em múltiplas linhas (wrap) e linha única compacta com scroll. |
-| **`Scroll Wheel`** | Régua de Decupagem | Rola horizontalmente os chips quando em linha única. |
-| **`Botão Régua`** (`fa-ruler-horizontal`) | Barra de Ferramentas | Mostra ou oculta a régua de decupagem, memorizando a preferência no navegador. |
-| **`Botão [✕]`** | Canto da Régua | Oculta a régua de decupagem instantaneamente. |
+| `,` | Inserir na Agulha (Ripple Insert) | Insere o trecho marcado no monitor Source na coordenada da agulha empurrando os clipes subsequentes |
+| `.` | Sobrescrever na Agulha (Overwrite Edit) | Insere o trecho marcado no monitor Source na coordenada da agulha substituindo o material sob o intervalo |
+| `Ctrl + Alt + A` | Alternar Canais na Inserção (AV / V / A) | Alterna os canais transferidos do monitor Source para a Timeline: Áudio+Vídeo (AV), Somente Vídeo (V) ou Somente Áudio (A) |
+| `Alt + F` | Localizar Quadro Original na Fonte (Match Frame) | Localiza a mídia bruta correspondente ao quadro sob a agulha da timeline e abre no Source Player marcando os pontos IN–OUT originais |
+| `Shift + F` | Localizar Quadro na Timeline (Reverse Match Frame) | Localiza onde o quadro atual sob a agulha do Source Player está sendo utilizado na timeline ativa e salta a agulha para a posição correspondente |
+| `Ctrl + Shift + R` | Substituir Clipe na Timeline (Replace Edit) | Substitui a mídia do clipe alvo (selecionado, sob a agulha ou sob o cursor com Alt no arraste) preservando duração exata, efeitos (Ken Burns), cor e velocidade |
+| `Ctrl + U` | Criar Subclipe na Biblioteca (Make Subclip) | Gera um novo item virtual na biblioteca a partir do intervalo [IN–OUT] delimitado no monitor Source |
+| `Ctrl + Shift + F` | Congelar Quadro (Freeze Frame) | Captura o quadro sob a agulha e insere um segmento estático na timeline (Ctrl+Shift+F) |
+| `Ctrl + R` | Velocidade / Duração do Clipe (Speed / Duration) | Abre o diálogo de velocidade percentual, duração proporcional e reversão do clipe selecionado (Ctrl+R) |
+| `Ctrl + Alt + R` | Preencher Espaço na Trilha (Fit to Gap) | Estende a duração do clipe ajustando a velocidade para preencher automaticamente o espaço vazio adjacente na pista (Ctrl+Alt+R) |
+| `Ctrl + Shift + D` | Crossfade de Áudio (Potência Constante) | Aplica transição de crossfade de áudio de potência constante (Equal-Power) na emenda entre clipes contíguos ou no clipe selecionado (Ctrl+Shift+D) |
+| `Ctrl + D` | Transição de Vídeo Padrão (Cross Dissolve) | Aplica transição de vídeo (Cross Dissolve, Dip to Black ou Dip to White) na emenda contígua sob a agulha ou entre os clipes selecionados (Ctrl+D) |
+| `Enter` | Renderizar Efeitos In para Out (Cache NLE) | Pré-renderiza o intervalo da timeline (In-Out ou trechos pesados) para playback suave em cache (Enter)<br>**Atalho compartilhado, depende do contexto:** Aceitar Sugestão de IA (Enter). |
+| `E` ou `Z` ou `Alt + E` ou `Alt + Z` | Dividir Clipe no Playhead (Split) | Fatia o clipe sob a agulha de reprodução (ou o clipe selecionado) |
+| `Q` | Ripple Trim Início (Até a Agulha) | Corta o início do clipe até a agulha e fecha o espaço na timeline |
+| `W` | Ripple Trim Fim (Da Agulha ao Fim) | Corta da agulha até o final do clipe e fecha o espaço na timeline |
+| `Del` ou `Alt + R` | Lift Delete (Apagar Clipe) | Apaga o clipe selecionado deixando o espaço vazio (gap) intacto<br>**Atalho compartilhado, depende do contexto:** Rejeitar Sugestão de IA (Del). |
+| `R` ou `Backspace` ou `Shift + Del` | Ripple Delete (Apagar e Fechar Espaço) | Apaga o clipe e puxa todos os clipes posteriores para fechar a lacuna<br>**Atalho compartilhado, depende do contexto:** Girar Mídia sob Cursor (+90°) (R). |
+| `Semicolon` ou `Alt + Del` | Lift no Intervalo IN–OUT | Apaga o conteúdo dentro do intervalo IN–OUT nas pistas ativas deixando o espaço vazio (gap)<br>**Atalho compartilhado, depende do contexto:** Apagar Faixa Única (Desvincular Par) (Alt + Del). |
+| `Alt + Del` | Apagar Faixa Única (Desvincular Par) | Apaga apenas o vídeo ou o áudio selecionado, preservando o outro fluxo<br>**Atalho compartilhado, depende do contexto:** Lift no Intervalo IN–OUT (Alt + Del). |
+| `Quote` ou `Alt + Shift + Del` | Extract (Ripple Delete) no Intervalo IN–OUT | Apaga o conteúdo dentro do intervalo IN–OUT e puxa os clipes posteriores para fechar o espaço |
+| `Ctrl + L` ou `Ctrl + Shift + U` | Desvincular Par Áudio/Vídeo | Quebra a vinculação estrita entre o vídeo e seu par de áudio correspondente<br>**Atalho compartilhado, depende do contexto:** Alternar Reprodução em Loop (Ctrl + L). |
+| `←` | Nudge: Deslocar 1 Frame para Trás | Move o clipe selecionado 1 frame para a esquerda na timeline<br>**Atalho compartilhado, depende do contexto:** Navegar 1 Frame para Trás (←). |
+| `→` | Nudge: Deslocar 1 Frame para Frente | Move o clipe selecionado 1 frame para a direita na timeline<br>**Atalho compartilhado, depende do contexto:** Navegar 1 Frame para Frente (→). |
+| `Alt + ←` ou `[` | Trim Ponto IN: Recuar 1 Frame | Expande ou contrai a ponta inicial do clipe selecionado em 1 frame<br>**Atalho compartilhado, depende do contexto:** Trim Ponto OUT: Recuar 1 Frame ([). |
+| `Alt + Shift + ←` ou `[` | Trim Ponto OUT: Recuar 1 Frame | Recua a ponta final do clipe selecionado em 1 frame<br>**Atalho compartilhado, depende do contexto:** Trim Ponto IN: Recuar 1 Frame ([). |
+| `Alt + →` | Trim Ponto IN: Avançar 1 Frame | Avança a ponta inicial do clipe selecionado em 1 frame |
+| `Alt + Shift + →` ou `]` | Trim Ponto OUT: Avançar 1 Frame | Avança a ponta final do clipe selecionado em 1 frame |
+| `D` | Selecionar Clipe sob a Agulha | Seleciona o clipe na trilha ativa posicionado sob a agulha de reprodução (D) |
+| `Shift + D` | Multi-Seleção na Agulha (Adicionar à Seleção) | Seleciona todos os clipes sob a agulha em todas as pistas e adiciona à seleção existente (Shift+D) |
+| `F` | Ativar / Desativar Clipe (Mute / Bypass) | Alterna se o clipe selecionado (ou sob a agulha) está ativo ou desativado |
 
----
+#### 4. Marcadores
 
-## ✂️ 5. Marcação de Pontos e Edição na Timeline
-
-| Tecla / Combinação | Ação | Descrição |
+| Atalho | Ação | Contexto/observação |
 | :--- | :--- | :--- |
-| **`I`** | **Marcar Entrada (In)** | **No Source / Na Timeline:** Define o frame inicial do trecho ativo. |
-| **`O`** | **Marcar Saída (Out)** | **No Source / Na Timeline:** Define o frame final do trecho ativo. |
-| **`Alt + X`** | **Limpar In / Out** | Remove as marcações de entrada e saída ativas no monitor ou timeline. |
-| **`,` (Vírgula)** | **Inserção Ripple / Insert (3 Pontos)** | Insere o trecho demarcado [In–Out] do Source Player na agulha da timeline, empurrando cortes subsequentes com sincronismo atômico. |
-| **`.` (Ponto)** *(ou `F10`)* | **Sobrescrita / Overwrite (3 Pontos)** | Substitui o trecho da timeline a partir da agulha pela duração do trecho [In–Out] da fonte sem empurrar os clipes posteriores. |
-| **`Ctrl + Alt + A`** | **Alternar Canais de Inserção (AV / V / A)** | Alterna o roteamento de canais da montagem de 3 pontos: Áudio + Vídeo (`AV`) $\rightarrow$ Apenas Vídeo (`V`) $\rightarrow$ Apenas Áudio (`A`). |
-| **`Alt + F`** *(ou `F` no Premiere/Resolve / `Shift+F` no FCP)* | **Localizar Quadro na Fonte (Match Frame)** | Com a agulha sobre um clipe na timeline, abre a mídia bruta no Source Player no mesmo quadro exato e projeta marcadores [IN-OUT]. |
-| **`Shift + F`** *(ou `Alt+F` no Final Cut)* | **Localizar na Timeline (Reverse Match Frame)** | Do Source Player, localiza onde o quadro atual foi utilizado na timeline ativa, salta a agulha e seleciona o clipe. Segurando `Shift` e teclando `F` sucessivamente, cicla sequencialmente por todas as ocorrências na montagem com Mini-HUD flutuante e menu popover. |
-| **`;` (Ponto e Vírgula)** | **Lift (Extração com Gap)** | Remove o trecho entre [In–Out] mantendo o espaço vazio correspondente. |
-| **`'` (Aspas Simples)** | **Extract (Extração com Ripple)** | Remove o trecho entre [In–Out] e fecha o espaço puxando os clipes à direita. |
-| **`E`** ou **`Z`** *(ou `Ctrl+K`/`Cmd+B`)* | **Dividir Clipe no Playhead (Split)** | Corta o clipe sob a agulha instantaneamente, sem precisar selecionar previamente o clipe na timeline. Completa a tríade ergonômica da mão esquerda **`Q`** (Trim Início), **`W`** (Trim Fim) e **`E`** (Split). Divide par A/V sincronizado (`Alt+E` ou `Alt+Z` para corte individual J/L-Cut). |
-| **`Shift + E`** | **Adicionar à Timeline (Append)** | Insere o trecho marcado [In–Out] do monitor de origem na trilha correspondente. |
-| **`Q`** | **Ripple Trim Head** | Corta do início do clipe até a agulha e puxa os clipes posteriores nas pistas com Sync Lock. |
-| **`W`** | **Ripple Trim Tail** | Corta da agulha até o fim do clipe e puxa os clipes posteriores nas pistas com Sync Lock. |
-| **`R`** *(ou `Backspace`)* | **Ripple Delete Inteligente** | Apaga o clipe selecionado, gap selecionado ou sob a agulha e puxa os clipes posteriores fechando o vão. |
-| **`Alt + R`** | **Lift Delete Rápido (Mão Esquerda)** | Apaga o clipe selecionado ou sob a agulha mantendo o vão vazio (gap) intacto. |
-| **`Backspace`** | **Ripple Delete / Fechar Gap** | **Em clipe ou sob a agulha:** Apaga e fecha a lacuna com ripple.<br>**Em Gap:** Fecha o vão vazio puxando os clipes.<br>**Em Ghost:** Rejeita sugestão de IA. |
-| **`Delete`** | **Lift Delete** | Apaga o clipe selecionado ou sob a agulha mantendo o vão vazio (Gap) intacto. |
-| **`A` / `S`** | **Navegar Pontos de Corte (Edit Points)** | Salta a agulha instantaneamente para o ponto de corte anterior (`A`) ou seguinte (`S`). |
-| **`D`** | **Selecionar Clipe na Agulha** | Seleciona com 1 toque o clipe sob a agulha na trilha ativa (*Select at Playhead*). |
-| **`Shift + D`** | **Multi-Seleção na Agulha** | Seleciona todos os clipes sob a agulha em todas as faixas e adiciona cumulativamente à seleção atual. |
-| **`F`** | **Ativar / Desativar Clipe (Mute/Bypass)** | Desativa o clipe (hachura visual, mute no áudio e bypass no export). Pressione novamente para reativar. |
-| **`Ctrl + Alt + P`** | **Alternar Seleção Acompanha a Agulha** | Liga ou desliga o modo dinâmico onde o clipe que cruza a agulha é selecionado automaticamente. |
-| **`Shift + Delete`** | **Ripple Delete de Clipe** | Apaga o clipe selecionado e fecha o espaço vazio imediatamente. |
-| **`Alt + Delete`** | **Apagar Faixa Única** | Apaga apenas o vídeo ou o áudio do clipe selecionado, desvinculando o par temporariamente. |
-| **`Alt + Clique`** | **Seleção A/V Independente** | Seleciona apenas a pista clicada de um par vinculado para cortes L-Cut e J-Cut. |
-| **`Ctrl + Arraste`** | **Ripple Insert** | Insere mídia abrindo espaço e empurrando os cortes à direita nas pistas sincronizadas. |
-| **`Ctrl + Trim`** | **Ripple Trim** | Ajusta as bordas de entrada/saída compensando o tempo nas pistas sincronizadas. |
-| **`Ctrl + R`** | **Velocidade e Duração do Clipe** | Abre diálogo modal flutuante com cálculo bidirecional de %, timecode, opções de Ripple/Cortar e Reverse Play. |
-| **`Ctrl + Alt + R`** | **Preencher Lacuna (Fit to Gap)** | Ajusta a velocidade do clipe selecionado para preencher a lacuna vizinha perfeitamente sem empurrar a montagem. |
-| **`Ctrl + Shift + F`** | **Congelar Quadro (Freeze Frame)** | Congela o frame sob o playhead com técnica tail hold e imunidade a limites da mídia fonte (*bounds immunity*). |
-| **`Ctrl + Alt + F`** | **Alternar Rolagem Automática (Follow Playhead)** | Ativa ou desativa a rolagem automática da timeline durante playback (modos Page e Smooth). |
-| **`Ctrl + Shift + D`** | **Crossfade de Áudio com Potência Constante** | Cria crossfade equal-power no corte sob a agulha ou entre os clipes de áudio selecionados (ou fade in/out se clipe isolado). |
+| `M` | Adicionar / Editar Marcador | Cria um novo marcador ou abre o popover de edição rápida no playhead |
+| `Shift + M` | Pular para o Próximo Marcador | Avança a agulha de reprodução até o marcador seguinte na timeline |
+| `Alt + M` | Pular para o Marcador Anterior | Recua a agulha de reprodução até o marcador anterior na timeline |
+| `Ctrl + Shift + K` ou `Ctrl + Shift + M` | Alternar Momento Crucial (Player / Galeria) | Marca ou desmarca o quadro atual como Momento Crucial para reprodução rápida em hover |
 
----
+#### 5. Assistência de IA & Tomadas
 
-## 🎛️ 6. Ferramentas da Timeline e Ajustes de Precisão
-
-| Tecla / Combinação | Ação | Descrição |
+| Atalho | Ação | Contexto/observação |
 | :--- | :--- | :--- |
-| **`V`** *(ou `S` no Kdenlive / `A` no Resolve)* | **Ferramenta de Seleção** | Retorna ao cursor padrão de seleção e arraste. |
-| **`Shift + R`** *(ou `X` no CapIAu / `R` no Premiere/Resolve/FCP / `Shift+R` no Kdenlive)* | **Ferramenta Estiramento de Taxa (Rate Stretch Tool)** | Altera a velocidade arrastando as bordas do clipe na timeline (10% a 1000%), com HUD flutuante em tempo real e cursores SVG direcionais. Mantenha `Alt` para estiramento de faixa individual. |
-| **`C`** *(ou `B` no Resolve/Final Cut)* | **Ferramenta Lâmina / Gilete (Blade)** | Divide o clipe clicado no frame exato (`Shift+C` fatia todas as pistas destravadas na agulha). |
-| **`Y`** *(ou `Shift+Y` no Resolve)* | **Deslizar Conteúdo Interno (Slip Tool)** | Desliza os pontos IN e OUT da mídia bruta mantendo a posição e duração na timeline intactas. |
-| **`U`** | **Deslocamento com Compensação (Slide Tool)** | Move a posição do clipe compensando simetricamente nos vizinhos adjacentes. |
-| **`Shift + N`** *(ou `T` no Resolve/Final Cut)* | **Corte Contínuo Adjacente (Rolling Edit)** | Ajusta o ponto de corte entre dois clipes contíguos sem alterar a duração total da sequência. |
-| **`Arraste Livre`** | **Seleção por Retângulo (Marquee)** | Abre caixa pontilhada para selecionar múltiplos clipes e marcadores em bloco. |
-| **`T`** *(ou `A` no Premiere)* | **Selecionar Faixa para Frente** | Seleciona todos os clipes à direita em todas as faixas ativas (*Shift = 1 faixa*). |
-| **`Shift + T`** *(ou `Shift+A`)* | **Selecionar Faixa para Trás** | Seleciona todos os clipes à esquerda em todas as faixas ativas (*Shift = 1 faixa*). |
-| **`N`** *(ou `Shift+S` / `F10`)* | **Alternar Snapping Magnético** | Liga ou desliga o magnetismo da timeline com guias visuais no Canvas. |
-| **`H`** *(ou segurar `Espaço` / botão do meio)* | **Ferramenta Mão / Pan** | Permite arrastar e navegar livremente pela timeline em qualquer direção. |
-| **`Z`** *(ou ícone na barra de ferramentas)* | **Ferramenta Zoom / Lupa** | Clique com botão esquerdo para aproximar (1.4x), `Alt + Clique` para afastar (0.7x), centrado no clique. *(Nos perfis Premiere/Resolve/FCP/Kdenlive, atalho nativo `Z`)*. |
-| **`+` / `=`** *(ou `Ctrl+=` no Resolve/FCP/Kdenlive)* | **Aumentar Zoom na Timeline (Zoom In)** | Aproxima o zoom horizontal da régua e clipes ancorado na posição da agulha de reprodução (*Playhead*). |
-| **`-`** *(ou `Ctrl+-` no Resolve/FCP/Kdenlive)* | **Diminuir Zoom na Timeline (Zoom Out)** | Afasta o zoom horizontal da régua e clipes ancorado na posição da agulha de reprodução (*Playhead*). |
-| **`\`** *(ou `Shift+Z` / `Ctrl+Shift+Espaço`)* | **Ajustar Sequência na Tela (Zoom to Fit)** | Alternância (*Toggle*) inteligente: enquadra perfeitamente todos os clipes na timeline com margem de respiro ou restaura o zoom anterior. |
-| **`.` (Ponto)** *(ou `Ctrl+1` no Premiere / `Shift+1` no Resolve/FCP)* | **Restaurar Zoom Padrão (1:1 / 0.5 px/f)** | Redefine a escala horizontal para 0.5 pixels por frame. |
-| **`Roda do Mouse` (sobre a Régua)** | **Zoom Horizontal Dinâmico na Régua** | Rolar a roda do mouse diretamente sobre a régua aplica zoom horizontal contínuo centralizado no ponteiro. |
-| **`Ctrl + Roda` (sobre o Canvas)** | **Zoom Horizontal Centralizado no Cursor** | Aproxima ou afasta a timeline centrado na coordenada do ponteiro do mouse. |
-| **`Shift + Roda` (sobre Cabeçalho de Pista)** | **Altura Individual daquela Pista Específica** | Aumenta ou diminui a altura vertical daquela pista específica em passos de 8px (22px a 240px). |
-| **`Shift + Roda` (sobre o Canvas / Régua)** | **Altura Global de Todas as Pistas** | Ajusta progressivamente a escala vertical uniforme de todas as faixas (0.5x a 1.7x). |
-| **`←` / `→`** | **Deslocar Clipe (Nudge 1 Frame)** | Desloca o clipe selecionado 1 frame para a esquerda ou direita. |
-| **`Alt + ←` / `Alt + →`** | **Ajustar Ponto IN (Trim In)** | Recua ou avança a borda esquerda do clipe selecionado em 1 frame. |
-| **`Shift + ←` / `Shift + →`** | **Ajustar Ponto OUT (Trim Out)** | Recua ou avança a borda direita do clipe selecionado em 1 frame. |
-| **`[` / `]`** | **Nudge Trim Rápido** | Ajusta borda esquerda (`[`) ou borda direita (`]`) em 1 frame. |
+| `Ctrl + Alt + B` | Alternar Detecção Facial no Source | Exibe ou oculta a camada visual de caixas de detecção facial e grounding no Monitor de Origem (Source) |
+| `Alt + A` | Alternar Tomadas / Alternativas de IA | Abre o seletor de tomadas alternativas em clipes gerados por IA / Inspetor |
+| `Enter` ou `Y` | Aceitar Sugestão de IA | Aprova a sugestão da faixa fantasma de IA, tornando-a clipe real na trilha<br>**Atalho compartilhado, depende do contexto:** Renderizar Efeitos In para Out (Cache NLE) (Enter); Deslizar Conteúdo Interno (Slip Tool) (Y). |
+| `Del` ou `N` | Rejeitar Sugestão de IA | Descarta e remove a sugestão fantasma da timeline<br>**Atalho compartilhado, depende do contexto:** Lift Delete (Apagar Clipe) (Del); Alternar Snapping Magnético (N). |
 
----
+#### 6. Canvas, Zoom & Histórico
 
-## 📍 7. Marcadores de Timeline e Clipe
-
-| Tecla / Combinação | Ação | Descrição |
+| Atalho | Ação | Contexto/observação |
 | :--- | :--- | :--- |
-| **`M`** | **Adicionar / Editar Marcador** | Cria ou edita marcador na agulha sem pausar a reprodução. |
-| **`Shift + M`** | **Pular para Próximo Marcador** | Move a agulha para o próximo marcador da timeline. |
-| **`Alt + M`** | **Pular para Marcador Anterior** | Move a agulha para o marcador anterior da timeline. |
-| **`Shift + Clique`** | **Seleção Múltipla de Marcadores** | Seleciona vários marcadores simultaneamente para edição ou exclusão em lote. |
-| **`Tab` (no box do marcador)** | **Alternar Campos** | Navega entre Título, Comentário e Seletor de Cores. |
-| **`Enter` / `Esc`** | **Salvar e Fechar Marcador** | Salva e fecha o popover de marcador instantaneamente. |
+| `\` ou `Shift + Z` | Ajustar Sequência na Tela (Zoom to Fit) | Enquadra perfeitamente todos os clipes na timeline ou restaura o zoom anterior (Toggle) |
+| `+ / =` ou `Num +` | Aumentar Zoom na Linha do Tempo | Aproxima o zoom horizontal da régua e clipes da timeline<br>**Atalho compartilhado, depende do contexto:** Timeline: Aumentar Altura das Pistas (Num +). |
+| `-` ou `Num -` | Diminuir Zoom na Linha do Tempo | Afasta o zoom horizontal da régua e clipes da timeline<br>**Atalho compartilhado, depende do contexto:** Timeline: Diminuir Altura das Pistas (Num -). |
+| `Ctrl + 1` | Restaurar Zoom Padrão (1:1 / 0.5 px/f) | Restaura a escala da régua e dos clipes para o zoom padrão de 0.5 pixels por frame |
+| `Ctrl + Alt + P` | Alternar 'Seleção Acompanha a Agulha' | Ativa ou desativa a seleção automática do clipe sob a agulha ao se mover |
+| `Ctrl + Alt + F` | Alternar 'Timeline Segue a Agulha' (Auto-Scroll) | Ativa ou desativa a rolagem automática da timeline para acompanhar o cursor de reprodução |
+| `Shift + L` | Travar / Destravar Pista Ativa (Track Lock) | Ativa ou desativa o cadeado físico de proteção total na pista selecionada |
+| `Ctrl + Alt + Shift + L` | Travar / Destravar Todas as Pistas | Alterna o cadeado físico em todas as pistas de vídeo, áudio e texto da timeline |
+| `Ctrl + Shift + G` | Alternar Margens de Segurança & Guias no Player (Safe Margins) | Exibe ou oculta o overlay vetorial de Action Safe (90%), Title Safe (80%), Cruz Central e Máscaras de Proporção no Monitor de Programa |
+| `Ctrl + Alt + G` | Alternar Máscara de Proporção no Player (16:9 / 9:16 / 1:1 / 2.39:1) | Alterna ciclicamente entre as máscaras de proporção de aspecto (16:9, 9:16, 1:1, 2.39:1, 4:5, 4:3, Sem Máscara) no Monitor de Programa |
+| `Ctrl + Z` | Desfazer Ação (Undo) | Desfaz a última alteração realizada na timeline |
+| `Ctrl + Shift + Z` ou `Ctrl + Y` | Refazer Ação (Redo) | Refaz a edição desfeita anteriormente |
+| `Ctrl + Shift + S` | Salvar Preset de Workspace | Abre o diálogo para salvar o layout visual atual da interface |
 
----
+#### 7. Layout & Workspace (Numpad)
 
-## 🤖 8. Inteligência Artificial, Inspetor e Comandos Globais
-
-| Tecla / Combinação | Ação | Descrição |
+| Atalho | Ação | Contexto/observação |
 | :--- | :--- | :--- |
-| **`Alt + A`** *(ou `A` na Biblioteca)* | **Alternativas IA / Inspetor** | **Na Timeline:** Abre o carrossel de planos alternativos sugeridos pela IA.<br>**Na Biblioteca:** Abre o Inspetor de Metadados e Decupagem. |
-| **`Enter` / `Y`** | **Aceitar Sugestão de IA** | Aceita e consolida o clipe fantasma (*ghost clip*) sugerido na timeline. |
-| **`Del` (sobre Ghost)** | **Rejeitar Sugestão de IA** | Remove o clipe fantasma sugerido pela IA. |
-| **`Ctrl + S`** | **Salvar Timeline / Projeto** | Salva a timeline ativa e persiste no banco SQLite/JSON. |
-| **`Ctrl + Z`** | **Desfazer (Undo)** | Desfaz a última ação realizada na timeline. |
-| **`Ctrl + Y`** *(ou `Ctrl+Shift+Z`)* | **Refazer (Redo)** | Refaz a ação desfeita. |
-| **`Esc`** | **Fechar / Cancelar** | Fecha modais, limpa seleções e conclui edições de texto. |
+| `Ctrl + Alt + Z` | Desfazer Mudança de Layout | Desfaz a última mudança na disposição dos painéis (histórico separado do da timeline) |
+| `Ctrl + Alt + Shift + Z` | Refazer Mudança de Layout | Refaz a mudança de layout desfeita anteriormente |
+| `Num 1` | Timeline: Expansão Direcional Esquerda | Alterna a expansão da timeline sob a sidebar esquerda (bottom-left ↔ center) |
+| `Alt + Num 1` | Timeline: Toggle Cabeçalho de Pistas | Oculta ou exibe a área de faixas e timecode da timeline (Track Headers) |
+| `Num 2` | Timeline: Alternar Centro ↔ Faixa Total | Alterna a timeline entre entre menus (center) e largura total na base (bottom-full) |
+| `Alt + Num 2` | Timeline: Recolher / Restaurar Verticalmente | Recolhe ou expande o painel da timeline para a linha restauradora na base |
+| `Ctrl + Num 2` | Timeline: Destacar / Reanexar Janela | Abre a timeline em janela flutuante para o segundo monitor ou a reanexa |
+| `Num 3` | Timeline: Expansão Direcional Direita | Alterna a expansão da timeline sob a sidebar direita (bottom-right ↔ center) |
+| `Alt + Num 3` | Timeline: Toggle Barra de Ferramentas | Recolhe ou expande a barra vertical de ferramentas de corte (V, C, Trims) |
+| `Num 4` | Biblioteca: Ocultar / Exibir | Recolhe ou expande a sidebar esquerda (Biblioteca de mídias, temas, rostos) |
+| `Alt + Num 4` | Biblioteca: Layout Estúdio (Maximizar) | Maximiza a biblioteca no layout estúdio com timeline e players empilhados |
+| `Ctrl + Num 4` | Biblioteca: Destacar / Reanexar Janela | Abre a biblioteca em janela flutuante externa ou a reanexa |
+| `Num 5` | Inspetor: Ocultar / Exibir | Recolhe ou expande o painel de Ajustes & Efeitos (Inspetor) |
+| `Alt + Num 5` | Inspetor: Maximizar / Restaurar | Maximiza o painel de Ajustes & Efeitos no espaço disponível |
+| `Ctrl + Num 5` | Inspetor: Destacar / Reanexar Janela | Abre o Inspetor em janela flutuante externa ou o reanexa |
+| `Num 6` | Painel Direito: Ocultar / Exibir | Recolhe ou expande a sidebar direita (Transcrição, Visão IA, Tarefas, Logs) |
+| `Alt + Num 6` | Painel Direito: Maximizar / Restaurar | Maximiza a sidebar direita no espaço disponível |
+| `Ctrl + Num 6` | Painel Direito: Destacar / Reanexar Janela | Abre a sidebar direita em janela flutuante externa ou a reanexa |
+| `Num 7` | Source Player: Ocultar / Exibir | Oculta ou exibe o monitor de origem (Source Player) |
+| `Alt + Num 7` | Source Player: Maximizar / Restaurar | Maximiza o monitor de origem no palco central |
+| `Ctrl + Num 7` | Source Player: Destacar / Reanexar Janela | Abre o monitor de origem em janela flutuante externa ou o reanexa |
+| `Num 8` | Header Geral: Ocultar / Exibir | Recolhe ou expande o cabeçalho superior da aplicação para ganhar espaço vertical |
+| `Num 9` | Program Player: Ocultar / Exibir | Oculta ou exibe o monitor de programa (Program Player) |
+| `Alt + Num 9` | Program Player: Maximizar / Restaurar | Maximiza o monitor de programa no palco central |
+| `Ctrl + Num 9` | Program Player: Destacar / Reanexar Janela | Abre o monitor de programa em janela flutuante externa ou o reanexa |
+| `Num 0` | Modo Foco / Cinema / Zen | Macro global: recolhe ou restaura Header e todas as Sidebars simultaneamente |
+| `Num .` | Timeline: Toggle Cabeçalho Superior | Recolhe ou restaura a barra superior de nome, zoom e sequência da timeline |
+| `Num +` | Timeline: Aumentar Altura das Pistas | Aumenta a altura das faixas de áudio e vídeo na timeline (+10px)<br>**Atalho compartilhado, depende do contexto:** Aumentar Zoom na Linha do Tempo (Num +). |
+| `Num -` | Timeline: Diminuir Altura das Pistas | Diminui a altura das faixas de áudio e vídeo na timeline (-10px)<br>**Atalho compartilhado, depende do contexto:** Diminuir Zoom na Linha do Tempo (Num -). |
+| `Num /` | Monitores: Alternar Lado a Lado / Empilhados | Alterna a disposição dos monitores entre horizontal e vertical |
+| `Num *` | Monitores: Swap / Alternar Foco | Alterna o foco ativo entre o Monitor Source e o Monitor Program |
+| `Num Enter` | Maximizar / Restaurar Painel sob Foco | Maximiza ou restaura o painel ativo ou sob o cursor |
+| `Ctrl + Alt + 1` ou `Ctrl + Alt + Num 1` | Workspace: Carregar Slot 1 | Carrega instantaneamente o layout salvo no slot numérico 1 (Ctrl + Alt + 1) |
+| `Ctrl + Alt + 2` ou `Ctrl + Alt + Num 2` | Workspace: Carregar Slot 2 | Carrega instantaneamente o layout salvo no slot numérico 2 (Ctrl + Alt + 2) |
+| `Ctrl + Alt + 3` ou `Ctrl + Alt + Num 3` | Workspace: Carregar Slot 3 | Carrega instantaneamente o layout salvo no slot numérico 3 (Ctrl + Alt + 3) |
+| `Ctrl + Alt + 4` ou `Ctrl + Alt + Num 4` | Workspace: Carregar Slot 4 | Carrega instantaneamente o layout salvo no slot numérico 4 (Ctrl + Alt + 4) |
+| `Ctrl + Alt + 5` ou `Ctrl + Alt + Num 5` | Workspace: Carregar Slot 5 | Carrega instantaneamente o layout salvo no slot numérico 5 (Ctrl + Alt + 5) |
+| `Ctrl + Alt + 6` ou `Ctrl + Alt + Num 6` | Workspace: Carregar Slot 6 | Carrega instantaneamente o layout salvo no slot numérico 6 (Ctrl + Alt + 6) |
+| `Ctrl + Alt + 7` ou `Ctrl + Alt + Num 7` | Workspace: Carregar Slot 7 | Carrega instantaneamente o layout salvo no slot numérico 7 (Ctrl + Alt + 7) |
+| `Ctrl + Alt + 8` ou `Ctrl + Alt + Num 8` | Workspace: Carregar Slot 8 | Carrega instantaneamente o layout salvo no slot numérico 8 (Ctrl + Alt + 8) |
+| `Ctrl + Alt + 9` ou `Ctrl + Alt + Num 9` | Workspace: Carregar Slot 9 | Carrega instantaneamente o layout salvo no slot numérico 9 (Ctrl + Alt + 9) |
+| `Ctrl + Alt + Shift + 1` ou `Ctrl + Alt + Shift + Num 1` | Workspace: Salvar no Slot 1 | Grava a disposição atual diretamente no slot numérico 1 (Ctrl + Alt + Shift + 1) |
+| `Ctrl + Alt + Shift + 2` ou `Ctrl + Alt + Shift + Num 2` | Workspace: Salvar no Slot 2 | Grava a disposição atual diretamente no slot numérico 2 (Ctrl + Alt + Shift + 2) |
+| `Ctrl + Alt + Shift + 3` ou `Ctrl + Alt + Shift + Num 3` | Workspace: Salvar no Slot 3 | Grava a disposição atual diretamente no slot numérico 3 (Ctrl + Alt + Shift + 3) |
+| `Ctrl + Alt + Shift + 4` ou `Ctrl + Alt + Shift + Num 4` | Workspace: Salvar no Slot 4 | Grava a disposição atual diretamente no slot numérico 4 (Ctrl + Alt + Shift + 4) |
+| `Ctrl + Alt + Shift + 5` ou `Ctrl + Alt + Shift + Num 5` | Workspace: Salvar no Slot 5 | Grava a disposição atual diretamente no slot numérico 5 (Ctrl + Alt + Shift + 5) |
+| `Ctrl + Alt + Shift + 6` ou `Ctrl + Alt + Shift + Num 6` | Workspace: Salvar no Slot 6 | Grava a disposição atual diretamente no slot numérico 6 (Ctrl + Alt + Shift + 6) |
+| `Ctrl + Alt + Shift + 7` ou `Ctrl + Alt + Shift + Num 7` | Workspace: Salvar no Slot 7 | Grava a disposição atual diretamente no slot numérico 7 (Ctrl + Alt + Shift + 7) |
+| `Ctrl + Alt + Shift + 8` ou `Ctrl + Alt + Shift + Num 8` | Workspace: Salvar no Slot 8 | Grava a disposição atual diretamente no slot numérico 8 (Ctrl + Alt + Shift + 8) |
+| `Ctrl + Alt + Shift + 9` ou `Ctrl + Alt + Shift + Num 9` | Workspace: Salvar no Slot 9 | Grava a disposição atual diretamente no slot numérico 9 (Ctrl + Alt + Shift + 9) |
 
----
+### Perfil Adobe Premiere Pro
 
-## 🎹 9. Atalhos Espaciais do Teclado Numérico (Numpad)
+> Alguns atalhos aparecem em mais de uma ação neste perfil. Isso é intencional: a ação executada depende do contexto (painel em foco, ferramenta ativa, elemento sob o mouse, sugestão ou clipe fantasma ativo). A coluna de observação indica com quais ações o atalho é compartilhado.
 
-O teclado numérico físico espelha intuitivamente a geometria dos painéis e quadrantes da workspace do CapIAu:
+#### 1. Reprodução & Navegação
 
-| Tecla / Combinação | Ação NLE | Descrição do Comportamento |
+| Atalho | Ação | Contexto/observação |
 | :--- | :--- | :--- |
-| **`Numpad 1`** | **Timeline: Expandir Esquerda** | Alterna expansão da timeline sob a biblioteca (`bottom-left` $\leftrightarrow$ `center`). |
-| **`Alt + Numpad 1`** | **Timeline: Cabeçalhos de Pistas** | Alterna visibilidade dos cabeçalhos das trilhas (*Track Headers* / controles de Mute, Lock, Magnet). |
-| **`Numpad 2`** | **Timeline: Faixa de Baixo Completa** | Alterna timeline em largura total de rodapé (`bottom-full` $\leftrightarrow$ `center`). |
-| **`Alt + Numpad 2`** | **Timeline: Régua de Tempo** | Alterna visibilidade da régua de tempo (*Ruler*) e marcadores de tempo da timeline. |
-| **`Ctrl + Numpad 2`** | **Timeline: Destacar / Popout** | Destaca a timeline para uma janela externa independente (ou reanexa). |
-| **`Numpad 3`** | **Timeline: Expandir Direita** | Alterna expansão da timeline sob o painel direito (`bottom-right` $\leftrightarrow$ `center`). |
-| **`Alt + Numpad 3`** | **Timeline: Minimapa** | Alterna visibilidade do minimapa de navegação panorâmica da timeline. |
-| **`Numpad 4`** | **Biblioteca: Ocultar / Mostrar** | Recolhe ou restaura a barra lateral esquerda da biblioteca de mídias. |
-| **`Alt + Numpad 4`** | **Biblioteca: Modo Estúdio** | Maximiza a biblioteca com monitores empilhados e visualização ampla de arquivos. |
-| **`Ctrl + Numpad 4`** | **Biblioteca: Destacar / Popout** | Destaca a biblioteca para monitor secundário (ou reanexa). |
-| **`Numpad 5`** | **Reanexar Janelas Destacadas** | Reanexa todas as janelas externas (popouts) de volta ao editor principal. |
-| **`Alt + Numpad 5`** | **Inspetor: Maximizar / Restaurar** | Maximiza ou restaura a largura horizontal do painel de ajustes e efeitos. |
-| **`Ctrl + Numpad 5`** | **Inspetor: Destacar / Popout** | Destaca o inspetor para monitor secundário (ou reanexa). |
-| **`Numpad 6`** | **Painel Direito: Ocultar / Mostrar** | Recolhe ou restaura a barra lateral direita de transcrição, IA e ferramentas. |
-| **`Alt + Numpad 6`** | **Painel Direito: Maximizar** | Maximiza ou restaura a largura horizontal do painel lateral direito. |
-| **`Ctrl + Numpad 6`** | **Painel Direito: Destacar / Popout** | Destaca o painel direito para monitor secundário (ou reanexa). |
-| **`Numpad 7`** | **Header Superior: Ocultar / Mostrar** | Recolhe ou restaura a barra de menu e ferramentas globais do topo. |
-| **`Alt + Numpad 7`** | **Source Player: Maximizar** | Expande o monitor Source para o tamanho máximo do contêiner. |
-| **`Ctrl + Numpad 7`** | **Source Player: Destacar / Popout** | Destaca o monitor Source para janela externa (ou reanexa). |
-| **`Numpad 8`** | **Barra de Ferramentas: Ocultar / Mostrar** | Recolhe ou restaura a barra de ferramentas da timeline (*Toolbar*). |
-| **`Numpad 9`** | **Monitores: Alternar Visualização** | Cicla a exibição dos monitores: *Source* $\rightarrow$ *Program* $\rightarrow$ *Ambos*. |
-| **`Alt + Numpad 9`** | **Program Player: Maximizar** | Expande o monitor Program para o tamanho máximo do contêiner. |
-| **`Ctrl + Numpad 9`** | **Program Player: Destacar / Popout** | Destaca o monitor Program para janela externa (ou reanexa). |
-| **`Numpad 0`** | **Modo Zen / Cinema** | Macro de 1 toque: oculta cabeçalho e todas as sidebars; 2º toque restaura o estado exato anterior. |
-| **`Numpad .`** | **Timeline: Barra Superior** | Recolhe ou restaura a barra com timecode, sliders de zoom e opções de pista. |
-| **`Alt + Numpad .`** | **Timeline: Barra de Status** | Recolhe ou restaura a barra inferior de status da timeline. |
-| **`Numpad +`** | **Aumentar Altura das Trilhas** | Incrementa a escala vertical das faixas da timeline (+8px). |
-| **`Numpad -`** | **Diminuir Altura das Trilhas** | Decrementa a escala vertical das faixas da timeline (-8px). |
-| **`Numpad /`** | **Monitores: Disposição** | Alterna entre layout Lado a Lado (`side-by-side`) e Empilhados (`stacked`). |
-| **`Numpad *`** | **Monitores: Swap / Trocar Foco** | Alterna o foco ativo ou inverte a posição/maximização entre Source e Program. |
-| **`Numpad Enter`** | **Maximizar Painel Ativo** | Maximiza o painel focado ou sob o cursor do mouse na área do editor. |
+| `Espaço` | Play / Pause | Inicia ou pausa a reprodução no player ativo (Source ou Program) |
+| `J` | Shuttle Reverso (J) | Reproduz para trás. Pressionar repetidamente acelera a velocidade (1x, 2x, 4x, 8x) |
+| `K` | Shuttle Play / Pause (K) | Alterna entre reproduzir e pausar a reprodução (segure K com J ou L para avançar/recuar quadro a quadro) |
+| `L` | Shuttle Avanço (L) | Reproduz para frente. Pressionar repetidamente acelera a velocidade (1x, 2x, 4x, 8x) |
+| `Shift + →` | Shuttle Acelerado / Avanço Rápido (Shift + →) | Reproduz acelerado para frente. Toques repetidos aumentam a velocidade (igual JKL); segurar reproduz acelerado enquanto pressionado |
+| `Shift + ←` | Shuttle Acelerado / Recuo Rápido (Shift + ←) | Reproduz acelerado para trás. Toques repetidos aumentam a velocidade reversa; segurar reproduz acelerado enquanto pressionado |
+| `Ctrl + →` | Câmera Lenta Avanço (Ctrl + →) | Reproduz em câmera lenta para frente (0.25x). Segurar reproduz enquanto pressionado |
+| `Ctrl + ←` | Câmera Lenta Recuo (Ctrl + ←) | Reproduz em câmera lenta reversa (-0.25x). Segurar reproduz enquanto pressionado |
+| `K + J` ou `←` | Jog Recuar 1 Frame (K + J) | Segure K e pressione J para recuar exatamente 1 frame<br>**Atalho compartilhado, depende do contexto:** Navegar 1 Frame para Trás (←). |
+| `←` | Navegar 1 Frame para Trás | Move a agulha 1 frame para trás (quando nenhum clipe estiver selecionado)<br>**Atalho compartilhado, depende do contexto:** Jog Recuar 1 Frame (K + J) (←). |
+| `K + L` ou `→` | Jog Avançar 1 Frame (K + L) | Segure K e pressione L para avançar exatamente 1 frame<br>**Atalho compartilhado, depende do contexto:** Navegar 1 Frame para Frente (→). |
+| `→` | Navegar 1 Frame para Frente | Move a agulha 1 frame para frente (quando nenhum clipe estiver selecionado)<br>**Atalho compartilhado, depende do contexto:** Jog Avançar 1 Frame (K + L) (→). |
+| `I` | Marcar Ponto de Entrada (IN) | Define o ponto inicial de corte no Player ou Linha do Tempo |
+| `O` | Marcar Ponto de Saída (OUT) | Define o ponto final de corte no Player ou Linha do Tempo |
+| `Ctrl + Shift + I` ou `Alt + I` | Limpar Ponto IN | Remove o ponto de entrada (IN) no Player ou Linha do Tempo |
+| `Ctrl + Shift + O` ou `Alt + O` | Limpar Ponto OUT | Remove o ponto de saída (OUT) no Player ou Linha do Tempo |
+| `Ctrl + Shift + X` ou `Alt + X` | Limpar Pontos IN e OUT | Remove ambos os pontos de entrada e saída (IN e OUT) |
+| `/` ou `X` | Marcar Clipe (IN / OUT) | Define pontos IN e OUT nos limites do clipe selecionado ou sob a agulha |
+| `Shift + I` | Ir para o Ponto IN | Move a agulha de reprodução diretamente para o ponto IN |
+| `Shift + O` | Ir para o Ponto OUT | Move a agulha de reprodução diretamente para o ponto OUT |
+| `Ctrl + Shift + Espaço` ou `Shift + Espaço` ou `Alt + K` | Tocar de IN até OUT | Reproduz o trecho delimitado entre os pontos IN e OUT e pausa |
+| `Ctrl + L` | Alternar Reprodução em Loop | Liga ou desliga a reprodução contínua em loop entre os pontos IN e OUT<br>**Atalho compartilhado, depende do contexto:** Desvincular Par Áudio/Vídeo (Ctrl + L). |
+| `E` | Inserir na Timeline (Append) | Insere o trecho marcado (IN ➔ OUT) na timeline |
+| `↑` | Pular para Ponto Anterior / Início | Program: move a agulha para o corte anterior; Source: vai para IN ou Início |
+| `↓` | Pular para Próximo Ponto / Fim | Program: move a agulha para o corte seguinte; Source: vai para OUT ou Fim |
+| `Ctrl + G` | Ir para Timecode / Navegação Numérica | Ativa a entrada de timecode para salto absoluto ou navegação relativa (+/- frames) |
 
----
+#### 2. Ferramentas & Modos
 
-## 🗂️ 10. Slots Numéricos Rápidos de Workspace (1 a 9)
-
-O CapIAu permite salvar layouts completos da workspace vinculados a posições numéricas rápidas de `1` a `9`:
-
-| Tecla / Combinação | Ação | Descrição |
+| Atalho | Ação | Contexto/observação |
 | :--- | :--- | :--- |
-| **`Ctrl + Alt + [1-9]`** | **Carregar Slot Numérico** | Carrega instantaneamente o layout de workspace vinculado ao slot numérico (1 a 9). |
-| **`Ctrl + Alt + Shift + [1-9]`** | **Salvar Layout no Slot** | Salva e vincula a disposição exata atual de painéis, larguras e monitores ao slot correspondente (1 a 9). |
+| `V` | Ferramenta de Seleção | Ativa a ferramenta de seleção padrão da timeline (Seta) |
+| `Shift + V` | Seleção por Caixa / Retângulo (Marquee) | Ativa a ferramenta de seleção por retângulo (arraste para selecionar clipes e marcadores) |
+| `C` | Ferramenta Lâmina / Gilete (Blade) | Ativa a ferramenta de corte de precisão por cursor na trilha |
+| `Shift + C` ou `Ctrl + Shift + K` | Lâmina Global na Agulha | Fatia todas as pistas destravadas na coordenada da agulha de reprodução<br>**Atalho compartilhado, depende do contexto:** Alternar Momento Crucial (Player / Galeria) (Ctrl + Shift + K). |
+| `Y` | Deslizar Conteúdo Interno (Slip Tool) | Desliza os pontos IN e OUT da mídia bruta mantendo a posição e duração na timeline<br>**Atalho compartilhado, depende do contexto:** Aceitar Sugestão de IA (Y). |
+| `U` | Deslizar Posição na Timeline (Slide Tool) | Move o clipe na timeline mantendo seu conteúdo intacto e compensando nos vizinhos adjacentes |
+| `N` | Corte Contínuo Adjacente (Rolling Edit) | Ajusta o ponto de corte entre dois clipes contíguos sem alterar a duração total da sequência<br>**Atalho compartilhado, depende do contexto:** Rejeitar Sugestão de IA (N). |
+| `R` | Esticar / Comprimir Taxa de Velocidade (Rate Stretch) | Altera a velocidade do clipe arrastando suas bordas para esticar ou comprimir a taxa temporal<br>**Atalho compartilhado, depende do contexto:** Girar Mídia sob Cursor (+90°) (R). |
+| `R` | Girar Mídia sob Cursor (+90°) | Rotaciona a mídia sob o cursor (hover) na biblioteca ou no monitor de origem<br>**Atalho compartilhado, depende do contexto:** Esticar / Comprimir Taxa de Velocidade (Rate Stretch) (R). |
+| `A` | Selecionar Faixa para Frente | Ativa a ferramenta de seleção de todos os clipes à direita<br>**Atalho compartilhado, depende do contexto:** Alternar Tomadas / Alternativas de IA (A). |
+| `Shift + A` | Selecionar Faixa para Trás | Ativa a ferramenta de seleção de todos os clipes à esquerda |
+| `S` | Alternar Snapping Magnético | Liga ou desliga o alinhamento magnético inteligente de bordas e agulha |
+| `H` | Ferramenta Mão / Pan | Ativa a ferramenta de navegação e arrasto contínuo da timeline (Pan) |
+| `Z` | Ferramenta Zoom / Lupa | Ativa a ferramenta de aproximação e afastamento por clique |
+| `Esc` | Desmarcar Seleção / Fechar Caixas | Limpa a seleção de clipes ou fecha pop-ups contextuais e modais |
 
----
+#### 3. Edição, Cortes & Trims
 
-## 🛡️ Prevenção Inteligente de Conflitos de Digitação
+| Atalho | Ação | Contexto/observação |
+| :--- | :--- | :--- |
+| `,` | Inserir na Agulha (Ripple Insert) | Insere o trecho marcado no monitor Source na coordenada da agulha empurrando os clipes subsequentes |
+| `.` | Sobrescrever na Agulha (Overwrite Edit) | Insere o trecho marcado no monitor Source na coordenada da agulha substituindo o material sob o intervalo |
+| `Ctrl + Alt + A` | Alternar Canais na Inserção (AV / V / A) | Alterna os canais transferidos do monitor Source para a Timeline: Áudio+Vídeo (AV), Somente Vídeo (V) ou Somente Áudio (A) |
+| `F` | Localizar Quadro Original na Fonte (Match Frame) | Localiza a mídia bruta correspondente ao quadro sob a agulha da timeline e abre no Source Player marcando os pontos IN–OUT originais |
+| `Shift + F` | Localizar Quadro na Timeline (Reverse Match Frame) | Localiza onde o quadro atual sob a agulha do Source Player está sendo utilizado na timeline ativa e salta a agulha para a posição correspondente |
+| `Ctrl + Shift + R` | Substituir Clipe na Timeline (Replace Edit) | Substitui a mídia do clipe alvo (selecionado, sob a agulha ou sob o cursor com Alt no arraste) preservando duração exata, efeitos (Ken Burns), cor e velocidade |
+| `Ctrl + U` | Criar Subclipe na Biblioteca (Make Subclip) | Gera um novo item virtual na biblioteca a partir do intervalo [IN–OUT] delimitado no monitor Source |
+| `Ctrl + Shift + F` | Congelar Quadro (Freeze Frame) | Captura o quadro sob a agulha e insere um segmento estático na timeline (Ctrl+Shift+F) |
+| `Ctrl + R` | Velocidade / Duração do Clipe (Speed / Duration) | Abre o diálogo de velocidade percentual, duração proporcional e reversão do clipe selecionado (Ctrl+R) |
+| `Ctrl + Alt + R` | Preencher Espaço na Trilha (Fit to Gap) | Estende a duração do clipe ajustando a velocidade para preencher automaticamente o espaço vazio adjacente na pista (Ctrl+Alt+R) |
+| `Ctrl + Shift + D` | Crossfade de Áudio (Potência Constante) | Aplica transição de crossfade de áudio de potência constante (Equal-Power) na emenda entre clipes contíguos ou no clipe selecionado (Ctrl+Shift+D) |
+| `Ctrl + D` | Transição de Vídeo Padrão (Cross Dissolve) | Aplica transição de vídeo (Cross Dissolve, Dip to Black ou Dip to White) na emenda contígua sob a agulha ou entre os clipes selecionados (Ctrl+D) |
+| `Enter` | Renderizar Efeitos In para Out (Cache NLE) | Pré-renderiza o intervalo da timeline (In-Out ou trechos pesados) para playback suave em cache (Enter)<br>**Atalho compartilhado, depende do contexto:** Aceitar Sugestão de IA (Enter). |
+| `Ctrl + K` | Dividir Clipe no Playhead (Split) | Fatia o clipe sob a agulha de reprodução (ou o clipe selecionado) |
+| `Q` | Ripple Trim Início (Até a Agulha) | Corta o início do clipe até a agulha e fecha o espaço na timeline |
+| `W` | Ripple Trim Fim (Da Agulha ao Fim) | Corta da agulha até o final do clipe e fecha o espaço na timeline |
+| `Backspace` | Lift Delete (Apagar Clipe) | Apaga o clipe selecionado deixando o espaço vazio (gap) intacto |
+| `Shift + Del` ou `Alt + Backspace` | Ripple Delete (Apagar e Fechar Espaço) | Apaga o clipe e puxa todos os clipes posteriores para fechar a lacuna<br>**Atalho compartilhado, depende do contexto:** Extract (Ripple Delete) no Intervalo IN–OUT (Shift + Del). |
+| `Quote` ou `Shift + Del` | Extract (Ripple Delete) no Intervalo IN–OUT | Apaga o conteúdo dentro do intervalo IN–OUT e puxa os clipes posteriores para fechar o espaço<br>**Atalho compartilhado, depende do contexto:** Ripple Delete (Apagar e Fechar Espaço) (Shift + Del). |
+| `Semicolon` ou `Alt + Del` | Lift no Intervalo IN–OUT | Apaga o conteúdo dentro do intervalo IN–OUT nas pistas ativas deixando o espaço vazio (gap)<br>**Atalho compartilhado, depende do contexto:** Apagar Faixa Única (Desvincular Par) (Alt + Del). |
+| `Alt + Del` | Apagar Faixa Única (Desvincular Par) | Apaga apenas o vídeo ou o áudio selecionado, preservando o outro fluxo<br>**Atalho compartilhado, depende do contexto:** Lift no Intervalo IN–OUT (Alt + Del). |
+| `Ctrl + L` | Desvincular Par Áudio/Vídeo | Quebra a vinculação estrita entre o vídeo e seu par de áudio correspondente<br>**Atalho compartilhado, depende do contexto:** Alternar Reprodução em Loop (Ctrl + L). |
+| `Alt + ←` | Nudge: Deslocar 1 Frame para Trás | Move o clipe selecionado 1 frame para a esquerda na timeline |
+| `Alt + →` | Nudge: Deslocar 1 Frame para Frente | Move o clipe selecionado 1 frame para a direita na timeline |
+| `Ctrl + Alt + ←` | Trim Ponto IN: Recuar 1 Frame | Expande ou contrai a ponta inicial do clipe selecionado em 1 frame |
+| `Ctrl + Alt + →` | Trim Ponto IN: Avançar 1 Frame | Avança a ponta inicial do clipe selecionado em 1 frame |
+| `Ctrl + Shift + ←` | Trim Ponto OUT: Recuar 1 Frame | Recua a ponta final do clipe selecionado em 1 frame |
+| `Ctrl + Shift + →` | Trim Ponto OUT: Avançar 1 Frame | Avança a ponta final do clipe selecionado em 1 frame |
+| `D` | Selecionar Clipe sob a Agulha | Seleciona o clipe na trilha ativa posicionado sob a agulha de reprodução (D) |
+| `Shift + D` | Multi-Seleção na Agulha (Adicionar à Seleção) | Seleciona todos os clipes sob a agulha em todas as pistas e adiciona à seleção existente (Shift+D) |
+| `Shift + E` | Ativar / Desativar Clipe (Mute / Bypass) | Alterna se o clipe selecionado (ou sob a agulha) está ativo ou desativado |
 
-O sistema monitora automaticamente o foco de digitação:
-* Ao focar em caixas de texto (Chatbot de IA, busca semântica, renomeação de mídias, edição de legendas/GCs), **todos os atalhos de playback e timeline são temporariamente suspensos**.
-* Ao pressionar `Esc` ou clicar fora do campo, os atalhos de edição NLE são reativados instantaneamente.
+#### 4. Marcadores
+
+| Atalho | Ação | Contexto/observação |
+| :--- | :--- | :--- |
+| `M` | Adicionar / Editar Marcador | Cria um novo marcador ou abre o popover de edição rápida no playhead |
+| `Shift + M` | Pular para o Próximo Marcador | Avança a agulha de reprodução até o marcador seguinte na timeline |
+| `Ctrl + Shift + M` ou `Alt + M` | Pular para o Marcador Anterior | Recua a agulha de reprodução até o marcador anterior na timeline |
+| `Ctrl + Shift + K` | Alternar Momento Crucial (Player / Galeria) | Marca ou desmarca o quadro atual como Momento Crucial para reprodução rápida em hover<br>**Atalho compartilhado, depende do contexto:** Lâmina Global na Agulha (Ctrl + Shift + K). |
+
+#### 5. Assistência de IA & Tomadas
+
+| Atalho | Ação | Contexto/observação |
+| :--- | :--- | :--- |
+| `Ctrl + Alt + B` | Alternar Detecção Facial no Source | Exibe ou oculta a camada visual de caixas de detecção facial e grounding no Monitor de Origem (Source) |
+| `Shift + T` ou `A` | Alternar Tomadas / Alternativas de IA | Abre o seletor de tomadas alternativas em clipes gerados por IA / Inspetor<br>**Atalho compartilhado, depende do contexto:** Selecionar Faixa para Frente (A). |
+| `Enter` ou `Y` | Aceitar Sugestão de IA | Aprova a sugestão da faixa fantasma de IA, tornando-a clipe real na trilha<br>**Atalho compartilhado, depende do contexto:** Renderizar Efeitos In para Out (Cache NLE) (Enter); Deslizar Conteúdo Interno (Slip Tool) (Y). |
+| `Del` ou `N` | Rejeitar Sugestão de IA | Descarta e remove a sugestão fantasma da timeline<br>**Atalho compartilhado, depende do contexto:** Corte Contínuo Adjacente (Rolling Edit) (N). |
+
+#### 6. Canvas, Zoom & Histórico
+
+| Atalho | Ação | Contexto/observação |
+| :--- | :--- | :--- |
+| `\` | Ajustar Sequência na Tela (Zoom to Fit) | Enquadra perfeitamente todos os clipes na timeline ou restaura o zoom anterior (Toggle) |
+| `+ / =` ou `Num +` | Aumentar Zoom na Linha do Tempo | Aproxima o zoom horizontal da régua e clipes da timeline<br>**Atalho compartilhado, depende do contexto:** Timeline: Aumentar Altura das Pistas (Num +). |
+| `-` ou `Num -` | Diminuir Zoom na Linha do Tempo | Afasta o zoom horizontal da régua e clipes da timeline<br>**Atalho compartilhado, depende do contexto:** Timeline: Diminuir Altura das Pistas (Num -). |
+| `Ctrl + 1` | Restaurar Zoom Padrão (1:1 / 0.5 px/f) | Restaura a escala da régua e dos clipes para o zoom padrão de 0.5 pixels por frame |
+| `Ctrl + Alt + P` | Alternar 'Seleção Acompanha a Agulha' | Ativa ou desativa a seleção automática do clipe sob a agulha ao se mover |
+| `Ctrl + Alt + F` | Alternar 'Timeline Segue a Agulha' (Auto-Scroll) | Ativa ou desativa a rolagem automática da timeline para acompanhar o cursor de reprodução |
+| `Ctrl + Shift + L` ou `Shift + L` | Travar / Destravar Pista Ativa (Track Lock) | Ativa ou desativa o cadeado físico de proteção total na pista selecionada |
+| `Ctrl + Alt + Shift + L` | Travar / Destravar Todas as Pistas | Alterna o cadeado físico em todas as pistas de vídeo, áudio e texto da timeline |
+| `Ctrl + Shift + G` | Alternar Margens de Segurança & Guias no Player (Safe Margins) | Exibe ou oculta o overlay vetorial de Action Safe (90%), Title Safe (80%), Cruz Central e Máscaras de Proporção no Monitor de Programa |
+| `Ctrl + Alt + G` | Alternar Máscara de Proporção no Player (16:9 / 9:16 / 1:1 / 2.39:1) | Alterna ciclicamente entre as máscaras de proporção de aspecto (16:9, 9:16, 1:1, 2.39:1, 4:5, 4:3, Sem Máscara) no Monitor de Programa |
+| `Ctrl + Z` | Desfazer Ação (Undo) | Desfaz a última alteração realizada na timeline |
+| `Ctrl + Shift + Z` ou `Ctrl + Y` | Refazer Ação (Redo) | Refaz a edição desfeita anteriormente |
+| `Ctrl + Shift + S` | Salvar Preset de Workspace | Abre o diálogo para salvar o layout visual atual da interface |
+
+#### 7. Layout & Workspace (Numpad)
+
+| Atalho | Ação | Contexto/observação |
+| :--- | :--- | :--- |
+| `Ctrl + Alt + Z` | Desfazer Mudança de Layout | Desfaz a última mudança na disposição dos painéis (histórico separado do da timeline) |
+| `Ctrl + Alt + Shift + Z` | Refazer Mudança de Layout | Refaz a mudança de layout desfeita anteriormente |
+| `Num 1` | Timeline: Expansão Direcional Esquerda | Alterna a expansão da timeline sob a sidebar esquerda (bottom-left ↔ center) |
+| `Alt + Num 1` | Timeline: Toggle Cabeçalho de Pistas | Oculta ou exibe a área de faixas e timecode da timeline (Track Headers) |
+| `Num 2` | Timeline: Alternar Centro ↔ Faixa Total | Alterna a timeline entre entre menus (center) e largura total na base (bottom-full) |
+| `Alt + Num 2` | Timeline: Recolher / Restaurar Verticalmente | Recolhe ou expande o painel da timeline para a linha restauradora na base |
+| `Ctrl + Num 2` | Timeline: Destacar / Reanexar Janela | Abre a timeline em janela flutuante para o segundo monitor ou a reanexa |
+| `Num 3` | Timeline: Expansão Direcional Direita | Alterna a expansão da timeline sob a sidebar direita (bottom-right ↔ center) |
+| `Alt + Num 3` | Timeline: Toggle Barra de Ferramentas | Recolhe ou expande a barra vertical de ferramentas de corte (V, C, Trims) |
+| `Num 4` | Biblioteca: Ocultar / Exibir | Recolhe ou expande a sidebar esquerda (Biblioteca de mídias, temas, rostos) |
+| `Alt + Num 4` | Biblioteca: Layout Estúdio (Maximizar) | Maximiza a biblioteca no layout estúdio com timeline e players empilhados |
+| `Ctrl + Num 4` | Biblioteca: Destacar / Reanexar Janela | Abre a biblioteca em janela flutuante externa ou a reanexa |
+| `Num 5` | Inspetor: Ocultar / Exibir | Recolhe ou expande o painel de Ajustes & Efeitos (Inspetor) |
+| `Alt + Num 5` | Inspetor: Maximizar / Restaurar | Maximiza o painel de Ajustes & Efeitos no espaço disponível |
+| `Ctrl + Num 5` | Inspetor: Destacar / Reanexar Janela | Abre o Inspetor em janela flutuante externa ou o reanexa |
+| `Num 6` | Painel Direito: Ocultar / Exibir | Recolhe ou expande a sidebar direita (Transcrição, Visão IA, Tarefas, Logs) |
+| `Alt + Num 6` | Painel Direito: Maximizar / Restaurar | Maximiza a sidebar direita no espaço disponível |
+| `Ctrl + Num 6` | Painel Direito: Destacar / Reanexar Janela | Abre a sidebar direita em janela flutuante externa ou a reanexa |
+| `Num 7` | Source Player: Ocultar / Exibir | Oculta ou exibe o monitor de origem (Source Player) |
+| `Alt + Num 7` | Source Player: Maximizar / Restaurar | Maximiza o monitor de origem no palco central |
+| `Ctrl + Num 7` | Source Player: Destacar / Reanexar Janela | Abre o monitor de origem em janela flutuante externa ou o reanexa |
+| `Num 8` | Header Geral: Ocultar / Exibir | Recolhe ou expande o cabeçalho superior da aplicação para ganhar espaço vertical |
+| `Num 9` | Program Player: Ocultar / Exibir | Oculta ou exibe o monitor de programa (Program Player) |
+| `Alt + Num 9` | Program Player: Maximizar / Restaurar | Maximiza o monitor de programa no palco central |
+| `Ctrl + Num 9` | Program Player: Destacar / Reanexar Janela | Abre o monitor de programa em janela flutuante externa ou o reanexa |
+| `Num 0` | Modo Foco / Cinema / Zen | Macro global: recolhe ou restaura Header e todas as Sidebars simultaneamente |
+| `Num .` | Timeline: Toggle Cabeçalho Superior | Recolhe ou restaura a barra superior de nome, zoom e sequência da timeline |
+| `Num +` | Timeline: Aumentar Altura das Pistas | Aumenta a altura das faixas de áudio e vídeo na timeline (+10px)<br>**Atalho compartilhado, depende do contexto:** Aumentar Zoom na Linha do Tempo (Num +). |
+| `Num -` | Timeline: Diminuir Altura das Pistas | Diminui a altura das faixas de áudio e vídeo na timeline (-10px)<br>**Atalho compartilhado, depende do contexto:** Diminuir Zoom na Linha do Tempo (Num -). |
+| `Num /` | Monitores: Alternar Lado a Lado / Empilhados | Alterna a disposição dos monitores entre horizontal e vertical |
+| `Num *` | Monitores: Swap / Alternar Foco | Alterna o foco ativo entre o Monitor Source e o Monitor Program |
+| `Num Enter` | Maximizar / Restaurar Painel sob Foco | Maximiza ou restaura o painel ativo ou sob o cursor |
+| `Ctrl + Alt + 1` ou `Ctrl + Alt + Num 1` | Workspace: Carregar Slot 1 | Carrega instantaneamente o layout salvo no slot numérico 1 (Ctrl + Alt + 1) |
+| `Ctrl + Alt + 2` ou `Ctrl + Alt + Num 2` | Workspace: Carregar Slot 2 | Carrega instantaneamente o layout salvo no slot numérico 2 (Ctrl + Alt + 2) |
+| `Ctrl + Alt + 3` ou `Ctrl + Alt + Num 3` | Workspace: Carregar Slot 3 | Carrega instantaneamente o layout salvo no slot numérico 3 (Ctrl + Alt + 3) |
+| `Ctrl + Alt + 4` ou `Ctrl + Alt + Num 4` | Workspace: Carregar Slot 4 | Carrega instantaneamente o layout salvo no slot numérico 4 (Ctrl + Alt + 4) |
+| `Ctrl + Alt + 5` ou `Ctrl + Alt + Num 5` | Workspace: Carregar Slot 5 | Carrega instantaneamente o layout salvo no slot numérico 5 (Ctrl + Alt + 5) |
+| `Ctrl + Alt + 6` ou `Ctrl + Alt + Num 6` | Workspace: Carregar Slot 6 | Carrega instantaneamente o layout salvo no slot numérico 6 (Ctrl + Alt + 6) |
+| `Ctrl + Alt + 7` ou `Ctrl + Alt + Num 7` | Workspace: Carregar Slot 7 | Carrega instantaneamente o layout salvo no slot numérico 7 (Ctrl + Alt + 7) |
+| `Ctrl + Alt + 8` ou `Ctrl + Alt + Num 8` | Workspace: Carregar Slot 8 | Carrega instantaneamente o layout salvo no slot numérico 8 (Ctrl + Alt + 8) |
+| `Ctrl + Alt + 9` ou `Ctrl + Alt + Num 9` | Workspace: Carregar Slot 9 | Carrega instantaneamente o layout salvo no slot numérico 9 (Ctrl + Alt + 9) |
+| `Ctrl + Alt + Shift + 1` ou `Ctrl + Alt + Shift + Num 1` | Workspace: Salvar no Slot 1 | Grava a disposição atual diretamente no slot numérico 1 (Ctrl + Alt + Shift + 1) |
+| `Ctrl + Alt + Shift + 2` ou `Ctrl + Alt + Shift + Num 2` | Workspace: Salvar no Slot 2 | Grava a disposição atual diretamente no slot numérico 2 (Ctrl + Alt + Shift + 2) |
+| `Ctrl + Alt + Shift + 3` ou `Ctrl + Alt + Shift + Num 3` | Workspace: Salvar no Slot 3 | Grava a disposição atual diretamente no slot numérico 3 (Ctrl + Alt + Shift + 3) |
+| `Ctrl + Alt + Shift + 4` ou `Ctrl + Alt + Shift + Num 4` | Workspace: Salvar no Slot 4 | Grava a disposição atual diretamente no slot numérico 4 (Ctrl + Alt + Shift + 4) |
+| `Ctrl + Alt + Shift + 5` ou `Ctrl + Alt + Shift + Num 5` | Workspace: Salvar no Slot 5 | Grava a disposição atual diretamente no slot numérico 5 (Ctrl + Alt + Shift + 5) |
+| `Ctrl + Alt + Shift + 6` ou `Ctrl + Alt + Shift + Num 6` | Workspace: Salvar no Slot 6 | Grava a disposição atual diretamente no slot numérico 6 (Ctrl + Alt + Shift + 6) |
+| `Ctrl + Alt + Shift + 7` ou `Ctrl + Alt + Shift + Num 7` | Workspace: Salvar no Slot 7 | Grava a disposição atual diretamente no slot numérico 7 (Ctrl + Alt + Shift + 7) |
+| `Ctrl + Alt + Shift + 8` ou `Ctrl + Alt + Shift + Num 8` | Workspace: Salvar no Slot 8 | Grava a disposição atual diretamente no slot numérico 8 (Ctrl + Alt + Shift + 8) |
+| `Ctrl + Alt + Shift + 9` ou `Ctrl + Alt + Shift + Num 9` | Workspace: Salvar no Slot 9 | Grava a disposição atual diretamente no slot numérico 9 (Ctrl + Alt + Shift + 9) |
+
+### Perfil DaVinci Resolve
+
+> Alguns atalhos aparecem em mais de uma ação neste perfil. Isso é intencional: a ação executada depende do contexto (painel em foco, ferramenta ativa, elemento sob o mouse, sugestão ou clipe fantasma ativo). A coluna de observação indica com quais ações o atalho é compartilhado.
+
+#### 1. Reprodução & Navegação
+
+| Atalho | Ação | Contexto/observação |
+| :--- | :--- | :--- |
+| `Espaço` | Play / Pause | Inicia ou pausa a reprodução no player ativo (Source ou Program) |
+| `J` | Shuttle Reverso (J) | Reproduz para trás. Pressionar repetidamente acelera a velocidade (1x, 2x, 4x, 8x) |
+| `K` | Shuttle Play / Pause (K) | Alterna entre reproduzir e pausar a reprodução (segure K com J ou L para avançar/recuar quadro a quadro) |
+| `L` | Shuttle Avanço (L) | Reproduz para frente. Pressionar repetidamente acelera a velocidade (1x, 2x, 4x, 8x) |
+| `Shift + →` | Shuttle Acelerado / Avanço Rápido (Shift + →) | Reproduz acelerado para frente. Toques repetidos aumentam a velocidade (igual JKL); segurar reproduz acelerado enquanto pressionado |
+| `Shift + ←` | Shuttle Acelerado / Recuo Rápido (Shift + ←) | Reproduz acelerado para trás. Toques repetidos aumentam a velocidade reversa; segurar reproduz acelerado enquanto pressionado |
+| `Ctrl + →` | Câmera Lenta Avanço (Ctrl + →) | Reproduz em câmera lenta para frente (0.25x). Segurar reproduz enquanto pressionado |
+| `Ctrl + ←` | Câmera Lenta Recuo (Ctrl + ←) | Reproduz em câmera lenta reversa (-0.25x). Segurar reproduz enquanto pressionado |
+| `K + J` ou `←` | Jog Recuar 1 Frame (K + J) | Segure K e pressione J para recuar exatamente 1 frame<br>**Atalho compartilhado, depende do contexto:** Navegar 1 Frame para Trás (←). |
+| `←` | Navegar 1 Frame para Trás | Move a agulha 1 frame para trás (quando nenhum clipe estiver selecionado)<br>**Atalho compartilhado, depende do contexto:** Jog Recuar 1 Frame (K + J) (←). |
+| `K + L` ou `→` | Jog Avançar 1 Frame (K + L) | Segure K e pressione L para avançar exatamente 1 frame<br>**Atalho compartilhado, depende do contexto:** Navegar 1 Frame para Frente (→). |
+| `→` | Navegar 1 Frame para Frente | Move a agulha 1 frame para frente (quando nenhum clipe estiver selecionado)<br>**Atalho compartilhado, depende do contexto:** Jog Avançar 1 Frame (K + L) (→). |
+| `I` | Marcar Ponto de Entrada (IN) | Define o ponto inicial de corte no Player ou Linha do Tempo |
+| `O` | Marcar Ponto de Saída (OUT) | Define o ponto final de corte no Player ou Linha do Tempo |
+| `Alt + I` | Limpar Ponto IN | Remove o ponto de entrada (IN) no Player ou Linha do Tempo |
+| `Alt + O` | Limpar Ponto OUT | Remove o ponto de saída (OUT) no Player ou Linha do Tempo |
+| `Alt + X` | Limpar Pontos IN e OUT | Remove ambos os pontos de entrada e saída (IN e OUT) |
+| `X` | Marcar Clipe (IN / OUT) | Define pontos IN e OUT nos limites do clipe selecionado ou sob a agulha |
+| `Shift + I` | Ir para o Ponto IN | Move a agulha de reprodução diretamente para o ponto IN |
+| `Shift + O` | Ir para o Ponto OUT | Move a agulha de reprodução diretamente para o ponto OUT |
+| `Alt + /` ou `Shift + Espaço` | Tocar de IN até OUT | Reproduz o trecho delimitado entre os pontos IN e OUT e pausa |
+| `Ctrl + /` ou `Ctrl + L` | Alternar Reprodução em Loop | Liga ou desliga a reprodução contínua em loop entre os pontos IN e OUT |
+| `Shift + F12` ou `E` | Inserir na Timeline (Append) | Insere o trecho marcado (IN ➔ OUT) na timeline |
+| `↑` | Pular para Ponto Anterior / Início | Program: move a agulha para o corte anterior; Source: vai para IN ou Início |
+| `↓` | Pular para Próximo Ponto / Fim | Program: move a agulha para o corte seguinte; Source: vai para OUT ou Fim |
+| `Ctrl + G` | Ir para Timecode / Navegação Numérica | Ativa a entrada de timecode para salto absoluto ou navegação relativa (+/- frames) |
+
+#### 2. Ferramentas & Modos
+
+| Atalho | Ação | Contexto/observação |
+| :--- | :--- | :--- |
+| `A` | Ferramenta de Seleção | Ativa a ferramenta de seleção padrão da timeline (Seta)<br>**Atalho compartilhado, depende do contexto:** Alternar Tomadas / Alternativas de IA (A). |
+| `Shift + A` | Seleção por Caixa / Retângulo (Marquee) | Ativa a ferramenta de seleção por retângulo (arraste para selecionar clipes e marcadores) |
+| `B` | Ferramenta Lâmina / Gilete (Blade) | Ativa a ferramenta de corte de precisão por cursor na trilha |
+| `Shift + B` ou `Ctrl + Shift + \` | Lâmina Global na Agulha | Fatia todas as pistas destravadas na coordenada da agulha de reprodução |
+| `Shift + Y` ou `Y` | Deslizar Conteúdo Interno (Slip Tool) | Desliza os pontos IN e OUT da mídia bruta mantendo a posição e duração na timeline<br>**Atalho compartilhado, depende do contexto:** Selecionar Faixa para Frente (Y); Aceitar Sugestão de IA (Y). |
+| `Y` | Selecionar Faixa para Frente | Ativa a ferramenta de seleção de todos os clipes à direita<br>**Atalho compartilhado, depende do contexto:** Deslizar Conteúdo Interno (Slip Tool) (Y); Aceitar Sugestão de IA (Y). |
+| `U` | Deslizar Posição na Timeline (Slide Tool) | Move o clipe na timeline mantendo seu conteúdo intacto e compensando nos vizinhos adjacentes |
+| `N` ou `T` | Corte Contínuo Adjacente (Rolling Edit) | Ajusta o ponto de corte entre dois clipes contíguos sem alterar a duração total da sequência<br>**Atalho compartilhado, depende do contexto:** Rejeitar Sugestão de IA (N); Alternar Tomadas / Alternativas de IA (T). |
+| `R` ou `Shift + R` | Esticar / Comprimir Taxa de Velocidade (Rate Stretch) | Altera a velocidade do clipe arrastando suas bordas para esticar ou comprimir a taxa temporal<br>**Atalho compartilhado, depende do contexto:** Girar Mídia sob Cursor (+90°) (R). |
+| `R` | Girar Mídia sob Cursor (+90°) | Rotaciona a mídia sob o cursor (hover) na biblioteca ou no monitor de origem<br>**Atalho compartilhado, depende do contexto:** Esticar / Comprimir Taxa de Velocidade (Rate Stretch) (R). |
+| `Ctrl + Y` | Selecionar Faixa para Trás | Ativa a ferramenta de seleção de todos os clipes à esquerda<br>**Atalho compartilhado, depende do contexto:** Refazer Ação (Redo) (Ctrl + Y). |
+| `Shift + N` ou `S` | Alternar Snapping Magnético | Liga ou desliga o alinhamento magnético inteligente de bordas e agulha |
+| `H` | Ferramenta Mão / Pan | Ativa a ferramenta de navegação e arrasto contínuo da timeline (Pan) |
+| `Z` | Ferramenta Zoom / Lupa | Ativa a ferramenta de aproximação e afastamento por clique |
+| `Esc` | Desmarcar Seleção / Fechar Caixas | Limpa a seleção de clipes ou fecha pop-ups contextuais e modais |
+
+#### 3. Edição, Cortes & Trims
+
+| Atalho | Ação | Contexto/observação |
+| :--- | :--- | :--- |
+| `F9` ou `,` | Inserir na Agulha (Ripple Insert) | Insere o trecho marcado no monitor Source na coordenada da agulha empurrando os clipes subsequentes |
+| `F10` ou `.` | Sobrescrever na Agulha (Overwrite Edit) | Insere o trecho marcado no monitor Source na coordenada da agulha substituindo o material sob o intervalo |
+| `Ctrl + Alt + A` | Alternar Canais na Inserção (AV / V / A) | Alterna os canais transferidos do monitor Source para a Timeline: Áudio+Vídeo (AV), Somente Vídeo (V) ou Somente Áudio (A) |
+| `F` | Localizar Quadro Original na Fonte (Match Frame) | Localiza a mídia bruta correspondente ao quadro sob a agulha da timeline e abre no Source Player marcando os pontos IN–OUT originais |
+| `Shift + F` | Localizar Quadro na Timeline (Reverse Match Frame) | Localiza onde o quadro atual sob a agulha do Source Player está sendo utilizado na timeline ativa e salta a agulha para a posição correspondente |
+| `Ctrl + Shift + R` | Substituir Clipe na Timeline (Replace Edit) | Substitui a mídia do clipe alvo (selecionado, sob a agulha ou sob o cursor com Alt no arraste) preservando duração exata, efeitos (Ken Burns), cor e velocidade |
+| `Ctrl + U` | Criar Subclipe na Biblioteca (Make Subclip) | Gera um novo item virtual na biblioteca a partir do intervalo [IN–OUT] delimitado no monitor Source |
+| `Ctrl + Shift + F` | Congelar Quadro (Freeze Frame) | Captura o quadro sob a agulha e insere um segmento estático na timeline (Ctrl+Shift+F) |
+| `Ctrl + R` | Velocidade / Duração do Clipe (Speed / Duration) | Abre o diálogo de velocidade percentual, duração proporcional e reversão do clipe selecionado (Ctrl+R) |
+| `Ctrl + Alt + R` ou `Cmd + Alt + R` | Preencher Espaço na Trilha (Fit to Gap) | Estende a duração do clipe ajustando a velocidade para preencher automaticamente o espaço vazio adjacente na pista (Ctrl+Alt+R) |
+| `Alt + T` ou `Ctrl + Shift + D` | Crossfade de Áudio (Potência Constante) | Aplica transição de crossfade de áudio de potência constante (Equal-Power) na emenda entre clipes contíguos ou no clipe selecionado (Ctrl+Shift+D) |
+| `Ctrl + T` ou `Ctrl + D` | Transição de Vídeo Padrão (Cross Dissolve) | Aplica transição de vídeo (Cross Dissolve, Dip to Black ou Dip to White) na emenda contígua sob a agulha ou entre os clipes selecionados (Ctrl+D) |
+| `Enter` | Renderizar Efeitos In para Out (Cache NLE) | Pré-renderiza o intervalo da timeline (In-Out ou trechos pesados) para playback suave em cache (Enter)<br>**Atalho compartilhado, depende do contexto:** Aceitar Sugestão de IA (Enter). |
+| `Ctrl + \` | Dividir Clipe no Playhead (Split) | Fatia o clipe sob a agulha de reprodução (ou o clipe selecionado) |
+| `Shift + [` ou `Q` | Ripple Trim Início (Até a Agulha) | Corta o início do clipe até a agulha e fecha o espaço na timeline |
+| `Shift + ]` ou `W` | Ripple Trim Fim (Da Agulha ao Fim) | Corta da agulha até o final do clipe e fecha o espaço na timeline |
+| `Backspace` | Lift Delete (Apagar Clipe) | Apaga o clipe selecionado deixando o espaço vazio (gap) intacto<br>**Atalho compartilhado, depende do contexto:** Lift no Intervalo IN–OUT (Backspace). |
+| `Backspace` ou `Semicolon` | Lift no Intervalo IN–OUT | Apaga o conteúdo dentro do intervalo IN–OUT nas pistas ativas deixando o espaço vazio (gap)<br>**Atalho compartilhado, depende do contexto:** Lift Delete (Apagar Clipe) (Backspace). |
+| `Shift + Backspace` ou `Del` | Ripple Delete (Apagar e Fechar Espaço) | Apaga o clipe e puxa todos os clipes posteriores para fechar a lacuna<br>**Atalho compartilhado, depende do contexto:** Extract (Ripple Delete) no Intervalo IN–OUT (Shift + Backspace); Rejeitar Sugestão de IA (Del). |
+| `Shift + Backspace` ou `Quote` | Extract (Ripple Delete) no Intervalo IN–OUT | Apaga o conteúdo dentro do intervalo IN–OUT e puxa os clipes posteriores para fechar o espaço<br>**Atalho compartilhado, depende do contexto:** Ripple Delete (Apagar e Fechar Espaço) (Shift + Backspace). |
+| `Alt + Del` ou `Alt + Backspace` | Apagar Faixa Única (Desvincular Par) | Apaga apenas o vídeo ou o áudio selecionado, preservando o outro fluxo |
+| `Ctrl + Alt + L` | Desvincular Par Áudio/Vídeo | Quebra a vinculação estrita entre o vídeo e seu par de áudio correspondente |
+| `Alt + ←` | Nudge: Deslocar 1 Frame para Trás | Move o clipe selecionado 1 frame para a esquerda na timeline |
+| `Alt + →` | Nudge: Deslocar 1 Frame para Frente | Move o clipe selecionado 1 frame para a direita na timeline |
+| `Shift + ,` | Trim Ponto IN: Recuar 1 Frame | Expande ou contrai a ponta inicial do clipe selecionado em 1 frame |
+| `Shift + .` | Trim Ponto IN: Avançar 1 Frame | Avança a ponta inicial do clipe selecionado em 1 frame |
+| `Ctrl + ,` | Trim Ponto OUT: Recuar 1 Frame | Recua a ponta final do clipe selecionado em 1 frame |
+| `Ctrl + .` | Trim Ponto OUT: Avançar 1 Frame | Avança a ponta final do clipe selecionado em 1 frame |
+| `D` | Selecionar Clipe sob a Agulha | Seleciona o clipe na trilha ativa posicionado sob a agulha de reprodução (D)<br>**Atalho compartilhado, depende do contexto:** Ativar / Desativar Clipe (Mute / Bypass) (D). |
+| `D` | Ativar / Desativar Clipe (Mute / Bypass) | Alterna se o clipe selecionado (ou sob a agulha) está ativo ou desativado<br>**Atalho compartilhado, depende do contexto:** Selecionar Clipe sob a Agulha (D). |
+| `Shift + D` | Multi-Seleção na Agulha (Adicionar à Seleção) | Seleciona todos os clipes sob a agulha em todas as pistas e adiciona à seleção existente (Shift+D) |
+
+#### 4. Marcadores
+
+| Atalho | Ação | Contexto/observação |
+| :--- | :--- | :--- |
+| `M` | Adicionar / Editar Marcador | Cria um novo marcador ou abre o popover de edição rápida no playhead |
+| `Shift + M` | Pular para o Próximo Marcador | Avança a agulha de reprodução até o marcador seguinte na timeline |
+| `Alt + M` | Pular para o Marcador Anterior | Recua a agulha de reprodução até o marcador anterior na timeline |
+| `Ctrl + Shift + K` | Alternar Momento Crucial (Player / Galeria) | Marca ou desmarca o quadro atual como Momento Crucial para reprodução rápida em hover |
+
+#### 5. Assistência de IA & Tomadas
+
+| Atalho | Ação | Contexto/observação |
+| :--- | :--- | :--- |
+| `Ctrl + Alt + B` | Alternar Detecção Facial no Source | Exibe ou oculta a camada visual de caixas de detecção facial e grounding no Monitor de Origem (Source) |
+| `T` ou `A` | Alternar Tomadas / Alternativas de IA | Abre o seletor de tomadas alternativas em clipes gerados por IA / Inspetor<br>**Atalho compartilhado, depende do contexto:** Corte Contínuo Adjacente (Rolling Edit) (T); Ferramenta de Seleção (A). |
+| `Enter` ou `Y` | Aceitar Sugestão de IA | Aprova a sugestão da faixa fantasma de IA, tornando-a clipe real na trilha<br>**Atalho compartilhado, depende do contexto:** Renderizar Efeitos In para Out (Cache NLE) (Enter); Deslizar Conteúdo Interno (Slip Tool) (Y); Selecionar Faixa para Frente (Y). |
+| `Del` ou `N` | Rejeitar Sugestão de IA | Descarta e remove a sugestão fantasma da timeline<br>**Atalho compartilhado, depende do contexto:** Ripple Delete (Apagar e Fechar Espaço) (Del); Corte Contínuo Adjacente (Rolling Edit) (N). |
+
+#### 6. Canvas, Zoom & Histórico
+
+| Atalho | Ação | Contexto/observação |
+| :--- | :--- | :--- |
+| `Shift + Z` | Ajustar Sequência na Tela (Zoom to Fit) | Enquadra perfeitamente todos os clipes na timeline ou restaura o zoom anterior (Toggle) |
+| `Ctrl + + / =` ou `Ctrl + Num +` ou `Cmd + + / =` | Aumentar Zoom na Linha do Tempo | Aproxima o zoom horizontal da régua e clipes da timeline |
+| `Ctrl + -` ou `Ctrl + Num -` ou `Cmd + -` | Diminuir Zoom na Linha do Tempo | Afasta o zoom horizontal da régua e clipes da timeline |
+| `Shift + 1` | Restaurar Zoom Padrão (1:1 / 0.5 px/f) | Restaura a escala da régua e dos clipes para o zoom padrão de 0.5 pixels por frame |
+| `Ctrl + Alt + P` | Alternar 'Seleção Acompanha a Agulha' | Ativa ou desativa a seleção automática do clipe sob a agulha ao se mover |
+| `Ctrl + Alt + F` | Alternar 'Timeline Segue a Agulha' (Auto-Scroll) | Ativa ou desativa a rolagem automática da timeline para acompanhar o cursor de reprodução |
+| `Alt + Shift + L` ou `Shift + L` | Travar / Destravar Pista Ativa (Track Lock) | Ativa ou desativa o cadeado físico de proteção total na pista selecionada |
+| `Ctrl + Alt + Shift + L` | Travar / Destravar Todas as Pistas | Alterna o cadeado físico em todas as pistas de vídeo, áudio e texto da timeline |
+| `Ctrl + Shift + G` | Alternar Margens de Segurança & Guias no Player (Safe Margins) | Exibe ou oculta o overlay vetorial de Action Safe (90%), Title Safe (80%), Cruz Central e Máscaras de Proporção no Monitor de Programa |
+| `Ctrl + Alt + G` | Alternar Máscara de Proporção no Player (16:9 / 9:16 / 1:1 / 2.39:1) | Alterna ciclicamente entre as máscaras de proporção de aspecto (16:9, 9:16, 1:1, 2.39:1, 4:5, 4:3, Sem Máscara) no Monitor de Programa |
+| `Ctrl + Z` | Desfazer Ação (Undo) | Desfaz a última alteração realizada na timeline |
+| `Ctrl + Shift + Z` ou `Ctrl + Y` | Refazer Ação (Redo) | Refaz a edição desfeita anteriormente<br>**Atalho compartilhado, depende do contexto:** Selecionar Faixa para Trás (Ctrl + Y). |
+| `Ctrl + Shift + S` | Salvar Preset de Workspace | Abre o diálogo para salvar o layout visual atual da interface |
+
+#### 7. Layout & Workspace (Numpad)
+
+| Atalho | Ação | Contexto/observação |
+| :--- | :--- | :--- |
+| `Ctrl + Alt + Z` | Desfazer Mudança de Layout | Desfaz a última mudança na disposição dos painéis (histórico separado do da timeline) |
+| `Ctrl + Alt + Shift + Z` | Refazer Mudança de Layout | Refaz a mudança de layout desfeita anteriormente |
+| `Num 1` | Timeline: Expansão Direcional Esquerda | Alterna a expansão da timeline sob a sidebar esquerda (bottom-left ↔ center) |
+| `Alt + Num 1` | Timeline: Toggle Cabeçalho de Pistas | Oculta ou exibe a área de faixas e timecode da timeline (Track Headers) |
+| `Num 2` | Timeline: Alternar Centro ↔ Faixa Total | Alterna a timeline entre entre menus (center) e largura total na base (bottom-full) |
+| `Alt + Num 2` | Timeline: Recolher / Restaurar Verticalmente | Recolhe ou expande o painel da timeline para a linha restauradora na base |
+| `Ctrl + Num 2` | Timeline: Destacar / Reanexar Janela | Abre a timeline em janela flutuante para o segundo monitor ou a reanexa |
+| `Num 3` | Timeline: Expansão Direcional Direita | Alterna a expansão da timeline sob a sidebar direita (bottom-right ↔ center) |
+| `Alt + Num 3` | Timeline: Toggle Barra de Ferramentas | Recolhe ou expande a barra vertical de ferramentas de corte (V, C, Trims) |
+| `Num 4` | Biblioteca: Ocultar / Exibir | Recolhe ou expande a sidebar esquerda (Biblioteca de mídias, temas, rostos) |
+| `Alt + Num 4` | Biblioteca: Layout Estúdio (Maximizar) | Maximiza a biblioteca no layout estúdio com timeline e players empilhados |
+| `Ctrl + Num 4` | Biblioteca: Destacar / Reanexar Janela | Abre a biblioteca em janela flutuante externa ou a reanexa |
+| `Num 5` | Inspetor: Ocultar / Exibir | Recolhe ou expande o painel de Ajustes & Efeitos (Inspetor) |
+| `Alt + Num 5` | Inspetor: Maximizar / Restaurar | Maximiza o painel de Ajustes & Efeitos no espaço disponível |
+| `Ctrl + Num 5` | Inspetor: Destacar / Reanexar Janela | Abre o Inspetor em janela flutuante externa ou o reanexa |
+| `Num 6` | Painel Direito: Ocultar / Exibir | Recolhe ou expande a sidebar direita (Transcrição, Visão IA, Tarefas, Logs) |
+| `Alt + Num 6` | Painel Direito: Maximizar / Restaurar | Maximiza a sidebar direita no espaço disponível |
+| `Ctrl + Num 6` | Painel Direito: Destacar / Reanexar Janela | Abre a sidebar direita em janela flutuante externa ou a reanexa |
+| `Num 7` | Source Player: Ocultar / Exibir | Oculta ou exibe o monitor de origem (Source Player) |
+| `Alt + Num 7` | Source Player: Maximizar / Restaurar | Maximiza o monitor de origem no palco central |
+| `Ctrl + Num 7` | Source Player: Destacar / Reanexar Janela | Abre o monitor de origem em janela flutuante externa ou o reanexa |
+| `Num 8` | Header Geral: Ocultar / Exibir | Recolhe ou expande o cabeçalho superior da aplicação para ganhar espaço vertical |
+| `Num 9` | Program Player: Ocultar / Exibir | Oculta ou exibe o monitor de programa (Program Player) |
+| `Alt + Num 9` | Program Player: Maximizar / Restaurar | Maximiza o monitor de programa no palco central |
+| `Ctrl + Num 9` | Program Player: Destacar / Reanexar Janela | Abre o monitor de programa em janela flutuante externa ou o reanexa |
+| `Num 0` | Modo Foco / Cinema / Zen | Macro global: recolhe ou restaura Header e todas as Sidebars simultaneamente |
+| `Num .` | Timeline: Toggle Cabeçalho Superior | Recolhe ou restaura a barra superior de nome, zoom e sequência da timeline |
+| `Num +` | Timeline: Aumentar Altura das Pistas | Aumenta a altura das faixas de áudio e vídeo na timeline (+10px) |
+| `Num -` | Timeline: Diminuir Altura das Pistas | Diminui a altura das faixas de áudio e vídeo na timeline (-10px) |
+| `Num /` | Monitores: Alternar Lado a Lado / Empilhados | Alterna a disposição dos monitores entre horizontal e vertical |
+| `Num *` | Monitores: Swap / Alternar Foco | Alterna o foco ativo entre o Monitor Source e o Monitor Program |
+| `Num Enter` | Maximizar / Restaurar Painel sob Foco | Maximiza ou restaura o painel ativo ou sob o cursor |
+| `Ctrl + Alt + 1` ou `Ctrl + Alt + Num 1` | Workspace: Carregar Slot 1 | Carrega instantaneamente o layout salvo no slot numérico 1 (Ctrl + Alt + 1) |
+| `Ctrl + Alt + 2` ou `Ctrl + Alt + Num 2` | Workspace: Carregar Slot 2 | Carrega instantaneamente o layout salvo no slot numérico 2 (Ctrl + Alt + 2) |
+| `Ctrl + Alt + 3` ou `Ctrl + Alt + Num 3` | Workspace: Carregar Slot 3 | Carrega instantaneamente o layout salvo no slot numérico 3 (Ctrl + Alt + 3) |
+| `Ctrl + Alt + 4` ou `Ctrl + Alt + Num 4` | Workspace: Carregar Slot 4 | Carrega instantaneamente o layout salvo no slot numérico 4 (Ctrl + Alt + 4) |
+| `Ctrl + Alt + 5` ou `Ctrl + Alt + Num 5` | Workspace: Carregar Slot 5 | Carrega instantaneamente o layout salvo no slot numérico 5 (Ctrl + Alt + 5) |
+| `Ctrl + Alt + 6` ou `Ctrl + Alt + Num 6` | Workspace: Carregar Slot 6 | Carrega instantaneamente o layout salvo no slot numérico 6 (Ctrl + Alt + 6) |
+| `Ctrl + Alt + 7` ou `Ctrl + Alt + Num 7` | Workspace: Carregar Slot 7 | Carrega instantaneamente o layout salvo no slot numérico 7 (Ctrl + Alt + 7) |
+| `Ctrl + Alt + 8` ou `Ctrl + Alt + Num 8` | Workspace: Carregar Slot 8 | Carrega instantaneamente o layout salvo no slot numérico 8 (Ctrl + Alt + 8) |
+| `Ctrl + Alt + 9` ou `Ctrl + Alt + Num 9` | Workspace: Carregar Slot 9 | Carrega instantaneamente o layout salvo no slot numérico 9 (Ctrl + Alt + 9) |
+| `Ctrl + Alt + Shift + 1` ou `Ctrl + Alt + Shift + Num 1` | Workspace: Salvar no Slot 1 | Grava a disposição atual diretamente no slot numérico 1 (Ctrl + Alt + Shift + 1) |
+| `Ctrl + Alt + Shift + 2` ou `Ctrl + Alt + Shift + Num 2` | Workspace: Salvar no Slot 2 | Grava a disposição atual diretamente no slot numérico 2 (Ctrl + Alt + Shift + 2) |
+| `Ctrl + Alt + Shift + 3` ou `Ctrl + Alt + Shift + Num 3` | Workspace: Salvar no Slot 3 | Grava a disposição atual diretamente no slot numérico 3 (Ctrl + Alt + Shift + 3) |
+| `Ctrl + Alt + Shift + 4` ou `Ctrl + Alt + Shift + Num 4` | Workspace: Salvar no Slot 4 | Grava a disposição atual diretamente no slot numérico 4 (Ctrl + Alt + Shift + 4) |
+| `Ctrl + Alt + Shift + 5` ou `Ctrl + Alt + Shift + Num 5` | Workspace: Salvar no Slot 5 | Grava a disposição atual diretamente no slot numérico 5 (Ctrl + Alt + Shift + 5) |
+| `Ctrl + Alt + Shift + 6` ou `Ctrl + Alt + Shift + Num 6` | Workspace: Salvar no Slot 6 | Grava a disposição atual diretamente no slot numérico 6 (Ctrl + Alt + Shift + 6) |
+| `Ctrl + Alt + Shift + 7` ou `Ctrl + Alt + Shift + Num 7` | Workspace: Salvar no Slot 7 | Grava a disposição atual diretamente no slot numérico 7 (Ctrl + Alt + Shift + 7) |
+| `Ctrl + Alt + Shift + 8` ou `Ctrl + Alt + Shift + Num 8` | Workspace: Salvar no Slot 8 | Grava a disposição atual diretamente no slot numérico 8 (Ctrl + Alt + Shift + 8) |
+| `Ctrl + Alt + Shift + 9` ou `Ctrl + Alt + Shift + Num 9` | Workspace: Salvar no Slot 9 | Grava a disposição atual diretamente no slot numérico 9 (Ctrl + Alt + Shift + 9) |
+
+### Perfil Apple Final Cut Pro
+
+> Alguns atalhos aparecem em mais de uma ação neste perfil. Isso é intencional: a ação executada depende do contexto (painel em foco, ferramenta ativa, elemento sob o mouse, sugestão ou clipe fantasma ativo). A coluna de observação indica com quais ações o atalho é compartilhado.
+
+#### 1. Reprodução & Navegação
+
+| Atalho | Ação | Contexto/observação |
+| :--- | :--- | :--- |
+| `Espaço` | Play / Pause | Inicia ou pausa a reprodução no player ativo (Source ou Program) |
+| `J` | Shuttle Reverso (J) | Reproduz para trás. Pressionar repetidamente acelera a velocidade (1x, 2x, 4x, 8x) |
+| `K` | Shuttle Play / Pause (K) | Alterna entre reproduzir e pausar a reprodução (segure K com J ou L para avançar/recuar quadro a quadro) |
+| `L` | Shuttle Avanço (L) | Reproduz para frente. Pressionar repetidamente acelera a velocidade (1x, 2x, 4x, 8x) |
+| `Shift + →` | Shuttle Acelerado / Avanço Rápido (Shift + →) | Reproduz acelerado para frente. Toques repetidos aumentam a velocidade (igual JKL); segurar reproduz acelerado enquanto pressionado |
+| `Shift + ←` | Shuttle Acelerado / Recuo Rápido (Shift + ←) | Reproduz acelerado para trás. Toques repetidos aumentam a velocidade reversa; segurar reproduz acelerado enquanto pressionado |
+| `Ctrl + →` | Câmera Lenta Avanço (Ctrl + →) | Reproduz em câmera lenta para frente (0.25x). Segurar reproduz enquanto pressionado |
+| `Ctrl + ←` | Câmera Lenta Recuo (Ctrl + ←) | Reproduz em câmera lenta reversa (-0.25x). Segurar reproduz enquanto pressionado |
+| `K + J` ou `←` | Jog Recuar 1 Frame (K + J) | Segure K e pressione J para recuar exatamente 1 frame<br>**Atalho compartilhado, depende do contexto:** Navegar 1 Frame para Trás (←). |
+| `←` | Navegar 1 Frame para Trás | Move a agulha 1 frame para trás (quando nenhum clipe estiver selecionado)<br>**Atalho compartilhado, depende do contexto:** Jog Recuar 1 Frame (K + J) (←). |
+| `K + L` ou `→` | Jog Avançar 1 Frame (K + L) | Segure K e pressione L para avançar exatamente 1 frame<br>**Atalho compartilhado, depende do contexto:** Navegar 1 Frame para Frente (→). |
+| `→` | Navegar 1 Frame para Frente | Move a agulha 1 frame para frente (quando nenhum clipe estiver selecionado)<br>**Atalho compartilhado, depende do contexto:** Jog Avançar 1 Frame (K + L) (→). |
+| `I` | Marcar Ponto de Entrada (IN) | Define o ponto inicial de corte no Player ou Linha do Tempo |
+| `O` | Marcar Ponto de Saída (OUT) | Define o ponto final de corte no Player ou Linha do Tempo |
+| `Alt + I` | Limpar Ponto IN | Remove o ponto de entrada (IN) no Player ou Linha do Tempo |
+| `Alt + O` | Limpar Ponto OUT | Remove o ponto de saída (OUT) no Player ou Linha do Tempo |
+| `Alt + X` | Limpar Pontos IN e OUT | Remove ambos os pontos de entrada e saída (IN e OUT) |
+| `X` | Marcar Clipe (IN / OUT) | Define pontos IN e OUT nos limites do clipe selecionado ou sob a agulha |
+| `Shift + I` | Ir para o Ponto IN | Move a agulha de reprodução diretamente para o ponto IN |
+| `Shift + O` | Ir para o Ponto OUT | Move a agulha de reprodução diretamente para o ponto OUT |
+| `Alt + /` ou `Shift + Espaço` | Tocar de IN até OUT | Reproduz o trecho delimitado entre os pontos IN e OUT e pausa |
+| `Cmd + L` ou `Ctrl + L` | Alternar Reprodução em Loop | Liga ou desliga a reprodução contínua em loop entre os pontos IN e OUT |
+| `E` | Inserir na Timeline (Append) | Insere o trecho marcado (IN ➔ OUT) na timeline |
+| `↑` ou `[` | Pular para Ponto Anterior / Início | Program: move a agulha para o corte anterior; Source: vai para IN ou Início |
+| `↓` ou `]` | Pular para Próximo Ponto / Fim | Program: move a agulha para o corte seguinte; Source: vai para OUT ou Fim |
+| `Ctrl + P` ou `Ctrl + G` | Ir para Timecode / Navegação Numérica | Ativa a entrada de timecode para salto absoluto ou navegação relativa (+/- frames) |
+
+#### 2. Ferramentas & Modos
+
+| Atalho | Ação | Contexto/observação |
+| :--- | :--- | :--- |
+| `A` | Ferramenta de Seleção | Ativa a ferramenta de seleção padrão da timeline (Seta)<br>**Atalho compartilhado, depende do contexto:** Alternar Tomadas / Alternativas de IA (A). |
+| `Shift + A` | Seleção por Caixa / Retângulo (Marquee) | Ativa a ferramenta de seleção por retângulo (arraste para selecionar clipes e marcadores) |
+| `B` | Ferramenta Lâmina / Gilete (Blade) | Ativa a ferramenta de corte de precisão por cursor na trilha |
+| `Shift + B` ou `Cmd + Shift + B` ou `Ctrl + Shift + B` | Lâmina Global na Agulha | Fatia todas as pistas destravadas na coordenada da agulha de reprodução |
+| `Y` | Deslizar Conteúdo Interno (Slip Tool) | Desliza os pontos IN e OUT da mídia bruta mantendo a posição e duração na timeline<br>**Atalho compartilhado, depende do contexto:** Alternar Tomadas / Alternativas de IA (Y); Aceitar Sugestão de IA (Y). |
+| `U` | Deslizar Posição na Timeline (Slide Tool) | Move o clipe na timeline mantendo seu conteúdo intacto e compensando nos vizinhos adjacentes |
+| `N` ou `T` | Corte Contínuo Adjacente (Rolling Edit) | Ajusta o ponto de corte entre dois clipes contíguos sem alterar a duração total da sequência<br>**Atalho compartilhado, depende do contexto:** Rejeitar Sugestão de IA (N). |
+| `R` | Esticar / Comprimir Taxa de Velocidade (Rate Stretch) | Altera a velocidade do clipe arrastando suas bordas para esticar ou comprimir a taxa temporal<br>**Atalho compartilhado, depende do contexto:** Girar Mídia sob Cursor (+90°) (R). |
+| `R` | Girar Mídia sob Cursor (+90°) | Rotaciona a mídia sob o cursor (hover) na biblioteca ou no monitor de origem<br>**Atalho compartilhado, depende do contexto:** Esticar / Comprimir Taxa de Velocidade (Rate Stretch) (R). |
+| `P` | Selecionar Faixa para Frente | Ativa a ferramenta de seleção de todos os clipes à direita |
+| `Shift + P` | Selecionar Faixa para Trás | Ativa a ferramenta de seleção de todos os clipes à esquerda |
+| `Shift + N` ou `S` | Alternar Snapping Magnético | Liga ou desliga o alinhamento magnético inteligente de bordas e agulha |
+| `H` | Ferramenta Mão / Pan | Ativa a ferramenta de navegação e arrasto contínuo da timeline (Pan) |
+| `Z` | Ferramenta Zoom / Lupa | Ativa a ferramenta de aproximação e afastamento por clique |
+| `Esc` | Desmarcar Seleção / Fechar Caixas | Limpa a seleção de clipes ou fecha pop-ups contextuais e modais |
+
+#### 3. Edição, Cortes & Trims
+
+| Atalho | Ação | Contexto/observação |
+| :--- | :--- | :--- |
+| `W` ou `,` | Inserir na Agulha (Ripple Insert) | Insere o trecho marcado no monitor Source na coordenada da agulha empurrando os clipes subsequentes |
+| `D` ou `.` | Sobrescrever na Agulha (Overwrite Edit) | Insere o trecho marcado no monitor Source na coordenada da agulha substituindo o material sob o intervalo<br>**Atalho compartilhado, depende do contexto:** Selecionar Clipe sob a Agulha (D). |
+| `D` | Selecionar Clipe sob a Agulha | Seleciona o clipe na trilha ativa posicionado sob a agulha de reprodução (D)<br>**Atalho compartilhado, depende do contexto:** Sobrescrever na Agulha (Overwrite Edit) (D). |
+| `Ctrl + Alt + A` | Alternar Canais na Inserção (AV / V / A) | Alterna os canais transferidos do monitor Source para a Timeline: Áudio+Vídeo (AV), Somente Vídeo (V) ou Somente Áudio (A) |
+| `Shift + F` | Localizar Quadro Original na Fonte (Match Frame) | Localiza a mídia bruta correspondente ao quadro sob a agulha da timeline e abre no Source Player marcando os pontos IN–OUT originais |
+| `Alt + F` | Localizar Quadro na Timeline (Reverse Match Frame) | Localiza onde o quadro atual sob a agulha do Source Player está sendo utilizado na timeline ativa e salta a agulha para a posição correspondente |
+| `Ctrl + Shift + R` | Substituir Clipe na Timeline (Replace Edit) | Substitui a mídia do clipe alvo (selecionado, sob a agulha ou sob o cursor com Alt no arraste) preservando duração exata, efeitos (Ken Burns), cor e velocidade |
+| `Ctrl + U` | Criar Subclipe na Biblioteca (Make Subclip) | Gera um novo item virtual na biblioteca a partir do intervalo [IN–OUT] delimitado no monitor Source |
+| `Ctrl + Shift + F` | Congelar Quadro (Freeze Frame) | Captura o quadro sob a agulha e insere um segmento estático na timeline (Ctrl+Shift+F) |
+| `Ctrl + R` ou `Cmd + R` | Velocidade / Duração do Clipe (Speed / Duration) | Abre o diálogo de velocidade percentual, duração proporcional e reversão do clipe selecionado (Ctrl+R)<br>**Atalho compartilhado, depende do contexto:** Renderizar Efeitos In para Out (Cache NLE) (Ctrl + R). |
+| `Enter` ou `Ctrl + R` | Renderizar Efeitos In para Out (Cache NLE) | Pré-renderiza o intervalo da timeline (In-Out ou trechos pesados) para playback suave em cache (Enter)<br>**Atalho compartilhado, depende do contexto:** Aceitar Sugestão de IA (Enter); Velocidade / Duração do Clipe (Speed / Duration) (Ctrl + R). |
+| `Ctrl + Alt + R` ou `Cmd + Alt + R` | Preencher Espaço na Trilha (Fit to Gap) | Estende a duração do clipe ajustando a velocidade para preencher automaticamente o espaço vazio adjacente na pista (Ctrl+Alt+R) |
+| `Alt + Cmd + T` ou `Ctrl + Shift + D` | Crossfade de Áudio (Potência Constante) | Aplica transição de crossfade de áudio de potência constante (Equal-Power) na emenda entre clipes contíguos ou no clipe selecionado (Ctrl+Shift+D) |
+| `Cmd + T` ou `Ctrl + D` | Transição de Vídeo Padrão (Cross Dissolve) | Aplica transição de vídeo (Cross Dissolve, Dip to Black ou Dip to White) na emenda contígua sob a agulha ou entre os clipes selecionados (Ctrl+D) |
+| `Cmd + B` | Dividir Clipe no Playhead (Split) | Fatia o clipe sob a agulha de reprodução (ou o clipe selecionado) |
+| `Alt + [` ou `Q` | Ripple Trim Início (Até a Agulha) | Corta o início do clipe até a agulha e fecha o espaço na timeline |
+| `Alt + ]` | Ripple Trim Fim (Da Agulha ao Fim) | Corta da agulha até o final do clipe e fecha o espaço na timeline |
+| `Del` | Lift Delete (Apagar Clipe) | Apaga o clipe selecionado deixando o espaço vazio (gap) intacto<br>**Atalho compartilhado, depende do contexto:** Lift no Intervalo IN–OUT (Del); Rejeitar Sugestão de IA (Del). |
+| `Del` ou `Semicolon` | Lift no Intervalo IN–OUT | Apaga o conteúdo dentro do intervalo IN–OUT nas pistas ativas deixando o espaço vazio (gap)<br>**Atalho compartilhado, depende do contexto:** Lift Delete (Apagar Clipe) (Del); Rejeitar Sugestão de IA (Del). |
+| `Shift + Del` ou `Backspace` | Ripple Delete (Apagar e Fechar Espaço) | Apaga o clipe e puxa todos os clipes posteriores para fechar a lacuna<br>**Atalho compartilhado, depende do contexto:** Extract (Ripple Delete) no Intervalo IN–OUT (Shift + Del). |
+| `Shift + Del` ou `Quote` | Extract (Ripple Delete) no Intervalo IN–OUT | Apaga o conteúdo dentro do intervalo IN–OUT e puxa os clipes posteriores para fechar o espaço<br>**Atalho compartilhado, depende do contexto:** Ripple Delete (Apagar e Fechar Espaço) (Shift + Del). |
+| `Alt + Del` | Apagar Faixa Única (Desvincular Par) | Apaga apenas o vídeo ou o áudio selecionado, preservando o outro fluxo |
+| `Cmd + Shift + S` ou `Ctrl + Shift + S` | Desvincular Par Áudio/Vídeo | Quebra a vinculação estrita entre o vídeo e seu par de áudio correspondente<br>**Atalho compartilhado, depende do contexto:** Salvar Preset de Workspace (Ctrl + Shift + S). |
+| `Alt + ←` | Nudge: Deslocar 1 Frame para Trás | Move o clipe selecionado 1 frame para a esquerda na timeline |
+| `Alt + →` | Nudge: Deslocar 1 Frame para Frente | Move o clipe selecionado 1 frame para a direita na timeline |
+| `Shift + ,` | Trim Ponto IN: Recuar 1 Frame | Expande ou contrai a ponta inicial do clipe selecionado em 1 frame |
+| `Shift + .` | Trim Ponto IN: Avançar 1 Frame | Avança a ponta inicial do clipe selecionado em 1 frame |
+| `Alt + ,` | Trim Ponto OUT: Recuar 1 Frame | Recua a ponta final do clipe selecionado em 1 frame |
+| `Alt + .` | Trim Ponto OUT: Avançar 1 Frame | Avança a ponta final do clipe selecionado em 1 frame |
+| `Shift + D` | Multi-Seleção na Agulha (Adicionar à Seleção) | Seleciona todos os clipes sob a agulha em todas as pistas e adiciona à seleção existente (Shift+D) |
+| `V` | Ativar / Desativar Clipe (Mute / Bypass) | Alterna se o clipe selecionado (ou sob a agulha) está ativo ou desativado |
+
+#### 4. Marcadores
+
+| Atalho | Ação | Contexto/observação |
+| :--- | :--- | :--- |
+| `M` | Adicionar / Editar Marcador | Cria um novo marcador ou abre o popover de edição rápida no playhead |
+| `Ctrl + Quote` ou `Shift + M` | Pular para o Próximo Marcador | Avança a agulha de reprodução até o marcador seguinte na timeline |
+| `Ctrl + Semicolon` ou `Alt + M` | Pular para o Marcador Anterior | Recua a agulha de reprodução até o marcador anterior na timeline |
+| `Ctrl + Shift + K` | Alternar Momento Crucial (Player / Galeria) | Marca ou desmarca o quadro atual como Momento Crucial para reprodução rápida em hover |
+
+#### 5. Assistência de IA & Tomadas
+
+| Atalho | Ação | Contexto/observação |
+| :--- | :--- | :--- |
+| `Ctrl + Alt + B` | Alternar Detecção Facial no Source | Exibe ou oculta a camada visual de caixas de detecção facial e grounding no Monitor de Origem (Source) |
+| `Y` ou `A` | Alternar Tomadas / Alternativas de IA | Abre o seletor de tomadas alternativas em clipes gerados por IA / Inspetor<br>**Atalho compartilhado, depende do contexto:** Deslizar Conteúdo Interno (Slip Tool) (Y); Aceitar Sugestão de IA (Y); Ferramenta de Seleção (A). |
+| `Enter` ou `Y` | Aceitar Sugestão de IA | Aprova a sugestão da faixa fantasma de IA, tornando-a clipe real na trilha<br>**Atalho compartilhado, depende do contexto:** Renderizar Efeitos In para Out (Cache NLE) (Enter); Deslizar Conteúdo Interno (Slip Tool) (Y); Alternar Tomadas / Alternativas de IA (Y). |
+| `Del` ou `N` | Rejeitar Sugestão de IA | Descarta e remove a sugestão fantasma da timeline<br>**Atalho compartilhado, depende do contexto:** Lift Delete (Apagar Clipe) (Del); Lift no Intervalo IN–OUT (Del); Corte Contínuo Adjacente (Rolling Edit) (N). |
+
+#### 6. Canvas, Zoom & Histórico
+
+| Atalho | Ação | Contexto/observação |
+| :--- | :--- | :--- |
+| `Shift + Z` | Ajustar Sequência na Tela (Zoom to Fit) | Enquadra perfeitamente todos os clipes na timeline ou restaura o zoom anterior (Toggle) |
+| `Cmd + + / =` ou `Ctrl + + / =` | Aumentar Zoom na Linha do Tempo | Aproxima o zoom horizontal da régua e clipes da timeline |
+| `Cmd + -` ou `Ctrl + -` | Diminuir Zoom na Linha do Tempo | Afasta o zoom horizontal da régua e clipes da timeline |
+| `Shift + 1` | Restaurar Zoom Padrão (1:1 / 0.5 px/f) | Restaura a escala da régua e dos clipes para o zoom padrão de 0.5 pixels por frame |
+| `Ctrl + Alt + P` | Alternar 'Seleção Acompanha a Agulha' | Ativa ou desativa a seleção automática do clipe sob a agulha ao se mover |
+| `Ctrl + Alt + F` | Alternar 'Timeline Segue a Agulha' (Auto-Scroll) | Ativa ou desativa a rolagem automática da timeline para acompanhar o cursor de reprodução |
+| `Shift + L` | Travar / Destravar Pista Ativa (Track Lock) | Ativa ou desativa o cadeado físico de proteção total na pista selecionada |
+| `Ctrl + Alt + Shift + L` | Travar / Destravar Todas as Pistas | Alterna o cadeado físico em todas as pistas de vídeo, áudio e texto da timeline |
+| `Ctrl + Shift + G` | Alternar Margens de Segurança & Guias no Player (Safe Margins) | Exibe ou oculta o overlay vetorial de Action Safe (90%), Title Safe (80%), Cruz Central e Máscaras de Proporção no Monitor de Programa |
+| `Ctrl + Alt + G` | Alternar Máscara de Proporção no Player (16:9 / 9:16 / 1:1 / 2.39:1) | Alterna ciclicamente entre as máscaras de proporção de aspecto (16:9, 9:16, 1:1, 2.39:1, 4:5, 4:3, Sem Máscara) no Monitor de Programa |
+| `Ctrl + Z` | Desfazer Ação (Undo) | Desfaz a última alteração realizada na timeline |
+| `Ctrl + Shift + Z` ou `Ctrl + Y` | Refazer Ação (Redo) | Refaz a edição desfeita anteriormente |
+| `Ctrl + Shift + S` | Salvar Preset de Workspace | Abre o diálogo para salvar o layout visual atual da interface<br>**Atalho compartilhado, depende do contexto:** Desvincular Par Áudio/Vídeo (Ctrl + Shift + S). |
+
+#### 7. Layout & Workspace (Numpad)
+
+| Atalho | Ação | Contexto/observação |
+| :--- | :--- | :--- |
+| `Ctrl + Alt + Z` | Desfazer Mudança de Layout | Desfaz a última mudança na disposição dos painéis (histórico separado do da timeline) |
+| `Ctrl + Alt + Shift + Z` | Refazer Mudança de Layout | Refaz a mudança de layout desfeita anteriormente |
+| `Num 1` | Timeline: Expansão Direcional Esquerda | Alterna a expansão da timeline sob a sidebar esquerda (bottom-left ↔ center) |
+| `Alt + Num 1` | Timeline: Toggle Cabeçalho de Pistas | Oculta ou exibe a área de faixas e timecode da timeline (Track Headers) |
+| `Num 2` | Timeline: Alternar Centro ↔ Faixa Total | Alterna a timeline entre entre menus (center) e largura total na base (bottom-full) |
+| `Alt + Num 2` | Timeline: Recolher / Restaurar Verticalmente | Recolhe ou expande o painel da timeline para a linha restauradora na base |
+| `Ctrl + Num 2` | Timeline: Destacar / Reanexar Janela | Abre a timeline em janela flutuante para o segundo monitor ou a reanexa |
+| `Num 3` | Timeline: Expansão Direcional Direita | Alterna a expansão da timeline sob a sidebar direita (bottom-right ↔ center) |
+| `Alt + Num 3` | Timeline: Toggle Barra de Ferramentas | Recolhe ou expande a barra vertical de ferramentas de corte (V, C, Trims) |
+| `Num 4` | Biblioteca: Ocultar / Exibir | Recolhe ou expande a sidebar esquerda (Biblioteca de mídias, temas, rostos) |
+| `Alt + Num 4` | Biblioteca: Layout Estúdio (Maximizar) | Maximiza a biblioteca no layout estúdio com timeline e players empilhados |
+| `Ctrl + Num 4` | Biblioteca: Destacar / Reanexar Janela | Abre a biblioteca em janela flutuante externa ou a reanexa |
+| `Num 5` | Inspetor: Ocultar / Exibir | Recolhe ou expande o painel de Ajustes & Efeitos (Inspetor) |
+| `Alt + Num 5` | Inspetor: Maximizar / Restaurar | Maximiza o painel de Ajustes & Efeitos no espaço disponível |
+| `Ctrl + Num 5` | Inspetor: Destacar / Reanexar Janela | Abre o Inspetor em janela flutuante externa ou o reanexa |
+| `Num 6` | Painel Direito: Ocultar / Exibir | Recolhe ou expande a sidebar direita (Transcrição, Visão IA, Tarefas, Logs) |
+| `Alt + Num 6` | Painel Direito: Maximizar / Restaurar | Maximiza a sidebar direita no espaço disponível |
+| `Ctrl + Num 6` | Painel Direito: Destacar / Reanexar Janela | Abre a sidebar direita em janela flutuante externa ou a reanexa |
+| `Num 7` | Source Player: Ocultar / Exibir | Oculta ou exibe o monitor de origem (Source Player) |
+| `Alt + Num 7` | Source Player: Maximizar / Restaurar | Maximiza o monitor de origem no palco central |
+| `Ctrl + Num 7` | Source Player: Destacar / Reanexar Janela | Abre o monitor de origem em janela flutuante externa ou o reanexa |
+| `Num 8` | Header Geral: Ocultar / Exibir | Recolhe ou expande o cabeçalho superior da aplicação para ganhar espaço vertical |
+| `Num 9` | Program Player: Ocultar / Exibir | Oculta ou exibe o monitor de programa (Program Player) |
+| `Alt + Num 9` | Program Player: Maximizar / Restaurar | Maximiza o monitor de programa no palco central |
+| `Ctrl + Num 9` | Program Player: Destacar / Reanexar Janela | Abre o monitor de programa em janela flutuante externa ou o reanexa |
+| `Num 0` | Modo Foco / Cinema / Zen | Macro global: recolhe ou restaura Header e todas as Sidebars simultaneamente |
+| `Num .` | Timeline: Toggle Cabeçalho Superior | Recolhe ou restaura a barra superior de nome, zoom e sequência da timeline |
+| `Num +` | Timeline: Aumentar Altura das Pistas | Aumenta a altura das faixas de áudio e vídeo na timeline (+10px) |
+| `Num -` | Timeline: Diminuir Altura das Pistas | Diminui a altura das faixas de áudio e vídeo na timeline (-10px) |
+| `Num /` | Monitores: Alternar Lado a Lado / Empilhados | Alterna a disposição dos monitores entre horizontal e vertical |
+| `Num *` | Monitores: Swap / Alternar Foco | Alterna o foco ativo entre o Monitor Source e o Monitor Program |
+| `Num Enter` | Maximizar / Restaurar Painel sob Foco | Maximiza ou restaura o painel ativo ou sob o cursor |
+| `Ctrl + Alt + 1` ou `Ctrl + Alt + Num 1` | Workspace: Carregar Slot 1 | Carrega instantaneamente o layout salvo no slot numérico 1 (Ctrl + Alt + 1) |
+| `Ctrl + Alt + 2` ou `Ctrl + Alt + Num 2` | Workspace: Carregar Slot 2 | Carrega instantaneamente o layout salvo no slot numérico 2 (Ctrl + Alt + 2) |
+| `Ctrl + Alt + 3` ou `Ctrl + Alt + Num 3` | Workspace: Carregar Slot 3 | Carrega instantaneamente o layout salvo no slot numérico 3 (Ctrl + Alt + 3) |
+| `Ctrl + Alt + 4` ou `Ctrl + Alt + Num 4` | Workspace: Carregar Slot 4 | Carrega instantaneamente o layout salvo no slot numérico 4 (Ctrl + Alt + 4) |
+| `Ctrl + Alt + 5` ou `Ctrl + Alt + Num 5` | Workspace: Carregar Slot 5 | Carrega instantaneamente o layout salvo no slot numérico 5 (Ctrl + Alt + 5) |
+| `Ctrl + Alt + 6` ou `Ctrl + Alt + Num 6` | Workspace: Carregar Slot 6 | Carrega instantaneamente o layout salvo no slot numérico 6 (Ctrl + Alt + 6) |
+| `Ctrl + Alt + 7` ou `Ctrl + Alt + Num 7` | Workspace: Carregar Slot 7 | Carrega instantaneamente o layout salvo no slot numérico 7 (Ctrl + Alt + 7) |
+| `Ctrl + Alt + 8` ou `Ctrl + Alt + Num 8` | Workspace: Carregar Slot 8 | Carrega instantaneamente o layout salvo no slot numérico 8 (Ctrl + Alt + 8) |
+| `Ctrl + Alt + 9` ou `Ctrl + Alt + Num 9` | Workspace: Carregar Slot 9 | Carrega instantaneamente o layout salvo no slot numérico 9 (Ctrl + Alt + 9) |
+| `Ctrl + Alt + Shift + 1` ou `Ctrl + Alt + Shift + Num 1` | Workspace: Salvar no Slot 1 | Grava a disposição atual diretamente no slot numérico 1 (Ctrl + Alt + Shift + 1) |
+| `Ctrl + Alt + Shift + 2` ou `Ctrl + Alt + Shift + Num 2` | Workspace: Salvar no Slot 2 | Grava a disposição atual diretamente no slot numérico 2 (Ctrl + Alt + Shift + 2) |
+| `Ctrl + Alt + Shift + 3` ou `Ctrl + Alt + Shift + Num 3` | Workspace: Salvar no Slot 3 | Grava a disposição atual diretamente no slot numérico 3 (Ctrl + Alt + Shift + 3) |
+| `Ctrl + Alt + Shift + 4` ou `Ctrl + Alt + Shift + Num 4` | Workspace: Salvar no Slot 4 | Grava a disposição atual diretamente no slot numérico 4 (Ctrl + Alt + Shift + 4) |
+| `Ctrl + Alt + Shift + 5` ou `Ctrl + Alt + Shift + Num 5` | Workspace: Salvar no Slot 5 | Grava a disposição atual diretamente no slot numérico 5 (Ctrl + Alt + Shift + 5) |
+| `Ctrl + Alt + Shift + 6` ou `Ctrl + Alt + Shift + Num 6` | Workspace: Salvar no Slot 6 | Grava a disposição atual diretamente no slot numérico 6 (Ctrl + Alt + Shift + 6) |
+| `Ctrl + Alt + Shift + 7` ou `Ctrl + Alt + Shift + Num 7` | Workspace: Salvar no Slot 7 | Grava a disposição atual diretamente no slot numérico 7 (Ctrl + Alt + Shift + 7) |
+| `Ctrl + Alt + Shift + 8` ou `Ctrl + Alt + Shift + Num 8` | Workspace: Salvar no Slot 8 | Grava a disposição atual diretamente no slot numérico 8 (Ctrl + Alt + Shift + 8) |
+| `Ctrl + Alt + Shift + 9` ou `Ctrl + Alt + Shift + Num 9` | Workspace: Salvar no Slot 9 | Grava a disposição atual diretamente no slot numérico 9 (Ctrl + Alt + Shift + 9) |
+
+### Perfil Kdenlive
+
+> Alguns atalhos aparecem em mais de uma ação neste perfil. Isso é intencional: a ação executada depende do contexto (painel em foco, ferramenta ativa, elemento sob o mouse, sugestão ou clipe fantasma ativo). A coluna de observação indica com quais ações o atalho é compartilhado.
+
+#### 1. Reprodução & Navegação
+
+| Atalho | Ação | Contexto/observação |
+| :--- | :--- | :--- |
+| `Espaço` | Play / Pause | Inicia ou pausa a reprodução no player ativo (Source ou Program) |
+| `J` | Shuttle Reverso (J) | Reproduz para trás. Pressionar repetidamente acelera a velocidade (1x, 2x, 4x, 8x) |
+| `K` | Shuttle Play / Pause (K) | Alterna entre reproduzir e pausar a reprodução (segure K com J ou L para avançar/recuar quadro a quadro) |
+| `L` | Shuttle Avanço (L) | Reproduz para frente. Pressionar repetidamente acelera a velocidade (1x, 2x, 4x, 8x) |
+| `Shift + →` | Shuttle Acelerado / Avanço Rápido (Shift + →) | Reproduz acelerado para frente. Toques repetidos aumentam a velocidade (igual JKL); segurar reproduz acelerado enquanto pressionado |
+| `Shift + ←` | Shuttle Acelerado / Recuo Rápido (Shift + ←) | Reproduz acelerado para trás. Toques repetidos aumentam a velocidade reversa; segurar reproduz acelerado enquanto pressionado |
+| `Ctrl + →` | Câmera Lenta Avanço (Ctrl + →) | Reproduz em câmera lenta para frente (0.25x). Segurar reproduz enquanto pressionado |
+| `Ctrl + ←` | Câmera Lenta Recuo (Ctrl + ←) | Reproduz em câmera lenta reversa (-0.25x). Segurar reproduz enquanto pressionado |
+| `K + J` ou `←` | Jog Recuar 1 Frame (K + J) | Segure K e pressione J para recuar exatamente 1 frame<br>**Atalho compartilhado, depende do contexto:** Navegar 1 Frame para Trás (←); Nudge: Deslocar 1 Frame para Trás (←). |
+| `←` | Navegar 1 Frame para Trás | Move a agulha 1 frame para trás (quando nenhum clipe estiver selecionado)<br>**Atalho compartilhado, depende do contexto:** Jog Recuar 1 Frame (K + J) (←); Nudge: Deslocar 1 Frame para Trás (←). |
+| `K + L` ou `→` | Jog Avançar 1 Frame (K + L) | Segure K e pressione L para avançar exatamente 1 frame<br>**Atalho compartilhado, depende do contexto:** Navegar 1 Frame para Frente (→); Nudge: Deslocar 1 Frame para Frente (→). |
+| `→` | Navegar 1 Frame para Frente | Move a agulha 1 frame para frente (quando nenhum clipe estiver selecionado)<br>**Atalho compartilhado, depende do contexto:** Jog Avançar 1 Frame (K + L) (→); Nudge: Deslocar 1 Frame para Frente (→). |
+| `I` | Marcar Ponto de Entrada (IN) | Define o ponto inicial de corte no Player ou Linha do Tempo |
+| `O` | Marcar Ponto de Saída (OUT) | Define o ponto final de corte no Player ou Linha do Tempo |
+| `Ctrl + Shift + I` ou `Alt + I` | Limpar Ponto IN | Remove o ponto de entrada (IN) no Player ou Linha do Tempo |
+| `Ctrl + Shift + O` ou `Alt + O` | Limpar Ponto OUT | Remove o ponto de saída (OUT) no Player ou Linha do Tempo |
+| `Alt + X` ou `Ctrl + Shift + A` | Limpar Pontos IN e OUT | Remove ambos os pontos de entrada e saída (IN e OUT) |
+| `X` | Marcar Clipe (IN / OUT) | Define pontos IN e OUT nos limites do clipe selecionado ou sob a agulha<br>**Atalho compartilhado, depende do contexto:** Dividir Clipe no Playhead (Split) (X). |
+| `Shift + I` | Ir para o Ponto IN | Move a agulha de reprodução diretamente para o ponto IN |
+| `Shift + O` | Ir para o Ponto OUT | Move a agulha de reprodução diretamente para o ponto OUT |
+| `Shift + Espaço` | Tocar de IN até OUT | Reproduz o trecho delimitado entre os pontos IN e OUT e pausa |
+| `Ctrl + Shift + Espaço` ou `Ctrl + L` | Alternar Reprodução em Loop | Liga ou desliga a reprodução contínua em loop entre os pontos IN e OUT<br>**Atalho compartilhado, depende do contexto:** Ajustar Sequência na Tela (Zoom to Fit) (Ctrl + Shift + Espaço); Desvincular Par Áudio/Vídeo (Ctrl + L). |
+| `E` | Inserir na Timeline (Append) | Insere o trecho marcado (IN ➔ OUT) na timeline |
+| `Alt + ←` ou `↑` | Pular para Ponto Anterior / Início | Program: move a agulha para o corte anterior; Source: vai para IN ou Início<br>**Atalho compartilhado, depende do contexto:** Trim Ponto IN: Recuar 1 Frame (Alt + ←). |
+| `Alt + →` ou `↓` | Pular para Próximo Ponto / Fim | Program: move a agulha para o corte seguinte; Source: vai para OUT ou Fim<br>**Atalho compartilhado, depende do contexto:** Trim Ponto IN: Avançar 1 Frame (Alt + →). |
+| `Ctrl + G` | Ir para Timecode / Navegação Numérica | Ativa a entrada de timecode para salto absoluto ou navegação relativa (+/- frames) |
+
+#### 2. Ferramentas & Modos
+
+| Atalho | Ação | Contexto/observação |
+| :--- | :--- | :--- |
+| `S` | Ferramenta de Seleção | Ativa a ferramenta de seleção padrão da timeline (Seta)<br>**Atalho compartilhado, depende do contexto:** Alternar Snapping Magnético (S). |
+| `F10` ou `S` | Alternar Snapping Magnético | Liga ou desliga o alinhamento magnético inteligente de bordas e agulha<br>**Atalho compartilhado, depende do contexto:** Ferramenta de Seleção (S). |
+| `Shift + S` | Seleção por Caixa / Retângulo (Marquee) | Ativa a ferramenta de seleção por retângulo (arraste para selecionar clipes e marcadores) |
+| `C` | Ferramenta Lâmina / Gilete (Blade) | Ativa a ferramenta de corte de precisão por cursor na trilha |
+| `Shift + C` | Lâmina Global na Agulha | Fatia todas as pistas destravadas na coordenada da agulha de reprodução |
+| `Y` | Deslizar Conteúdo Interno (Slip Tool) | Desliza os pontos IN e OUT da mídia bruta mantendo a posição e duração na timeline<br>**Atalho compartilhado, depende do contexto:** Aceitar Sugestão de IA (Y). |
+| `U` | Deslizar Posição na Timeline (Slide Tool) | Move o clipe na timeline mantendo seu conteúdo intacto e compensando nos vizinhos adjacentes<br>**Atalho compartilhado, depende do contexto:** Crossfade de Áudio (Potência Constante) (U). |
+| `N` | Corte Contínuo Adjacente (Rolling Edit) | Ajusta o ponto de corte entre dois clipes contíguos sem alterar a duração total da sequência<br>**Atalho compartilhado, depende do contexto:** Rejeitar Sugestão de IA (N). |
+| `Shift + R` | Esticar / Comprimir Taxa de Velocidade (Rate Stretch) | Altera a velocidade do clipe arrastando suas bordas para esticar ou comprimir a taxa temporal<br>**Atalho compartilhado, depende do contexto:** Dividir Clipe no Playhead (Split) (Shift + R). |
+| `M` | Selecionar Faixa para Frente | Ativa a ferramenta de seleção de todos os clipes à direita<br>**Atalho compartilhado, depende do contexto:** Adicionar / Editar Marcador (M). |
+| `Shift + M` | Selecionar Faixa para Trás | Ativa a ferramenta de seleção de todos os clipes à esquerda<br>**Atalho compartilhado, depende do contexto:** Pular para o Próximo Marcador (Shift + M). |
+| `H` | Ferramenta Mão / Pan | Ativa a ferramenta de navegação e arrasto contínuo da timeline (Pan) |
+| `Z` | Ferramenta Zoom / Lupa | Ativa a ferramenta de aproximação e afastamento por clique |
+| `Esc` | Desmarcar Seleção / Fechar Caixas | Limpa a seleção de clipes ou fecha pop-ups contextuais e modais |
+| `R` | Girar Mídia sob Cursor (+90°) | Rotaciona a mídia sob o cursor (hover) na biblioteca ou no monitor de origem |
+
+#### 3. Edição, Cortes & Trims
+
+| Atalho | Ação | Contexto/observação |
+| :--- | :--- | :--- |
+| `V` ou `,` | Inserir na Agulha (Ripple Insert) | Insere o trecho marcado no monitor Source na coordenada da agulha empurrando os clipes subsequentes |
+| `B` ou `.` | Sobrescrever na Agulha (Overwrite Edit) | Insere o trecho marcado no monitor Source na coordenada da agulha substituindo o material sob o intervalo<br>**Atalho compartilhado, depende do contexto:** Restaurar Zoom Padrão (1:1 / 0.5 px/f) (.). |
+| `Ctrl + Alt + A` | Alternar Canais na Inserção (AV / V / A) | Alterna os canais transferidos do monitor Source para a Timeline: Áudio+Vídeo (AV), Somente Vídeo (V) ou Somente Áudio (A) |
+| `Alt + F` | Localizar Quadro Original na Fonte (Match Frame) | Localiza a mídia bruta correspondente ao quadro sob a agulha da timeline e abre no Source Player marcando os pontos IN–OUT originais |
+| `Shift + F` | Localizar Quadro na Timeline (Reverse Match Frame) | Localiza onde o quadro atual sob a agulha do Source Player está sendo utilizado na timeline ativa e salta a agulha para a posição correspondente |
+| `Ctrl + Shift + R` | Substituir Clipe na Timeline (Replace Edit) | Substitui a mídia do clipe alvo (selecionado, sob a agulha ou sob o cursor com Alt no arraste) preservando duração exata, efeitos (Ken Burns), cor e velocidade |
+| `Ctrl + U` | Criar Subclipe na Biblioteca (Make Subclip) | Gera um novo item virtual na biblioteca a partir do intervalo [IN–OUT] delimitado no monitor Source |
+| `Ctrl + Shift + F` | Congelar Quadro (Freeze Frame) | Captura o quadro sob a agulha e insere um segmento estático na timeline (Ctrl+Shift+F) |
+| `Ctrl + R` | Velocidade / Duração do Clipe (Speed / Duration) | Abre o diálogo de velocidade percentual, duração proporcional e reversão do clipe selecionado (Ctrl+R) |
+| `Ctrl + Alt + R` | Preencher Espaço na Trilha (Fit to Gap) | Estende a duração do clipe ajustando a velocidade para preencher automaticamente o espaço vazio adjacente na pista (Ctrl+Alt+R) |
+| `Ctrl + Shift + D` ou `U` | Crossfade de Áudio (Potência Constante) | Aplica transição de crossfade de áudio de potência constante (Equal-Power) na emenda entre clipes contíguos ou no clipe selecionado (Ctrl+Shift+D)<br>**Atalho compartilhado, depende do contexto:** Deslizar Posição na Timeline (Slide Tool) (U). |
+| `Ctrl + D` | Transição de Vídeo Padrão (Cross Dissolve) | Aplica transição de vídeo (Cross Dissolve, Dip to Black ou Dip to White) na emenda contígua sob a agulha ou entre os clipes selecionados (Ctrl+D) |
+| `Enter` | Renderizar Efeitos In para Out (Cache NLE) | Pré-renderiza o intervalo da timeline (In-Out ou trechos pesados) para playback suave em cache (Enter)<br>**Atalho compartilhado, depende do contexto:** Aceitar Sugestão de IA (Enter). |
+| `Shift + R` ou `X` | Dividir Clipe no Playhead (Split) | Fatia o clipe sob a agulha de reprodução (ou o clipe selecionado)<br>**Atalho compartilhado, depende do contexto:** Esticar / Comprimir Taxa de Velocidade (Rate Stretch) (Shift + R); Marcar Clipe (IN / OUT) (X). |
+| `[` ou `Q` | Ripple Trim Início (Até a Agulha) | Corta o início do clipe até a agulha e fecha o espaço na timeline |
+| `]` ou `W` | Ripple Trim Fim (Da Agulha ao Fim) | Corta da agulha até o final do clipe e fecha o espaço na timeline |
+| `Backspace` | Lift Delete (Apagar Clipe) | Apaga o clipe selecionado deixando o espaço vazio (gap) intacto |
+| `Del` ou `Shift + Del` | Ripple Delete (Apagar e Fechar Espaço) | Apaga o clipe e puxa todos os clipes posteriores para fechar a lacuna<br>**Atalho compartilhado, depende do contexto:** Rejeitar Sugestão de IA (Del); Extract (Ripple Delete) no Intervalo IN–OUT (Shift + Del). |
+| `Shift + Del` ou `Quote` | Extract (Ripple Delete) no Intervalo IN–OUT | Apaga o conteúdo dentro do intervalo IN–OUT e puxa os clipes posteriores para fechar o espaço<br>**Atalho compartilhado, depende do contexto:** Ripple Delete (Apagar e Fechar Espaço) (Shift + Del). |
+| `Alt + Backspace` ou `Semicolon` | Lift no Intervalo IN–OUT | Apaga o conteúdo dentro do intervalo IN–OUT nas pistas ativas deixando o espaço vazio (gap) |
+| `Alt + Del` | Apagar Faixa Única (Desvincular Par) | Apaga apenas o vídeo ou o áudio selecionado, preservando o outro fluxo |
+| `Ctrl + Shift + U` ou `Ctrl + L` | Desvincular Par Áudio/Vídeo | Quebra a vinculação estrita entre o vídeo e seu par de áudio correspondente<br>**Atalho compartilhado, depende do contexto:** Alternar Reprodução em Loop (Ctrl + L). |
+| `←` | Nudge: Deslocar 1 Frame para Trás | Move o clipe selecionado 1 frame para a esquerda na timeline<br>**Atalho compartilhado, depende do contexto:** Jog Recuar 1 Frame (K + J) (←); Navegar 1 Frame para Trás (←). |
+| `→` | Nudge: Deslocar 1 Frame para Frente | Move o clipe selecionado 1 frame para a direita na timeline<br>**Atalho compartilhado, depende do contexto:** Jog Avançar 1 Frame (K + L) (→); Navegar 1 Frame para Frente (→). |
+| `Alt + ←` | Trim Ponto IN: Recuar 1 Frame | Expande ou contrai a ponta inicial do clipe selecionado em 1 frame<br>**Atalho compartilhado, depende do contexto:** Pular para Ponto Anterior / Início (Alt + ←). |
+| `Alt + →` | Trim Ponto IN: Avançar 1 Frame | Avança a ponta inicial do clipe selecionado em 1 frame<br>**Atalho compartilhado, depende do contexto:** Pular para Próximo Ponto / Fim (Alt + →). |
+| `Alt + Shift + ←` | Trim Ponto OUT: Recuar 1 Frame | Recua a ponta final do clipe selecionado em 1 frame |
+| `Alt + Shift + →` | Trim Ponto OUT: Avançar 1 Frame | Avança a ponta final do clipe selecionado em 1 frame |
+| `D` | Selecionar Clipe sob a Agulha | Seleciona o clipe na trilha ativa posicionado sob a agulha de reprodução (D) |
+| `Shift + D` | Multi-Seleção na Agulha (Adicionar à Seleção) | Seleciona todos os clipes sob a agulha em todas as pistas e adiciona à seleção existente (Shift+D) |
+| `F` | Ativar / Desativar Clipe (Mute / Bypass) | Alterna se o clipe selecionado (ou sob a agulha) está ativo ou desativado |
+
+#### 4. Marcadores
+
+| Atalho | Ação | Contexto/observação |
+| :--- | :--- | :--- |
+| `Num *` ou `G` ou `M` | Adicionar / Editar Marcador | Cria um novo marcador ou abre o popover de edição rápida no playhead<br>**Atalho compartilhado, depende do contexto:** Monitores: Swap / Alternar Foco (Num *); Selecionar Faixa para Frente (M). |
+| `Alt + G` ou `Shift + M` | Pular para o Próximo Marcador | Avança a agulha de reprodução até o marcador seguinte na timeline<br>**Atalho compartilhado, depende do contexto:** Selecionar Faixa para Trás (Shift + M). |
+| `Alt + Shift + G` ou `Alt + M` | Pular para o Marcador Anterior | Recua a agulha de reprodução até o marcador anterior na timeline |
+| `Ctrl + Shift + K` | Alternar Momento Crucial (Player / Galeria) | Marca ou desmarca o quadro atual como Momento Crucial para reprodução rápida em hover |
+
+#### 5. Assistência de IA & Tomadas
+
+| Atalho | Ação | Contexto/observação |
+| :--- | :--- | :--- |
+| `Ctrl + Alt + B` | Alternar Detecção Facial no Source | Exibe ou oculta a camada visual de caixas de detecção facial e grounding no Monitor de Origem (Source) |
+| `A` | Alternar Tomadas / Alternativas de IA | Abre o seletor de tomadas alternativas em clipes gerados por IA / Inspetor |
+| `Enter` ou `Y` | Aceitar Sugestão de IA | Aprova a sugestão da faixa fantasma de IA, tornando-a clipe real na trilha<br>**Atalho compartilhado, depende do contexto:** Renderizar Efeitos In para Out (Cache NLE) (Enter); Deslizar Conteúdo Interno (Slip Tool) (Y). |
+| `Del` ou `N` | Rejeitar Sugestão de IA | Descarta e remove a sugestão fantasma da timeline<br>**Atalho compartilhado, depende do contexto:** Ripple Delete (Apagar e Fechar Espaço) (Del); Corte Contínuo Adjacente (Rolling Edit) (N). |
+
+#### 6. Canvas, Zoom & Histórico
+
+| Atalho | Ação | Contexto/observação |
+| :--- | :--- | :--- |
+| `Ctrl + Shift + Espaço` | Ajustar Sequência na Tela (Zoom to Fit) | Enquadra perfeitamente todos os clipes na timeline ou restaura o zoom anterior (Toggle)<br>**Atalho compartilhado, depende do contexto:** Alternar Reprodução em Loop (Ctrl + Shift + Espaço). |
+| `Ctrl + + / =` ou `Ctrl + Num +` | Aumentar Zoom na Linha do Tempo | Aproxima o zoom horizontal da régua e clipes da timeline |
+| `Ctrl + -` ou `Ctrl + Num -` | Diminuir Zoom na Linha do Tempo | Afasta o zoom horizontal da régua e clipes da timeline |
+| `.` | Restaurar Zoom Padrão (1:1 / 0.5 px/f) | Restaura a escala da régua e dos clipes para o zoom padrão de 0.5 pixels por frame<br>**Atalho compartilhado, depende do contexto:** Sobrescrever na Agulha (Overwrite Edit) (.). |
+| `Ctrl + Alt + P` | Alternar 'Seleção Acompanha a Agulha' | Ativa ou desativa a seleção automática do clipe sob a agulha ao se mover |
+| `Ctrl + Alt + F` | Alternar 'Timeline Segue a Agulha' (Auto-Scroll) | Ativa ou desativa a rolagem automática da timeline para acompanhar o cursor de reprodução |
+| `Shift + L` | Travar / Destravar Pista Ativa (Track Lock) | Ativa ou desativa o cadeado físico de proteção total na pista selecionada |
+| `Ctrl + Alt + Shift + L` | Travar / Destravar Todas as Pistas | Alterna o cadeado físico em todas as pistas de vídeo, áudio e texto da timeline |
+| `Ctrl + Shift + G` | Alternar Margens de Segurança & Guias no Player (Safe Margins) | Exibe ou oculta o overlay vetorial de Action Safe (90%), Title Safe (80%), Cruz Central e Máscaras de Proporção no Monitor de Programa |
+| `Ctrl + Alt + G` | Alternar Máscara de Proporção no Player (16:9 / 9:16 / 1:1 / 2.39:1) | Alterna ciclicamente entre as máscaras de proporção de aspecto (16:9, 9:16, 1:1, 2.39:1, 4:5, 4:3, Sem Máscara) no Monitor de Programa |
+| `Ctrl + Z` | Desfazer Ação (Undo) | Desfaz a última alteração realizada na timeline |
+| `Ctrl + Shift + Z` ou `Ctrl + Y` | Refazer Ação (Redo) | Refaz a edição desfeita anteriormente |
+| `Ctrl + Shift + S` | Salvar Preset de Workspace | Abre o diálogo para salvar o layout visual atual da interface |
+
+#### 7. Layout & Workspace (Numpad)
+
+| Atalho | Ação | Contexto/observação |
+| :--- | :--- | :--- |
+| `Ctrl + Alt + Z` | Desfazer Mudança de Layout | Desfaz a última mudança na disposição dos painéis (histórico separado do da timeline) |
+| `Ctrl + Alt + Shift + Z` | Refazer Mudança de Layout | Refaz a mudança de layout desfeita anteriormente |
+| `Num 1` | Timeline: Expansão Direcional Esquerda | Alterna a expansão da timeline sob a sidebar esquerda (bottom-left ↔ center) |
+| `Alt + Num 1` | Timeline: Toggle Cabeçalho de Pistas | Oculta ou exibe a área de faixas e timecode da timeline (Track Headers) |
+| `Num 2` | Timeline: Alternar Centro ↔ Faixa Total | Alterna a timeline entre entre menus (center) e largura total na base (bottom-full) |
+| `Alt + Num 2` | Timeline: Recolher / Restaurar Verticalmente | Recolhe ou expande o painel da timeline para a linha restauradora na base |
+| `Ctrl + Num 2` | Timeline: Destacar / Reanexar Janela | Abre a timeline em janela flutuante para o segundo monitor ou a reanexa |
+| `Num 3` | Timeline: Expansão Direcional Direita | Alterna a expansão da timeline sob a sidebar direita (bottom-right ↔ center) |
+| `Alt + Num 3` | Timeline: Toggle Barra de Ferramentas | Recolhe ou expande a barra vertical de ferramentas de corte (V, C, Trims) |
+| `Num 4` | Biblioteca: Ocultar / Exibir | Recolhe ou expande a sidebar esquerda (Biblioteca de mídias, temas, rostos) |
+| `Alt + Num 4` | Biblioteca: Layout Estúdio (Maximizar) | Maximiza a biblioteca no layout estúdio com timeline e players empilhados |
+| `Ctrl + Num 4` | Biblioteca: Destacar / Reanexar Janela | Abre a biblioteca em janela flutuante externa ou a reanexa |
+| `Num 5` | Inspetor: Ocultar / Exibir | Recolhe ou expande o painel de Ajustes & Efeitos (Inspetor) |
+| `Alt + Num 5` | Inspetor: Maximizar / Restaurar | Maximiza o painel de Ajustes & Efeitos no espaço disponível |
+| `Ctrl + Num 5` | Inspetor: Destacar / Reanexar Janela | Abre o Inspetor em janela flutuante externa ou o reanexa |
+| `Num 6` | Painel Direito: Ocultar / Exibir | Recolhe ou expande a sidebar direita (Transcrição, Visão IA, Tarefas, Logs) |
+| `Alt + Num 6` | Painel Direito: Maximizar / Restaurar | Maximiza a sidebar direita no espaço disponível |
+| `Ctrl + Num 6` | Painel Direito: Destacar / Reanexar Janela | Abre a sidebar direita em janela flutuante externa ou a reanexa |
+| `Num 7` | Source Player: Ocultar / Exibir | Oculta ou exibe o monitor de origem (Source Player) |
+| `Alt + Num 7` | Source Player: Maximizar / Restaurar | Maximiza o monitor de origem no palco central |
+| `Ctrl + Num 7` | Source Player: Destacar / Reanexar Janela | Abre o monitor de origem em janela flutuante externa ou o reanexa |
+| `Num 8` | Header Geral: Ocultar / Exibir | Recolhe ou expande o cabeçalho superior da aplicação para ganhar espaço vertical |
+| `Num 9` | Program Player: Ocultar / Exibir | Oculta ou exibe o monitor de programa (Program Player) |
+| `Alt + Num 9` | Program Player: Maximizar / Restaurar | Maximiza o monitor de programa no palco central |
+| `Ctrl + Num 9` | Program Player: Destacar / Reanexar Janela | Abre o monitor de programa em janela flutuante externa ou o reanexa |
+| `Num 0` | Modo Foco / Cinema / Zen | Macro global: recolhe ou restaura Header e todas as Sidebars simultaneamente |
+| `Num .` | Timeline: Toggle Cabeçalho Superior | Recolhe ou restaura a barra superior de nome, zoom e sequência da timeline |
+| `Num +` | Timeline: Aumentar Altura das Pistas | Aumenta a altura das faixas de áudio e vídeo na timeline (+10px) |
+| `Num -` | Timeline: Diminuir Altura das Pistas | Diminui a altura das faixas de áudio e vídeo na timeline (-10px) |
+| `Num /` | Monitores: Alternar Lado a Lado / Empilhados | Alterna a disposição dos monitores entre horizontal e vertical |
+| `Num *` | Monitores: Swap / Alternar Foco | Alterna o foco ativo entre o Monitor Source e o Monitor Program<br>**Atalho compartilhado, depende do contexto:** Adicionar / Editar Marcador (Num *). |
+| `Num Enter` | Maximizar / Restaurar Painel sob Foco | Maximiza ou restaura o painel ativo ou sob o cursor |
+| `Ctrl + Alt + 1` ou `Ctrl + Alt + Num 1` | Workspace: Carregar Slot 1 | Carrega instantaneamente o layout salvo no slot numérico 1 (Ctrl + Alt + 1) |
+| `Ctrl + Alt + 2` ou `Ctrl + Alt + Num 2` | Workspace: Carregar Slot 2 | Carrega instantaneamente o layout salvo no slot numérico 2 (Ctrl + Alt + 2) |
+| `Ctrl + Alt + 3` ou `Ctrl + Alt + Num 3` | Workspace: Carregar Slot 3 | Carrega instantaneamente o layout salvo no slot numérico 3 (Ctrl + Alt + 3) |
+| `Ctrl + Alt + 4` ou `Ctrl + Alt + Num 4` | Workspace: Carregar Slot 4 | Carrega instantaneamente o layout salvo no slot numérico 4 (Ctrl + Alt + 4) |
+| `Ctrl + Alt + 5` ou `Ctrl + Alt + Num 5` | Workspace: Carregar Slot 5 | Carrega instantaneamente o layout salvo no slot numérico 5 (Ctrl + Alt + 5) |
+| `Ctrl + Alt + 6` ou `Ctrl + Alt + Num 6` | Workspace: Carregar Slot 6 | Carrega instantaneamente o layout salvo no slot numérico 6 (Ctrl + Alt + 6) |
+| `Ctrl + Alt + 7` ou `Ctrl + Alt + Num 7` | Workspace: Carregar Slot 7 | Carrega instantaneamente o layout salvo no slot numérico 7 (Ctrl + Alt + 7) |
+| `Ctrl + Alt + 8` ou `Ctrl + Alt + Num 8` | Workspace: Carregar Slot 8 | Carrega instantaneamente o layout salvo no slot numérico 8 (Ctrl + Alt + 8) |
+| `Ctrl + Alt + 9` ou `Ctrl + Alt + Num 9` | Workspace: Carregar Slot 9 | Carrega instantaneamente o layout salvo no slot numérico 9 (Ctrl + Alt + 9) |
+| `Ctrl + Alt + Shift + 1` ou `Ctrl + Alt + Shift + Num 1` | Workspace: Salvar no Slot 1 | Grava a disposição atual diretamente no slot numérico 1 (Ctrl + Alt + Shift + 1) |
+| `Ctrl + Alt + Shift + 2` ou `Ctrl + Alt + Shift + Num 2` | Workspace: Salvar no Slot 2 | Grava a disposição atual diretamente no slot numérico 2 (Ctrl + Alt + Shift + 2) |
+| `Ctrl + Alt + Shift + 3` ou `Ctrl + Alt + Shift + Num 3` | Workspace: Salvar no Slot 3 | Grava a disposição atual diretamente no slot numérico 3 (Ctrl + Alt + Shift + 3) |
+| `Ctrl + Alt + Shift + 4` ou `Ctrl + Alt + Shift + Num 4` | Workspace: Salvar no Slot 4 | Grava a disposição atual diretamente no slot numérico 4 (Ctrl + Alt + Shift + 4) |
+| `Ctrl + Alt + Shift + 5` ou `Ctrl + Alt + Shift + Num 5` | Workspace: Salvar no Slot 5 | Grava a disposição atual diretamente no slot numérico 5 (Ctrl + Alt + Shift + 5) |
+| `Ctrl + Alt + Shift + 6` ou `Ctrl + Alt + Shift + Num 6` | Workspace: Salvar no Slot 6 | Grava a disposição atual diretamente no slot numérico 6 (Ctrl + Alt + Shift + 6) |
+| `Ctrl + Alt + Shift + 7` ou `Ctrl + Alt + Shift + Num 7` | Workspace: Salvar no Slot 7 | Grava a disposição atual diretamente no slot numérico 7 (Ctrl + Alt + Shift + 7) |
+| `Ctrl + Alt + Shift + 8` ou `Ctrl + Alt + Shift + Num 8` | Workspace: Salvar no Slot 8 | Grava a disposição atual diretamente no slot numérico 8 (Ctrl + Alt + Shift + 8) |
+| `Ctrl + Alt + Shift + 9` ou `Ctrl + Alt + Shift + Num 9` | Workspace: Salvar no Slot 9 | Grava a disposição atual diretamente no slot numérico 9 (Ctrl + Alt + Shift + 9) |
+
+<!-- GERADO:ATALHOS:FIM -->

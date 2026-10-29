@@ -1,8 +1,15 @@
-# 🔌 Detalhamento das APIs de Visão, Faces e Áudio
+# API REST do CapIAu-Talho
 
-Abaixo estão listadas as rotas do backend FastAPI que gerenciam o fluxo
-de detecções, desambiguação, anotações e tratamento de áudio do
-CapIAu-Talho:
+O backend é um servidor FastAPI (`uvicorn src.api.server:app`). Com ele em execução, tudo é servido na mesma porta.
+
+| Item | Valor |
+| :--- | :--- |
+| URL base | `http://localhost:8000` (as rotas da API começam com `/api`) |
+| Documentação interativa (Swagger) | `http://localhost:8000/docs` |
+| Esquema OpenAPI | `http://localhost:8000/openapi.json` |
+| Autenticação | Nenhuma por enquanto. O CORS aceita qualquer origem; use apenas em máquina ou rede confiável. |
+
+A tabela completa de rotas, no fim desta página, é gerada automaticamente a partir do código. Antes dela há exemplos comentados dos fluxos mais usados (rostos, busca visual, áudio, waveforms, render e ingestão). Para parâmetros e esquemas exatos, consulte sempre o `/docs`.
 
 ## 1. Rotulação e Resolução de Conflitos
 
@@ -148,28 +155,35 @@ que rodam 100% localmente via embeddings CLIP, sem custo de API.
 
 - **Resposta:** mesmo formato do endpoint de foto.
 
-### POST /api/media/batch-similar
+### POST /api/media/similar-batch
 
-- **Descrição:** Executa a busca por similaridade visual em lote a partir de uma lista de IDs de fotos ou vídeos.
+- **Descrição:** Busca por similaridade em lote (visual ou textual) a
+  partir de uma lista de itens de referência (fotos ou vídeos).
 
-- **Payload:** `{ "photo_ids": [1, 2], "video_ids": [5], "project_id": 1, "limit": 12 }`
+- **Payload:** `{ "project_id": 1, "items": [...], "search_type": "visual", "media_type_filter": "all", "limit": 12 }`.
+  `items` aceita de 1 a 20 itens no formato `{ "kind": "photo" ou "video", "id": 1, "timestamp": null }`; `search_type` é `visual` ou `textual`;
+  `media_type_filter` aceita `all`, `interview`, `broll` ou `photo`;
+  `limit` vai de 1 a 60.
 
-## 6. Tarefas de Miniaturas & Configurações de IA
+- **Resposta:** `{ results, mode_used, cohesion, warnings }`, com a
+  explicação de por que cada resultado apareceu.
 
-### POST /api/media/thumbnails/sync
-- **Descrição:** Sincroniza e força o re-processamento ou verificação da fila de miniaturas em background.
+## 6. Miniaturas e tarefas em segundo plano
 
-### POST /api/media/thumbnails/task/{task_id}/cancel
-- **Descrição:** Cancela ou pausa a execução de uma tarefa individual de geração de miniatura.
+### POST /api/video/{video_id}/pause-thumbnails
+- **Descrição:** Pausa a geração progressiva de miniaturas do vídeo.
 
-### GET /api/settings/vision-model
-- **Descrição:** Retorna o modelo de visão atualmente selecionado e a lista de provedores/modelos disponíveis (Nemotron 70B, Gemini 2.5 Flash, Gemini 3.1 Flash Lite).
+### POST /api/video/{video_id}/resume-thumbnails
+- **Descrição:** Retoma a geração progressiva de miniaturas do vídeo.
 
-### POST /api/settings/vision-model
-- **Descrição:** Atualiza dinamicamente o modelo de visão ativo para triagem e descrição de keyframes.
-- **Payload:** `{ "model": "nvidia/nemotron-4-70b-vision" }`
+### POST /api/video/{video_id}/cancel-thumbnails
+- **Descrição:** Cancela a geração progressiva de miniaturas do vídeo.
 
-## 8. Diagnóstico e Tratamento de Áudio
+Os modelos de visão e demais opções de IA são lidos e gravados pelas rotas
+de configurações (`GET /api/settings`, `PUT /api/settings/global`), listadas
+na tabela completa mais abaixo.
+
+## 7. Diagnóstico e tratamento de áudio
 
 Sete rotas que sustentam o painel de Ajustes de áudio. O princípio que as
 organiza: **o arquivo original nunca é tocado**. Todo tratamento gera um WAV
@@ -281,7 +295,7 @@ apenas um ponteiro.
 - **Query:** `secao` filtra por `diagnostico`, `aovivo`, `tratamento` ou
   `nuvem`. Seção inválida devolve **400** listando as válidas.
 
-## 9. Formas de Onda de Áudio (Waveforms)
+## 8. Formas de Onda de Áudio (Waveforms)
 
 ### GET /api/videos/{video_id}/waveform
 Picos Min/Max reais extraídos do stream PCM. Gera na primeira chamada e serve do cache depois.
@@ -306,7 +320,7 @@ publica progresso no TASK_MANAGER.
 
 ---
 
-## 10. Render de Vídeo e Exportação da Timeline
+## 9. Render de Vídeo e Exportação da Timeline
 
 ### GET /api/timeline/{timeline_id}/export/{formato}
 Gera e baixa o arquivo de intercâmbio de timeline nos formatos suportados (`otio`, `xml`, `edl`, `fcpxml`, etc.).
@@ -379,11 +393,11 @@ Não há rota própria: o render usa as genéricas da casa.
 
 ---
 
-## 7. Ingestão Direta, Análise Individual e Integração com Sistema
+## 10. Ingestão por upload, análise individual e integração com o sistema
 
-### POST /api/project/{project_id}/upload-direct
-- **Descrição:** Ingestão multipart/form-data direta de múltiplos arquivos para a pasta `watch/` com disparo automático de ingestão em segundo plano.
-- **Payload:** `files: List[UploadFile]`
+### POST /api/ingest/upload-files
+- **Descrição:** Recebe arquivos enviados por arrastar e soltar (multipart/form-data) e os salva na pasta `originals/` para ingestão em segundo plano.
+- **Campos do formulário:** `files` (um ou mais arquivos), `project_id` (padrão 1), `virtual_folder` (padrão `root`).
 
 ### POST /api/video/{video_id}/analyze-all
 - **Descrição:** Dispara a análise completa de IA (ASR + Visão por segmentos + Rostos + Indexação Vetorial) para um único vídeo específico.
@@ -397,13 +411,253 @@ Não há rota própria: o render usa as genéricas da casa.
 
 ### POST /api/ingest/external-files
 - **Descrição:** Registra e ingere uma lista de caminhos de arquivos externos in-place no projeto sem duplicação de dados no disco.
-- **Payload:** `{ "paths": ["/caminho/video1.mp4", "/caminho/video2.mp4"], "project_id": 1 }`
+- **Payload:** `{ "paths": ["/caminho/video1.mp4", "/caminho/video2.mp4"], "project_id": 1, "virtual_folder": "root" }`
 
 ---
 
-## 8. Documentação Interativa Swagger
+---
 
-- Para documentações interativas completas das rotas HTTP, payloads e
-  esquemas de dados, inicie a aplicação localmente e acesse a
-  documentação gerada pelo FastAPI Swagger: 👉
-  [**http://localhost:8000/docs**](http://localhost:8000/docs)
+## Todas as rotas
+
+Gerado por `python scripts/gerar_docs_api.py`. Não edite o bloco abaixo à mão.
+
+<!-- GERADO:API:INICIO -->
+
+Total: 190 rotas em 9 grupos. A documentação interativa completa (parâmetros e esquemas) fica em `/docs` com o servidor em execução.
+
+### AI Settings
+
+| Método | Rota | Descrição |
+| :--- | :--- | :--- |
+| GET | `/api/settings` | Valores resolvidos (default -> global -> projeto) com origem de cada um. Secrets mascarados. |
+| PUT | `/api/settings/global` | Grava overrides globais (apenas as chaves enviadas). |
+| POST | `/api/settings/global/reset` | Remove overrides globais (todos, ou apenas as chaves informadas). |
+| POST | `/api/settings/preset` | Aplica um preset no escopo pedido. |
+| PUT | `/api/settings/project/{project_id}` | Grava overrides do projeto (apenas as chaves enviadas). |
+| POST | `/api/settings/project/{project_id}/reset` | Remove overrides do projeto (todos, ou apenas as chaves informadas). |
+| GET | `/api/settings/prompts` | Lista todos os prompts do sistema com os valores resolvidos e suas origens. |
+| PUT | `/api/settings/prompts/{prompt_id}` | Grava ou atualiza um override de prompt (global ou por projeto). |
+| DELETE | `/api/settings/prompts/{prompt_id}` | Remove o override de um prompt, restaurando o padrão de fábrica. |
+| GET | `/api/settings/registry` | Metadados do catálogo (sem valores): o painel da UI se auto-gera a partir daqui. |
+
+### Entities
+
+| Método | Rota | Descrição |
+| :--- | :--- | :--- |
+| POST | `/api/entities` | Cria manualmente uma entidade (ex: cadastrar equipamento antes da análise). |
+| POST | `/api/entities/bulk-status` | Aceita/rejeita entidades sugeridas pela extração de roteiro em massa (P2.5). |
+| POST | `/api/entities/merge` | Funde duas entidades (E-A2): `source` some, `target` sobrevive com as menções |
+| GET | `/api/entities/project/{project_id}` | Lista as entidades do projeto com contagem de menções. |
+| POST | `/api/entities/project/{project_id}/backfill-legacy` | Migra rotulagens legadas (face.name e hack 'text:') para a camada de entidades. |
+| POST | `/api/entities/project/{project_id}/enrich` | Dispara o re-enriquecimento das descrições: reescreve com os nomes confirmados |
+| POST | `/api/entities/project/{project_id}/enrich/cancel` | Cancela a sincronização de descrições ativa do projeto. |
+| DELETE | `/api/entities/project/{project_id}/enrich/cancel` | Cancela a sincronização de descrições ativa do projeto. |
+| PATCH | `/api/entities/{entity_id}` | Edita uma entidade: nome/tipo/descrição/função/universo/vínculo/aliases. |
+| DELETE | `/api/entities/{entity_id}` | Remove uma entidade e suas menções. |
+
+### Faces
+
+| Método | Rota | Descrição |
+| :--- | :--- | :--- |
+| POST | `/api/faces/confirm-cluster` | Operador confirma manualmente TODOS os rostos de um grupo/cluster (Tier 4). |
+| POST | `/api/faces/confirm-identity` | Operador confirma manualmente a identidade de uma face (Tier 4). |
+| POST | `/api/faces/face` | Insere manualmente uma face ou objeto desenhado pelo usuario no frame/foto. |
+| GET | `/api/faces/face/{face_id}` | Retorna detalhes completos de uma face com todos os reconhecimentos. |
+| GET | `/api/faces/face/{face_id}/context-media` | Retorna mídias de contexto temporal (fotos da mesma rajada/momento ou janela temporal de vídeo). |
+| POST | `/api/faces/face/{face_id}/enhance` | Restaura/realça o rosto em alta definição para desambiguação (crop do rosto). |
+| POST | `/api/faces/face/{face_id}/label` | Rotula uma face ou cluster de faces inteiro, gerenciando conflitos. |
+| POST | `/api/faces/face/{face_id}/precise` | Processa uma face com Tier 3 (InsightFace GPU) para maxima precisao. |
+| POST | `/api/faces/face/{face_id}/refine` | Refina uma face com tiers superiores (Azure/AWS). |
+| POST | `/api/faces/face/{face_id}/reject` | Marca uma face como rejeitada/nao relevante (nao e rosto) e opcionalmente especifica o objeto. |
+| GET | `/api/faces/face/{face_id}/thumbnail` | Retorna o thumbnail da face, priorizando cache/crop_path para máxima velocidade. |
+| POST | `/api/faces/photo/{photo_id}/detect` | Executa deteccao facial Tier 0 em uma foto. |
+| GET | `/api/faces/photo/{photo_id}/faces` | Retorna rostos da foto com compatibilidade, excluindo detecções descartadas. |
+| POST | `/api/faces/pipeline/install-insightface` | Instala o InsightFace e dependências de runtime (onnxruntime) no Python local. |
+| GET | `/api/faces/pipeline/s3/status` | Retorna o status da integracao S3, tamanho do bucket e travas de seguranca. |
+| GET | `/api/faces/pipeline/status` | Retorna status dos backends disponiveis no pipeline. |
+| GET | `/api/faces/project/{project_id}/face-clusters` | Lista todos os grupos de rostos agrupados no projeto. |
+| GET | `/api/faces/project/{project_id}/face-clusters/{cluster_id}/faces` | Retorna todas as faces individuais de um cluster com paths de midias para preview. |
+| GET | `/api/faces/project/{project_id}/faces` | Retorna todas as faces do projeto com reconhecimento autoritativo. |
+| POST | `/api/faces/project/{project_id}/faces/cluster` | Clusteriza todas as faces do projeto usando DBSCAN. |
+| POST | `/api/faces/project/{project_id}/faces/dissociate` | Remove a identificação de um conjunto de faces, voltando a serem desconhecidas. |
+| POST | `/api/faces/project/{project_id}/faces/merge` | Mescla dois clusters em um unico. |
+| POST | `/api/faces/project/{project_id}/faces/reassign` | Reatribui faces de forma unitaria (desambiguacao manual). |
+| POST | `/api/faces/project/{project_id}/faces/reset-unconfirmed` | Reseta nomes e cluster_ids de faces nao confirmadas manualmente pelo usuario. |
+| POST | `/api/faces/project/{project_id}/names/delete` | Remove a associação de um nome/falante globalmente no projeto (faces, falas, pessoa, entidades). |
+| POST | `/api/faces/project/{project_id}/names/merge` | Mescla as ocorrências de um nome (src_name) em outro (dest_name). |
+| POST | `/api/faces/project/{project_id}/names/rename` | Renomeia uma pessoa/falante globalmente no projeto, atualizando rostos, falas e entidades. |
+| GET | `/api/faces/project/{project_id}/people` | Retorna todas as pessoas identificadas no projeto. |
+| POST | `/api/faces/project/{project_id}/people` | Cria uma nova pessoa no projeto. |
+| POST | `/api/faces/project/{project_id}/recover-photo-faces` | Dispara em background: detecção facial nas fotos sem detecção + re-clustering |
+| GET | `/api/faces/project/{project_id}/unlabeled-faces` | Retorna rostos nao rotulados (ou placeholders) para desambiguacao rapida, ordenados cronologicamente. |
+| GET | `/api/faces/video/{video_id}/faces` | Retorna rostos do video com compatibilidade, excluindo detecções descartadas. |
+| POST | `/api/faces/video/{video_id}/frame/detect` | Executa deteccao facial Tier 0 em um frame de video. |
+
+### Media & Ingestion
+
+| Método | Rota | Descrição |
+| :--- | :--- | :--- |
+| GET | `/api/audio/glossario` | Serve o glossário de áudio para a interface (contrato N1). |
+| GET | `/api/audio/nuvem/campos` | Grade viva dos campos ajustáveis do Auphonic (contratos L1 e L2/L4). |
+| GET | `/api/audio/nuvem/cota` | Retrato da cota gratuita mensal do Auphonic (contratos H4 e H6). |
+| GET | `/api/audio/tratado/{video_id}/{chain_hash}.wav` | Serve o WAV tratado para o player (A/B do contrato F4). |
+| GET | `/api/conversions` | Retorna o progresso em tempo real das conversões de vídeo/foto em execução. |
+| POST | `/api/editor/heartbeat` | Reporta atividade do usuário no editor para desacelerar tarefas de segundo plano. |
+| POST | `/api/ingest/external` | Varre uma pasta ou arquivo externo inserindo os caminhos em formato Link (in-place) para uma pasta virtual. |
+| POST | `/api/ingest/external-files` | Ingere múltiplos arquivos externos in-place em background para uma pasta virtual. |
+| POST | `/api/ingest/select-files` | Abre uma caixa de diálogo nativa do Windows para seleção múltipla de arquivos de mídia se suportado. |
+| POST | `/api/ingest/select-folder` | Abre uma caixa de diálogo nativa do Windows para seleção de diretório se suportado. |
+| POST | `/api/ingest/upload-files` | Recebe arquivos enviados via drag & drop e salva na pasta originals/ para ingestão. |
+| POST | `/api/media/batch-move-to-bin` | Move múltiplas mídias em lote para uma pasta virtual. |
+| POST | `/api/media/cancel-all-analyses` | Cancela todas as análises de visão/reanálises em andamento no projeto ou globalmente. |
+| GET | `/api/media/failed-count` | Retorna o número de vídeos afetados por falhas visuais ou status de erro. |
+| POST | `/api/media/move-to-bin` | Move uma mídia individual para uma pasta virtual. |
+| GET | `/api/media/photo/{photo_id}/similar` | Fotos visualmente próximas via CLIP local (E2.B6). |
+| POST | `/api/media/reanalyze-failed` | Dispara a reanálise em lote das mídias afetadas por falha visual. |
+| POST | `/api/media/similar-batch` | Busca de mídias por similaridade multimodal (visual ou textual) em lote (E2.B6). |
+| GET | `/api/media/video/{video_id}/similar` | Trechos/fotos visualmente próximos do keyframe indexado mais perto do timestamp (E2.B6). |
+| PATCH | `/api/media/{media_type}/{media_id}/metadata` | Atualiza campos de metadados editoriais, data de gravação/diária e pasta virtual da mídia. |
+| POST | `/api/media/{media_type}/{media_id}/rotate` | Gira a foto ou vídeo em passos de 90 graus (0, 90, 180, 270). |
+| DELETE | `/api/photo/{photo_id}` | Exclui a foto do banco e remove o proxy físico WebP. |
+| POST | `/api/photo/{photo_id}/analyze-all` | Executa o pipeline completo de IA (Visão + Rostos + Indexação Vetorial) para uma única foto. |
+| POST | `/api/photo/{photo_id}/analyze-vision` | Inicia a análise visual e tags por IA da foto bastidores de forma síncrona. |
+| PATCH | `/api/photo/{photo_id}/category` | Correção humana de categoria da foto. Fotos de rajada compartilham a mesma |
+| GET | `/api/photo/{photo_id}/file` | Retorna uma imagem exibível no browser. |
+| DELETE | `/api/photo/{photo_id}/proxy` | Cancela tarefas e apaga o arquivo proxy WebP físico da foto no disco. |
+| POST | `/api/photo/{photo_id}/retry` | Reinicia a geração de proxy e análise de uma foto individual. |
+| GET | `/api/photo/{photo_id}/thumbnail` | Miniatura pequena da foto, gerada uma vez e cacheada em disco. |
+| PATCH | `/api/photo/{photo_id}/title` | Atualização manual/humana do título da foto. |
+| GET | `/api/photos` | Lista todas as fotos e injeta caminhos relativos de proxies se existirem. |
+| POST | `/api/project/open-folder-in-explorer` | Abre um diretório ou a pasta do arquivo no Windows Explorer nativo. |
+| POST | `/api/project/open-proxies-folder` | Abre a pasta local de proxies no Windows Explorer. |
+| POST | `/api/project/{project_id}/analyze-all-vision` | Analisa de forma assíncrona todas as mídias pendentes ou todas (se force=True) de visão, aplicando detecção facial e burst-sequencing de fotos. |
+| GET | `/api/project/{project_id}/bins` | Retorna a lista de todas as pastas virtuais (bins) do projeto. |
+| POST | `/api/project/{project_id}/bins` | Cria ou atualiza uma pasta virtual no projeto. |
+| DELETE | `/api/project/{project_id}/bins` | Remove uma pasta virtual da biblioteca sem apagar nenhum arquivo físico. |
+| PATCH | `/api/project/{project_id}/bins/color` | Altera a cor temática do bin. |
+| PATCH | `/api/project/{project_id}/bins/rename` | Renomeia uma pasta virtual e propaga para subpastas e mídias. |
+| GET | `/api/project/{project_id}/regenerate-titles` | Dispara a regeneração em lote dos títulos executivos curtos (3 a 6 palavras) via IA. |
+| POST | `/api/project/{project_id}/regenerate-titles` | Dispara a regeneração em lote dos títulos executivos curtos (3 a 6 palavras) via IA. |
+| POST | `/api/project/{project_id}/relink` | Varre uma pasta raiz com subpastas para relincar automaticamente mídias desconectadas. |
+| POST | `/api/project/{project_id}/retry-failed` | Efetua retry em lote de todas as mídias falhas (status error) ou com proxies físicos ausentes. |
+| POST | `/api/project/{project_id}/scan-watch` | Escaneia a pasta watch/ em background e registra os novos arquivos. |
+| POST | `/api/project/{project_id}/transcribe-all` | Inicia transcrição ASR em lote para todos os depoimentos pendentes do projeto. |
+| POST | `/api/project/{project_id}/transcribe-worker` | Lança o worker de transcrição em PROCESSO SEPARADO e devolve o PID. |
+| GET | `/api/project/{project_id}/triage/review` | Mídias cuja triagem merece revisão humana: confiança abaixo de |
+| POST | `/api/projects/{project_id}/generate-waveforms` | Gera waveforms em background para todos os vídeos cadastrados no projeto. |
+| POST | `/api/projects/{project_id}/relink` | Varre um diretório recursivamente buscando arquivos originais para reconectar |
+| POST | `/api/task/{task_key}` | Remove ou cancela a tarefa da lista de progresso em segundo plano. |
+| DELETE | `/api/task/{task_key}` | Remove ou cancela a tarefa da lista de progresso em segundo plano. |
+| POST | `/api/task/{task_key}/cancel` | Cancela qualquer tarefa em segundo plano via seu task_key. |
+| DELETE | `/api/task/{task_key}/cancel` | Cancela qualquer tarefa em segundo plano via seu task_key. |
+| DELETE | `/api/video/{video_id}` | Deleta o vídeo do banco e apaga seu proxy físico correspondente. |
+| POST | `/api/video/{video_id}/analyze-all` | Executa o pipeline completo de IA (ASR + Visão + Rostos + Indexação Vetorial) para um único vídeo. |
+| POST | `/api/video/{video_id}/analyze-vision` | Inicia a decupagem visual multimodal do B-roll via OpenRouter Vision. |
+| GET | `/api/video/{video_id}/audio/analysis` | Pre-analise de audio do clipe (plano de ajustes de áudio, não versionado, secao 5). |
+| POST | `/api/video/{video_id}/audio/render` | Aplica a cadeia ffmpeg e gera o WAV tratado (Tipo B, secao 6 do plano). |
+| GET | `/api/video/{video_id}/audio/render/{chain_hash}` | Estado do render (contrato F2): status, path, progresso na tela de Tarefas |
+| POST | `/api/video/{video_id}/cancel-conversion` | Cancela o processo ativo de codificação ou análise visual de um vídeo. |
+| POST | `/api/video/{video_id}/cancel-thumbnails` | Cancela a geração progressiva de miniaturas de um vídeo. |
+| PATCH | `/api/video/{video_id}/category` | Correção humana de categoria: persiste com confiança 1.0, registra o |
+| POST | `/api/video/{video_id}/crucial-moments` | Adiciona, remove ou substitui momentos cruciais de um vídeo. |
+| POST | `/api/video/{video_id}/hover-duration` | Define ou limpa a duração customizada de hover play para um vídeo específico. |
+| GET | `/api/video/{video_id}/metadata-history` | Versões anteriores da decupagem editorial, mais recente primeiro. |
+| POST | `/api/video/{video_id}/metadata-history/{history_id}/restore` | Restaura uma versão arquivada. A versão atual é arquivada antes, então dá para voltar. |
+| POST | `/api/video/{video_id}/override-status` | Permite ao usuário alternar manualmente o status de uma mídia entre 'error' e 'analyzed'. |
+| PUT | `/api/video/{video_id}/override-status` | Permite ao usuário alternar manualmente o status de uma mídia entre 'error' e 'analyzed'. |
+| POST | `/api/video/{video_id}/pause-thumbnails` | Pausa a geração progressiva de miniaturas de um vídeo. |
+| DELETE | `/api/video/{video_id}/proxy` | Cancela conversões e apaga o arquivo proxy MP4 físico do disco. |
+| POST | `/api/video/{video_id}/relink` | Relinca o caminho do arquivo de vídeo original com um novo arquivo no disco. |
+| POST | `/api/video/{video_id}/resume-thumbnails` | Retoma a geração progressiva de miniaturas de um vídeo. |
+| POST | `/api/video/{video_id}/retry` | Reinicia a codificação de proxy de um vídeo individual. |
+| GET | `/api/video/{video_id}/stream` | Retorna o arquivo de vídeo original ou proxy para streaming no player/card. |
+| GET | `/api/video/{video_id}/thumbnail` |  |
+| POST | `/api/video/{video_id}/thumbnail` | Extrai e define uma miniatura específica no timestamp fornecido. |
+| GET | `/api/video/{video_id}/thumbnail-at` | Retorna o thumbnail do vídeo no timestamp fornecido com suporte a carregamento progressivo e extração sob demanda. |
+| PATCH | `/api/video/{video_id}/title` | Atualização manual/humana do título executivo do vídeo. |
+| POST | `/api/video/{video_id}/transcribe` | Inicia a transcrição ASR AssemblyAI e indexação semântica em background. |
+| GET | `/api/videos` | Lista todos os vídeos cadastrados no projeto. |
+| GET | `/api/videos/{video_id}/waveform` | Retorna os picos Min/Max normalizados (-1.0 a 1.0) do arquivo de áudio/vídeo. |
+
+### Modelos locais
+
+| Método | Rota | Descrição |
+| :--- | :--- | :--- |
+| GET | `/api/modelos` |  |
+| POST | `/api/modelos/{modelo_id}/baixar` |  |
+
+### Narratives & Search
+
+| Método | Rota | Descrição |
+| :--- | :--- | :--- |
+| GET | `/api/agent/models` | Retorna os modelos de agente de edição configurados e o padrão do sistema (Fase 1). |
+| POST | `/api/project/cluster-themes` | Dispara processamento de clustering de temas em background. |
+| POST | `/api/project/{project_id}/chat` | Interface chatbot RAG (legado) ou Agente de Edição ativo (se timeline for enviada). |
+| POST | `/api/project/{project_id}/facets/backfill-palette` | Backfill de paleta/temperatura de cor das FOTOS (E2.D2) a partir dos proxies locais. |
+| POST | `/api/project/{project_id}/facets/backfill-shot-scale` | Backfill das facetas visuais (E2.D1/D3) para o acervo JÁ indexado. |
+| POST | `/api/render/revelar` | Abre o gerenciador de arquivos com o arquivo renderizado SELECIONADO. |
+| GET | `/api/search` | Busca híbrida inteligente cruzando metadados relacionais e Qdrant vetorial. |
+| POST | `/api/search/categorize` | Agrupa os resultados da busca em categorias semânticas via LLM. |
+| POST | `/api/search/reindex` | Re-embeda todo o acervo com o modelo de embeddings atual (após troca de modelo). |
+| GET | `/api/search/visual` | Busca visual pura por CLIP local (texto → imagem, sem custo de API), com facetas. |
+| POST | `/api/theme/segment` | Associa um trecho de vídeo a um tema narrativo. |
+| DELETE | `/api/theme/segment/{segment_id}` | Remove uma associação de tema segmentado. |
+| GET | `/api/theme/{theme_id}/segments` | Retorna os trechos exatos (mídia + intervalo de tempo) vinculados a um tema. |
+| GET | `/api/themes` | Retorna os temas catalogados com contagem de segmentos (trechos com timecode). |
+| GET | `/api/timeline` | Retorna todas as timelines cadastradas do projeto. |
+| POST | `/api/timeline` | Salva um novo rascunho de timeline (formato v2 multipista). |
+| POST | `/api/timeline/ai-suggest` | Analisa o corte ATUAL da timeline (transcrições dos trechos, descrições visuais, |
+| POST | `/api/timeline/import` | Importa um arquivo de timeline (.otio/.xml/.edl) e recria a timeline no projeto. |
+| GET | `/api/timeline/{timeline_id}` | Carrega uma timeline salva (normalizada para o formato v2 com trilhas e posições). |
+| GET | `/api/timeline/{timeline_id}/export/{export_format}` | Exporta a timeline em formato XML/EDL/OTIO e retorna o arquivo para download. |
+| POST | `/api/timeline/{timeline_id}/render` | Valida, recusa em bloqueio e ENFILEIRA o render -- nunca segura o request. |
+| POST | `/api/timeline/{timeline_id}/render/preflight` | Diagnóstico do modal de exportação: NÃO renderiza nada. |
+| GET | `/api/timeline/{timeline_id}/render/ultimo` | Resultado do último render, para o modal reabrir com estado. |
+| GET | `/api/video/{video_id}/diarization-clues` | Calcula e retorna pistas de diarização baseadas em silêncios, perguntas e rostos. |
+| POST | `/api/video/{video_id}/edit-dialogue` | Atualiza o diálogo em um trecho específico e re-indexa no Qdrant. |
+| POST | `/api/video/{video_id}/rename-speaker` | Renomeia um falante local ou globalmente e atualiza o índice semântico. |
+| POST | `/api/video/{video_id}/split-transcript` | Divide a fala em um timestamp específico e atualiza falantes subsequentes. |
+| GET | `/api/video/{video_id}/transcript` | Retorna a transcrição interativa agrupada por blocos de diálogos e palavras individuais. |
+| GET | `/api/video/{video_id}/vision` | Retorna descrições de frames de B-roll enriquecidas com rostos/objetos do banco de dados (tolerância 5.0s). |
+
+### Projects
+
+| Método | Rota | Descrição |
+| :--- | :--- | :--- |
+| DELETE | `/api/docs/{doc_id}` | Remove um documento de contexto e limpa seus vetores associados. |
+| POST | `/api/onboarding/api-key` | Salva a chave de API fornecida no onboarding nas configurações globais. |
+| POST | `/api/onboarding/chat` | Chat inteligente de onboarding com IA em nuvem ou inteligência especializada nativa. |
+| POST | `/api/onboarding/chat/stream` | Mesmo chat de /api/onboarding/chat, com o texto chegando aos poucos (Server-Sent Events). |
+| POST | `/api/project/backup-db` | Faz backup manual do arquivo de banco de dados SQLite para o S3. |
+| POST | `/api/project/import` | Recebe um ZIP exportado e reconstrói o projeto, mídias e índices vetoriais. |
+| GET | `/api/project/{project_id}/docs` | Retorna a lista de documentos de contexto cadastrados do projeto. |
+| POST | `/api/project/{project_id}/docs` | Faz upload de um documento de roteiro/pauta e indexa no Qdrant. |
+| PUT | `/api/project/{project_id}/drive-link` | Atualiza o link do Google Drive de referência do projeto. |
+| POST | `/api/project/{project_id}/export` | Agrupa metadados e arquivos de mídia do projeto em um arquivo ZIP para download. |
+| GET | `/api/project/{project_id}/fonts` | Fontes enviadas para o projeto: [{familia, arquivo, tamanho, url}]. |
+| POST | `/api/project/{project_id}/fonts` | Guarda um arquivo de fonte (.ttf/.otf/.woff/.woff2) no projeto. |
+| GET | `/api/project/{project_id}/fonts/{arquivo}` |  |
+| DELETE | `/api/project/{project_id}/fonts/{arquivo}` |  |
+| PUT | `/api/project/{project_id}/objetivo` | Objetivo do projeto (ex.: 'making of do longa MONSTRO'). A triagem e a Laya leem |
+| GET | `/api/project/{project_id}/speakers` | Retorna lista consolidada de falantes e rostos rotulados do projeto. |
+| GET | `/api/projects` | Retorna uma lista com todos os projetos cadastrados. |
+| POST | `/api/projects` | Cria um novo projeto de documentário ou making of. |
+| DELETE | `/api/projects/{project_id}` | Deleta um projeto e todas as suas mídias associadas no SQLite (em cascata). |
+
+### Scenes
+
+| Método | Rota | Descrição |
+| :--- | :--- | :--- |
+| POST | `/api/docs/{doc_id}/extract-structure` | Dispara a extração estruturada em background. IO-bound (chamadas HTTP |
+| GET | `/api/docs/{doc_id}/extraction` | Última rodada de extração deste documento (status, custo, estratégia usada). |
+| GET | `/api/docs/{doc_id}/structure-preview` | Roda a detecção de formato do roteiro sem gastar API (a menos que llm=true), |
+| GET | `/api/project/{project_id}/scenes` |  |
+| POST | `/api/scenes/bulk-status` | Aceita/rejeita cenas sugeridas em massa (curadoria da aba Docs). |
+
+### Sistema
+
+| Método | Rota | Descrição |
+| :--- | :--- | :--- |
+| GET | `/api/health` | Retorna o status de saúde do backend: SQLite, Qdrant, Hardware/GPU e porta em execução. |
+
+<!-- GERADO:API:FIM -->
