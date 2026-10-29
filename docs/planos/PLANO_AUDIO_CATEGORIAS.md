@@ -2,7 +2,7 @@
 
 > Criado em 06/10/2026. Decidido com o Fernando: a lista de categorias abaixo serve; implementar
 > **genérico** e **calibrar depois**. ⚠ **FALTA CALIBRAR**: não há arquivos de efeito, room tone
-> e ambiente no acervo (seção 6). Contexto: `docs/REVISAO_CATEGORIAS.md`.
+> e ambiente no acervo (seção 6). Contexto: `docs/planos/REVISAO_CATEGORIAS.md`.
 
 ## 1. Situação hoje (lida no código)
 

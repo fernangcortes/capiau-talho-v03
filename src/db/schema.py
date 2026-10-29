@@ -271,7 +271,7 @@ CREATE TABLE IF NOT EXISTS media_segment (
 
 -- Descricao da visao por keyframe. Antes so existia no Qdrant (unica copia de um
 -- dado pago); aqui alimenta o resumo mesclado fala+imagem e a reindexacao sem API
--- (ex.: docs/PLANO_EMBEDDINGGEMMA2.md, 1.4). Saida da IA: a reanalise substitui.
+-- (ex.: docs/planos/PLANO_EMBEDDINGGEMMA2.md, 1.4). Saida da IA: a reanalise substitui.
 CREATE TABLE IF NOT EXISTS video_keyframe (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     project_id INTEGER NOT NULL REFERENCES project(id) ON DELETE CASCADE,
@@ -634,7 +634,7 @@ def migrate_storage_schema(conn: sqlite3.Connection) -> None:
 
 
 def migrar_taxonomia_categorias(conn: sqlite3.Connection) -> None:
-    """Chaves antigas de categoria -> novas (docs/REVISAO_CATEGORIAS.md, proposta B).
+    """Chaves antigas de categoria -> novas (docs/planos/REVISAO_CATEGORIAS.md, proposta B).
 
     Idempotente: só toca linhas que ainda têm o nome antigo. 'pessoal' deixa de ser
     categoria: no vídeo vira a marca fora_do_projeto (categoria vazia, para a triagem
@@ -662,7 +662,7 @@ def migrar_taxonomia_categorias(conn: sqlite3.Connection) -> None:
 
 
 def migrar_natureza(conn: sqlite3.Connection) -> None:
-    """Coluna video.natureza (docs/PLANO_AUDIO_CATEGORIAS.md, camada 1).
+    """Coluna video.natureza (docs/planos/PLANO_AUDIO_CATEGORIAS.md, camada 1).
 
     Idempotente. Ao criar a coluna, marca como áudio o que a extensão já diz que é;
     imagem parada (como o vídeo 555) só a análise descobre, porque pede ler quadros.
@@ -766,14 +766,14 @@ def init_db(db_path: Path = None):
             cursor.execute("ALTER TABLE video ADD COLUMN category_confidence REAL")
             print("[MIGRATION] Coluna 'category_confidence' adicionada a tabela video.")
         # Perfil de esforço com que a visão rodou e aviso de análise desatualizada
-        # (docs/ORDEM_DAS_ANALISES.md, item 5)
+        # (docs/planos/ORDEM_DAS_ANALISES.md, item 5)
         if "esforco_analisado" not in video_cols:
             cursor.execute("ALTER TABLE video ADD COLUMN esforco_analisado TEXT")
             print("[MIGRATION] Coluna 'esforco_analisado' adicionada a tabela video.")
         if "analise_desatualizada" not in video_cols:
             cursor.execute("ALTER TABLE video ADD COLUMN analise_desatualizada TEXT")
             print("[MIGRATION] Coluna 'analise_desatualizada' adicionada a tabela video.")
-        # Triagem em dois eixos (docs/REVISAO_CATEGORIAS.md): misto e fora do projeto
+        # Triagem em dois eixos (docs/planos/REVISAO_CATEGORIAS.md): misto e fora do projeto
         if "categorias_secundarias" not in video_cols:
             cursor.execute("ALTER TABLE video ADD COLUMN categorias_secundarias TEXT")
             print("[MIGRATION] Coluna 'categorias_secundarias' adicionada a tabela video.")
@@ -795,7 +795,7 @@ def init_db(db_path: Path = None):
             cursor.execute("ALTER TABLE video ADD COLUMN metadata_origem TEXT DEFAULT 'ia'")
             print("[MIGRATION] Coluna 'metadata_origem' adicionada a tabela video.")
 
-        # Gerenciamento de cor -- Fase 0 de docs/PLANO_COR_OCIO.md.
+        # Gerenciamento de cor -- Fase 0 de docs/planos/PLANO_COR_OCIO.md.
         # As cinco primeiras guardam a tag CRUA do FFprobe (NULL = o arquivo nao
         # declarou nada, que e o caso dos 259 .MTS do acervo). color_profile e
         # color_profile_origem sao a INTERPRETACAO de src/color/deteccao.py: o
@@ -878,7 +878,7 @@ def init_db(db_path: Path = None):
             cursor.execute("ALTER TABLE photo ADD COLUMN palette_hex TEXT")
             print("[MIGRATION] Coluna 'palette_hex' adicionada a tabela photo.")
 
-        # Cor da foto -- Fase 0 de docs/PLANO_COR_OCIO.md. color_profile aqui e
+        # Cor da foto -- Fase 0 de docs/planos/PLANO_COR_OCIO.md. color_profile aqui e
         # 'raw' (CR2: a cor final e decidida pelo rawpy, nao pelo arquivo) ou o
         # espaco declarado no EXIF (JPEG). raw_params_json fica NULL ate a Fase 1.2
         # passar parametros EXPLICITOS ao rawpy -- hoje ele roda com os defaults,

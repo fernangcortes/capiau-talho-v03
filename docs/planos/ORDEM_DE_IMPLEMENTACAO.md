@@ -11,7 +11,7 @@ risco.
 > ou commit) e as dependências. Os ids dos planos sem numeração própria (NUV, EG2, OBJ, VPT, DOCK, RM,
 > TM, C01 a C08, PCM, PCA, MCP, AUP, CUS) foram atribuídos nesta análise.
 >
-> **Fora desta análise:** `docs/PLANO_SUITE_NLE_CLASSICO.md` (o plano da suíte NLE), que não está no
+> **Fora desta análise:** `docs/planos/PLANO_SUITE_NLE_CLASSICO.md` (o plano da suíte NLE), que não está no
 > repositório. As Tasks 16 a 25 foram reconstruídas pelo roadmap e conferidas no código. Quando o
 > plano chegar, ele é cruzado com este documento e com a proposta da Sequência Fantasma (seção 7).
 
@@ -80,29 +80,29 @@ contas na nuvem, de hardware ou de teste com mouse real ficaram como "não verif
 
 | Documento | Itens | Feito | Parcial | Ausente | Fora do repo | Obsoleto | Leitura |
 | :--- | ---: | ---: | ---: | ---: | ---: | ---: | :--- |
-| `docs/PLANO_IMPLEMENTACAO.md` | 87 | 34 | 15 | 27 | 8 | 2 | Etapas 1 e 2 quase completas; da Etapa 3 só existe a parte de roteiro (P2); da Etapa 4, nada. Parado desde 23/08, contradiz o código (taxonomia antiga, limiar de rajada 0,93). Um item (E3.E5) foi dividido em dois. |
-| `docs/ORDEM_DAS_ANALISES.md` | 20 | 9 | 3 | 7 | 1 | 0 | As correções de 05 e 06/10 estão no código; sobram itens da seção 7. |
-| `docs/REVISAO_CATEGORIAS.md` | 35 | 17 | 10 | 5 | 3 | 0 | Taxonomia, regras e perfis no código; falta o que depende de rodada paga e do banco de casa. |
-| `docs/proximos_chats/01` | 8 | 8 | 0 | 0 | 0 | 0 | Feito. O prompt virou histórico. |
-| `docs/proximos_chats/02` | 7 | 0 | 1 | 6 | 0 | 0 | Chaves sem leitor e `hardware.ai_device`, que nada lê. |
-| `docs/proximos_chats/03` a `05` | 20 | 0 | 0 | 18 | 2 | 0 | Busca por objeto (rotas B, A/D e C): nada no código; depende de decisões. |
-| `docs/proximos_chats/06` | 7 | 0 | 2 | 5 | 0 | 0 | Gabaritos humanos: falta a página de marcação e o importador das revisões. |
-| `docs/proximos_chats/07` | 6 | 0 | 2 | 2 | 2 | 0 | Pendências externas (chaves, ambiente nemo, testes de modelos). |
-| `docs/proximos_chats/08` | 24 | 0 | 3 | 17 | 3 | 1 | Plano-sequência: scripts de exploração; nada integrado ao app. |
-| `docs/proximos_chats/README.md` | 8 | 3 | 1 | 4 | 0 | 0 | Decisões abertas sobre objetos. |
-| `docs/PROMPT_CONFIGURAR_MODELOS_2026.md` | 5 | 2 | 2 | 0 | 0 | 1 | Histórico; resta tirar opções que não funcionam. |
-| `docs/PROMPT_PROXIMO_CHAT_CATEGORIAS_AUDIO.md` | 10 | 2 | 3 | 4 | 1 | 0 | Camadas de áudio 1 e 2 feitas; o resto depende do banco de casa. |
-| `docs/PLANO_EMBEDDINGGEMMA2.md` | 32 | 1 | 0 | 27 | 4 | 0 | Nada implementado; a bancada de teste não precisa dos arquivos do usuário. |
-| `docs/PROPOSTA_BUSCA_OBJETOS.md` | 33 | 0 | 2 | 30 | 0 | 1 | Nada implementado; a categoria `obra` virou `cena` e os filtros do plano não acham nada. |
-| `docs/PLANO_NUVEM.md` | 64 | 1 | 1 | 53 | 8 | 1 | Só NUV.1 feito; o resto depende de decisões e contas. |
-| `docs/PESQUISA_VIDEO_AUDIO_MCP.md` | 13 | 0 | 2 | 2 | 5 | 4 | Superada pela decisão de um MCP próprio do Talho, com Claude Code. |
-| `docs/AUPHONIC_AUDIO_RESTORATION_GUIDE.md` | 18 | 3 | 8 | 0 | 3 | 4 | A trilha Auphonic do código está à frente do guia. |
-| `docs/costs_and_security.md` | 11 | 4 | 0 | 1 | 5 | 1 | Defasado (cita ChromaDB e modelos antigos); o resto é cuidado de conta do usuário. |
-| `docs/PLANO_VIEWPORT_TRANSFORM_CROP.md` | 37 | 24 | 6 | 2 | 1 | 4 | Quase todo feito; sobram o undo de fps e tamanho e a paridade do crop. |
-| `docs/HANDOFF_JANELAS_DRAG_DOCK.md` | 34 | 15 | 2 | 15 | 2 | 0 | Metade feita; as pendências reais são quase todas pequenas. |
-| `docs/TESTE_MANUAL_TRACK_BASED_NLE.md` | 20 | 17 | 3 | 0 | 0 | 0 | Os recursos existem; o roteiro está desatualizado (atalhos) e precisa ser refeito. |
+| `docs/planos/PLANO_IMPLEMENTACAO.md` | 87 | 34 | 15 | 27 | 8 | 2 | Etapas 1 e 2 quase completas; da Etapa 3 só existe a parte de roteiro (P2); da Etapa 4, nada. Parado desde 23/08, contradiz o código (taxonomia antiga, limiar de rajada 0,93). Um item (E3.E5) foi dividido em dois. |
+| `docs/planos/ORDEM_DAS_ANALISES.md` | 20 | 9 | 3 | 7 | 1 | 0 | As correções de 05 e 06/10 estão no código; sobram itens da seção 7. |
+| `docs/planos/REVISAO_CATEGORIAS.md` | 35 | 17 | 10 | 5 | 3 | 0 | Taxonomia, regras e perfis no código; falta o que depende de rodada paga e do banco de casa. |
+| `docs/agentes/proximos_chats/01` | 8 | 8 | 0 | 0 | 0 | 0 | Feito. O prompt virou histórico. |
+| `docs/agentes/proximos_chats/02` | 7 | 0 | 1 | 6 | 0 | 0 | Chaves sem leitor e `hardware.ai_device`, que nada lê. |
+| `docs/agentes/proximos_chats/03` a `05` | 20 | 0 | 0 | 18 | 2 | 0 | Busca por objeto (rotas B, A/D e C): nada no código; depende de decisões. |
+| `docs/agentes/proximos_chats/06` | 7 | 0 | 2 | 5 | 0 | 0 | Gabaritos humanos: falta a página de marcação e o importador das revisões. |
+| `docs/agentes/proximos_chats/07` | 6 | 0 | 2 | 2 | 2 | 0 | Pendências externas (chaves, ambiente nemo, testes de modelos). |
+| `docs/agentes/proximos_chats/08` | 24 | 0 | 3 | 17 | 3 | 1 | Plano-sequência: scripts de exploração; nada integrado ao app. |
+| `docs/agentes/proximos_chats/README.md` | 8 | 3 | 1 | 4 | 0 | 0 | Decisões abertas sobre objetos. |
+| `docs/agentes/PROMPT_CONFIGURAR_MODELOS_2026.md` | 5 | 2 | 2 | 0 | 0 | 1 | Histórico; resta tirar opções que não funcionam. |
+| `docs/agentes/PROMPT_PROXIMO_CHAT_CATEGORIAS_AUDIO.md` | 10 | 2 | 3 | 4 | 1 | 0 | Camadas de áudio 1 e 2 feitas; o resto depende do banco de casa. |
+| `docs/planos/PLANO_EMBEDDINGGEMMA2.md` | 32 | 1 | 0 | 27 | 4 | 0 | Nada implementado; a bancada de teste não precisa dos arquivos do usuário. |
+| `docs/propostas/PROPOSTA_BUSCA_OBJETOS.md` | 33 | 0 | 2 | 30 | 0 | 1 | Nada implementado; a categoria `obra` virou `cena` e os filtros do plano não acham nada. |
+| `docs/planos/PLANO_NUVEM.md` | 64 | 1 | 1 | 53 | 8 | 1 | Só NUV.1 feito; o resto depende de decisões e contas. |
+| `docs/Pesquisas/PESQUISA_VIDEO_AUDIO_MCP.md` | 13 | 0 | 2 | 2 | 5 | 4 | Superada pela decisão de um MCP próprio do Talho, com Claude Code. |
+| `docs/dev/AUPHONIC_AUDIO_RESTORATION_GUIDE.md` | 18 | 3 | 8 | 0 | 3 | 4 | A trilha Auphonic do código está à frente do guia. |
+| `docs/usuario/costs_and_security.md` | 11 | 4 | 0 | 1 | 5 | 1 | Defasado (cita ChromaDB e modelos antigos); o resto é cuidado de conta do usuário. |
+| `docs/planos/PLANO_VIEWPORT_TRANSFORM_CROP.md` | 37 | 24 | 6 | 2 | 1 | 4 | Quase todo feito; sobram o undo de fps e tamanho e a paridade do crop. |
+| `docs/agentes/HANDOFF_JANELAS_DRAG_DOCK.md` | 34 | 15 | 2 | 15 | 2 | 0 | Metade feita; as pendências reais são quase todas pequenas. |
+| `docs/usuario/TESTE_MANUAL_TRACK_BASED_NLE.md` | 20 | 17 | 3 | 0 | 0 | 0 | Os recursos existem; o roteiro está desatualizado (atalhos) e precisa ser refeito. |
 | Roadmap (`wiki/17`, `README.md`) | 47 | 31 | 7 | 9 | 0 | 0 | Desatualizado: Tasks 16 a 18 e track lock feitos; OpenColorIO dado como feito, mas não existe. |
-| `docs/PROPOSTA_SEQUENCIA_FANTASMA_IA.md` | 14 | 0 | 1 | 13 | 0 | 0 | Nada implementado (é de 17/10). Defeitos D1 a D6 confirmados; D2 é pior e D6 é diferente do descrito. |
+| `docs/propostas/PROPOSTA_SEQUENCIA_FANTASMA_IA.md` | 14 | 0 | 1 | 13 | 0 | 0 | Nada implementado (é de 17/10). Defeitos D1 a D6 confirmados; D2 é pior e D6 é diferente do descrito. |
 | **Total** | **560** | **171** | **74** | **247** | **48** | **19** | Mais 1 item dividido. |
 
 "Fora do repo" = não verificável sem o banco de casa, contas, hardware, teste com mouse real ou
@@ -202,7 +202,7 @@ descarta cor sólida e camada de ajuste (`otio_export.py:164-168`) e não escrev
 
 **3.12 O Cartão de Contexto muda o custo.** O Cartão (E3.A3) entra em cinco prompts e soma até cerca
 de 2.000 tokens a cada chamada paga de triagem e visão; o piloto mediu 2.212 tokens de entrada por
-clipe (`docs/REVISAO_CATEGORIAS.md:344`). Calibrar e estimar a reanálise sem ele e acrescentá-lo
+clipe (`docs/planos/REVISAO_CATEGORIAS.md:344`). Calibrar e estimar a reanálise sem ele e acrescentá-lo
 depois invalida a estimativa. Ele entra na Onda 2, antes da calibração, e o teste A/B dele roda na
 mesma bancada.
 
@@ -240,7 +240,7 @@ limites de gasto.
 
 ## 5. A ordem
 
-![Ordem de implementação em ondas e trilhas](images/ordem-implementacao-ondas.svg)
+![Ordem de implementação em ondas e trilhas](../images/ordem-implementacao-ondas.svg)
 
 ### Onda 0 — Destravar
 
@@ -458,7 +458,7 @@ comparação (C03.3), na Onda 3.
 
 ## 9. Como usar este documento
 
-- Cada onda pode virar uma série de chats, no formato de `docs/proximos_chats/`: um prompt por
+- Cada onda pode virar uma série de chats, no formato de `docs/agentes/proximos_chats/`: um prompt por
   trilha, com as regras do repositório repetidas e o portão de saída como critério de aceite.
 - Antes de começar um item, confira a linha dele no CSV (evidência e dependências) e no documento de
   origem. A conferência foi estática e tem data.

@@ -15,7 +15,7 @@ Três correções de fato, verificadas no código:
 
 **Já está pronto.** O projeto roda Starlette 1.6.0, cujo `FileResponse` trata o header
 `Range` nativamente (`starlette/responses.py:362`, retorna 206 + `Content-Range`).
-Todas as rotas de mídia em [`media.py`](../src/api/routes/media.py) usam `FileResponse`.
+Todas as rotas de mídia em [`media.py`](../../src/api/routes/media.py) usam `FileResponse`.
 Não há nada a fazer. O código de exemplo da pesquisa reimplementaria à mão algo que
 o framework já faz melhor.
 
@@ -81,7 +81,7 @@ KEYFRAME @ 16.683333
 ```
 
 **Um keyframe a cada 8,34 segundos** — 250 frames a 29,97fps, que é o `keyint` default
-do x264. [`generate_video_proxy()`](../src/media/ffmpeg.py):195 nunca passa `-g`.
+do x264. [`generate_video_proxy()`](../../src/media/ffmpeg.py):195 nunca passa `-g`.
 
 Consequência: cada scrub na timeline força o browser a decodificar até 250 frames a
 partir do keyframe anterior. É essa a origem do "laggy" que a pesquisa atribui ao
@@ -94,7 +94,7 @@ partir do keyframe anterior. É essa a origem do "laggy" que a pesquisa atribui 
 
 ## Implementação
 
-Em [`src/media/ffmpeg.py`](../src/media/ffmpeg.py):208, no `cmd` de `generate_video_proxy`:
+Em [`src/media/ffmpeg.py`](../../src/media/ffmpeg.py):208, no `cmd` de `generate_video_proxy`:
 
 ```python
     # GOP de ~1s: keyframe a cada N frames, sem keyframes extras por corte de cena.
@@ -120,7 +120,7 @@ Em [`src/media/ffmpeg.py`](../src/media/ffmpeg.py):208, no `cmd` de `generate_vi
 
 `generate_video_proxy` ainda não recebe o fps da fonte. Duas opções:
 
-- adicionar parâmetro `source_fps: float` e passar de [`ingest.py`](../src/services/ingest.py)
+- adicionar parâmetro `source_fps: float` e passar de [`ingest.py`](../../src/services/ingest.py)
   (o fps já está no banco, coluna `video.fps`);
 - ou fixar `-g 30` para todo mundo — mais simples, aceitável, GOP entre 0,5s (59,94fps) e 1,25s (24fps).
 
@@ -155,7 +155,7 @@ timeline id 4: {'video_id': 89, 'in': 3.72589, 'out': 15.126423, 'timeline_start
 timeline id 2: {'video_id': 54, 'in': 1.425321, 'out': 6.764048}
 ```
 
-E [`otio_export.py:175`](../src/export/otio_export.py):175 converte de volta com **truncamento**:
+E [`otio_export.py:175`](../../src/export/otio_export.py):175 converte de volta com **truncamento**:
 
 ```python
 start_time=otio.opentime.RationalTime(int(in_s * fps), fps),
@@ -232,7 +232,7 @@ falhar explícito a assumir 24.
 
 ## Diagnóstico
 
-[`timelineRenderer.js:714`](../src/ui/js/timelineRenderer.js):714 pede cada miniatura
+[`timelineRenderer.js:714`](../../src/ui/js/timelineRenderer.js):714 pede cada miniatura
 individualmente:
 
 ```javascript
@@ -303,7 +303,7 @@ não tem GPU dedicada — só Intel UHD 630, que não serve para inferência de 
 
 Além disso, a diarização do WhisperX não é "nativa": ela chama **pyannote.audio**, que
 exige token do HuggingFace, aceite de licença e é pesada em CPU. Hoje o
-[`asr_engine.py:174`](../src/transcription/asr_engine.py):174 obtém diarização de graça
+[`asr_engine.py:174`](../../src/transcription/asr_engine.py):174 obtém diarização de graça
 com `speaker_labels=True` na AssemblyAI. Trocar por local **piora** esse aspecto até
 prova em contrário.
 
@@ -327,7 +327,7 @@ para o fluxo de trabalho de documentário.
 ## Implementação (se o benchmark aprovar)
 
 Não substituir — **tornar plugável**. Espelhar o padrão que o projeto já usa em
-[`src/vision/backends/`](../src/vision/backends/) (`base.py`, `local_backend.py`,
+[`src/vision/backends/`](../../src/vision/backends/) (`base.py`, `local_backend.py`,
 `aws_backend.py`, `azure_backend.py`):
 
 ```
@@ -350,7 +350,7 @@ padrão `assemblyai`. Assim nada quebra e dá para comparar lado a lado no acerv
    o Whisper já devolve timestamps por palavra com `word_timestamps=True`).
 4. Expor o seletor nas configurações do projeto.
 5. Diarização local: **fase separada**, só se o passo 1 mostrar folga de CPU.
-6. Documentar o custo real medido em [`costs_and_security.md`](costs_and_security.md).
+6. Documentar o custo real medido em [`costs_and_security.md`](../usuario/costs_and_security.md).
 
 ## Ponto de atenção
 
@@ -429,8 +429,8 @@ nova da pesquisa que abre uma categoria de busca que não existe.
 
 ## Implementação
 
-O gancho já existe: [`vision_batch.py`](../src/services/vision_batch.py) e
-[`media_segment`](../src/db/schema.py):224 já processam frames-chave por segmento.
+O gancho já existe: [`vision_batch.py`](../../src/services/vision_batch.py) e
+[`media_segment`](../../src/db/schema.py):224 já processam frames-chave por segmento.
 O OCR entra no mesmo laço, sobre frames que já são extraídos — custo marginal de I/O zero.
 
 1. Tabela `ocr_text` (`video_id`, `photo_id`, `timestamp`, `text`, `confidence`, `bbox`)
@@ -440,7 +440,7 @@ O OCR entra no mesmo laço, sobre frames que já são extraídos — custo margi
    OCR em vídeo comprimido gera muito lixo.
 3. Indexar o texto no Qdrant, na coleção de texto existente, com payload marcando
    `source: "ocr"` — assim a busca semântica atual passa a alcançar B-roll sem mudança na UI.
-4. Filtro `ocr:` no [`searchParser.js`](../src/ui/js/searchParser.js), que já tem
+4. Filtro `ocr:` no [`searchParser.js`](../../src/ui/js/searchParser.js), que já tem
    gramática de filtros.
 
 ## Ponto de atenção
@@ -465,7 +465,7 @@ O que **sobraria** para o WebCodecs resolver de fato:
 - acesso a `VideoFrame` para análise de IA no cliente — não é o modelo do Talho (a IA roda no backend).
 
 Nenhum dos dois é dor atual. E o `player.js` (1923 linhas) tem lógica não trivial de
-anti-drift em playback multi-clipe ([linhas 1076-1101](../src/ui/js/player.js)) que
+anti-drift em playback multi-clipe ([linhas 1076-1101](../../src/ui/js/player.js)) que
 precisaria ser reescrita do zero — risco alto de regressão em algo que já funciona.
 
 Se um dia for feito, o pré-requisito é o índice de keyframes por proxy — que a Ferramenta 1
@@ -478,11 +478,11 @@ torna trivial (keyframes previsíveis a cada N frames, sem precisar de índice).
 **O custo escondido é a reindexação.**
 
 O projeto usa `clip-ViT-B-32` (512d) + `clip-ViT-B-32-multilingual-v1` no mesmo espaço
-vetorial ([`image_semantic.py:21`](../src/search/image_semantic.py):21). Jina CLIP v2 tem
+vetorial ([`image_semantic.py:21`](../../src/search/image_semantic.py):21). Jina CLIP v2 tem
 1024 dimensões — **muda o `VectorParams(size=)` da coleção**, obrigando a recriar e
 reprocessar todas as imagens e frames do acervo.
 
-Existe `reindex_all()` em [`semantic.py:556`](../src/search/semantic.py):556 para a coleção
+Existe `reindex_all()` em [`semantic.py:556`](../../src/search/semantic.py):556 para a coleção
 de texto, mas o caminho de imagem precisaria do equivalente. O ganho — "melhor em conceitos
 abstratos" — é real, porém difuso e difícil de medir.
 

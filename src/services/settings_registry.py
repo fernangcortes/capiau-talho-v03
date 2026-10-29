@@ -749,7 +749,7 @@ SETTINGS_REGISTRY: List[Dict[str, Any]] = [
         "key": "burst.similarity_threshold", "type": "float", "default": 0.80, "min": 0.80, "max": 0.999, "step": 0.005,
         "label": "Rajadas: similaridade mínima",
         "help": "Quão parecidas duas fotos precisam ser para entrarem na mesma rajada. Menor = agrupa mais (e arrisca juntar fotos diferentes); maior = só quadros praticamente idênticos.",
-        "help_tech": "Cosseno mínimo entre embeddings CLIP da foto e da líder do grupo corrente. Padrão 0,80 medido em 06/10/2026 nas 1.424 fotos de MONSTRO (docs/REVISAO_CATEGORIAS.md, seção 10): 0,97 juntava 6%; 0,80 junta 48% (736 chamadas de visão) e o Fernando conferiu nas folhas de contato que os grupos de fronteira são de fato a mesma sequência.",
+        "help_tech": "Cosseno mínimo entre embeddings CLIP da foto e da líder do grupo corrente. Padrão 0,80 medido em 06/10/2026 nas 1.424 fotos de MONSTRO (docs/planos/REVISAO_CATEGORIAS.md, seção 10): 0,97 juntava 6%; 0,80 junta 48% (736 chamadas de visão) e o Fernando conferiu nas folhas de contato que os grupos de fronteira são de fato a mesma sequência.",
         "category": "themes_search", "level": "pro", "scope": "both", "requires_reprocess": True,
     },
     {
@@ -1039,7 +1039,7 @@ SETTINGS_REGISTRY: List[Dict[str, Any]] = [
         "category": "hardware", "level": "pro", "scope": "global", "requires_reprocess": False,
     },
 
-    # -- Aparência da interface (docs/PLANO_TEMA_NEUTRO.md) ------------------------
+    # -- Aparência da interface (docs/planos/PLANO_TEMA_NEUTRO.md) ------------------------
     # Só a UI: nada disso muda o vídeo exportado. Aplicado ao vivo por src/ui/js/themeManager.js.
     {
         "key": "ui.theme", "type": "enum", "default": "neutro",

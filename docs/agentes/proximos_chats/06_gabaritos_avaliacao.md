@@ -53,7 +53,7 @@ com base em acerto real. Confira tudo no código antes de afirmar.
 
 ## Regras deste repositório
 
-- Leia o `CLAUDE.md` da pasta `dev` e `docs/HANDOFF_DESIGN_UI.md`.
+- Leia o `CLAUDE.md` da pasta `dev` e `docs/agentes/HANDOFF_DESIGN_UI.md`.
 - Outra sessão mexe na interface. Commit só dos seus trechos (índice a partir do HEAD), direto na
   main, sem coautoria, sem push.
 - Chamadas pagas (AssemblyAI, Deepgram, Jev, Gemini, OpenRouter): diga o custo estimado antes de

@@ -18,7 +18,7 @@ O objetivo a médio/longo prazo no Talho é duplo:
 
 ## 2. Anatomia Técnica dos Algoritmos Auphonic (Estado da Arte 2026)
 
-![Anatomia Técnica dos Algoritmos Auphonic](images/auphonic-algoritmos.svg)
+![Anatomia Técnica dos Algoritmos Auphonic](../images/auphonic-algoritmos.svg)
 
 ### 2.1. Filtering and Enhancement (Filtragem e Síntese)
 * **Adaptive High-Pass Filtering:** Detecta a frequência fundamental do locutor e corta ruídos subsônicos, impactos físicos e efeito de proximidade excessivo de lapelas. Aplica *notch filters* para cancelar zumbido elétrico (*ground hum* de 60 Hz no Brasil / 50 Hz internacional e harmônicos).
@@ -97,7 +97,7 @@ $$\vec{v} = [ \mathbf{LUFS_I}, \mathbf{LRA}, \mathbf{TruePeak_{dB}}, \mathbf{Noi
 ### 4.2. Base de Treinamento e Testes Automatizados
 O Talho executará um script de lote (`scripts/benchmark_audio_clustering.py`) sobre centenas de amostras sintéticas e reais de áudio (vozes masculinas/femininas, microfones lapela/shotgun/celular, salas secas/eco/ruído de rua) gerando clusters de problemas:
 
-![Fluxo de Clustering e Prescrição](images/auphonic-clustering-flow.svg)
+![Fluxo de Clustering e Prescrição](../images/auphonic-clustering-flow.svg)
 
 ### 4.3. Tabela de Clusters e Prescrições Automáticas
 

@@ -6,7 +6,7 @@
 
 [![Licença: GPL v3](https://img.shields.io/badge/Licen%C3%A7a-GPL%20v3-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.12%20recomendado%20(%3C3.14)-3776AB?logo=python&logoColor=white)](https://www.python.org/)
-[![Status](https://img.shields.io/badge/Status-MVP%20em%20desenvolvimento-orange.svg)](docs/PLANO_IMPLEMENTACAO.md)
+[![Status](https://img.shields.io/badge/Status-MVP%20em%20desenvolvimento-orange.svg)](docs/planos/PLANO_IMPLEMENTACAO.md)
 [![Roda em CPU](https://img.shields.io/badge/GPU-n%C3%A3o%20necess%C3%A1ria-success.svg)](#arquitetura)
 
 </div>
@@ -85,7 +85,7 @@ No Windows, `criar-atalho.bat` cria um ícone na Área de Trabalho. Depois da in
   pastas, paletas de cor, escala de plano e falante.
 - **Editores de montagem.** Faça triagem e rough cut com atalhos de NLE profissional (JKL, 3 e 4
   pontos, Match Frame, seis perfis de teclado) e exporte sem aprisionamento. O Kdenlive 25.04+ abre
-  o `.otio` direto; veja [`docs/kdenlive_workflow.md`](docs/kdenlive_workflow.md).
+  o `.otio` direto; veja [`docs/usuario/kdenlive_workflow.md`](docs/usuario/kdenlive_workflow.md).
 
 <a id="recursos"></a>
 ## Recursos e status
@@ -167,7 +167,7 @@ sobre o `.env`**.
 A lista completa (modelos reserva, desempenho, S3, Azure Face) está no `.env.example` e na
 [Instalação e Configuração](https://github.com/fernangcortes/capiau-talho-v03/wiki/02.-Instalacao-e-Configuracao).
 O `.env` é ignorado pelo Git de propósito: **nunca faça commit dele**. Para custos, veja
-[`docs/costs_and_security.md`](docs/costs_and_security.md).
+[`docs/usuario/costs_and_security.md`](docs/usuario/costs_and_security.md).
 
 <a id="seguranca"></a>
 ## Segurança
@@ -178,7 +178,7 @@ O `.env` é ignorado pelo Git de propósito: **nunca faça commit dele**. Para c
 
 Para uso restrito a este computador, altere o mapeamento de porta em `docker-compose.yml` para
 `127.0.0.1:8000:8000`. Existe um plano de autenticação e restrição de rede, ainda **não
-implementado** (veja a [Ordem de implementação](docs/ORDEM_DE_IMPLEMENTACAO.md)).
+implementado** (veja a [Ordem de implementação](docs/planos/ORDEM_DE_IMPLEMENTACAO.md)).
 
 <a id="documentacao"></a>
 ## Documentação
@@ -193,10 +193,10 @@ implementado** (veja a [Ordem de implementação](docs/ORDEM_DE_IMPLEMENTACAO.md
 | [Wiki: Glossário](https://github.com/fernangcortes/capiau-talho-v03/wiki/18.-Glossario-Visual-e-Terminologia) | Terminologia de NLE e do projeto |
 | [Wiki: Solução de problemas](https://github.com/fernangcortes/capiau-talho-v03/wiki/16.-Solucao-de-Problemas-e-FAQ) | Erros comuns e FAQ |
 | [Wiki: Arquitetura e API](https://github.com/fernangcortes/capiau-talho-v03/wiki/15.-Arquitetura-Tecnica-e-API-REST) | Para desenvolvedores |
-| [`docs/shortcuts.md`](docs/shortcuts.md) | Atalhos e mapa do teclado |
-| [`docs/api_endpoints.md`](docs/api_endpoints.md) | Referência das rotas HTTP |
+| [`docs/usuario/shortcuts.md`](docs/usuario/shortcuts.md) | Atalhos e mapa do teclado |
+| [`docs/dev/api_endpoints.md`](docs/dev/api_endpoints.md) | Referência das rotas HTTP |
 | [`docs/README.md`](docs/README.md) | Índice dos documentos internos (planos, propostas, guias) |
-| [`docs/ORDEM_DE_IMPLEMENTACAO.md`](docs/ORDEM_DE_IMPLEMENTACAO.md) | Planos organizados em ondas, com status conferido no código |
+| [`docs/planos/ORDEM_DE_IMPLEMENTACAO.md`](docs/planos/ORDEM_DE_IMPLEMENTACAO.md) | Planos organizados em ondas, com status conferido no código |
 
 <a id="roadmap"></a>
 ## Roadmap
@@ -206,7 +206,7 @@ segurança) também. Em andamento ou planejado: medidor VU, keyframes de áudio 
 (Tasks 19 a 21), múltiplas sequências em abas (Task 25), Cartão de Contexto e sugestões de montagem
 por IA, busca em 3 passos, agentes externos via MCP e **autenticação**. Detalhes em
 [Roadmap e Contribuição](https://github.com/fernangcortes/capiau-talho-v03/wiki/17.-Roadmap-e-Guia-de-Contribuicao)
-e na [Ordem de implementação](docs/ORDEM_DE_IMPLEMENTACAO.md).
+e na [Ordem de implementação](docs/planos/ORDEM_DE_IMPLEMENTACAO.md).
 
 <a id="testes"></a>
 ## Testes

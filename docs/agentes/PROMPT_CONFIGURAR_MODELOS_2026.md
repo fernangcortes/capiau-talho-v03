@@ -56,7 +56,7 @@ máquina. Se algo não servir, proponha a alternativa antes de implementar.
 
 ## Regras deste repositório
 
-- Leia `CLAUDE.md` da pasta `dev` e `docs/HANDOFF_DESIGN_UI.md` (regras de interface: tamanhos
+- Leia `CLAUDE.md` da pasta `dev` e `docs/agentes/HANDOFF_DESIGN_UI.md` (regras de interface: tamanhos
   pequenos, painéis empurram, nada abre sozinho).
 - **Tem outra sessão trabalhando no mesmo repo** (Welcome Hub, streaming do chat de onboarding em
   `onboarding_agent.py` e `welcomeHub.js`, e outra em `timelineState.js`/painéis). Não faça

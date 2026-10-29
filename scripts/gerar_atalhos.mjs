@@ -5,10 +5,10 @@
 //   node scripts/gerar_atalhos.mjs --check    sai com código 1 se algum arquivo estiver desatualizado
 //
 // Escreve (somente ENTRE os marcadores) em:
-//   docs/shortcuts.md                          todos os perfis
+//   docs/usuario/shortcuts.md                          todos os perfis
 //   wiki/14.-Guia-Completo-de-Atalhos.md       perfil CapIAu completo + link para as demais
 //   USER_MANUAL.md                             perfil CapIAu completo (se os marcadores existirem)
-// E gera por completo: docs/atalhos/cartao-<perfil>.html (cartão A4 imprimível).
+// E gera por completo: docs/usuario/atalhos/cartao-<perfil>.html (cartão A4 imprimível).
 
 import fs from "node:fs";
 import path from "node:path";
@@ -19,7 +19,7 @@ const CHECK = process.argv.includes("--check");
 
 const INICIO = "<!-- GERADO:ATALHOS:INICIO -->";
 const FIM = "<!-- GERADO:ATALHOS:FIM -->";
-const URL_DOCS = "https://github.com/fernangcortes/capiau-talho-v03/blob/main/docs/shortcuts.md";
+const URL_DOCS = "https://github.com/fernangcortes/capiau-talho-v03/blob/main/docs/usuario/shortcuts.md";
 
 // ── Carregamento do módulo da UI (com mínimo de polyfills de DOM) ───────────
 function prepararAmbiente() {
@@ -280,15 +280,15 @@ function escreverArquivo(rel, conteudo) {
 
 console.log(CHECK ? "Verificando atalhos gerados..." : "Gerando atalhos...");
 
-substituirBloco("docs/shortcuts.md", blocoDocs(), { obrigatorio: true });
+substituirBloco("docs/usuario/shortcuts.md", blocoDocs(), { obrigatorio: true });
 
 const rodapeWiki =
     `As tabelas dos demais perfis (${PERFIS.filter((p) => p !== "capiau").map(nomePerfil).join(", ")}) ficam em ` +
-    `[docs/shortcuts.md](${URL_DOCS}).`;
+    `[docs/usuario/shortcuts.md](${URL_DOCS}).`;
 substituirBloco("wiki/14.-Guia-Completo-de-Atalhos.md", blocoCapiau(3, rodapeWiki), { obrigatorio: true });
 substituirBloco("USER_MANUAL.md", blocoCapiau(4, rodapeWiki), { obrigatorio: false });
 
-for (const p of PERFIS) escreverArquivo(`docs/atalhos/cartao-${p}.html`, cartaoHtml(p));
+for (const p of PERFIS) escreverArquivo(`docs/usuario/atalhos/cartao-${p}.html`, cartaoHtml(p));
 
 if (CHECK) {
     if (desatualizados.length) {

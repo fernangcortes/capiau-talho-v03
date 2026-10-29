@@ -549,7 +549,7 @@ O plano gratuito oferece **2 horas por mês**. O painel mostra quanto resta e av
 
 > **Dica:** não mande a entrevista bruta. Mande o trecho que entra no filme. Com o aproveitamento típico de um documentário, as suas horas de bruto viram menos de uma hora de material usado, e isso cabe no mês com folga.
 
-Em **Ajustes da nuvem** você vê o que a medição decidiu campo a campo e pode discordar de qualquer um; só o que você alterar vai como manual. Uma coisa não é negociável nem ali: **corte automático de silêncio e de hesitação fica sempre desligado**. Para o guia detalhado do Auphonic, consulte [docs/AUPHONIC_AUDIO_RESTORATION_GUIDE.md](docs/AUPHONIC_AUDIO_RESTORATION_GUIDE.md).
+Em **Ajustes da nuvem** você vê o que a medição decidiu campo a campo e pode discordar de qualquer um; só o que você alterar vai como manual. Uma coisa não é negociável nem ali: **corte automático de silêncio e de hesitação fica sempre desligado**. Para o guia detalhado do Auphonic, consulte [docs/dev/AUPHONIC_AUDIO_RESTORATION_GUIDE.md](docs/dev/AUPHONIC_AUDIO_RESTORATION_GUIDE.md).
 
 ---
 
@@ -588,7 +588,7 @@ Você não precisa salvar a cada modificação. Um mecanismo em segundo plano gr
 4. **Exportar com proxies locais.** Para levar a timeline a outro computador sem carregar discos de mídias pesadas, marque **Usar proxies locais**. O arquivo (ex.: `montagem_proxy.otio`) aponta para os vídeos leves em `data/proxies/`.
 5. Clique em **Exportar**. O download começa no navegador e o arquivo está pronto para abrir no seu editor.
 
-> **Vindo do Premiere/Resolve/FCP/Kdenlive:** o Kdenlive abre o `.otio` direto. Veja [docs/kdenlive_workflow.md](docs/kdenlive_workflow.md).
+> **Vindo do Premiere/Resolve/FCP/Kdenlive:** o Kdenlive abre o `.otio` direto. Veja [docs/usuario/kdenlive_workflow.md](docs/usuario/kdenlive_workflow.md).
 
 ### 8.3 Importação de timelines (o caminho inverso)
 
@@ -860,8 +860,8 @@ O Guia de Atalhos traz um teclado esquemático em tamanho real:
 
 ### Lista completa de atalhos
 
-- Lista completa e atualizada, gerada a partir do mapa de teclas do programa: [docs/shortcuts.md](docs/shortcuts.md).
-- Cartões imprimíveis por perfil (para deixar ao lado do teclado): pasta [docs/atalhos/](docs/atalhos/).
+- Lista completa e atualizada, gerada a partir do mapa de teclas do programa: [docs/usuario/shortcuts.md](docs/usuario/shortcuts.md).
+- Cartões imprimíveis por perfil (para deixar ao lado do teclado): pasta [docs/usuario/atalhos/](docs/usuario/atalhos/).
 - Versão da wiki: [Guia Completo de Atalhos](https://github.com/fernangcortes/capiau-talho-v03/wiki/14.-Guia-Completo-de-Atalhos).
 
 <!-- GERADO:ATALHOS:INICIO -->
@@ -1047,7 +1047,7 @@ O Guia de Atalhos traz um teclado esquemático em tamanho real:
 | `Ctrl + Alt + Shift + 8` ou `Ctrl + Alt + Shift + Num 8` | Workspace: Salvar no Slot 8 | Grava a disposição atual diretamente no slot numérico 8 (Ctrl + Alt + Shift + 8) |
 | `Ctrl + Alt + Shift + 9` ou `Ctrl + Alt + Shift + Num 9` | Workspace: Salvar no Slot 9 | Grava a disposição atual diretamente no slot numérico 9 (Ctrl + Alt + Shift + 9) |
 
-As tabelas dos demais perfis (Adobe Premiere Pro, DaVinci Resolve, Apple Final Cut Pro, Kdenlive) ficam em [docs/shortcuts.md](https://github.com/fernangcortes/capiau-talho-v03/blob/main/docs/shortcuts.md).
+As tabelas dos demais perfis (Adobe Premiere Pro, DaVinci Resolve, Apple Final Cut Pro, Kdenlive) ficam em [docs/usuario/shortcuts.md](https://github.com/fernangcortes/capiau-talho-v03/blob/main/docs/usuario/shortcuts.md).
 
 <!-- GERADO:ATALHOS:FIM -->
 

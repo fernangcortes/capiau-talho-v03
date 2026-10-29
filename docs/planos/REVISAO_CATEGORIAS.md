@@ -2,7 +2,7 @@
 
 > Escrito em 06/10/2026 a partir do código e do banco (projeto 2, acervo MONSTRO). As marcas
 > **[DECIDIR]** foram decididas na seção 9; o que já está no código está na seção 13.
-> Contexto: `docs/ORDEM_DAS_ANALISES.md`.
+> Contexto: `docs/planos/ORDEM_DAS_ANALISES.md`.
 
 ## 1. Por que agora
 
@@ -327,7 +327,7 @@ Ainda não feito:
 - **Números por categoria**: provisórios, os de antes. Calibrar com `scripts/visao_calibrar.py`
   (seção 12) depois da rodada de triagem.
 - **Rodada só de triagem** (seção 8, passo 3): não há rota nem script ainda.
-- **Áudio**: plano em `docs/PLANO_AUDIO_CATEGORIAS.md` (categorias aprovadas, calibração pendente).
+- **Áudio**: plano em `docs/planos/PLANO_AUDIO_CATEGORIAS.md` (categorias aprovadas, calibração pendente).
   O vídeo 555 (`Trilha`) vira `trilha` quando a camada de áudio existir.
 - Campo de objetivo nas configurações do projeto (hoje só o Welcome Hub pergunta, na criação).
 
@@ -337,7 +337,7 @@ Ainda não feito:
 | Commit | O que entrou |
 |---|---|
 | `e12e23e` | Camada 1 do áudio: `video.natureza` (sem imagem ou imagem parada = `audio`), fora da visão |
-| `f86c6e4` | Camada 2 do áudio: tipo de som local (PANNs Cnn10), só fala vai ao ASR (`docs/PLANO_AUDIO_CATEGORIAS.md`, local) |
+| `f86c6e4` | Camada 2 do áudio: tipo de som local (PANNs Cnn10), só fala vai ao ASR (`docs/planos/PLANO_AUDIO_CATEGORIAS.md`, local) |
 | `e1f8135` | `scripts/triagem_rodada.py`: só triagem, dry-run por padrão, piloto espalhado pela duração, teto de gasto, gasto real pelo `usage` da OpenRouter |
 | `ebf7df9` | `scripts/triagem_relatorio.py`: relatório HTML para revisar (vídeo, falas clicáveis, Laya, JEV, revisão exportável em JSON) |
 

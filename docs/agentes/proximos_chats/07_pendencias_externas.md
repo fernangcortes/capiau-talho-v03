@@ -37,7 +37,7 @@ no código antes de afirmar.
 ## 4. Suíte completa e push
 
 - Rodar a suíte inteira (`pytest` e os `tests/*.mjs`), separar falhas antigas das novas (o
-  `docs/HANDOFF_DESIGN_UI.md` lista as que já falhavam) e me mostrar.
+  `docs/agentes/HANDOFF_DESIGN_UI.md` lista as que já falhavam) e me mostrar.
 - A main local está à frente do origin; **push é comigo**. Prepare o resumo dos commits para eu
   revisar e empurrar.
 

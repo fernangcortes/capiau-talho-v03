@@ -10,7 +10,7 @@ Uso:
     python scripts/gerar_docs_api.py --check   sai com código 1 se estiver desatualizado
 
 Escreve somente ENTRE os marcadores <!-- GERADO:API:INICIO --> e <!-- GERADO:API:FIM -->
-em docs/api_endpoints.md e wiki/15.-Arquitetura-Tecnica-e-API-REST.md.
+em docs/dev/api_endpoints.md e wiki/15.-Arquitetura-Tecnica-e-API-REST.md.
 """
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ RAIZ = Path(__file__).resolve().parent.parent
 INICIO = "<!-- GERADO:API:INICIO -->"
 FIM = "<!-- GERADO:API:FIM -->"
 ALVOS = [
-    ("docs/api_endpoints.md", True),
+    ("docs/dev/api_endpoints.md", True),
     ("wiki/15.-Arquitetura-Tecnica-e-API-REST.md", False),  # reescrita por outro fluxo: marcadores opcionais
 ]
 METODOS_HTTP = {"get", "post", "put", "patch", "delete"}

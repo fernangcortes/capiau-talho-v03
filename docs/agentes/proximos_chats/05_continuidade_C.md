@@ -8,7 +8,7 @@
 Quero saber, no CapIAu Talho, se o adereço ou figurino que o roteiro pede numa cena aparece nos takes
 dessa cena: "o revólver da cena 12 aparece em algum take?", "a garrafa sumiu entre o take 3 e o 4?".
 É o que a configuração `object.link_script_props` prometia e nunca fez. Leia antes
-`docs/PROPOSTA_BUSCA_OBJETOS.md` (rota C) e confira no código; linhas podem ter andado.
+`docs/propostas/PROPOSTA_BUSCA_OBJETOS.md` (rota C) e confira no código; linhas podem ter andado.
 
 ## O que já existe (conferido em 05/10/2026)
 
@@ -39,7 +39,7 @@ dessa cena: "o revólver da cena 12 aparece em algum take?", "a garrafa sumiu en
 
 ## Regras deste repositório
 
-- Leia o `CLAUDE.md` da pasta `dev` e `docs/HANDOFF_DESIGN_UI.md` (9–12 px, botões 20–28 px,
+- Leia o `CLAUDE.md` da pasta `dev` e `docs/agentes/HANDOFF_DESIGN_UI.md` (9–12 px, botões 20–28 px,
   `var(--fs-N)`, `var(--sp-N)`, `--accent`).
 - Outra sessão mexe na interface. Commit só dos seus trechos (índice a partir do HEAD), direto na
   main, sem coautoria, sem push.

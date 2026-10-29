@@ -1,4 +1,4 @@
-// Modelo de layout em árvore do plano de janelas destacáveis (docs/HANDOFF_JANELAS_DRAG_DOCK.md, fase F1).
+// Modelo de layout em árvore do plano de janelas destacáveis (docs/agentes/HANDOFF_JANELAS_DRAG_DOCK.md, fase F1).
 // Módulo puro (sem DOM): descreve onde cada painel está, converte de/para o layout legado do
 // WorkspaceManager (ordem das colunas + posição da timeline + monitores + janelas destacadas)
 // e mantém o histórico de desfazer/refazer do layout.

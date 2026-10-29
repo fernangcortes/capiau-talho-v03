@@ -1,4 +1,4 @@
-"""Camada 2 do áudio: tipo de som (docs/PLANO_AUDIO_CATEGORIAS.md).
+"""Camada 2 do áudio: tipo de som (docs/planos/PLANO_AUDIO_CATEGORIAS.md).
 
 Motor falso nos testes de decisão e de leitura; o motor real só roda se os pesos
 do PANNs Cnn10 já estiverem no cache do Hugging Face (nada é baixado aqui).

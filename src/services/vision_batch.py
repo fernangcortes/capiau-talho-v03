@@ -11,7 +11,7 @@ so a interface morria. Esta e a solucao paliativa ate o E4.D (fila persistente
 + worker) da Etapa 4.
 
 Cuidado com log: o console desta maquina e cp1252 e nao codifica '->' unicode,
-'<=' nem emoji. Ver a convencao em docs/PLANO_IMPLEMENTACAO.md.
+'<=' nem emoji. Ver a convencao em docs/planos/PLANO_IMPLEMENTACAO.md.
 """
 from pathlib import Path
 from typing import Any, List

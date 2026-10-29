@@ -15,7 +15,7 @@ copiadas de uma especificação (`docs/Pesquisas/PLANO_MODERNIZACAO_ANALISES_IA_
    definido pela escolha do detector (`EXECUCAO` em `src/vision/detectores.py`). Ajustar o teste
    `tests/test_ai_layers_2026.py` (`test_settings_registry_has_2026_keys`) e explicar no commit.
 2. **Remover `object.auto_crop`** (~290) por enquanto. Volta no chat 03, junto com a tela de revisão
-   da checagem técnica, que é quem precisa de recortes. Anote isso em `docs/proximos_chats/03_*.md`.
+   da checagem técnica, que é quem precisa de recortes. Anote isso em `docs/agentes/proximos_chats/03_*.md`.
 3. **Manter `object.link_script_props`** (~297), mas mudar a ajuda para dizer que entra com a
    continuidade (chat 05) e que hoje não faz nada; ou esconder da tela até lá. Pergunte-me qual.
 4. **Fazer `hardware.ai_device` valer** (~1019; opções auto/cpu/directml/cuda). Hoje ninguém lê:
@@ -32,7 +32,7 @@ copiadas de uma especificação (`docs/Pesquisas/PLANO_MODERNIZACAO_ANALISES_IA_
 
 ## Regras deste repositório
 
-- Leia o `CLAUDE.md` da pasta `dev` e `docs/HANDOFF_DESIGN_UI.md`.
+- Leia o `CLAUDE.md` da pasta `dev` e `docs/agentes/HANDOFF_DESIGN_UI.md`.
 - Outra sessão mexe na interface (`index.html`, `main.js`, `workspaceManager.js`, `styles.css`,
   `library.js`, `welcomeHub.js`). Commit só dos seus trechos, direto na main, sem coautoria, sem push.
 - Valor salvo no banco que sair da lista aparece como "(fora da lista atual)" no painel

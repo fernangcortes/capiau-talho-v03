@@ -217,7 +217,7 @@ def update_video_category(video_id: int, payload: CategoryUpdate, conn: sqlite3.
     if not row:
         raise HTTPException(404, "Vídeo não encontrado")
 
-    # Material de áudio tem a taxonomia própria (docs/PLANO_AUDIO_CATEGORIAS.md)
+    # Material de áudio tem a taxonomia própria (docs/planos/PLANO_AUDIO_CATEGORIAS.md)
     audio = row["natureza"] == "audio"
     category = normalizar_categoria(payload.category, row["natureza"])
     if not category:

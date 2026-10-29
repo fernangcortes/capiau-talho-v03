@@ -1,7 +1,7 @@
 # 🎬 Plano Mestre de Implementação: Suíte Clássica de Ferramentas NLE no CapIAu-Talho
 
 > **Status:** Planejamento Aprovado / Em Execução Modular  
-> **Arquivo de Referência Permanente:** `docs/PLANO_SUITE_NLE_CLASSICO.md`  
+> **Arquivo de Referência Permanente:** `docs/planos/PLANO_SUITE_NLE_CLASSICO.md`  
 > **Alvo:** Paridade operacional e ergonomia clássica de NLE (Premiere Pro, DaVinci Resolve, Final Cut Pro e Kdenlive).
 
 ---
@@ -54,7 +54,7 @@
 > [!IMPORTANT]
 > **Regra de Ouro do Desenvolvimento:**
 > Cada tarefa deste plano representa **uma ferramenta isolada e completa**. O desenvolvimento **NUNCA avançará para a próxima tarefa sem que a anterior tenha:**
-> 1. Código completamente implementado e integrado sem quebrar o layout *seamless* nem o design system ([`SKILL.md`](../.agents/skills/capiau-nle-design-system/SKILL.md)).
+> 1. Código completamente implementado e integrado sem quebrar o layout *seamless* nem o design system ([`SKILL.md`](../../.agents/skills/capiau-nle-design-system/SKILL.md)).
 > 2. Autoteste automatizado criado e executando com **100% de sucesso** (`node tests/autoteste_...mjs` ou `pytest`).
 > 3. **Parada obrigatória** com notificação para o usuário realizar o teste manual guiado e dar a aprovação explícita para prosseguir.
 
@@ -1354,7 +1354,7 @@ Durante a consolidação da Sessão 1, foi implementado o bloco ergonômico de e
 ## 🚦 Critérios de Aceitação Global do Projeto
 
 1. **Zero Regressão:** Nenhuma etapa pode quebrar J/L-cuts, Sync Lock, busca semântica, titler, diarização de áudio, render FFmpeg ou exportação OTIO.
-2. **Conformidade Estrita com o Design System:** Respeito absoluto ao layout sem espaços, sidebars de 3 níveis, selects premium e motor de tooltips globais ([`SKILL.md`](../.agents/skills/capiau-nle-design-system/SKILL.md)).
+2. **Conformidade Estrita com o Design System:** Respeito absoluto ao layout sem espaços, sidebars de 3 níveis, selects premium e motor de tooltips globais ([`SKILL.md`](../../.agents/skills/capiau-nle-design-system/SKILL.md)).
 3. **Persistência Confiável:** Todas as novas propriedades de corte, transição, velocidade e cor são salvas nos formatos nativos do projeto.
 4. **Cadência Interativa:** Cada uma das 26 etapas termina com o relatório técnico dos autotestes e o convite guiado para o teste humano no navegador.
 5. **Paridade Total de Teclado & Cheat Sheet Sincronizada:** Toda nova ferramenta ou ação introduzida deve estar registrada no catálogo e nos 5 perfis NLE (`capiau`, `premiere`, `resolve`, `finalcut`, `kdenlive`), refletindo dinamicamente no Teclado Virtual, no Guia/Cheat Sheet de Atalhos e no Editor de Teclas, validada em autoteste automatizado.

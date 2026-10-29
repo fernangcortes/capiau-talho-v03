@@ -1,4 +1,4 @@
-// Arrastar painéis pela alça ⋮⋮ (fases F2 e F3 do plano docs/HANDOFF_JANELAS_DRAG_DOCK.md).
+// Arrastar painéis pela alça ⋮⋮ (fases F2 e F3 do plano docs/agentes/HANDOFF_JANELAS_DRAG_DOCK.md).
 // F3: soltar fora do editor destaca o painel numa janela que nasce ao cruzar a borda e segue o
 // cursor; arrastar a alça da janela destacada de volta ao editor reacopla (com as mesmas zonas).
 // Motor de Pointer Events (validado na F0): fantasma que segue o cursor, zonas de encaixe e

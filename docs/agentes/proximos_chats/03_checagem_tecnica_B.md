@@ -7,7 +7,7 @@
 
 Vamos implementar a checagem técnica dos takes da obra no CapIAu Talho: achar equipamento de set
 entrando no quadro (boom, microfone, tripé, refletor, reflexo da equipe) para o montador revisar.
-Leia antes `docs/PROPOSTA_BUSCA_OBJETOS.md` (rota B) e `docs/ORDEM_DAS_ANALISES.md` (item 7 da ordem
+Leia antes `docs/propostas/PROPOSTA_BUSCA_OBJETOS.md` (rota B) e `docs/planos/ORDEM_DAS_ANALISES.md` (item 7 da ordem
 recomendada). Confira no código o que eles afirmam; linhas podem ter andado.
 
 ## O que já existe (conferido em 05/10/2026)
@@ -54,12 +54,12 @@ recomendada). Confira no código o que eles afirmam; linhas podem ter andado.
 7. **Tela de revisão**: lista de suspeitas por take, com recorte (aqui volta o `object.auto_crop`,
    removido no chat 02: recortes em `data/cache/crops/objects`), confirmar/rejeitar
    (`status`), abrir o take no instante. Painel que **empurra**, nunca sobrepõe; nada abre sozinho.
-   Siga `docs/HANDOFF_DESIGN_UI.md` (texto 9–12 px, botões 20–28 px, `var(--fs-N)`, `var(--sp-N)`,
+   Siga `docs/agentes/HANDOFF_DESIGN_UI.md` (texto 9–12 px, botões 20–28 px, `var(--fs-N)`, `var(--sp-N)`,
    `--accent`).
 
 ## Regras deste repositório
 
-- Leia o `CLAUDE.md` da pasta `dev` e `docs/HANDOFF_DESIGN_UI.md`.
+- Leia o `CLAUDE.md` da pasta `dev` e `docs/agentes/HANDOFF_DESIGN_UI.md`.
 - Outra sessão mexe na interface (`index.html`, `main.js`, `workspaceManager.js`, `styles.css`,
   `library.js`, `welcomeHub.js`, `onboarding_agent.py`). Commit só dos seus trechos (índice montado
   a partir do HEAD), direto na main, sem coautoria, sem push.

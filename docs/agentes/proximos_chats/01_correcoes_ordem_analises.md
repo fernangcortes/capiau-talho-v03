@@ -5,7 +5,7 @@
 ---
 
 Vamos corrigir dois bugs confirmados e ajustar a ordem das análises da ingestão do CapIAu Talho, para
-que cada análise use o contexto da anterior sem criar viés. Leia antes `docs/ORDEM_DAS_ANALISES.md`
+que cada análise use o contexto da anterior sem criar viés. Leia antes `docs/planos/ORDEM_DAS_ANALISES.md`
 (mapa de dependências, feito em 05/10/2026) e confira no código cada afirmação antes de mexer: as
 linhas podem ter andado. Se algo não for como o documento diz, me avise em vez de seguir.
 
@@ -49,7 +49,7 @@ linhas podem ter andado. Se algo não for como o documento diz, me avise em vez 
 
 ## Regras deste repositório
 
-- Leia o `CLAUDE.md` da pasta `dev` e `docs/HANDOFF_DESIGN_UI.md`.
+- Leia o `CLAUDE.md` da pasta `dev` e `docs/agentes/HANDOFF_DESIGN_UI.md`.
 - **Outra sessão trabalha no mesmo repo** (interface: `index.html`, `main.js`, `workspaceManager.js`,
   `styles.css`, `library.js`, `welcomeHub.js`). Não faça `git add` de arquivo inteiro que você não
   escreveu; commit só dos seus trechos (montar o índice a partir do HEAD), direto na main, **sem
@@ -64,4 +64,4 @@ linhas podem ter andado. Se algo não for como o documento diz, me avise em vez 
 ## Pronto quando
 
 Os dois bugs corrigidos com teste; itens 3 a 6 decididos comigo e implementados, cada um com teste e
-commit; `docs/ORDEM_DAS_ANALISES.md` atualizado com o que mudou.
+commit; `docs/planos/ORDEM_DAS_ANALISES.md` atualizado com o que mudou.

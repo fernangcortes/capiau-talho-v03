@@ -29,14 +29,14 @@ O validador `scripts/validate_wiki_glossary.py` passa com 50 de 50 testes, mas s
   - Falta `OPENROUTER_API_KEY`, que é a chave essencial.
   - Os nomes reais são `CAPIAU_*` e `AUPHONIC_API_KEY`.
 - **Tabela de API em `wiki/15:29-82`:** 19 das 29 rotas não existem. Exemplos: `/api/transcription/*`, `/api/search/hybrid` e `/api/audio/{id}/filter/deepfilter`.
-- **`docs/api_endpoints.md`:** 7 rotas inexistentes, entre elas `batch-similar` (o nome real é `similar-batch`), `vision-model` e `upload-direct`. As seções estão fora de ordem e há dois "## 8".
+- **`docs/dev/api_endpoints.md`:** 7 rotas inexistentes, entre elas `batch-similar` (o nome real é `similar-batch`), `vision-model` e `upload-direct`. As seções estão fora de ordem e há dois "## 8".
 
 ### Descrições erradas de funcionalidades
 - **USER_MANUAL.md:379** diz que `U` desvincula A/V. No código, `U` é a ferramenta Slide. Desvincular é `Ctrl+Shift+U` ou `Ctrl+L`.
 - **Denoise.** A wiki (10, 15, 17, Home, 18) diz DeepFilterNet. O código (`src/media/audio_denoise.py`) usa **DPDFNet** e **GTCRN** via ONNX.
-- **Numpad em `docs/shortcuts.md:205-227`.** `Num5`, `Num7`, `Num8`, `Num9`, `Alt+Num2` e `Alt+Num3` fazem coisas diferentes do que a doc diz. `Shift+←/→` (`:164`) é shuttle, não Trim OUT.
+- **Numpad em `docs/usuario/shortcuts.md:205-227`.** `Num5`, `Num7`, `Num8`, `Num9`, `Alt+Num2` e `Alt+Num3` fazem coisas diferentes do que a doc diz. `Shift+←/→` (`:164`) é shuttle, não Trim OUT.
 - **Modelos de IA.**
-  - `docs/costs_and_security.md:36` diz que o padrão é `deepseek/deepseek-chat`. O real é `deepseek/deepseek-v4.1-flash`.
+  - `docs/usuario/costs_and_security.md:36` diz que o padrão é `deepseek/deepseek-chat`. O real é `deepseek/deepseek-v4.1-flash`.
   - `ai_settings_pro_guide.md:64` cita `anthropic/claude-5-sonnet`. O slug real é `anthropic/claude-sonnet-5.5`.
   - `USER_MANUAL:1096` cita "Nemotron 70B Vision" como opção principal.
 
@@ -54,8 +54,8 @@ O roadmap ainda marca a Task 23 e a Task 24 como pendentes. O mesmo vale para `P
 - **USER_MANUAL.md:13-47:** as 20 entradas do índice estão quebradas. Títulos que começam com emoji geram um slug com hífen inicial.
 - **README.md:56, 57, 475, 708, 742 e 785:** apontam para `#passo-a-passo` e `#executando`, que não existem mais.
 - **wiki/18:43-50:** os 8 links de eixo omitem os acentos que o GitHub mantém no slug.
-- **docs/PLANO_SUITE_NLE_CLASSICO.md:** 6 entradas de índice com texto diferente do título.
-- **docs/PLANO_PESQUISA_19082026.md:** o link para a pesquisa de origem aponta para um arquivo inexistente. Outros 9 links usam o sufixo `arquivo.py:linha`, que quebra o destino.
+- **docs/planos/PLANO_SUITE_NLE_CLASSICO.md:** 6 entradas de índice com texto diferente do título.
+- **docs/arquivo/PLANO_PESQUISA_19082026.md:** o link para a pesquisa de origem aponta para um arquivo inexistente. Outros 9 links usam o sufixo `arquivo.py:linha`, que quebra o destino.
 
 ### O código cita docs que nunca existiram
 | Doc citado | Onde é citado |
@@ -82,7 +82,7 @@ O roadmap ainda marca a Task 23 e a Task 24 como pendentes. O mesmo vale para `P
   - A âncora `#retorcao` tem erro de digitação.
 - **Termos que faltam no glossário:** OpenRouter, fallback de modelo, Triagem, Ghost Clips/Sequência Fantasma, Bins, RTF, DPDFNet, Track Lock vs Sync Lock, Safe Margins, Lift vs Extract, Replace Edit, Match Frame, Rate Stretch, Freeze Frame, Diarização e LUFS.
 - **Conflitos de atalho no código.** No preset CapIAu, `Ctrl+L`, `R`, `X`, `Y`, `N`, `Enter`, `Delete` e `[` estão ligados a dois comandos cada. A regra de precedência por contexto não está documentada.
-- **Duplicação.** Os atalhos têm 4 fontes editadas à mão: `docs/shortcuts.md`, `wiki/14`, `USER_MANUAL §15` e o README. O diff só entre as duas primeiras dá 346 linhas.
+- **Duplicação.** Os atalhos têm 4 fontes editadas à mão: `docs/usuario/shortcuts.md`, `wiki/14`, `USER_MANUAL §15` e o README. O diff só entre as duas primeiras dá 346 linhas.
 - **Segurança.** Há CORS `*` e porta 8000 aberta em todas as interfaces, sem autenticação. O aviso fica enterrado na seção Docker.
 - **Imagens.** O README tem 5 PNGs comentados que não existem. O USER_MANUAL tem 0 imagens. 4 dos 6 SVGs em `docs/images` não aparecem na documentação de usuário.
 
@@ -120,7 +120,7 @@ docs/
 ## 5. Ideias
 
 ### Fonte única de verdade, com geração automática
-1. **`scripts/gerar_docs_api.py`:** usa `app.openapi()` para gerar `docs/api_endpoints.md` e o trecho da wiki 15. Um teste pytest falha se a doc divergir do código.
+1. **`scripts/gerar_docs_api.py`:** usa `app.openapi()` para gerar `docs/dev/api_endpoints.md` e o trecho da wiki 15. Um teste pytest falha se a doc divergir do código.
 2. **`scripts/gerar_atalhos.mjs`:** lê o `KEYMAP_PRESETS` e o `COMMANDS_CATALOG` e gera `shortcuts.md`, a wiki 14, a §15 do manual e um **cartão A4 imprimível por perfil** (Premiere, Resolve, FCP, Kdenlive, CapIAu).
 3. **Lint de atalhos:** falha se houver combinação duplicada sem estar numa allowlist de contexto, ou comando sem documentação.
 4. **Lint de `.env`:** compara o `os.getenv` e o `settings_service` com o `.env.example` e com os blocos ` ```env ` das docs.
@@ -169,7 +169,7 @@ Aplicado na branch `claude/docs-multiagent-analysis-o5drof`:
   - 10, 07 e 11 corrigidas;
   - nova página 19, "Primeiros 15 minutos e Receitas".
 - **Glossário:** 94 verbetes, todos com nível, caminhos e funções conferidos no código.
-- **Geradores:** atalhos (`scripts/gerar_atalhos.mjs`, com cartões A4 em `docs/atalhos/`) e rotas da API (`scripts/gerar_docs_api.py`, 190 rotas).
+- **Geradores:** atalhos (`scripts/gerar_atalhos.mjs`, com cartões A4 em `docs/usuario/atalhos/`) e rotas da API (`scripts/gerar_docs_api.py`, 190 rotas).
 - **Verificação:** `scripts/verificar_docs.py` roda no CI (`.github/workflows/docs.yml`) e hoje termina com **0 problemas**. O `validate_wiki_glossary.py` passa nos 68 testes.
 - **Índice:** criado `docs/README.md`. As referências do código a planos inexistentes foram corrigidas, alterando só comentários.
 - **Dockerfile:** passa a instalar `git`, de que a dependência CLIP via `git+https` precisa.

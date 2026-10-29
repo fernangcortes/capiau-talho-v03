@@ -8,10 +8,10 @@
 Vamos continuar a reorganização das análises do CapIAu Talho. Leia antes, nesta ordem, e confira
 no código cada afirmação antes de mexer (as linhas podem ter andado; se algo não bater, me avise):
 
-1. `docs/ORDEM_DAS_ANALISES.md` (seções 6 e 7: o que mudou e achados pendentes)
-2. `docs/REVISAO_CATEGORIAS.md` (taxonomia em dois eixos, decisões, seção 13: o que está feito)
-3. `docs/PLANO_AUDIO_CATEGORIAS.md` (categorias de áudio aprovadas, calibração pendente)
-4. `docs/HANDOFF_DESIGN_UI.md` se for mexer em interface
+1. `docs/planos/ORDEM_DAS_ANALISES.md` (seções 6 e 7: o que mudou e achados pendentes)
+2. `docs/planos/REVISAO_CATEGORIAS.md` (taxonomia em dois eixos, decisões, seção 13: o que está feito)
+3. `docs/planos/PLANO_AUDIO_CATEGORIAS.md` (categorias de áudio aprovadas, calibração pendente)
+4. `docs/agentes/HANDOFF_DESIGN_UI.md` se for mexer em interface
 
 ## Estado em 06/10/2026 (tudo na main, sem push)
 
@@ -30,7 +30,7 @@ no código cada afirmação antes de mexer (as linhas podem ter andado; se algo 
 
 ## Próximos passos, nesta ordem
 
-1. **Camada 1 do áudio** (`docs/PLANO_AUDIO_CATEGORIAS.md`, seção 3): coluna `natureza`, detectar
+1. **Camada 1 do áudio** (`docs/planos/PLANO_AUDIO_CATEGORIAS.md`, seção 3): coluna `natureza`, detectar
    áudio (sem faixa de vídeo ou imagem parada) na ingestão e na análise, e tirar esse material da
    visão. Teste com fixtures geradas por ffmpeg.
 2. **Camada 2 do áudio, genérica**: classificador AudioSet local (YAMNet ou PANNs, o menor que

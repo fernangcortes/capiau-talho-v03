@@ -7,7 +7,7 @@
 
 Quero achar planos por objeto no CapIAu Talho ("planos com carro", "garrafa verde") sem lista fixa
 de classes, e que o programa entenda o que estou procurando e sugira buscas sem misturar com a
-checagem técnica. Leia antes `docs/PROPOSTA_BUSCA_OBJETOS.md` (seções 2, 3, 4 e 6) e confira no
+checagem técnica. Leia antes `docs/propostas/PROPOSTA_BUSCA_OBJETOS.md` (seções 2, 3, 4 e 6) e confira no
 código cada afirmação; linhas podem ter andado.
 
 ## O que já existe (conferido em 05/10/2026)
@@ -43,12 +43,12 @@ código cada afirmação; linhas podem ter andado.
    leitura (só caixas que eu confirmei ou de consulta recente). O clique cai no mesmo roteador.
 5. **Sugestões discretas**: chip pequeno (nunca modal ou toast), que eu escolho abrir; painel que
    empurra. Pergunte-me: só no player ou também na biblioteca.
-6. Interface segue `docs/HANDOFF_DESIGN_UI.md` (9–12 px, botões 20–28 px, `var(--fs-N)`,
+6. Interface segue `docs/agentes/HANDOFF_DESIGN_UI.md` (9–12 px, botões 20–28 px, `var(--fs-N)`,
    `var(--sp-N)`, `--accent`, nada abre sozinho).
 
 ## Regras deste repositório
 
-- Leia o `CLAUDE.md` da pasta `dev` e `docs/HANDOFF_DESIGN_UI.md`.
+- Leia o `CLAUDE.md` da pasta `dev` e `docs/agentes/HANDOFF_DESIGN_UI.md`.
 - Outra sessão mexe na interface (`index.html`, `main.js`, `workspaceManager.js`, `styles.css`,
   `library.js`, `welcomeHub.js`, `player.js` às vezes). Commit só dos seus trechos (índice montado a
   partir do HEAD), direto na main, sem coautoria, sem push.

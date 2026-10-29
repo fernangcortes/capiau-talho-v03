@@ -1,5 +1,7 @@
 # Walkthrough da Implementação --- CapIAu-Talho Making Of MVP
 
+> **Documento histórico.** Diário técnico da construção do MVP, mantido como registro das decisões. Não é atualizado: para uso atual, veja o [Manual do Usuário](../../USER_MANUAL.md) e a [wiki](https://github.com/fernangcortes/capiau-talho-v03/wiki).
+
 Este documento resume as implementações realizadas, os testes efetuados
 e instrui sobre como executar a aplicação de forma rápida e local.
 
@@ -326,7 +328,7 @@ completando o ciclo inteligente do CapIAu-Talho:
 
 1.  **Pipeline de Sumarização por IA (DeepSeek V3):**
 
-    - Criado [`summary_engine.py`](src/nlp/summary_engine.py) que se
+    - Criado [`summary_engine.py`](../../src/nlp/summary_engine.py) que se
       comunica com o OpenRouter (modelo deepseek/deepseek-chat) para
       analisar as transcrições das Entrevistas e a sequência temporal
       das descrições do B-roll.
@@ -336,12 +338,12 @@ completando o ciclo inteligente do CapIAu-Talho:
       narrativo/editorial do vídeo, e um conjunto de tags.
 
     - Integrado de forma assíncrona ao final dos pipelines de ASR
-      ([`asr_engine.py`](src/transcription/asr_engine.py)) e Visão Multimodal
-      ([`multimodal_engine.py`](src/vision/multimodal_engine.py)).
+      ([`asr_engine.py`](../../src/transcription/asr_engine.py)) e Visão Multimodal
+      ([`multimodal_engine.py`](../../src/vision/multimodal_engine.py)).
 
 2.  **Endpoint Chatbot RAG Híbrido (/api/project/{project_id}/chat):**
 
-    - Criado no [`server.py`](src/api/server.py) o endpoint de
+    - Criado no [`server.py`](../../src/api/server.py) o endpoint de
       chat RAG.
 
     - Realiza busca semântica no banco de dados vetorial Qdrant para
@@ -355,9 +357,9 @@ completando o ciclo inteligente do CapIAu-Talho:
 3.  **Interface de Chat no Painel Lateral:**
 
     - Adicionada a aba **Chat IA** no painel lateral direito do frontend
-      ([`index.html`](src/ui/index.html),
+      ([`index.html`](../../src/ui/index.html),
       `app.js`,
-      [`styles.css`](src/ui/styles.css)).
+      [`styles.css`](../../src/ui/styles.css)).
 
     - Apresenta boas-vindas com sugestões de perguntas e renderiza
       bolhas de mensagens do usuário (alinhadas à direita em gradiente)
@@ -1026,7 +1028,7 @@ no painel lateral esquerdo (ativado via atalho A ou clicando em
 
 ## 🎞️ Fase 16: Reforma do Pipeline — Segmentação Real, CLIP Local e Busca Visual (Etapa 2, 12–13/07/2026)
 
-Substituímos o relógio fixo de extração de frames (1 a cada 10s) por uma decupagem que entende o conteúdo do vídeo, e adicionamos busca por imagem 100% local, sem custo de API. Trabalho descrito em detalhe em `docs/PLANO_IMPLEMENTACAO.md` (Etapa 2):
+Substituímos o relógio fixo de extração de frames (1 a cada 10s) por uma decupagem que entende o conteúdo do vídeo, e adicionamos busca por imagem 100% local, sem custo de API. Trabalho descrito em detalhe em `docs/planos/PLANO_IMPLEMENTACAO.md` (Etapa 2):
 
 1.  **Segmentação Real: Shots, Beats e Movimento de Câmera (E2.A):**
 
@@ -1066,11 +1068,11 @@ Substituímos o relógio fixo de extração de frames (1 a cada 10s) por uma dec
 
     - Testado end-to-end no navegador contra o servidor real: função definida globalmente, 1.424 cards de foto com botão de similares funcional, e fluxo completo clique → painel → renderização de cards mistos (foto + b-roll) validado com stub de rede controlado.
 
-    - **Pendências da Etapa 2** (ver `docs/PLANO_IMPLEMENTACAO.md`): dedupe de rajadas de fotos (E2.B4), zero-shot tagging de entidades por CLIP (E2.B5), perfis de esforço por categoria (E2.C), fila de revisão de triagem (E2.C2) e gramática do plano — escala, paleta, facetas (E2.D). Recomendado **não** disparar a reanálise completa do acervo (E1.T5, 541 vídeos + 1.424 fotos) antes de E2.B4 e E2.C1 estarem prontos, já que ambos reduzem diretamente o custo dessa rodada única.
+    - **Pendências da Etapa 2** (ver `docs/planos/PLANO_IMPLEMENTACAO.md`): dedupe de rajadas de fotos (E2.B4), zero-shot tagging de entidades por CLIP (E2.B5), perfis de esforço por categoria (E2.C), fila de revisão de triagem (E2.C2) e gramática do plano — escala, paleta, facetas (E2.D). Recomendado **não** disparar a reanálise completa do acervo (E1.T5, 541 vídeos + 1.424 fotos) antes de E2.B4 e E2.C1 estarem prontos, já que ambos reduzem diretamente o custo dessa rodada única.
 
 ## 📐 Fase 17: Configurações da Sequência, Viewport Estável, Alças de Transformação e Efeito de Crop (15/07/2026)
 
-Implementamos a fundação para controle preciso de enquadramento da timeline, propriedades da sequência, e manipulação direta de efeitos de transform e crop no player do Program. Detalhado em `docs/PLANO_VIEWPORT_TRANSFORM_CROP.md`.
+Implementamos a fundação para controle preciso de enquadramento da timeline, propriedades da sequência, e manipulação direta de efeitos de transform e crop no player do Program. Detalhado em `docs/planos/PLANO_VIEWPORT_TRANSFORM_CROP.md`.
 
 1.  **Fundação e Correções de Bugs (Fase 0):**
     - Descravado o FPS do player: todas as rotinas de sincronia e seek leem dinamicamente `TIMELINE_STATE.fps` em runtime.

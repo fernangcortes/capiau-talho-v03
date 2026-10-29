@@ -1,4 +1,4 @@
-"""Servico de nuvem de audio (ETAPA 5 do plano de ajustes de áudio, não versionado, secao 8; a nuvem Auphonic está em docs/AUPHONIC_AUDIO_RESTORATION_GUIDE.md).
+"""Servico de nuvem de audio (ETAPA 5 do plano de ajustes de áudio, não versionado, secao 8; a nuvem Auphonic está em docs/dev/AUPHONIC_AUDIO_RESTORATION_GUIDE.md).
 
 Um unico provedor por tras de uma interface: Auphonic. O que este modulo faz:
 

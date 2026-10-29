@@ -6,7 +6,7 @@ equipe de pós-produção e usando todas as ferramentas do NLE.
 > Levantamento feito lendo o código em 17/10/2026. Referências `arquivo:linha` em `src/`, podem
 > ter andado. Nada aqui foi implementado: o documento é diagnóstico, desenho e plano em fases.
 >
-> O plano da suíte NLE (`docs/PLANO_SUITE_NLE_CLASSICO.md`) está versionado desde o commit
+> O plano da suíte NLE (`docs/planos/PLANO_SUITE_NLE_CLASSICO.md`) está versionado desde o commit
 > `7666562` (entrou com `git add -f`, pois o `.gitignore` ignora `docs/PLANO_*.md`). O escopo das
 > Tasks 16 a 25 citado aqui foi levantado a partir do roadmap (`wiki/17.-Roadmap-e-Guia-de-Contribuicao.md`)
 > e do código; antes de implementar, confira-o com o status atual do plano.
@@ -220,7 +220,7 @@ materializar(fantasma) = aplicar(base na revisão, blocos aceitos ou pendentes, 
 
 ### 3.3 Três visões
 
-![Sequência Fantasma no modo Contracampo](images/sequencia-fantasma-contracampo.svg)
+![Sequência Fantasma no modo Contracampo](../images/sequencia-fantasma-contracampo.svg)
 
 | Visão | Como é | Quando usar |
 | :--- | :--- | :--- |
@@ -241,7 +241,7 @@ O que vale para as três:
 ### 3.4 Persistência
 
 A fantasma sai do `localStorage` e vai para o banco, como sequência `kind = ghost`. Assim ela
-sobrevive à troca de máquina (ver `docs/PLANO_NUVEM.md`), tem autor e custo, e alimenta o
+sobrevive à troca de máquina (ver `docs/planos/PLANO_NUVEM.md`), tem autor e custo, e alimenta o
 aprendizado (seção 9). Esboço de schema:
 
 ```sql
@@ -376,9 +376,9 @@ regra de paridade do projeto existe para evitar.
 
 ## 7. Servidor MCP do Talho
 
-![Mesa de Montagem: multiagentes via MCP](images/mesa-de-montagem-mcp.svg)
+![Mesa de Montagem: multiagentes via MCP](../images/mesa-de-montagem-mcp.svg)
 
-É o E4.C1 do `docs/PLANO_IMPLEMENTACAO.md`, ampliado. **Um registro único de ferramentas** com
+É o E4.C1 do `docs/planos/PLANO_IMPLEMENTACAO.md`, ampliado. **Um registro único de ferramentas** com
 dois transportes: o function-calling que o chat usa hoje (OpenRouter) e o MCP (HTTP local com
 token). O chat interno vira só mais um cliente.
 
@@ -511,7 +511,7 @@ uma só.
 - **Gabarito**: um corte final feito por humano (export OTIO) sobre material já indexado. A Mesa
   roda no mesmo material e mede cobertura dos trechos usados, semelhança da ordem dos beats,
   erro de duração e preferência cega do editor entre versões. Liga com
-  `docs/proximos_chats/06_gabaritos_avaliacao.md`.
+  `docs/agentes/proximos_chats/06_gabaritos_avaliacao.md`.
 
 ---
 
@@ -569,7 +569,7 @@ o editor mexer na base é reaplicada sobre a revisão nova e marca só os blocos
 - [ ] Servidor MCP dentro do processo do backend (HTTP local com token) com tools, resources e
   prompts, e canal para o navegador; o chat interno passa a usar o mesmo registro. A parte só de
   leitura (busca, transcrição, Cartão, cenas) é o E4.C1 do plano principal e pode vir antes, sem
-  Node nem fantasma (E4.C1a em `docs/ORDEM_DE_IMPLEMENTACAO.md`).
+  Node nem fantasma (E4.C1a em `docs/planos/ORDEM_DE_IMPLEMENTACAO.md`).
 
 *Aceite:* de uma sessão de harness externo, buscar momentos, abrir uma fantasma, aplicar dez
 operações variadas e ver o resultado tocar na interface do Talho.
@@ -614,10 +614,10 @@ Fechadas em 18/10/2026:
 - **Node em produção**: aceito para o motor único (núcleo puro do `timelineState.js` num processo
   ao lado do backend). Pesa a partir da F3; até lá, a fantasma valida só na interface.
 - **Subsequências aninhadas** entram no roadmap da suíte NLE.
-- **Nada desta proposta é implementado** antes de os dois planos (este e `docs/PLANO_SUITE_NLE_CLASSICO.md`)
+- **Nada desta proposta é implementado** antes de os dois planos (este e `docs/planos/PLANO_SUITE_NLE_CLASSICO.md`)
   serem cruzados e atualizados juntos. Atenção: o `.gitignore` ignora `docs/PLANO_*.md`; novos planos
-  entram com `git add -f` ou depois da decisão D-01 de `docs/ORDEM_DE_IMPLEMENTACAO.md`. A ordem propõe uma exceção para os defeitos D1 a D6 (decisão
+  entram com `git add -f` ou depois da decisão D-01 de `docs/planos/ORDEM_DE_IMPLEMENTACAO.md`. A ordem propõe uma exceção para os defeitos D1 a D6 (decisão
   D-13), por serem defeitos do fluxo atual, não recurso novo.
 
 Em aberto: nenhuma decisão desta proposta. A ordem de implementação junto com os demais planos
-está em `docs/ORDEM_DE_IMPLEMENTACAO.md`.
+está em `docs/planos/ORDEM_DE_IMPLEMENTACAO.md`.

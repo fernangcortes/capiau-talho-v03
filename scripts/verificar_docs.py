@@ -28,25 +28,25 @@ from urllib.parse import unquote
 RAIZ = Path(__file__).resolve().parent.parent
 
 # Exclusões padrão (prefixos relativos à raiz): material histórico e de pesquisa, ruidoso para links.
-EXCLUIR_PADRAO = ["docs/Pesquisas", "docs/proximos_chats"]
+EXCLUIR_PADRAO = ["docs/Pesquisas", "docs/agentes/proximos_chats"]
 
 # Docs voltadas ao usuário: sujeitas às checagens de modelos e de caminhos src/...
 DOCS_USUARIO_FIXAS = [
     "README.md",
     "USER_MANUAL.md",
-    "docs/ai_settings_pro_guide.md",
-    "docs/costs_and_security.md",
-    "docs/shortcuts.md",
-    "docs/api_endpoints.md",
-    "docs/kdenlive_workflow.md",
-    "docs/AUPHONIC_AUDIO_RESTORATION_GUIDE.md",
+    "docs/usuario/ai_settings_pro_guide.md",
+    "docs/usuario/costs_and_security.md",
+    "docs/usuario/shortcuts.md",
+    "docs/dev/api_endpoints.md",
+    "docs/usuario/kdenlive_workflow.md",
+    "docs/dev/AUPHONIC_AUDIO_RESTORATION_GUIDE.md",
 ]
 # Para modelos, só as docs de configuração/uso (o resto pode citar modelos de pesquisa)
 DOCS_MODELOS_FIXAS = [
     "README.md",
     "USER_MANUAL.md",
-    "docs/ai_settings_pro_guide.md",
-    "docs/costs_and_security.md",
+    "docs/usuario/ai_settings_pro_guide.md",
+    "docs/usuario/costs_and_security.md",
 ]
 
 # Slugs aceitos mesmo sem estar em config.py (exemplos genéricos, etc.)

@@ -232,7 +232,7 @@ def get_vision_prompt(known_entities: list = None, detected_people: list = None,
     `category` é ignorada desde 06/10/2026: com a categoria no prompt ("descreva dentro
     desse contexto") a descrição confirmava a triagem, inclusive quando ela errava. A
     descrição fica independente e o resumo final confere a categoria com ela
-    (docs/REVISAO_CATEGORIAS.md, seção 11).
+    (docs/planos/REVISAO_CATEGORIAS.md, seção 11).
     """
     context_block = ""
     if known_entities:

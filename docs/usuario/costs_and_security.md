@@ -11,8 +11,8 @@ Abaixo estão as diretrizes fundamentais de segurança e economia recomendadas p
 ## 1. Diretrizes de Segurança (Proteção de Credenciais)
 
 ### 🔑 Isolamento Absoluto de Chaves de API
-- Suas chaves (`OPENROUTER_API_KEY` e `ASSEMBLYAI_API_KEY`) devem ficar, de preferência, no arquivo local `.env` (modelo em [`.env.example`](../.env.example)).
-- **NUNCA comite o arquivo .env para repositórios públicos ou privados do GitHub.** O arquivo está listado no seu [`.gitignore`](../.gitignore) para prevenção automática de vazamento, mas certifique-se de não forçar a adição do arquivo por engano.
+- Suas chaves (`OPENROUTER_API_KEY` e `ASSEMBLYAI_API_KEY`) devem ficar, de preferência, no arquivo local `.env` (modelo em [`.env.example`](../../.env.example)).
+- **NUNCA comite o arquivo .env para repositórios públicos ou privados do GitHub.** O arquivo está listado no seu [`.gitignore`](../../.gitignore) para prevenção automática de vazamento, mas certifique-se de não forçar a adição do arquivo por engano.
 - Se for necessário hospedar ou compartilhar o código, forneça apenas o arquivo `.env.example` com placeholders vazios.
 
 ### 🛡️ Controle e Escopo das Chaves

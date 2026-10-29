@@ -20,7 +20,7 @@ Feito e commitado na main (sem push):
   Configurações > Modelos locais (`src/ui/js/modelosLocais.js`), rota `/api/modelos`.
 - Scripts de comparação: `scripts/system1_avaliar.py`, `scripts/asr_comparar.py`,
   `scripts/detectores_comparar.py`.
-- Documentos: `docs/PROPOSTA_BUSCA_OBJETOS.md` (rotas A/B/C/D) e `docs/ORDEM_DAS_ANALISES.md`
+- Documentos: `docs/propostas/PROPOSTA_BUSCA_OBJETOS.md` (rotas A/B/C/D) e `docs/planos/ORDEM_DAS_ANALISES.md`
   (dependências, bugs, ordem recomendada).
 
 ## Ordem dos chats

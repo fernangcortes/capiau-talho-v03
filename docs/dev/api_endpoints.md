@@ -120,7 +120,7 @@ A tabela completa de rotas, no fim desta página, é gerada automaticamente a pa
 
 ## 5. Busca Visual e "Encontrar Similares" (CLIP Local)
 
-Rotas da reforma de pipeline da Etapa 2 (ver `docs/PLANO_IMPLEMENTACAO.md`)
+Rotas da reforma de pipeline da Etapa 2 (ver `docs/planos/PLANO_IMPLEMENTACAO.md`)
 que rodam 100% localmente via embeddings CLIP, sem custo de API.
 
 ### GET /api/search/visual
