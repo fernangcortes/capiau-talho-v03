@@ -5,7 +5,7 @@
 **Ilha de pré-edição, decupagem e assistência inteligente por IA para grandes acervos e documentários**
 
 [![Licença: GPL v3](https://img.shields.io/badge/Licen%C3%A7a-GPL%20v3-blue.svg)](https://github.com/fernangcortes/capiau-talho-v03/blob/main/LICENSE)
-[![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![Python 3.12](https://img.shields.io/badge/Python-3.12%20(%3C%203.14)-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![Status](https://img.shields.io/badge/Status-Track--Based%20NLE-orange.svg)](https://github.com/fernangcortes/capiau-talho-v03)
 [![CPU First](https://img.shields.io/badge/Arquitetura-CPU--First%20Local-success.svg)](01.-Visao-Geral-e-Conceito)
 
@@ -27,6 +27,17 @@ Diferente de plugins convencionais ou ferramentas que tratam IA como uma caixa p
 
 ---
 
+## 👉 Comece aqui
+
+1. Instale em 5 minutos: [[02. Instalação e Configuração|02.-Instalacao-e-Configuracao]] (Python 3.12 recomendado; versões abaixo de 3.14).
+2. Faça o roteiro de [[19. Primeiros 15 Minutos e Receitas|19.-Primeiros-15-Minutos-e-Receitas]]: ingerir, transcrever, buscar, montar e exportar.
+3. Problemas? [[16. Solução de Problemas e FAQ|16.-Solucao-de-Problemas-e-FAQ]]. Termo desconhecido? [[Glossário|18.-Glossario-Visual-e-Terminologia]].
+
+> [!WARNING]
+> O servidor ainda não tem autenticação e aceita qualquer origem. Use apenas em máquina ou rede confiável.
+
+---
+
 ## 🗺️ Mapa de Navegação da Wiki
 
 Explore a documentação completa através dos módulos abaixo:
@@ -34,36 +45,39 @@ Explore a documentação completa através dos módulos abaixo:
 | Seção | Título | Conteúdo Principal |
 | :--- | :--- | :--- |
 | 🚀 **Início** | [[01. Visão Geral e Conceito\|01.-Visao-Geral-e-Conceito]] | Filosofia, desafios em documentários, acervos e arquitetura híbrida. |
-| 🛠️ **Setup** | [[02. Instalação e Configuração\|02.-Instalacao-e-Configuracao]] | Requisitos de hardware, instalação local, Docker, `.env` e launcher Windows. |
+| 🛠️ **Setup** | [[02. Instalação e Configuração\|02.-Instalacao-e-Configuracao]] | Requisitos, Docker, instalação no Windows e Linux/macOS, `.env` e segurança. |
 | 🎨 **Interface** | [[03. Design System e Interface NLE\|03.-Design-System-e-Interface-NLE]] | Layout seamless sem gaps, sidebars adaptativas, linhas restauradoras de 4px. |
 | 📂 **Acervo** | [[04. Ingestão e Gestão de Acervos\|04.-Ingestao-e-Gestao-de-Acervos]] | Ingestão in-place sem cópia, watch folder, proxies 720p/360p, RAW CR2 e MTS. |
 | ✂️ **Edição** | [[05. Timeline e Edição Multipista\|05.-Timeline-e-Edicao-Multipista]] | Canvas 2D NLE, pistas V/A, Sync Lock, Magnetismo, J/L-Cuts e ferramentas de Trim. |
 | 🎞️ **Visão** | [[06. Decupagem e Visão Computacional\|06.-Decupagem-Inteligente-e-Visao]] | PySceneDetect (shots/beats), decupagem cromática, chips minimalistas, títulos de IA e CLIP local. |
-| 🎙️ **Texto** | [[07. Transcrição e Edição por Texto\|07.-Transcricao-ASR-e-Edicao-por-Texto]] | AssemblyAI/Whisper, diarização, gaveta de pistas, waveform e inserção rápida. |
+| 🎙️ **Texto** | [[07. Transcrição e Edição por Texto\|07.-Transcricao-ASR-e-Edicao-por-Texto]] | AssemblyAI/Deepgram (Whisper local experimental), diarização, gaveta de pistas, waveform e inserção rápida. |
 | 🔍 **Busca** | [[08. Busca Híbrida e Semântica\|08.-Busca-Hibrida-e-Semantica]] | Busca semântica RAG, similares visuais, filtros avançados e explicações de IA. |
-| 👥 **Faces** | [[09. Reconhecimento Facial e Elenco\|09.-Reconhecimento-Facial-e-Elenco]] | InsightFace ONNX CPU, DBSCAN local, rotulação, fusão de clusters e caixas manuais. |
-| 🔊 **Áudio** | [[10. Diagnóstico e Restauração de Áudio\|10.-Audio-Diagnostico-e-Restauracao]] | Medição LUFS EBU R128, DeepFilterNet local, Auphonic REST API e EQ 3 bandas. |
-| 🌈 **Cor & FX** | [[11. Cor, OCIO e Viewport NLE\|11.-Cor-Grading-e-Transformacoes-Visuais]] | OpenColorIO, LUTs 3D .cube, Color Wheels, Viewport NLE, Transform e Crop. |
+| 👥 **Faces** | [[09. Reconhecimento Facial e Elenco\|09.-Reconhecimento-Facial-e-Elenco]] | SCRFD + ArcFace ONNX (CPU), DBSCAN local, rotulação, fusão de clusters e caixas manuais. |
+| 🔊 **Áudio** | [[10. Diagnóstico e Restauração de Áudio\|10.-Audio-Diagnostico-e-Restauracao]] | Medição LUFS EBU R128, denoise local (DPDFNet/GTCRN), Auphonic e EQ 3 bandas. |
+| 🌈 **Cor & FX** | [[11. Cor e Viewport NLE\|11.-Cor-Grading-e-Transformacoes-Visuais]] | Perfil de cor das câmeras, ajustes de cor, camada de ajuste, Viewport NLE, Transform e Crop. |
 | 📝 **Titler** | [[12. Titler NLE, Legendas e Animação\|12.-Titler-NLE-Legendas-e-Animacao]] | Gerador de títulos, Lower Thirds, legendas queimadas/SRT e animação com keyframes. |
 | 🎬 **Export** | [[13. Exportação e Interoperabilidade NLE\|13.-Exportacao-e-Interoperabilidade-NLE]] | Formatos OTIO, XML FCP7, EDL, Render MP4 e integração com Kdenlive/Premiere/Resolve. |
 | 🎹 **Atalhos** | [[14. Guia Completo de Atalhos\|14.-Guia-Completo-de-Atalhos]] | Tabela completa de atalhos de teclado (JKL, I/O/E, Shift+E, A, Ferramentas). |
-| 🔌 **API** | [[15. Arquitetura Técnica e API REST\|15.-Arquitetura-Tecnica-e-API-REST]] | FastAPI, SQLite + Qdrant, acompanhamento de progresso e endpoints REST. |
+| 🔌 **API** | [[15. Arquitetura Técnica e API REST\|15.-Arquitetura-Tecnica-e-API-REST]] | Camadas, fluxo de dados, SQLite + Qdrant, filas e endpoints REST. |
 | 🩺 **Suporte** | [[16. Solução de Problemas e FAQ\|16.-Solucao-de-Problemas-e-FAQ]] | Resolução de problemas comuns, diagnóstico de erros, logs e FAQ. |
-| 🗺️ **Futuro** | [[17. Roadmap e Guia de Contribuição\|17.-Roadmap-e-Guia-de-Contribuicao]] | Próximas versões, suíte de testes pytest e diretrizes para pull requests. |
+| 🗺️ **Futuro** | [[17. Roadmap e Guia de Contribuição\|17.-Roadmap-e-Guia-de-Contribuicao]] | Roadmap, testes e como contribuir. |
+| 🧭 **Comece aqui** | [[19. Primeiros 15 Minutos e Receitas\|19.-Primeiros-15-Minutos-e-Receitas]] | Caminho único do primeiro clipe ao arquivo exportado, mais receitas prontas. |
 | 📖 **Glossário** | [[18. Glossário Visual e Terminologia\|18.-Glossario-Visual-e-Terminologia]] | Dicionário visual de termos NLE, IA, biometria facial, acústica e intercâmbio com mais de 70 verbetes didáticos e diagramas. |
 
 
 ---
 
-## ⚡ Guia de Inicialização Rápida (3 Minutos)
+## ⚡ Guia de Inicialização Rápida
 
 ![Fluxo Quickstart do CapIAu-Talho](images/quickstart-workflow.svg)
 
-1. **Ingestão:** Coloque seus vídeos, áudios ou fotos na pasta `watch/` ou aponte seus discos rígidos externos na interface.
-2. **Indexação Automática:** Clique em **Escanear watch/**. O backend extrai metadados via FFprobe, gera proxies H.264 ultra-leves e indexa os vetores visuais CLIP.
-3. **Transcrição:** Abra uma entrevista no player Source e clique em **Transcrever Vídeo**. Os diálogos aparecem divididos por personagens com marcação palavra a palavra.
-4. **Montagem Rápida:** Selecione trechos de texto e tecle `Shift+E` para jogá-los direto na Timeline, ou use `I` (In), `O` (Out) e `E` para inserir trechos de vídeo.
-5. **Exportação:** Exporte seu rough cut em **OpenTimelineIO (`.otio`)** para continuar a pós-produção no **Kdenlive 25.04+**, ou em **XML FCP7** para **Premiere Pro / DaVinci Resolve**.
+1. **Ingestão:** coloque vídeos, áudios ou fotos na pasta `watch/` ou aponte um HD externo na interface.
+2. **Indexação:** no menu **Importar**, clique em **Escanear a pasta watch/**. O backend extrai metadados, gera proxies leves e indexa os vetores visuais.
+3. **Transcrição:** abra uma entrevista e, no Inspetor, clique em **Transcrever Áudio (ASR)**. As falas aparecem separadas por falante, palavra a palavra.
+4. **Montagem:** selecione trechos de texto e tecle `Shift+E`, ou use `I`, `O` e os botões de inserir e sobrescrever.
+5. **Exportação:** clique em **Exportar Timeline** e escolha `.otio` (Kdenlive 25.04+) ou `.xml` (Premiere / Resolve / Final Cut).
+
+Passo a passo completo em [[19. Primeiros 15 Minutos e Receitas|19.-Primeiros-15-Minutos-e-Receitas]].
 
 ---
 

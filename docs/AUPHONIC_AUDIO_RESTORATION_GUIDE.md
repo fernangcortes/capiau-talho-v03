@@ -1,6 +1,6 @@
 # Guia de Restauração de Áudio Auphonic e Sistema de Diagnóstico Inteligente — CapIAu / Talho
 
-> **Referência de Sessão Antigravity:** [Auphonic Audio Restoration Guide](conversation://ee745f2c-3917-4514-8471-125c91618dbd)  
+> **Referência de Sessão Antigravity:** Auphonic Audio Restoration Guide (sessão de chat, não versionada)  
 > **Data de Registro:** 27 de Agosto de 2026  
 > **Status:** Especificação Técnica, Benchmark de Casos Reais e Modelo de Relatórios para o Talho NLE.
 
@@ -216,9 +216,9 @@ O relatório dentro do Talho será renderizado no painel de **Ajustes de Áudio*
    - Adicionar parser de histograma de clipping a partir do filtro `volumedetect`.
    - Adicionar parser de True Peak oversampling (`ebur128=peak=true`).
    - Implementar cálculo de `flat_factor` e contagem de picos para alimentar a detecção de *Preamp Overdrive*.
-2. **Criação de `src/media/audio_classifier.py`:**
+2. **Classificador de áudio** (implementado como `src/media/audio_classificador.py`):
    - Implementar o motor de classificação por proximidade (KNN) com os clusters definidos na Seção 4.
-3. **Criação de `src/services/audio_cloud_auphonic.py`:**
+3. **Integração Auphonic** (implementada como `src/services/audio_cloud.py`):
    - Integrar endpoints da API do Auphonic (`/api/productions.json`) para envio assíncrono com webhook de retorno.
 4. **UI no Talho (Web/Desktop):**
    - Renderizar o componente de relatório interativo com visualização da waveform com marcadores vermelhos nos pontos onde `true_peak > 0` e links diretos para saltar a agulha de reprodução.
