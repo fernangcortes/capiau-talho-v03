@@ -157,6 +157,34 @@ docs/
 
 ---
 
-## 6. Perguntas em aberto
+## 6. Situação após as correções (29/10/2026)
 
-Consolidadas na conversa da sessão. Veja também o fim de cada seção acima.
+Aplicado na branch `claude/docs-multiagent-analysis-o5drof`:
+
+- **README:** vira vitrine enxuta, de 65 KB para 15 KB.
+- **USER_MANUAL:** voltado só ao usuário final, com os 4 recursos novos.
+- **Wiki:**
+  - 02 e 15 reescritas a partir do código;
+  - 16 organizada por sintoma;
+  - 10, 07 e 11 corrigidas;
+  - nova página 19, "Primeiros 15 minutos e Receitas".
+- **Glossário:** 94 verbetes, todos com nível, caminhos e funções conferidos no código.
+- **Geradores:** atalhos (`scripts/gerar_atalhos.mjs`, com cartões A4 em `docs/atalhos/`) e rotas da API (`scripts/gerar_docs_api.py`, 190 rotas).
+- **Verificação:** `scripts/verificar_docs.py` roda no CI (`.github/workflows/docs.yml`) e hoje termina com **0 problemas**. O `validate_wiki_glossary.py` passa nos 68 testes.
+- **Índice:** criado `docs/README.md`. As referências do código a planos inexistentes foram corrigidas, alterando só comentários.
+- **Dockerfile:** passa a instalar `git`, de que a dependência CLIP via `git+https` precisa.
+
+### Pendências para o autor
+
+- O `.gitignore` ignora `docs/PLANO_*.md`, `docs/HANDOFF_*.md` e `docs/Pesquisas/`. Os planos citados no código e marcados como "não versionado" provavelmente estão só na máquina local. Decida se eles devem ser versionados.
+- A versão oficial de Python ainda não está definida. As docs dizem "3.12 recomendado, < 3.14".
+- **Capturas e GIFs:** a lista do que falta está em `docs/images/README.md`.
+- **A confirmar na UI:**
+  - O tooltip de `Ctrl+Alt+G` diz "opções", mas o código alterna a máscara.
+  - Não há botão Solo nas pistas.
+  - Não há filtro de biblioteca por pessoa.
+  - As docstrings de rostos citam YuNet + SFace, enquanto o backend usa SCRFD + ArcFace.
+- **RTF do DPDFNet:** o código registra 0,82 em `audio_denoise.py` e 0,71 em `settings_registry.py`.
+- **Glossário, eixo 6:** os conceitos de cor ainda não implementados (LUT, Color Wheels, White Balance) estão marcados com status. Falta decidir se ficam assim ou saem.
+- **`walkthrough.md`:** candidato a `docs/arquivo/` como diário histórico.
+- **Reorganização de `docs/` em subpastas:** não foi feita. Exige atualizar as referências em `src/`, `scripts/` e `tests/`.
