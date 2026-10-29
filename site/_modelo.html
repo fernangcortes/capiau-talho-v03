@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- MODELO DE PÁGINA. Para criar uma página nova: copie este arquivo, troque
+         TITULO, DESCRICAO e PAGINA (o id usado em data-page, no CSS e no JS),
+         e escreva o conteúdo dentro de <main>. Cabeçalho e rodapé ficam IGUAIS
+         em todas as páginas (o base.js marca o item do menu da página atual). -->
+    <title>TITULO — CapIAu-Talho</title>
+    <meta name="description" content="DESCRICAO">
+    <meta name="theme-color" content="#07060b">
+    <meta name="color-scheme" content="dark">
+    <meta property="og:type" content="website">
+    <meta property="og:locale" content="pt_BR">
+    <meta property="og:site_name" content="CapIAu-Talho">
+    <meta property="og:title" content="TITULO — CapIAu-Talho">
+    <meta property="og:description" content="DESCRICAO">
+    <meta property="og:image" content="https://fernangcortes.github.io/capiau-talho-v03/assets/img/og-image.png">
+    <meta name="twitter:card" content="summary_large_image">
+    <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="assets/img/favicon-32x32.png" sizes="32x32" type="image/png">
+    <link rel="apple-touch-icon" href="assets/img/apple-touch-icon.png">
+    <link rel="preload" href="assets/fonts/inter-var.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="preload" href="assets/fonts/barlow-semi-condensed-700.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="stylesheet" href="assets/css/base.css">
+    <link rel="stylesheet" href="assets/css/PAGINA.css">
+    <script>
+        /* antes de pintar: marca que há JS e aplica a escolha de animações (sem piscar) */
+        (function (r) {
+            r.classList.add("js");
+            try {
+                var m = localStorage.getItem("talho-motion");
+                if (m === "off" || (!m && matchMedia("(prefers-reduced-motion: reduce)").matches)) r.dataset.motion = "off";
+            } catch (e) {}
+        })(document.documentElement);
+    </script>
+    <script src="assets/js/base.js" defer></script>
+    <script src="assets/js/PAGINA.js" defer></script>
+</head>
+<body data-page="PAGINA">
+    <a class="skip-link" href="#conteudo">Pular para o conteúdo</a>
+
+    <!-- ═══════════════ CABEÇALHO (idêntico em todas as páginas) ═══════════════ -->
+    <header class="site-header" data-header>
+        <div class="site-header__inner">
+            <a class="brand" href="index.html" aria-label="CapIAu-Talho — página inicial">
+                <img src="assets/img/logo.svg" width="34" height="34" alt="">
+                <span class="brand__name">CapIAu-<span class="brand__talho">Talho</span></span>
+            </a>
+            <nav class="site-nav" id="site-nav" aria-label="Principal">
+                <a href="index.html" data-nav-id="inicio">Início</a>
+                <a href="recursos.html" data-nav-id="recursos">Recursos</a>
+                <a href="como-funciona.html" data-nav-id="como-funciona">Como funciona</a>
+                <a href="comecar.html" data-nav-id="comecar">Começar</a>
+                <a href="contribuir.html" data-nav-id="contribuir">Contribuir</a>
+                <div class="site-nav__mobile-cta">
+                    <a class="btn btn--primary" href="comecar.html">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 20h14"/></svg>
+                        Baixar grátis
+                    </a>
+                </div>
+            </nav>
+            <div class="header-actions">
+                <span class="header-tc" aria-hidden="true" title="A página como uma sequência: o timecode acompanha a rolagem" data-scroll-timecode>00:00:00:00</span>
+                <button class="icon-btn" type="button" data-motion-toggle aria-label="Pausar animações">
+                    <svg class="motion-icon-pause" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 6v12M15 6v12"/></svg>
+                    <svg class="motion-icon-play" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M8 5.5v13l11-6.5z"/></svg>
+                </button>
+                <a class="icon-btn" data-github href="https://github.com/fernangcortes/capiau-talho-v03" aria-label="Código-fonte no GitHub">
+                    <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
+                </a>
+                <a class="btn btn--primary btn--sm header-cta" href="comecar.html">Baixar grátis</a>
+                <button class="icon-btn nav-toggle" type="button" aria-controls="site-nav" aria-expanded="false" aria-label="Abrir menu">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+                </button>
+            </div>
+        </div>
+        <div class="scroll-playhead" aria-hidden="true"><span></span></div>
+    </header>
+
+    <main id="conteudo">
+        <!-- ═══════════════ EXEMPLO de topo de página interna ═══════════════ -->
+        <section class="page-hero">
+            <div class="container">
+                <p class="eyebrow" data-reveal>Rótulo curto</p>
+                <h1 class="page-hero__title" data-reveal style="--d: 80ms">Título da página com <span class="text-gradient">destaque</span></h1>
+                <p class="lead page-hero__lead" data-reveal style="--d: 160ms">Um parágrafo de abertura que explica o que a pessoa vai encontrar aqui.</p>
+            </div>
+        </section>
+
+        <div class="container"><div class="talho-cut" data-inview></div></div>
+
+        <!-- ═══════════════ EXEMPLO de seção ═══════════════ -->
+        <section class="section" id="exemplo" aria-labelledby="exemplo-titulo">
+            <div class="container">
+                <header class="section-head">
+                    <p class="eyebrow eyebrow--violet" data-reveal>01 — Rótulo</p>
+                    <h2 class="section-title" id="exemplo-titulo" data-reveal>Título da seção</h2>
+                    <p class="lead" data-reveal>Texto de apoio.</p>
+                </header>
+                <div class="grid grid--3" data-reveal-stagger="90">
+                    <article class="card" data-reveal data-glow>
+                        <div class="card__icon" aria-hidden="true">
+                            <!-- tesoura (o talho) -->
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="7" r="2.5"/><circle cx="6" cy="17" r="2.5"/><path d="M8.2 8.4 20 18M8.2 15.6 20 6"/></svg>
+                        </div>
+                        <h3 class="card__title">Cartão</h3>
+                        <p class="card__text">Descrição curta.</p>
+                    </article>
+                </div>
+            </div>
+        </section>
+
+        <!-- ═══════════════ EXEMPLO de chamada final (toda página termina com uma) ═══════════════ -->
+        <section class="section section--tight" aria-labelledby="cta-titulo">
+            <div class="container">
+                <div class="cta-band" data-reveal="scale">
+                    <p class="eyebrow eyebrow--rec">Grátis · sem assinatura · código aberto</p>
+                    <h2 class="cta-band__title" id="cta-titulo">Chamada para ação</h2>
+                    <p class="lead cta-band__lead">Texto de apoio.</p>
+                    <div class="cluster cta-band__actions">
+                        <a class="btn btn--primary btn--lg" href="comecar.html">Baixar grátis
+                            <svg class="btn__arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                        </a>
+                        <a class="btn btn--ghost btn--lg" href="contribuir.html">Quero contribuir</a>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- ═══════════════ RODAPÉ (idêntico em todas as páginas) ═══════════════ -->
+    <footer class="site-footer">
+        <div class="container">
+            <div class="site-footer__grid">
+                <div class="site-footer__brand">
+                    <a class="brand" href="index.html" aria-label="CapIAu-Talho — página inicial">
+                        <img src="assets/img/logo.svg" width="34" height="34" alt="">
+                        <span class="brand__name">CapIAu-<span class="brand__talho">Talho</span></span>
+                    </a>
+                    <p class="site-footer__about">Ilha de pré-edição, decupagem e assistência por IA para documentários e grandes acervos audiovisuais. Grátis, sem assinatura e de código aberto.</p>
+                    <div class="cluster site-footer__badges">
+                        <span class="chip chip--emerald"><span class="chip__dot"></span>Grátis</span>
+                        <span class="chip chip--violet">GPL-3.0</span>
+                        <span class="chip chip--cyan">Roda em CPU</span>
+                    </div>
+                </div>
+                <nav aria-labelledby="rodape-site">
+                    <h2 class="site-footer__title" id="rodape-site">Site</h2>
+                    <ul class="site-footer__links">
+                        <li><a href="index.html">Início</a></li>
+                        <li><a href="recursos.html">Recursos</a></li>
+                        <li><a href="como-funciona.html">Como funciona</a></li>
+                        <li><a href="comecar.html">Começar</a></li>
+                        <li><a href="contribuir.html">Contribuir</a></li>
+                    </ul>
+                </nav>
+                <nav aria-labelledby="rodape-docs">
+                    <h2 class="site-footer__title" id="rodape-docs">Documentação</h2>
+                    <ul class="site-footer__links">
+                        <li><a href="https://github.com/fernangcortes/capiau-talho-v03/wiki">Wiki oficial</a></li>
+                        <li><a href="https://github.com/fernangcortes/capiau-talho-v03/blob/main/USER_MANUAL.md">Manual do usuário</a></li>
+                        <li><a href="https://github.com/fernangcortes/capiau-talho-v03/blob/main/docs/shortcuts.md">Atalhos de teclado</a></li>
+                        <li><a href="https://github.com/fernangcortes/capiau-talho-v03/blob/main/docs/costs_and_security.md">Custos e segurança</a></li>
+                    </ul>
+                </nav>
+                <nav aria-labelledby="rodape-comunidade">
+                    <h2 class="site-footer__title" id="rodape-comunidade">Comunidade</h2>
+                    <ul class="site-footer__links">
+                        <li><a href="https://github.com/fernangcortes/capiau-talho-v03">Código no GitHub</a></li>
+                        <li><a href="https://github.com/fernangcortes/capiau-talho-v03/issues">Relatar um problema</a></li>
+                        <li><a href="https://github.com/fernangcortes/capiau-talho-v03/blob/main/docs/PLANO_IMPLEMENTACAO.md">Plano e roadmap</a></li>
+                        <li><a href="https://github.com/fernangcortes/capiau-talho-v03/blob/main/LICENSE">Licença GPL-3.0</a></li>
+                    </ul>
+                </nav>
+            </div>
+            <div class="site-footer__bottom">
+                <p>© <span data-year>2026</span> CapIAu-Talho e colaboradores · Software livre sob a <a href="https://github.com/fernangcortes/capiau-talho-v03/blob/main/LICENSE">GPL-3.0</a>.</p>
+                <div class="cluster">
+                    <button class="text-btn" type="button" data-motion-toggle>
+                        <svg class="motion-icon-pause" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 6v12M15 6v12"/></svg>
+                        <svg class="motion-icon-play" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M8 5.5v13l11-6.5z"/></svg>
+                        <span data-motion-label>Pausar animações</span>
+                    </button>
+                    <a class="text-btn" href="#conteudo">Voltar ao topo ↑</a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- ÍCONES de traço (24×24, stroke currentColor, 1.75–2) para copiar quando precisar:
+         seta →        <path d="M5 12h14M13 6l6 6-6 6"/>
+         baixar        <path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 20h14"/>
+         externo       <path d="M14 5h5v5M19 5l-8 8M18 14v4a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h4"/>
+         ok            <path d="M5 12.5l4.5 4.5L19 7.5"/>
+         copiar        <rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/>
+         tesoura       <circle cx="6" cy="7" r="2.5"/><circle cx="6" cy="17" r="2.5"/><path d="M8.2 8.4 20 18M8.2 15.6 20 6"/>
+         coração       <path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/>
+         estrela       <path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/>
+         play          <path d="M8 5.5v13l11-6.5z"/>
+         escudo        <path d="M12 3 5 6v5c0 4.4 3 8.3 7 9.5 4-1.2 7-5.1 7-9.5V6z"/>
+         cpu           <rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4"/>
+         lupa          <circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/>
+         onda          <path d="M3 12h2M7 8v8M11 5v14M15 9v6M19 7v10M21 12h0"/>
+         rosto         <circle cx="12" cy="9" r="4"/><path d="M4.5 20a7.5 7.5 0 0 1 15 0"/>
+         código        <path d="m8 7-5 5 5 5M16 7l5 5-5 5"/>
+    -->
+</body>
+</html>
