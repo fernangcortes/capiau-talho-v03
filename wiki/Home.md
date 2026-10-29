@@ -62,7 +62,7 @@ Explore a documentação completa através dos módulos abaixo:
 | 🩺 **Suporte** | [[16. Solução de Problemas e FAQ\|16.-Solucao-de-Problemas-e-FAQ]] | Resolução de problemas comuns, diagnóstico de erros, logs e FAQ. |
 | 🗺️ **Futuro** | [[17. Roadmap e Guia de Contribuição\|17.-Roadmap-e-Guia-de-Contribuicao]] | Roadmap, testes e como contribuir. |
 | 🧭 **Comece aqui** | [[19. Primeiros 15 Minutos e Receitas\|19.-Primeiros-15-Minutos-e-Receitas]] | Caminho único do primeiro clipe ao arquivo exportado, mais receitas prontas. |
-| 📖 **Glossário** | [[18. Glossário Visual e Terminologia\|18.-Glossario-Visual-e-Terminologia]] | Dicionário visual de termos NLE, IA, biometria facial, acústica e intercâmbio com mais de 70 verbetes didáticos e diagramas. |
+| 📖 **Glossário** | [[18. Glossário Visual e Terminologia\|18.-Glossario-Visual-e-Terminologia]] | Dicionário visual de termos NLE, IA, biometria facial, acústica e intercâmbio com 91 verbetes didáticos e diagramas. |
 
 
 ---
