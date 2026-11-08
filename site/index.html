@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>CapIAu-Talho — ilha de pré-edição com IA, grátis e de código aberto</title>
+    <meta name="description" content="Ilha de pré-edição, decupagem e assistência por IA para documentários e grandes acervos. Roda no seu computador, sem GPU. Grátis, sem assinatura e de código aberto (GPL-3.0).">
+    <meta name="theme-color" content="#07060b">
+    <meta name="color-scheme" content="dark">
+    <meta property="og:type" content="website">
+    <meta property="og:locale" content="pt_BR">
+    <meta property="og:site_name" content="CapIAu-Talho">
+    <meta property="og:title" content="CapIAu-Talho — ilha de pré-edição com IA, grátis e de código aberto">
+    <meta property="og:description" content="Ilha de pré-edição, decupagem e assistência por IA para documentários e grandes acervos. Roda no seu computador, sem GPU. Grátis, sem assinatura e de código aberto (GPL-3.0).">
+    <meta property="og:image" content="https://fernangcortes.github.io/capiau-talho-v03/assets/img/og-image.png">
+    <meta name="twitter:card" content="summary_large_image">
+    <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="assets/img/favicon-32x32.png" sizes="32x32" type="image/png">
+    <link rel="apple-touch-icon" href="assets/img/apple-touch-icon.png">
+    <link rel="preload" href="assets/fonts/inter-var.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="preload" href="assets/fonts/barlow-semi-condensed-700.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="stylesheet" href="assets/css/base.css">
+    <link rel="stylesheet" href="assets/css/inicio.css">
+    <script>
+        /* antes de pintar: marca que há JS e aplica a escolha de animações (sem piscar) */
+        (function (r) {
+            r.classList.add("js");
+            try {
+                var m = localStorage.getItem("talho-motion");
+                if (m === "off" || (!m && matchMedia("(prefers-reduced-motion: reduce)").matches)) r.dataset.motion = "off";
+            } catch (e) {}
+        })(document.documentElement);
+    </script>
+    <script src="assets/js/base.js" defer></script>
+    <script src="assets/js/inicio.js" defer></script>
+</head>
+<body data-page="inicio">
+    <a class="skip-link" href="#conteudo">Pular para o conteúdo</a>
+
+    <!-- ═══════════════ CABEÇALHO (idêntico em todas as páginas) ═══════════════ -->
+    <header class="site-header" data-header>
+        <div class="site-header__inner">
+            <a class="brand" href="index.html" aria-label="CapIAu-Talho — página inicial">
+                <img src="assets/img/logo.svg" width="34" height="34" alt="">
+                <span class="brand__name">CapIAu-<span class="brand__talho">Talho</span></span>
+            </a>
+            <nav class="site-nav" id="site-nav" aria-label="Principal">
+                <a href="index.html" data-nav-id="inicio">Início</a>
+                <a href="recursos.html" data-nav-id="recursos">Recursos</a>
+                <a href="como-funciona.html" data-nav-id="como-funciona">Como funciona</a>
+                <a href="comecar.html" data-nav-id="comecar">Começar</a>
+                <a href="contribuir.html" data-nav-id="contribuir">Contribuir</a>
+                <div class="site-nav__mobile-cta">
+                    <a class="btn btn--primary" href="comecar.html">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 20h14"/></svg>
+                        Baixar grátis
+                    </a>
+                </div>
+            </nav>
+            <div class="header-actions">
+                <span class="header-tc" aria-hidden="true" title="A página como uma sequência: o timecode acompanha a rolagem" data-scroll-timecode>00:00:00:00</span>
+                <button class="icon-btn" type="button" data-motion-toggle aria-label="Pausar animações">
+                    <svg class="motion-icon-pause" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 6v12M15 6v12"/></svg>
+                    <svg class="motion-icon-play" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M8 5.5v13l11-6.5z"/></svg>
+                </button>
+                <a class="icon-btn" data-github href="https://github.com/fernangcortes/capiau-talho-v03" aria-label="Código-fonte no GitHub">
+                    <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.290 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.490-2.010.37-2.530-.49-2.690-.94-.09-.23-.48-.94-.82-1.130-.28-.15-.68-.52-.01-.53.63-.01 1.080.58 1.230.82.72 1.210 1.870.87 2.330.66.07-.52.28-.87.51-1.070-1.780-.2-3.640-.89-3.640-3.950 0-.87.31-1.590.82-2.150-.08-.2-.36-1.020.08-2.120 0 0 .67-.21 2.200.82.64-.18 1.320-.27 2-.27.68 0 1.360.09 2 .27 1.530-1.040 2.200-.82 2.200-.82.44 1.100.16 1.920.08 2.120.51.56.82 1.270.82 2.150 0 3.070-1.870 3.750-3.650 3.950.29.25.54.73.54 1.480 0 1.070-.01 1.930-.01 2.200 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.420-3.580-8-8-8z"/></svg>
+                </a>
+                <a class="btn btn--primary btn--sm header-cta" href="comecar.html">Baixar grátis</a>
+                <button class="icon-btn nav-toggle" type="button" aria-controls="site-nav" aria-expanded="false" aria-label="Abrir menu">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+                </button>
+            </div>
+        </div>
+        <div class="scroll-playhead" aria-hidden="true"><span></span></div>
+    </header>

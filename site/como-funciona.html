@@ -1,0 +1,1181 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Como funciona — CapIAu-Talho</title>
+    <meta name="description" content="Por dentro do Talho: as quatro camadas, o caminho de uma mídia do disco à timeline, o que fica na sua máquina, por que a conta da nuvem fica pequena, a tecnologia e as regras da casa.">
+    <meta name="theme-color" content="#07060b">
+    <meta name="color-scheme" content="dark">
+    <meta property="og:type" content="website">
+    <meta property="og:locale" content="pt_BR">
+    <meta property="og:site_name" content="CapIAu-Talho">
+    <meta property="og:title" content="Como funciona — CapIAu-Talho">
+    <meta property="og:description" content="Por dentro do Talho: as quatro camadas, o caminho de uma mídia do disco à timeline, o que fica na sua máquina, por que a conta da nuvem fica pequena, a tecnologia e as regras da casa.">
+    <meta property="og:image" content="https://fernangcortes.github.io/capiau-talho-v03/assets/img/og-image.png">
+    <meta name="twitter:card" content="summary_large_image">
+    <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="assets/img/favicon-32x32.png" sizes="32x32" type="image/png">
+    <link rel="apple-touch-icon" href="assets/img/apple-touch-icon.png">
+    <link rel="preload" href="assets/fonts/inter-var.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="preload" href="assets/fonts/barlow-semi-condensed-700.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="stylesheet" href="assets/css/base.css">
+    <link rel="stylesheet" href="assets/css/como-funciona.css">
+    <script>
+        /* antes de pintar: marca que há JS e aplica a escolha de animações (sem piscar) */
+        (function (r) {
+            r.classList.add("js");
+            try {
+                var m = localStorage.getItem("talho-motion");
+                if (m === "off" || (!m && matchMedia("(prefers-reduced-motion: reduce)").matches)) r.dataset.motion = "off";
+            } catch (e) {}
+        })(document.documentElement);
+    </script>
+    <script src="assets/js/base.js" defer></script>
+    <script src="assets/js/como-funciona.js" defer></script>
+</head>
+<body data-page="como-funciona">
+    <a class="skip-link" href="#conteudo">Pular para o conteúdo</a>
+
+    <!-- ═══════════════ CABEÇALHO (idêntico em todas as páginas) ═══════════════ -->
+    <header class="site-header" data-header>
+        <div class="site-header__inner">
+            <a class="brand" href="index.html" aria-label="CapIAu-Talho — página inicial">
+                <img src="assets/img/logo.svg" width="34" height="34" alt="">
+                <span class="brand__name">CapIAu-<span class="brand__talho">Talho</span></span>
+            </a>
+            <nav class="site-nav" id="site-nav" aria-label="Principal">
+                <a href="index.html" data-nav-id="inicio">Início</a>
+                <a href="recursos.html" data-nav-id="recursos">Recursos</a>
+                <a href="como-funciona.html" data-nav-id="como-funciona">Como funciona</a>
+                <a href="comecar.html" data-nav-id="comecar">Começar</a>
+                <a href="contribuir.html" data-nav-id="contribuir">Contribuir</a>
+                <div class="site-nav__mobile-cta">
+                    <a class="btn btn--primary" href="comecar.html">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 20h14"/></svg>
+                        Baixar grátis
+                    </a>
+                </div>
+            </nav>
+            <div class="header-actions">
+                <span class="header-tc" aria-hidden="true" title="A página como uma sequência: o timecode acompanha a rolagem" data-scroll-timecode>00:00:00:00</span>
+                <button class="icon-btn" type="button" data-motion-toggle aria-label="Pausar animações">
+                    <svg class="motion-icon-pause" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 6v12M15 6v12"/></svg>
+                    <svg class="motion-icon-play" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M8 5.5v13l11-6.5z"/></svg>
+                </button>
+                <a class="icon-btn" data-github href="https://github.com/fernangcortes/capiau-talho-v03" aria-label="Código-fonte no GitHub">
+                    <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
+                </a>
+                <a class="btn btn--primary btn--sm header-cta" href="comecar.html">Baixar grátis</a>
+                <button class="icon-btn nav-toggle" type="button" aria-controls="site-nav" aria-expanded="false" aria-label="Abrir menu">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+                </button>
+            </div>
+        </div>
+        <div class="scroll-playhead" aria-hidden="true"><span></span></div>
+    </header>
+
+    <main id="conteudo">
+        <!-- ═══════════════ TOPO: do disco à timeline ═══════════════ -->
+        <section class="page-hero cf-hero" aria-labelledby="cf-titulo">
+            <div class="container">
+                <p class="eyebrow" data-reveal>Como funciona · por dentro</p>
+                <h1 class="page-hero__title" id="cf-titulo" data-reveal style="--d: 80ms">Do disco à <span class="text-gradient">timeline</span></h1>
+                <p class="lead page-hero__lead" data-reveal style="--d: 160ms">O Talho por dentro: onde cada peça roda, por onde passa uma mídia até virar corte, o que nunca sai da sua máquina e por que a conta da nuvem fica pequena. Para quem monta entender — e para quem programa conferir.</p>
+                <div class="cluster page-hero__actions" data-reveal style="--d: 240ms">
+                    <a class="btn btn--primary" href="#caminho">Seguir uma mídia
+                        <svg class="btn__arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M6 13l6 6 6-6"/></svg>
+                    </a>
+                    <a class="btn btn--ghost" href="#privacidade">O que fica na sua máquina</a>
+                </div>
+            </div>
+
+            <div class="container container--wide">
+                <figure class="cf-flow" data-flow data-reveal="fade" style="--d: 320ms">
+                    <div class="cf-flow__bar" aria-hidden="true">
+                        <span class="cf-flow__rec"></span>
+                        <span>Ingestão</span>
+                        <svg class="cf-flow__barsep" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                        <span>Timeline</span>
+                        <span class="timecode cf-flow__tc" data-flow-tc>00:00:00:00</span>
+                    </div>
+                    <div class="ruler cf-flow__ruler" aria-hidden="true"></div>
+                    <div class="cf-flow__body">
+                        <svg class="cf-flow__svg" aria-hidden="true" focusable="false">
+                            <path class="cf-flow__track" d=""/>
+                            <path class="cf-flow__belt" d=""/>
+                            <g class="cf-flow__packets" data-packets></g>
+                        </svg>
+                        <ol class="cf-flow__stations" role="list">
+                            <li class="cf-st">
+                                <span class="cf-st__node" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="12" rx="2.5"/><path d="M7 14h.01M11 14h6"/></svg></span>
+                                <span class="cf-st__text"><span class="cf-st__label">Seu HD</span><span class="cf-st__sub">original intocado</span></span>
+                            </li>
+                            <li class="cf-st">
+                                <span class="cf-st__node" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 4 7.5 20M16.5 4l-2 16M4.5 9h16M3.5 15h16"/></svg></span>
+                                <span class="cf-st__text"><span class="cf-st__label">SHA-256</span><span class="cf-st__sub">nunca cataloga 2×</span></span>
+                            </li>
+                            <li class="cf-st">
+                                <span class="cf-st__node" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 5v14M17 5v14M3 9.5h4M3 14.5h4M17 9.5h4M17 14.5h4"/></svg></span>
+                                <span class="cf-st__text"><span class="cf-st__label">Proxy 720p</span><span class="cf-st__sub">para o player</span></span>
+                            </li>
+                            <li class="cf-st">
+                                <span class="cf-st__node" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h2M7 8v8M11 5v14M15 9v6M19 7v10M21 12h0"/></svg></span>
+                                <span class="cf-st__text"><span class="cf-st__label">MP3 16 kHz</span><span class="cf-st__sub">mono, para a fala</span></span>
+                            </li>
+                            <li class="cf-st cf-st--rose">
+                                <span class="cf-st__node" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="7" r="2.5"/><circle cx="6" cy="17" r="2.5"/><path d="M8.2 8.4 20 18M8.2 15.6 20 6"/></svg></span>
+                                <span class="cf-st__text"><span class="cf-st__label">Cortes e beats</span><span class="cf-st__sub">1 keyframe por trecho</span></span>
+                            </li>
+                            <li class="cf-st cf-st--violet">
+                                <span class="cf-st__node" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="7" r="1.8"/><circle cx="17.5" cy="6" r="1.8"/><circle cx="12" cy="13" r="1.8"/><circle cx="6" cy="18.5" r="1.8"/><circle cx="18" cy="17.5" r="1.8"/><path d="m7.3 8.4 3.4 3.4M13.4 11.8l2.9-4.3M10.6 14.1l-3.2 3.3M13.6 13.9l2.9 2.5"/></svg></span>
+                                <span class="cf-st__text"><span class="cf-st__label">Vetores</span><span class="cf-st__sub">Qdrant local</span></span>
+                            </li>
+                            <li class="cf-st cf-st--violet">
+                                <span class="cf-st__node" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="9" r="4"/><path d="M4.5 20a7.5 7.5 0 0 1 15 0"/></svg></span>
+                                <span class="cf-st__text"><span class="cf-st__label">Rostos</span><span class="cf-st__sub">YuNet + SFace</span></span>
+                            </li>
+                            <li class="cf-st cf-st--emerald cf-st--end">
+                                <span class="cf-st__node" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h18M3 17h18"/><rect x="4" y="9.5" width="7" height="5" rx="1"/><rect x="12.5" y="9.5" width="7.5" height="5" rx="1"/><path d="M15 3.5v17"/></svg></span>
+                                <span class="cf-st__text"><span class="cf-st__label">Timeline</span><span class="cf-st__sub">.otio · .xml · .edl</span></span>
+                                <span class="cf-mini" aria-hidden="true" data-mini>
+                                    <span class="cf-mini__lane cf-mini__lane--v2" data-lane><i style="--w: 26%"></i><i style="--w: 30%"></i></span>
+                                    <span class="cf-mini__lane cf-mini__lane--v1" data-lane><i style="--w: 34%"></i><i style="--w: 22%"></i><i style="--w: 30%"></i></span>
+                                    <span class="cf-mini__lane cf-mini__lane--a1" data-lane><i style="--w: 38%"></i><i style="--w: 26%"></i><i style="--w: 24%"></i></span>
+                                    <span class="cf-mini__head"></span>
+                                </span>
+                            </li>
+                        </ol>
+                    </div>
+                    <figcaption class="sr-only">Uma mídia sai do seu HD, ganha uma impressão digital SHA-256, vira proxy 720p e MP3 de 16 kHz, é dividida em cortes e beats, vira vetores no Qdrant local, tem os rostos agrupados e chega à timeline, pronta para exportar em .otio, .xml ou .edl.</figcaption>
+                </figure>
+
+                <ul class="cf-facts" role="list" data-reveal-stagger="90">
+                    <li data-reveal>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
+                        <span><strong>Original intocado</strong> nunca copiado, enviado ou modificado</span>
+                    </li>
+                    <li data-reveal>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4"/></svg>
+                        <span><strong>Roda em CPU</strong> GPU não é necessária</span>
+                    </li>
+                    <li data-reveal>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 18h10.5a4.5 4.5 0 0 0 .6-8.96A6 6 0 0 0 6.6 10.2 4 4 0 0 0 7 18z"/></svg>
+                        <span><strong>Nuvem opcional</strong> só com a sua chave, só o mínimo</span>
+                    </li>
+                </ul>
+            </div>
+        </section>
+
+        <nav class="subnav" data-subnav aria-label="Nesta página">
+            <ul class="subnav__list">
+                <li><a href="#camadas">Camadas</a></li>
+                <li><a href="#caminho">Caminho da mídia</a></li>
+                <li><a href="#privacidade">Privacidade</a></li>
+                <li><a href="#custos">Custos</a></li>
+                <li><a href="#tecnologia">Tecnologia</a></li>
+                <li><a href="#principios">Princípios</a></li>
+            </ul>
+        </nav>
+
+        <!-- ═══════════════ 01 — CAMADAS ═══════════════ -->
+        <section class="section" id="camadas" aria-labelledby="camadas-titulo">
+            <div class="container">
+                <header class="section-head">
+                    <p class="eyebrow" data-reveal>01 — Arquitetura</p>
+                    <h2 class="section-title" id="camadas-titulo" data-reveal>Quatro camadas. Uma decisão: <span class="text-gradient">o que é seu fica com você.</span></h2>
+                    <p class="lead" data-reveal>O Talho é um programa local: um servidor Python roda na sua máquina e a interface abre no navegador, em <code class="inline">localhost:8000</code>. A nuvem é uma camada à parte — só entra se você puser uma chave, e só para tarefas específicas.</p>
+                </header>
+
+                <div class="cf-layers" data-layers data-inview>
+                    <svg class="cf-layers__wires" aria-hidden="true" focusable="false">
+                        <path class="cf-wire" data-wire="storage-backend" d=""/>
+                        <path class="cf-wire" data-wire="backend-frontend" d=""/>
+                        <path class="cf-wire cf-wire--cloud" data-wire="backend-cloud" d=""/>
+                        <text class="cf-wire__label" data-wire-label="storage-backend">só leitura</text>
+                        <text class="cf-wire__label" data-wire-label="backend-frontend">HTTP local</text>
+                        <text class="cf-wire__label cf-wire__label--cloud" data-wire-label="backend-cloud">só com a sua chave</text>
+                        <g data-wire-packets></g>
+                    </svg>
+
+                    <div class="cf-machine">
+                        <p class="cf-machine__label" aria-hidden="true"><span class="cf-machine__dot"></span>Sua máquina</p>
+
+                        <article class="cf-layer cf-layer--storage" data-layer="storage">
+                            <div class="cf-layer__head">
+                                <span class="cf-layer__icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="12" rx="2.5"/><path d="M7 14h.01M11 14h6"/></svg></span>
+                                <h3 class="cf-layer__title">Armazenamento</h3>
+                            </div>
+                            <dl class="cf-layer__facts">
+                                <div><dt>Onde roda</dt><dd>HD externo ou SSD — onde o material já está.</dd></div>
+                                <div><dt>O que faz</dt><dd>Guarda os originais. O Talho só lê: nunca copia, nunca move, nunca altera.</dd></div>
+                                <div><dt>Custo</dt><dd><span class="cf-cost-tag">Nenhum: é o seu disco</span></dd></div>
+                            </dl>
+                        </article>
+
+                        <article class="cf-layer cf-layer--backend" data-layer="backend">
+                            <div class="cf-layer__head">
+                                <span class="cf-layer__icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4"/></svg></span>
+                                <h3 class="cf-layer__title">Backend</h3>
+                            </div>
+                            <dl class="cf-layer__facts">
+                                <div><dt>Onde roda</dt><dd>Na sua CPU, em Python (FastAPI). GPU não é necessária.</dd></div>
+                                <div><dt>O que faz</dt><dd>Ingestão, proxies, segmentação, vetores, biometria facial, banco vetorial, áudio e render.</dd></div>
+                                <div><dt>Custo</dt><dd><span class="cf-cost-tag cf-cost-tag--free">Grátis</span></dd></div>
+                            </dl>
+                        </article>
+
+                        <article class="cf-layer cf-layer--frontend" data-layer="frontend">
+                            <div class="cf-layer__head">
+                                <span class="cf-layer__icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="15" rx="2"/><path d="M3 9h18M6.5 6.8h.01M9 6.8h.01"/></svg></span>
+                                <h3 class="cf-layer__title">Frontend</h3>
+                            </div>
+                            <dl class="cf-layer__facts">
+                                <div><dt>Onde roda</dt><dd>No seu navegador, em <code class="inline">localhost:8000</code>.</dd></div>
+                                <div><dt>O que faz</dt><dd>Timeline em Canvas 2D, players Source e Programa, biblioteca e o chat do agente.</dd></div>
+                                <div><dt>Custo</dt><dd><span class="cf-cost-tag">Nenhum</span></dd></div>
+                            </dl>
+                        </article>
+                    </div>
+
+                    <article class="cf-layer cf-layer--cloud" data-layer="cloud">
+                        <div class="cf-layer__head">
+                            <span class="cf-layer__icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M7 18h10.5a4.5 4.5 0 0 0 .6-8.96A6 6 0 0 0 6.6 10.2 4 4 0 0 0 7 18z"/></svg></span>
+                            <h3 class="cf-layer__title">Nuvem <span class="cf-layer__opt">opcional</span></h3>
+                        </div>
+                        <dl class="cf-layer__facts">
+                            <div><dt>Onde roda</dt><dd>APIs externas — só as que você configurar, com a sua chave.</dd></div>
+                            <div><dt>O que faz</dt><dd>Transcrição com separação de falantes, descrição de imagens, títulos, temas, resumos e o agente.</dd></div>
+                            <div><dt>Custo</dt><dd><span class="cf-cost-tag cf-cost-tag--paid">Pago por uso, direto ao provedor</span></dd></div>
+                        </dl>
+                    </article>
+                </div>
+
+                <div class="callout callout--amber cf-safety" data-reveal>
+                    <p><strong>Uma regra de segurança.</strong> A API local não tem autenticação: use o Talho só na própria máquina. No Docker, publique a porta como <code class="inline">127.0.0.1:8000:8000</code>, e nunca faça commit do <code class="inline">.env</code>, onde moram as suas chaves. <a class="inline-link" href="comecar.html#seguranca">Mais em Começar › Segurança</a>.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- ═══════════════ 02 — O CAMINHO DE UMA MÍDIA (scrollytelling) ═══════════════ -->
+        <section class="section section--alt" id="caminho" aria-labelledby="caminho-titulo">
+            <!-- gradientes compartilhados pelas cenas (as cenas não têm id: são clonadas no celular) -->
+            <svg class="cf-defs" aria-hidden="true" focusable="false" width="0" height="0">
+                <defs>
+                    <linearGradient id="cf-g-shot-a" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3d2b70"/><stop offset="1" stop-color="#140f25"/></linearGradient>
+                    <linearGradient id="cf-g-shot-b" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#114554"/><stop offset="1" stop-color="#0a141c"/></linearGradient>
+                    <linearGradient id="cf-g-shot-c" x1="1" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6b4a14"/><stop offset=".55" stop-color="#2a1d0c"/><stop offset="1" stop-color="#120d07"/></linearGradient>
+                </defs>
+            </svg>
+
+            <div class="container">
+                <header class="section-head">
+                    <p class="eyebrow eyebrow--violet" data-reveal>02 — O caminho de uma mídia</p>
+                    <h2 class="section-title" id="caminho-titulo" data-reveal>Oito paradas entre o seu HD e a sua timeline</h2>
+                    <p class="lead" data-reveal>Acompanhe um arquivo com nome de câmera — <code class="inline">MOV_0492.MOV</code> — desde o momento em que o Talho o encontra até virar corte exportável. Role a página: o monitor acompanha cada parada.</p>
+                </header>
+
+                <div class="cf-path" data-path>
+                    <ol class="cf-path__steps" role="list">
+                        <li class="cf-step is-active" data-step data-title="Ingestão">
+                            <div class="cf-step__visual" aria-hidden="true"></div>
+                            <p class="cf-step__num"><span>01</span> de 08</p>
+                            <h3 class="cf-step__title">Ingestão no lugar</h3>
+                            <p class="cf-step__text">O Talho varre a pasta que você apontar e calcula o <strong>SHA-256</strong> de cada arquivo — uma impressão digital que impede catalogar o mesmo material duas vezes, mesmo com outro nome. No banco SQLite entra só o <em>caminho</em>: o original não é copiado e não sai do lugar.</p>
+                            <ul class="cf-step__tags" role="list"><li class="chip chip--cyan">SHA-256</li><li class="chip chip--cyan">SQLite</li><li class="chip chip--emerald">original intocado</li></ul>
+                        </li>
+                        <li class="cf-step" data-step data-title="Proxies">
+                            <div class="cf-step__visual" aria-hidden="true"></div>
+                            <p class="cf-step__num"><span>02</span> de 08</p>
+                            <h3 class="cf-step__title">Proxies: versões leves de trabalho</h3>
+                            <p class="cf-step__text">O <strong>FFmpeg</strong> gera um vídeo 720p para o player andar liso e um <strong>MP3 mono de 16 kHz</strong>, que é tudo de que a transcrição precisa. <em>Proxy</em> é isso: uma cópia de trabalho; o master continua no HD. Se houver GPU, o encode usa NVENC, QSV ou AMF — senão, volta sozinho para a CPU.</p>
+                            <ul class="cf-step__tags" role="list"><li class="chip chip--cyan">FFmpeg</li><li class="chip chip--cyan">720p</li><li class="chip chip--cyan">MP3 16 kHz</li></ul>
+                        </li>
+                        <li class="cf-step" data-step data-title="Cortes e beats">
+                            <div class="cf-step__visual" aria-hidden="true"></div>
+                            <p class="cf-step__num"><span>03</span> de 08</p>
+                            <h3 class="cf-step__title">Cortes reais e beats</h3>
+                            <p class="cf-step__text">O <strong>PySceneDetect</strong> acha os cortes de verdade. Planos longos viram <em>beats</em> quando o conteúdo visual muda; o movimento de câmera é classificado (estático, pan, tilt, caminhando, mão livre, whip). De cada trecho sai <strong>1 keyframe</strong> — não um quadro a cada 10 segundos.</p>
+                            <ul class="cf-step__tags" role="list"><li class="chip chip--rose">PySceneDetect</li><li class="chip chip--cyan">OpenCV</li><li class="chip chip--rose">1 keyframe por trecho</li></ul>
+                        </li>
+                        <li class="cf-step" data-step data-title="Análise">
+                            <div class="cf-step__visual" aria-hidden="true"></div>
+                            <p class="cf-step__num"><span>04</span> de 08</p>
+                            <h3 class="cf-step__title">Análise: a parada que pode usar nuvem</h3>
+                            <p class="cf-step__text">Os poucos keyframes vão a um modelo de visão (via <strong>OpenRouter</strong>) e voltam como descrições. O MP3 vai à <strong>AssemblyAI</strong> e volta transcrito palavra a palavra, separado por falante — a <em>diarização</em>. Isso só acontece com a sua chave; para a transcrição, há alternativa local (Whisper na CPU).</p>
+                            <ul class="cf-step__tags" role="list"><li class="chip chip--amber">OpenRouter · sua chave</li><li class="chip chip--amber">AssemblyAI · sua chave</li><li class="chip chip--emerald">Whisper local</li></ul>
+                        </li>
+                        <li class="cf-step" data-step data-title="Indexação">
+                            <div class="cf-step__visual" aria-hidden="true"></div>
+                            <p class="cf-step__num"><span>05</span> de 08</p>
+                            <h3 class="cf-step__title">Indexação: tudo vira vetor, na sua máquina</h3>
+                            <p class="cf-step__text">Falas viram vetores com o <strong>MiniLM</strong> multilíngue; imagens, com o <strong>CLIP</strong> multilíngue. Tudo fica no <strong>Qdrant</strong>, que roda localmente. É por isso que buscar “contraluz na janela” acha o plano mesmo sem essa palavra na descrição.</p>
+                            <ul class="cf-step__tags" role="list"><li class="chip chip--violet">MiniLM</li><li class="chip chip--violet">CLIP</li><li class="chip chip--emerald">Qdrant local</li></ul>
+                        </li>
+                        <li class="cf-step" data-step data-title="Rostos">
+                            <div class="cf-step__visual" aria-hidden="true"></div>
+                            <p class="cf-step__num"><span>06</span> de 08</p>
+                            <h3 class="cf-step__title">Rostos, sem sair de casa</h3>
+                            <p class="cf-step__text">Em paralelo, o <strong>YuNet</strong> detecta rostos, o <strong>SFace</strong> transforma cada um em vetor e o <strong>DBSCAN</strong> agrupa os parecidos. Você nomeia, funde e corrige — e suas correções ficam travadas contra reagrupamentos futuros. Há também um backend InsightFace (ONNX), opcional.</p>
+                            <ul class="cf-step__tags" role="list"><li class="chip chip--violet">YuNet</li><li class="chip chip--violet">SFace</li><li class="chip chip--violet">DBSCAN</li></ul>
+                        </li>
+                        <li class="cf-step" data-step data-title="Áudio">
+                            <div class="cf-step__visual" aria-hidden="true"></div>
+                            <p class="cf-step__num"><span>07</span> de 08</p>
+                            <h3 class="cf-step__title">Áudio, quando você pedir</h3>
+                            <p class="cf-step__text">Um passe de FFmpeg mede loudness, pico real e piso de ruído em ~3 s e sugere um preset. Renderizar grava um <strong>WAV derivado</strong> (48 kHz, 24 bits) em <code class="inline">data/audio_tratado/</code>, e o clipe passa a apontar para ele — o original fica intocado. EQ, gate e compressor podem ficar só ao vivo, no navegador.</p>
+                            <ul class="cf-step__tags" role="list"><li class="chip chip--emerald">-16 LUFS</li><li class="chip chip--emerald">WAV 48 kHz · 24 bits</li><li class="chip chip--cyan">WebAudio</li></ul>
+                        </li>
+                        <li class="cf-step" data-step data-title="Timeline e saída">
+                            <div class="cf-step__visual" aria-hidden="true"></div>
+                            <p class="cf-step__num"><span>08</span> de 08</p>
+                            <h3 class="cf-step__title">Timeline e saída</h3>
+                            <p class="cf-step__text">Você monta na timeline em <strong>Canvas 2D</strong> e leva o corte embora: <code class="inline">.otio</code> (o Kdenlive 25.04+ abre direto), <code class="inline">.xml</code> (FCP7) para Premiere, Resolve e Final Cut, ou <code class="inline">.edl</code>. Ou renderiza um MP4 pelo FFmpeg, igual ao que você viu no monitor.</p>
+                            <ul class="cf-step__tags" role="list"><li class="chip chip--amber">OpenTimelineIO</li><li class="chip chip--amber">FCP7 XML</li><li class="chip chip--amber">EDL</li><li class="chip chip--emerald">MP4</li></ul>
+                        </li>
+                    </ol>
+
+                    <div class="cf-stage" aria-hidden="true">
+                        <div class="cf-stage__frame">
+                            <div class="cf-stage__bar">
+                                <span class="cf-stage__dot"></span>
+                                <span class="cf-stage__name">Monitor</span>
+                                <span class="cf-stage__label" data-stage-label>Parada 01 · Ingestão</span>
+                            </div>
+                            <div class="cf-stage__screen">
+
+                                <!-- 1 · Ingestão -->
+                                <div class="cf-scene is-active" data-scene>
+                                    <svg viewBox="0 0 420 280">
+                                        <rect class="sv-panel" x="12" y="22" width="150" height="226" rx="14"/>
+                                        <text class="sv-lbl" x="26" y="46">HD EXTERNO</text>
+                                        <circle class="sv-led" cx="146" cy="42" r="3.5"/>
+                                        <g class="sc1-file"><rect class="sv-file" x="24" y="60" width="126" height="36" rx="8"/><text class="sv-mono" x="34" y="83">MOV_0492.MOV</text></g>
+                                        <g class="sc1-file"><rect class="sv-file" x="24" y="106" width="126" height="36" rx="8"/><text class="sv-mono" x="34" y="129">00012.MTS</text></g>
+                                        <g class="sc1-file"><rect class="sv-file" x="24" y="152" width="126" height="36" rx="8"/><text class="sv-mono" x="34" y="175">MOV_0492 (2).MOV</text></g>
+                                        <rect class="sc1-scan" x="20" y="58" width="134" height="3" rx="1.5"/>
+                                        <g class="sv-lock" transform="translate(24 206)"><rect x="1" y="7" width="12" height="9" rx="2"/><path d="M3.5 7V5a3.5 3.5 0 0 1 7 0v2"/></g>
+                                        <text class="sv-small" x="44" y="220">fica aqui, intocado</text>
+
+                                        <g class="sc1-hash" style="--i: 0"><path class="sv-wire" d="M150 78 H176"/><rect class="sv-chip sv-chip--cyan" x="176" y="65" width="104" height="26" rx="13"/><text class="sv-hash" x="228" y="82" text-anchor="middle">9f2c…e41a</text></g>
+                                        <g class="sc1-hash" style="--i: 1"><path class="sv-wire" d="M150 124 H176"/><rect class="sv-chip sv-chip--cyan" x="176" y="111" width="104" height="26" rx="13"/><text class="sv-hash" x="228" y="128" text-anchor="middle">4b7d…0c19</text></g>
+                                        <g class="sc1-hash sc1-hash--dup" style="--i: 2"><path class="sv-wire sv-wire--amber" d="M150 170 H176"/><rect class="sv-chip sv-chip--amber" x="176" y="157" width="104" height="26" rx="13"/><text class="sv-hash sv-hash--amber" x="228" y="174" text-anchor="middle">9f2c…e41a</text><text class="sv-small sv-small--amber" x="228" y="203" text-anchor="middle">igual ao 1º · ignorado</text></g>
+
+                                        <rect class="sv-panel" x="292" y="46" width="120" height="150" rx="12"/>
+                                        <g class="sv-ico" transform="translate(304 58)"><ellipse cx="8" cy="4" rx="7" ry="3"/><path d="M1 4v9c0 1.7 3.1 3 7 3s7-1.3 7-3V4"/></g>
+                                        <text class="sv-lbl" x="326" y="70">SQLITE</text>
+                                        <text class="sv-small" x="304" y="94">só o caminho</text>
+                                        <path class="sv-wire" d="M280 78 C 290 78, 290 116, 300 116"/>
+                                        <path class="sv-wire" d="M280 124 C 290 124, 290 148, 300 148"/>
+                                        <g class="sc1-row" style="--i: 0"><rect class="sv-row" x="300" y="104" width="104" height="24" rx="6"/><text class="sv-path" x="307" y="120">/HD/MOV_0492.MOV</text></g>
+                                        <g class="sc1-row" style="--i: 1"><rect class="sv-row" x="300" y="136" width="104" height="24" rx="6"/><text class="sv-path" x="307" y="152">/HD/00012.MTS</text></g>
+                                    </svg>
+                                </div>
+
+                                <!-- 2 · Proxies -->
+                                <div class="cf-scene" data-scene>
+                                    <svg viewBox="0 0 420 280">
+                                        <rect x="12" y="34" width="170" height="104" rx="10" fill="url(#cf-g-shot-c)"/>
+                                        <circle class="sv-sun" cx="128" cy="70" r="16"/>
+                                        <path class="sv-hill" d="M12 120 C 50 92, 86 100, 116 112 S 160 96, 182 104 V128 a10 10 0 0 1 -10 10 H22 a10 10 0 0 1 -10 -10z"/>
+                                        <rect class="sv-badge" x="20" y="42" width="92" height="20" rx="10"/>
+                                        <text class="sv-badge-txt" x="66" y="56" text-anchor="middle">4K · ORIGINAL</text>
+                                        <g class="sv-lock" transform="translate(12 150)"><rect x="1" y="7" width="12" height="9" rx="2"/><path d="M3.5 7V5a3.5 3.5 0 0 1 7 0v2"/></g>
+                                        <text class="sv-small" x="32" y="164">fica no HD, intocado</text>
+
+                                        <path class="sv-wire sc2-flow" d="M182 86 H196"/>
+                                        <rect class="sv-node" x="196" y="70" width="74" height="32" rx="16"/>
+                                        <text class="sv-node-txt" x="233" y="91" text-anchor="middle">FFmpeg</text>
+                                        <path class="sv-wire sc2-flow" d="M270 86 C 286 86, 284 53, 300 53"/>
+                                        <path class="sv-wire sc2-flow" d="M270 86 C 286 86, 284 150, 300 150"/>
+
+                                        <g class="sc2-out" style="--i: 0">
+                                            <rect x="300" y="22" width="108" height="62" rx="8" fill="url(#cf-g-shot-c)"/>
+                                            <circle class="sv-sun" cx="374" cy="44" r="9"/>
+                                            <path class="sv-hill" d="M300 74 C 322 58, 344 62, 362 69 S 392 60, 408 64 V76 a8 8 0 0 1 -8 8 H308 a8 8 0 0 1 -8 -8z"/>
+                                            <rect class="sv-badge" x="306" y="28" width="44" height="16" rx="8"/>
+                                            <text class="sv-badge-txt" x="328" y="39.5" text-anchor="middle">720p</text>
+                                            <text class="sv-small" x="300" y="100">proxy · para o player</text>
+                                        </g>
+                                        <g class="sc2-out" style="--i: 1">
+                                            <rect class="sv-panel sv-panel--emerald" x="300" y="122" width="108" height="56" rx="8"/>
+                                            <path class="sv-wave sc2-wave" d="M308 150v-4M312 150v-10M316 150v-16M320 150v-8M324 150v-18M328 150v-12M332 150v-6M336 150v-14M340 150v-20M344 150v-10M348 150v-6M352 150v-16M356 150v-12M360 150v-4M364 150v-10M368 150v-18M372 150v-8M376 150v-14M380 150v-6M384 150v-12M388 150v-16M392 150v-8M396 150v-4M400 150v-10M308 150v4M312 150v10M316 150v16M320 150v8M324 150v18M328 150v12M332 150v6M336 150v14M340 150v20M344 150v10M348 150v6M352 150v16M356 150v12M360 150v4M364 150v10M368 150v18M372 150v8M376 150v14M380 150v6M384 150v12M388 150v16M392 150v8M396 150v4M400 150v10"/>
+                                            <text class="sv-small sv-small--emerald" x="300" y="196">MP3 mono · 16 kHz</text>
+                                            <text class="sv-small" x="300" y="211">para a transcrição</text>
+                                        </g>
+
+                                        <rect class="sv-chip sv-chip--line" x="12" y="232" width="250" height="28" rx="14"/>
+                                        <text class="sv-small" x="26" y="250">GPU? NVENC · QSV · AMF — senão, CPU</text>
+                                    </svg>
+                                </div>
+
+                                <!-- 3 · Cortes e beats -->
+                                <div class="cf-scene" data-scene>
+                                    <svg viewBox="0 0 420 280">
+                                        <text class="sv-lbl" x="12" y="22">MOV_0492.MOV</text>
+                                        <text class="sv-lbl" x="408" y="22" text-anchor="end">04:12</text>
+                                        <rect x="12" y="32" width="98" height="60" fill="url(#cf-g-shot-a)"/>
+                                        <rect x="110" y="32" width="86" height="60" fill="url(#cf-g-shot-b)"/>
+                                        <rect x="196" y="32" width="212" height="60" fill="url(#cf-g-shot-c)"/>
+                                        <path class="sv-frames" d="M36 32v60M60 32v60M84 32v60M134 32v60M158 32v60M182 32v60M220 32v60M244 32v60M292 32v60M316 32v60M364 32v60M388 32v60"/>
+                                        <rect class="sv-strip" x="12" y="32" width="396" height="60" rx="3"/>
+
+                                        <g class="sc3-mark" style="--i: 0"><path class="sv-cut" d="M110 26 V98"/><path class="sv-cut-tip" d="M105 26h10l-5 6z"/><text class="sv-tag sv-tag--rose" x="110" y="112" text-anchor="middle">corte</text></g>
+                                        <g class="sc3-mark" style="--i: 1"><path class="sv-cut" d="M196 26 V98"/><path class="sv-cut-tip" d="M191 26h10l-5 6z"/><text class="sv-tag sv-tag--rose" x="196" y="112" text-anchor="middle">corte</text></g>
+                                        <g class="sc3-mark" style="--i: 2"><path class="sv-beat" d="M268 28 V96"/><text class="sv-tag sv-tag--violet" x="268" y="112" text-anchor="middle">beat</text></g>
+                                        <g class="sc3-mark" style="--i: 3"><path class="sv-beat" d="M340 28 V96"/><text class="sv-tag sv-tag--violet" x="340" y="112" text-anchor="middle">beat</text></g>
+
+                                        <g class="sc3-key" style="--i: 0"><rect class="sv-key" x="48" y="38" width="26" height="48" rx="3"/></g>
+                                        <g class="sc3-key" style="--i: 1"><rect class="sv-key" x="140" y="38" width="26" height="48" rx="3"/></g>
+                                        <g class="sc3-key" style="--i: 2"><rect class="sv-key" x="219" y="38" width="26" height="48" rx="3"/></g>
+                                        <g class="sc3-key" style="--i: 3"><rect class="sv-key" x="291" y="38" width="26" height="48" rx="3"/></g>
+                                        <g class="sc3-key" style="--i: 4"><rect class="sv-key" x="361" y="38" width="26" height="48" rx="3"/></g>
+
+                                        <g class="sc3-moves">
+                                            <rect class="sv-pill" x="32" y="124" width="58" height="18" rx="9"/><text class="sv-pill-txt" x="61" y="137" text-anchor="middle">estático</text>
+                                            <rect class="sv-pill" x="135" y="124" width="36" height="18" rx="9"/><text class="sv-pill-txt" x="153" y="137" text-anchor="middle">pan</text>
+                                            <rect class="sv-pill" x="198" y="124" width="68" height="18" rx="9"/><text class="sv-pill-txt" x="232" y="137" text-anchor="middle">caminhando</text>
+                                            <rect class="sv-pill" x="272" y="124" width="64" height="18" rx="9"/><text class="sv-pill-txt" x="304" y="137" text-anchor="middle">mão livre</text>
+                                            <rect class="sv-pill" x="352" y="124" width="44" height="18" rx="9"/><text class="sv-pill-txt" x="374" y="137" text-anchor="middle">whip</text>
+                                        </g>
+                                        <path class="sc3-head" d="M12 24 V100"/>
+
+                                        <text class="sv-small" x="12" y="184">a cada 10 s</text>
+                                        <path class="sv-ticks sv-ticks--dim" d="M90 176v14M102 176v14M114 176v14M126 176v14M138 176v14M150 176v14M162 176v14M174 176v14M186 176v14M198 176v14M210 176v14M222 176v14M234 176v14M246 176v14M258 176v14M270 176v14M282 176v14M294 176v14M306 176v14M318 176v14M330 176v14M342 176v14M354 176v14M366 176v14M378 176v14"/>
+                                        <text class="sv-count sv-count--dim" x="408" y="188" text-anchor="end">25</text>
+                                        <text class="sv-small" x="12" y="226">por trecho</text>
+                                        <path class="sv-ticks sv-ticks--on sc3-few" d="M126 218v14M193 218v14M250 218v14M302 218v14M353 218v14"/>
+                                        <text class="sv-count sv-count--on" x="408" y="230" text-anchor="end">5</text>
+                                        <text class="sv-small sv-small--dim" x="12" y="264">quadros enviados à visão neste exemplo</text>
+                                    </svg>
+                                </div>
+
+                                <!-- 4 · Análise -->
+                                <div class="cf-scene" data-scene>
+                                    <svg viewBox="0 0 420 280">
+                                        <rect x="12" y="38" width="56" height="36" rx="4" fill="url(#cf-g-shot-a)"/>
+                                        <rect x="24" y="50" width="56" height="36" rx="4" fill="url(#cf-g-shot-b)"/>
+                                        <rect class="sv-thumb" x="36" y="62" width="56" height="36" rx="4" fill="url(#cf-g-shot-c)"/>
+                                        <text class="sv-small" x="12" y="118">keyframes</text>
+                                        <path class="sv-wire sv-wire--flow" d="M96 76 H136"/>
+                                        <rect class="sv-cloud" x="136" y="54" width="110" height="44" rx="22"/>
+                                        <g class="sv-ico sv-ico--amber" transform="translate(146 64)"><path d="M7 18h10.5a4.5 4.5 0 0 0 .6-8.96A6 6 0 0 0 6.6 10.2 4 4 0 0 0 7 18z"/></g>
+                                        <text class="sv-title" x="174" y="74">visão</text>
+                                        <text class="sv-small sv-small--amber" x="174" y="88">OpenRouter</text>
+                                        <path class="sv-wire sv-wire--flow" d="M246 76 H270"/>
+                                        <g class="sc4-out" style="--i: 0">
+                                            <rect class="sv-panel" x="270" y="30" width="138" height="92" rx="10"/>
+                                            <text class="sv-lbl" x="282" y="50">DESCRIÇÃO</text>
+                                            <text class="sv-title" x="282" y="72">Detalhe das mãos</text>
+                                            <text class="sv-title" x="282" y="88">no vinil</text>
+                                            <rect class="sv-line" x="282" y="100" width="100" height="5" rx="2.5"/>
+                                            <rect class="sv-line" x="282" y="110" width="70" height="5" rx="2.5"/>
+                                        </g>
+
+                                        <rect class="sv-panel sv-panel--emerald" x="12" y="160" width="84" height="40" rx="6"/>
+                                        <path class="sv-wave" d="M20 180v-5M25 180v-11M30 180v-7M35 180v-14M40 180v-9M45 180v-4M50 180v-12M55 180v-8M60 180v-15M65 180v-6M70 180v-10M75 180v-13M80 180v-5M85 180v-9M90 180v-4M20 180v5M25 180v11M30 180v7M35 180v14M40 180v9M45 180v4M50 180v12M55 180v8M60 180v15M65 180v6M70 180v10M75 180v13M80 180v5M85 180v9M90 180v4"/>
+                                        <text class="sv-small" x="12" y="218">MP3 16 kHz</text>
+                                        <path class="sv-wire sv-wire--flow" d="M96 180 H136"/>
+                                        <rect class="sv-cloud" x="136" y="158" width="110" height="44" rx="22"/>
+                                        <g class="sv-ico sv-ico--amber" transform="translate(146 168)"><path d="M7 18h10.5a4.5 4.5 0 0 0 .6-8.96A6 6 0 0 0 6.6 10.2 4 4 0 0 0 7 18z"/></g>
+                                        <text class="sv-title" x="174" y="178">transcrição</text>
+                                        <text class="sv-small sv-small--amber" x="174" y="192">AssemblyAI</text>
+                                        <path class="sv-wire sv-wire--flow" d="M246 180 H270"/>
+                                        <g class="sc4-out" style="--i: 1">
+                                            <rect class="sv-panel" x="270" y="134" width="138" height="104" rx="10"/>
+                                            <text class="sv-spk sv-spk--a" x="282" y="154">FALANTE A</text>
+                                            <rect class="sv-word" x="282" y="162" width="24" height="9" rx="4.5"/><rect class="sv-word" x="310" y="162" width="34" height="9" rx="4.5"/><rect class="sv-word" x="348" y="162" width="18" height="9" rx="4.5"/><rect class="sv-word" x="370" y="162" width="28" height="9" rx="4.5"/>
+                                            <rect class="sv-word" x="282" y="176" width="40" height="9" rx="4.5"/><rect class="sv-word" x="326" y="176" width="22" height="9" rx="4.5"/>
+                                            <text class="sv-spk sv-spk--b" x="282" y="204">FALANTE B</text>
+                                            <rect class="sv-word" x="282" y="212" width="30" height="9" rx="4.5"/><rect class="sv-word" x="316" y="212" width="20" height="9" rx="4.5"/><rect class="sv-word" x="340" y="212" width="36" height="9" rx="4.5"/>
+                                        </g>
+                                        <rect class="sv-chip sv-chip--emerald" x="12" y="246" width="208" height="24" rx="12"/>
+                                        <text class="sv-small sv-small--emerald" x="24" y="262">alternativa local: Whisper na CPU</text>
+                                    </svg>
+                                </div>
+
+                                <!-- 5 · Indexação -->
+                                <div class="cf-scene" data-scene>
+                                    <svg viewBox="0 0 420 280">
+                                        <rect class="sv-query" x="12" y="24" width="180" height="34" rx="17"/>
+                                        <g class="sv-ico sv-ico--cyan" transform="translate(22 30) scale(.9)"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></g>
+                                        <text class="sv-q" x="46" y="46">contraluz na janela</text>
+
+                                        <rect class="sv-chip sv-chip--cyan" x="12" y="96" width="124" height="26" rx="13"/>
+                                        <text class="sv-small sv-small--cyan" x="26" y="113">MiniLM · falas</text>
+                                        <rect class="sv-chip sv-chip--violet" x="12" y="134" width="124" height="26" rx="13"/>
+                                        <text class="sv-small sv-small--violet" x="26" y="151">CLIP · imagens</text>
+                                        <path class="sv-wire sv-wire--flow" d="M136 109 C 152 109, 152 120, 168 120"/>
+                                        <path class="sv-wire sv-wire--flow" d="M136 147 C 152 147, 152 140, 168 140"/>
+
+                                        <rect class="sv-panel" x="168" y="12" width="240" height="210" rx="12"/>
+                                        <path class="sv-grid" d="M168 54h240M168 96h240M168 138h240M168 180h240M216 12v210M264 12v210M312 12v210M360 12v210"/>
+                                        <text class="sv-lbl" x="180" y="32">QDRANT · LOCAL</text>
+                                        <g class="sc5-dots">
+                                            <circle class="sv-dot sv-dot--v" cx="206" cy="78" r="4"/><circle class="sv-dot sv-dot--v" cx="222" cy="66" r="4"/><circle class="sv-dot sv-dot--c" cx="214" cy="92" r="4"/><circle class="sv-dot sv-dot--v" cx="236" cy="84" r="4"/><circle class="sv-dot sv-dot--c" cx="198" cy="100" r="4"/>
+                                            <circle class="sv-dot sv-dot--c" cx="300" cy="58" r="4"/><circle class="sv-dot sv-dot--c" cx="318" cy="70" r="4"/><circle class="sv-dot sv-dot--v" cx="290" cy="76" r="4"/><circle class="sv-dot sv-dot--c" cx="326" cy="50" r="4"/>
+                                            <circle class="sv-dot sv-dot--c" cx="220" cy="176" r="4"/><circle class="sv-dot sv-dot--v" cx="238" cy="190" r="4"/><circle class="sv-dot sv-dot--c" cx="204" cy="196" r="4"/><circle class="sv-dot sv-dot--v" cx="386" cy="200" r="4"/><circle class="sv-dot sv-dot--c" cx="380" cy="42" r="4"/>
+                                        </g>
+                                        <g class="sc5-near">
+                                            <circle class="sv-dot sv-dot--v sv-dot--hit" cx="322" cy="144" r="4.5"/><circle class="sv-dot sv-dot--v sv-dot--hit" cx="344" cy="158" r="4.5"/><circle class="sv-dot sv-dot--v sv-dot--hit" cx="330" cy="170" r="4.5"/><circle class="sv-dot sv-dot--c sv-dot--hit" cx="352" cy="138" r="4.5"/>
+                                        </g>
+                                        <path class="sv-wire sv-wire--q" d="M192 41 C 262 41, 300 96, 336 152"/>
+                                        <circle class="sc5-ring" cx="336" cy="154" r="30"/>
+                                        <path class="sv-star" d="M336 145l2.6 5.8 6.3.7-4.7 4.3 1.3 6.2-5.5-3.2-5.5 3.2 1.3-6.2-4.7-4.3 6.3-.7z"/>
+                                        <g class="sc5-found">
+                                            <rect x="250" y="236" width="58" height="34" rx="4" fill="url(#cf-g-shot-c)"/>
+                                            <rect class="sv-key" x="250" y="236" width="58" height="34" rx="4"/>
+                                            <text class="sv-small sv-small--emerald" x="318" y="251">achado sem</text>
+                                            <text class="sv-small sv-small--emerald" x="318" y="265">a palavra</text>
+                                        </g>
+                                        <text class="sv-small" x="12" y="214">busca local,</text>
+                                        <text class="sv-small" x="12" y="229">sem custo de API</text>
+                                    </svg>
+                                </div>
+
+                                <!-- 6 · Rostos -->
+                                <div class="cf-scene" data-scene>
+                                    <svg viewBox="0 0 420 280">
+                                        <rect x="12" y="24" width="168" height="112" rx="8" fill="url(#cf-g-shot-b)"/>
+                                        <g class="sv-person"><circle cx="52" cy="70" r="12"/><path d="M30 136 a22 24 0 0 1 44 0z"/></g>
+                                        <g class="sv-person"><circle cx="98" cy="62" r="12"/><path d="M76 136 a22 30 0 0 1 44 0z"/></g>
+                                        <g class="sv-person"><circle cx="144" cy="74" r="12"/><path d="M122 136 a22 22 0 0 1 44 0z"/></g>
+                                        <rect class="sc6-box" x="36" y="52" width="32" height="36" rx="4"/>
+                                        <rect class="sc6-box" x="82" y="44" width="32" height="36" rx="4"/>
+                                        <rect class="sc6-box" x="128" y="56" width="32" height="36" rx="4"/>
+                                        <path class="sv-wire sv-wire--flow" d="M180 70 H196"/>
+                                        <g class="sc6-vec" style="--i: 0"><path class="sv-bars sv-bars--violet" d="M198 50v-8M203 50v-14M208 50v-6M213 50v-12M218 50v-10M223 50v-16M228 50v-7M233 50v-11M238 50v-5M243 50v-13M248 50v-9M253 50v-6"/></g>
+                                        <g class="sc6-vec" style="--i: 1"><path class="sv-bars sv-bars--violet" d="M198 82v-12M203 82v-6M208 82v-15M213 82v-9M218 82v-5M223 82v-11M228 82v-14M233 82v-7M238 82v-12M243 82v-6M248 82v-10M253 82v-13"/></g>
+                                        <g class="sc6-vec" style="--i: 2"><path class="sv-bars sv-bars--violet" d="M198 114v-7M203 114v-13M208 114v-9M213 114v-16M218 114v-8M223 114v-5M228 114v-12M233 114v-10M238 114v-14M243 114v-7M248 114v-11M253 114v-8"/></g>
+                                        <path class="sv-wire sv-wire--flow" d="M262 70 H280"/>
+                                        <rect class="sv-panel" x="280" y="24" width="128" height="112" rx="10"/>
+                                        <circle class="sc6-group sc6-group--a" cx="320" cy="72" r="28"/>
+                                        <circle class="sc6-group sc6-group--b" cx="374" cy="102" r="22"/>
+                                        <circle class="sv-dot sv-dot--v sc6-dot" style="--dx: 40px; --dy: 30px" cx="310" cy="64" r="4"/>
+                                        <circle class="sv-dot sv-dot--v sc6-dot" style="--dx: -20px; --dy: 40px" cx="326" cy="58" r="4"/>
+                                        <circle class="sv-dot sv-dot--v sc6-dot" style="--dx: 30px; --dy: -24px" cx="332" cy="80" r="4"/>
+                                        <circle class="sv-dot sv-dot--v sc6-dot" style="--dx: 50px; --dy: 10px" cx="312" cy="84" r="4"/>
+                                        <circle class="sv-dot sv-dot--v sc6-dot" style="--dx: -12px; --dy: -30px" cx="320" cy="72" r="4"/>
+                                        <circle class="sv-dot sv-dot--c sc6-dot" style="--dx: -50px; --dy: -20px" cx="368" cy="98" r="4"/>
+                                        <circle class="sv-dot sv-dot--c sc6-dot" style="--dx: -30px; --dy: -46px" cx="380" cy="94" r="4"/>
+                                        <circle class="sv-dot sv-dot--c sc6-dot" style="--dx: -60px; --dy: 6px" cx="374" cy="110" r="4"/>
+                                        <circle class="sv-dot sv-dot--x sc6-dot" style="--dx: -40px; --dy: 40px" cx="394" cy="44" r="3.5"/>
+                                        <g class="sc6-lock">
+                                            <rect class="sv-lockbadge" x="336" y="32" width="22" height="20" rx="6"/>
+                                            <g class="sv-lock sv-lock--violet" transform="translate(340 34)"><rect x="1" y="7" width="12" height="9" rx="2"/><path d="M3.5 7V5a3.5 3.5 0 0 1 7 0v2"/></g>
+                                        </g>
+                                        <text class="sv-small sv-small--cyan" x="12" y="156">YuNet · detecta</text>
+                                        <text class="sv-small sv-small--violet" x="196" y="156">SFace · vetoriza</text>
+                                        <text class="sv-small sv-small--violet" x="292" y="156">DBSCAN · agrupa</text>
+                                        <g class="sc6-fix">
+                                            <rect class="sv-chip sv-chip--violet" x="12" y="186" width="70" height="28" rx="14"/>
+                                            <g class="sv-lock sv-lock--violet" transform="translate(22 191)"><rect x="1" y="7" width="12" height="9" rx="2"/><path d="M3.5 7V5a3.5 3.5 0 0 1 7 0v2"/></g>
+                                            <text class="sv-title" x="42" y="205">Zé</text>
+                                            <text class="sv-small" x="94" y="198">correção manual: travada</text>
+                                            <text class="sv-small sv-small--dim" x="94" y="212">reagrupamentos não passam por cima</text>
+                                        </g>
+                                        <text class="sv-small sv-small--dim" x="12" y="250">tudo local · InsightFace (ONNX) como backend opcional</text>
+                                    </svg>
+                                </div>
+
+                                <!-- 7 · Áudio -->
+                                <div class="cf-scene" data-scene>
+                                    <svg viewBox="0 0 420 280">
+                                        <text class="sv-lbl" x="12" y="14">A1 · ENTREVISTA</text>
+                                        <text class="sv-lbl sv-lbl--emerald" x="408" y="14" text-anchor="end">MEDIÇÃO · ~3 S</text>
+                                        <rect class="sv-panel sv-panel--emerald" x="12" y="20" width="396" height="70" rx="8"/>
+                                        <path class="sv-wave" d="M20 55v-8M26 55v-14M32 55v-20M38 55v-10M44 55v-24M50 55v-16M56 55v-6M62 55v-12M68 55v-22M74 55v-18M80 55v-8M86 55v-4M92 55v-14M98 55v-26M104 55v-20M110 55v-10M116 55v-16M122 55v-6M128 55v-12M134 55v-22M140 55v-14M146 55v-8M152 55v-18M158 55v-24M164 55v-12M170 55v-6M176 55v-4M182 55v-10M188 55v-20M194 55v-16M200 55v-8M206 55v-14M212 55v-24M218 55v-18M224 55v-10M230 55v-6M236 55v-12M242 55v-22M248 55v-16M254 55v-8M260 55v-4M266 55v-14M272 55v-20M278 55v-26M284 55v-12M290 55v-8M296 55v-16M302 55v-22M308 55v-10M314 55v-6M320 55v-14M326 55v-18M332 55v-24M338 55v-12M344 55v-6M350 55v-10M356 55v-20M362 55v-14M368 55v-8M374 55v-16M380 55v-22M386 55v-10M392 55v-6M398 55v-12M20 55v8M26 55v14M32 55v20M38 55v10M44 55v24M50 55v16M56 55v6M62 55v12M68 55v22M74 55v18M80 55v8M86 55v4M92 55v14M98 55v26M104 55v20M110 55v10M116 55v16M122 55v6M128 55v12M134 55v22M140 55v14M146 55v8M152 55v18M158 55v24M164 55v12M170 55v6M176 55v4M182 55v10M188 55v20M194 55v16M200 55v8M206 55v14M212 55v24M218 55v18M224 55v10M230 55v6M236 55v12M242 55v22M248 55v16M254 55v8M260 55v4M266 55v14M272 55v20M278 55v26M284 55v12M290 55v8M296 55v16M302 55v22M308 55v10M314 55v6M320 55v14M326 55v18M332 55v24M338 55v12M344 55v6M350 55v10M356 55v20M362 55v14M368 55v8M374 55v16M380 55v22M386 55v10M392 55v6M398 55v12"/>
+                                        <rect class="sc7-scan" x="12" y="20" width="44" height="70" rx="8"/>
+
+                                        <g class="sc7-meter" style="--i: 0">
+                                            <rect class="sv-panel" x="12" y="104" width="128" height="62" rx="8"/>
+                                            <text class="sv-lbl" x="22" y="122">LOUDNESS</text>
+                                            <text class="sv-val" x="22" y="144">-16 LUFS</text>
+                                            <rect class="sv-meter-bg" x="22" y="152" width="108" height="5" rx="2.5"/>
+                                            <rect class="sv-meter sc7-fill" x="22" y="152" width="78" height="5" rx="2.5"/>
+                                        </g>
+                                        <g class="sc7-meter" style="--i: 1">
+                                            <rect class="sv-panel" x="146" y="104" width="128" height="62" rx="8"/>
+                                            <text class="sv-lbl" x="156" y="122">PICO REAL</text>
+                                            <text class="sv-val" x="156" y="144">≤ -1,5 dBTP</text>
+                                            <rect class="sv-meter-bg" x="156" y="152" width="108" height="5" rx="2.5"/>
+                                            <rect class="sv-meter sc7-fill" x="156" y="152" width="96" height="5" rx="2.5"/>
+                                        </g>
+                                        <g class="sc7-meter" style="--i: 2">
+                                            <rect class="sv-panel sv-panel--emerald" x="280" y="104" width="128" height="62" rx="8"/>
+                                            <text class="sv-lbl sv-lbl--emerald" x="290" y="122">SUGESTÃO</text>
+                                            <text class="sv-val sv-val--emerald" x="290" y="144">preset</text>
+                                            <text class="sv-small" x="290" y="158">a partir da medição</text>
+                                        </g>
+
+                                        <rect class="sv-file" x="12" y="186" width="150" height="40" rx="8"/>
+                                        <g class="sv-lock" transform="translate(22 196)"><rect x="1" y="7" width="12" height="9" rx="2"/><path d="M3.5 7V5a3.5 3.5 0 0 1 7 0v2"/></g>
+                                        <text class="sv-mono" x="42" y="203">original</text>
+                                        <text class="sv-small sv-small--dim" x="42" y="218">intocado</text>
+                                        <rect class="sv-file sv-file--emerald" x="258" y="186" width="150" height="40" rx="8"/>
+                                        <text class="sv-small sv-small--emerald" x="268" y="203">WAV 48 kHz · 24 bits</text>
+                                        <text class="sv-path" x="268" y="218">data/audio_tratado/</text>
+                                        <path class="sc7-old" d="M196 238 C 186 232, 140 236, 110 228"/>
+                                        <path class="sc7-new" d="M224 238 C 234 232, 286 236, 316 228"/>
+                                        <rect class="sv-clip" x="168" y="236" width="84" height="22" rx="5"/>
+                                        <text class="sv-clip-txt" x="210" y="251" text-anchor="middle">clipe</text>
+                                        <text class="sv-small sv-small--dim" x="12" y="276">ao vivo, sem arquivo: EQ · gate · compressor (WebAudio)</text>
+                                    </svg>
+                                </div>
+
+                                <!-- 8 · Timeline e saída -->
+                                <div class="cf-scene" data-scene>
+                                    <svg viewBox="0 0 420 280">
+                                        <rect class="sv-panel" x="12" y="10" width="396" height="168" rx="10"/>
+                                        <path class="sv-ruler" d="M48 30v6M60 32v4M72 32v4M84 32v4M96 30v6M108 32v4M120 32v4M132 32v4M144 30v6M156 32v4M168 32v4M180 32v4M192 30v6M204 32v4M216 32v4M228 32v4M240 30v6M252 32v4M264 32v4M276 32v4M288 30v6M300 32v4M312 32v4M324 32v4M336 30v6M348 32v4M360 32v4M372 32v4M384 30v6M396 32v4"/>
+                                        <text class="sv-tc" x="48" y="25">00:00</text>
+                                        <text class="sv-tc" x="240" y="25">00:20</text>
+                                        <text class="sv-track" x="22" y="58">V2</text>
+                                        <text class="sv-track" x="22" y="88">V1</text>
+                                        <text class="sv-track" x="22" y="118">A1</text>
+                                        <text class="sv-track" x="22" y="148">A2</text>
+                                        <rect class="sv-clip sv-clip--cyan" x="120" y="44" width="54" height="22" rx="4"/>
+                                        <rect class="sv-clip sv-clip--cyan" x="250" y="44" width="62" height="22" rx="4"/>
+                                        <rect class="sv-clip sv-clip--ghost" x="330" y="44" width="66" height="22" rx="4"/>
+                                        <rect class="sv-clip" x="48" y="74" width="96" height="22" rx="4"/>
+                                        <rect class="sv-clip" x="146" y="74" width="70" height="22" rx="4"/>
+                                        <rect class="sv-clip" x="218" y="74" width="110" height="22" rx="4"/>
+                                        <rect class="sv-clip" x="330" y="74" width="66" height="22" rx="4"/>
+                                        <rect class="sv-clip sv-clip--emerald" x="48" y="104" width="104" height="22" rx="4"/>
+                                        <rect class="sv-clip sv-clip--emerald" x="154" y="104" width="62" height="22" rx="4"/>
+                                        <rect class="sv-clip sv-clip--emerald" x="218" y="104" width="110" height="22" rx="4"/>
+                                        <rect class="sv-clip sv-clip--emerald" x="330" y="104" width="66" height="22" rx="4"/>
+                                        <path class="sv-wave sv-wave--thin" d="M56 115h88M162 115h46M226 115h94M338 115h50"/>
+                                        <rect class="sv-clip sv-clip--amber" x="48" y="134" width="348" height="22" rx="4"/>
+                                        <g class="sc8-head"><path class="sv-head" d="M150 26 V170"/><path class="sv-head-tip" d="M144 24h12l-6 7z"/></g>
+
+                                        <g class="sc8-exp" style="--i: 0"><rect class="sv-exp" x="12" y="188" width="396" height="24" rx="12"/><text class="sv-exp-ext" x="26" y="204">.otio</text><text class="sv-small" x="80" y="204">Kdenlive 25.04+ abre direto</text></g>
+                                        <g class="sc8-exp" style="--i: 1"><rect class="sv-exp" x="12" y="218" width="396" height="24" rx="12"/><text class="sv-exp-ext" x="26" y="234">.xml</text><text class="sv-small" x="80" y="234">Premiere · Resolve · Final Cut</text></g>
+                                        <g class="sc8-exp" style="--i: 2"><rect class="sv-exp" x="12" y="248" width="192" height="24" rx="12"/><text class="sv-exp-ext" x="26" y="264">.edl</text><text class="sv-small" x="80" y="264">edição em lista</text></g>
+                                        <g class="sc8-exp" style="--i: 3"><rect class="sv-exp sv-exp--emerald" x="216" y="248" width="192" height="24" rx="12"/><text class="sv-exp-ext sv-exp-ext--emerald" x="230" y="264">MP4</text><text class="sv-small" x="272" y="264">render pelo FFmpeg</text></g>
+                                    </svg>
+                                </div>
+                            </div>
+                            <div class="cf-stage__rail">
+                                <span class="cf-stage__ticks"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
+                                <span class="cf-stage__head"></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ═══════════════ 03 — PRIVACIDADE ═══════════════ -->
+        <section class="section" id="privacidade" aria-labelledby="privacidade-titulo">
+            <div class="container">
+                <header class="section-head">
+                    <p class="eyebrow eyebrow--emerald" data-reveal>03 — Privacidade</p>
+                    <h2 class="section-title" id="privacidade-titulo" data-reveal>O que fica na sua máquina — e o pouco que pode sair</h2>
+                    <p class="lead" data-reveal>Acordo de confidencialidade, elenco, material inédito: o que é sensível não precisa viajar. O vídeo original nunca é enviado. A nuvem só recebe o que você configurar, e só o mínimo para cada tarefa.</p>
+                </header>
+
+                <div class="table-wrap cf-table-wrap" data-reveal>
+                    <table class="table cf-table">
+                        <caption class="sr-only">O que fica na sua máquina e o que pode sair para a nuvem</caption>
+                        <thead>
+                            <tr><th scope="col">Dado</th><th scope="col">Onde fica</th><th scope="col">Sai da sua máquina?</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <th scope="row">Arquivos originais (vídeo, foto, áudio)</th>
+                                <td data-label="Onde fica">No seu HD ou SSD, onde já estão.</td>
+                                <td data-label="Sai?"><span class="cf-out cf-out--never">Nunca</span> Não são copiados, enviados nem modificados.</td>
+                            </tr>
+                            <tr>
+                                <th scope="row">Proxies, miniaturas e WAVs tratados</th>
+                                <td data-label="Onde fica">Na pasta <code class="inline">data/</code>, na sua máquina.</td>
+                                <td data-label="Sai?"><span class="cf-out cf-out--no">Não</span> Só se você ligar o armazenamento remoto S3 (desligado por padrão), que envia proxies e miniaturas.</td>
+                            </tr>
+                            <tr>
+                                <th scope="row">Catálogo (SQLite) e banco vetorial (Qdrant)</th>
+                                <td data-label="Onde fica">Na sua máquina.</td>
+                                <td data-label="Sai?"><span class="cf-out cf-out--no">Não</span></td>
+                            </tr>
+                            <tr>
+                                <th scope="row">Vetores de texto (MiniLM) e de imagem (CLIP)</th>
+                                <td data-label="Onde fica">Calculados na sua CPU.</td>
+                                <td data-label="Sai?"><span class="cf-out cf-out--no">Não</span> Busca e Encontrar Similares não chamam API nenhuma.</td>
+                            </tr>
+                            <tr>
+                                <th scope="row">Biometria facial do módulo local</th>
+                                <td data-label="Onde fica">Detecção, vetores e agrupamento, na sua máquina.</td>
+                                <td data-label="Sai?"><span class="cf-out cf-out--no">Não</span> Só os fluxos faciais em nuvem, opcionais (Azure Face), enviam dados de rosto.</td>
+                            </tr>
+                            <tr>
+                                <th scope="row">Medição e tratamento local de áudio</th>
+                                <td data-label="Onde fica">Na sua máquina.</td>
+                                <td data-label="Sai?"><span class="cf-out cf-out--no">Não</span></td>
+                            </tr>
+                            <tr>
+                                <th scope="row">Áudio para transcrição</th>
+                                <td data-label="Onde fica">MP3 mono de 16 kHz, gerado localmente.</td>
+                                <td data-label="Sai?"><span class="cf-out cf-out--opt">Se você configurar</span> Vai à transcrição em nuvem (AssemblyAI ou Deepgram). Com Whisper local, não sai.</td>
+                            </tr>
+                            <tr>
+                                <th scope="row">Keyframes</th>
+                                <td data-label="Onde fica">Extraídos localmente, 1 por trecho.</td>
+                                <td data-label="Sai?"><span class="cf-out cf-out--opt">Se você configurar</span> Poucos quadros vão ao modelo de visão (OpenRouter).</td>
+                            </tr>
+                            <tr>
+                                <th scope="row">Textos: transcrições, descrições, roteiro</th>
+                                <td data-label="Onde fica">Na sua máquina.</td>
+                                <td data-label="Sai?"><span class="cf-out cf-out--opt">Se você configurar</span> Vão ao modelo de texto para títulos, temas, resumos e o agente.</td>
+                            </tr>
+                            <tr>
+                                <th scope="row">Trecho de áudio para restauração</th>
+                                <td data-label="Onde fica">Selecionado por você na timeline.</td>
+                                <td data-label="Sai?"><span class="cf-out cf-out--opt">Se você configurar</span> Só o trecho selecionado vai ao Auphonic.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="cf-local" data-local>
+                    <div class="cf-local__head">
+                        <div class="cf-local__intro">
+                            <h3 class="cf-local__title" id="modo-local-titulo">Modo só local</h3>
+                            <p class="cf-local__text">Ligue para ver o que continua funcionando sem chave nenhuma — e o que depende de nuvem.</p>
+                        </div>
+                        <button class="cf-switch" type="button" role="switch" aria-checked="false" aria-labelledby="modo-local-titulo" data-local-switch>
+                            <span class="cf-switch__track" aria-hidden="true"><span class="cf-switch__thumb"></span></span>
+                            <span class="cf-switch__state" aria-hidden="true" data-switch-state>Desligado</span>
+                        </button>
+                    </div>
+
+                    <div class="cf-vault" aria-hidden="true" data-vault>
+                        <div class="cf-vault__in">
+                            <p class="cf-vault__label"><span class="cf-vault__dot"></span>Sua máquina</p>
+                            <ul class="cf-vault__items" role="list">
+                                <li><b>Originais</b></li><li>Proxies</li><li>SQLite</li><li>Qdrant</li><li>Vetores CLIP e MiniLM</li><li>Rostos (local)</li><li>Medição de áudio</li><li>Timeline e render</li>
+                            </ul>
+                        </div>
+                        <div class="cf-vault__door">
+                            <span class="cf-vault__pk"></span><span class="cf-vault__pk"></span><span class="cf-vault__pk"></span>
+                            <span class="cf-vault__cut"></span>
+                        </div>
+                        <div class="cf-vault__out">
+                            <p class="cf-vault__label cf-vault__label--out">Nuvem · com a sua chave</p>
+                            <ul class="cf-vault__items" role="list">
+                                <li>MP3 16 kHz</li><li>Poucos keyframes</li><li>Textos</li><li>Trecho de áudio</li>
+                            </ul>
+                            <p class="cf-vault__closed">Nada sai: sem chave, sem envio.</p>
+                        </div>
+                    </div>
+
+                    <p class="cf-local__summary" aria-live="polite" data-local-summary>Com as suas chaves configuradas, tudo fica disponível. Os itens em âmbar usam o provedor de nuvem que você escolher, pago por uso.</p>
+
+                    <ul class="cf-feats" role="list">
+                        <li class="cf-feat" data-kind="local">
+                            <span class="cf-feat__icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="12" rx="2.5"/><path d="M7 14h.01M11 14h6"/></svg></span>
+                            <span class="cf-feat__body"><span class="cf-feat__name">Ingestão, SHA-256 e catálogo</span><span class="cf-feat__how">FFmpeg e SQLite</span></span>
+                            <span class="cf-feat__state" data-off="Local" data-on="Continua">Local</span>
+                        </li>
+                        <li class="cf-feat" data-kind="local">
+                            <span class="cf-feat__icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 5v14M17 5v14M3 9.5h4M3 14.5h4M17 9.5h4M17 14.5h4"/></svg></span>
+                            <span class="cf-feat__body"><span class="cf-feat__name">Proxies e miniaturas</span><span class="cf-feat__how">FFmpeg, com GPU se houver</span></span>
+                            <span class="cf-feat__state" data-off="Local" data-on="Continua">Local</span>
+                        </li>
+                        <li class="cf-feat" data-kind="local">
+                            <span class="cf-feat__icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="7" r="2.5"/><circle cx="6" cy="17" r="2.5"/><path d="M8.2 8.4 20 18M8.2 15.6 20 6"/></svg></span>
+                            <span class="cf-feat__body"><span class="cf-feat__name">Cortes, beats e movimento de câmera</span><span class="cf-feat__how">PySceneDetect e OpenCV</span></span>
+                            <span class="cf-feat__state" data-off="Local" data-on="Continua">Local</span>
+                        </li>
+                        <li class="cf-feat" data-kind="local">
+                            <span class="cf-feat__icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></svg></span>
+                            <span class="cf-feat__body"><span class="cf-feat__name">Busca visual e Encontrar Similares</span><span class="cf-feat__how">CLIP multilíngue na CPU</span></span>
+                            <span class="cf-feat__state" data-off="Local" data-on="Continua">Local</span>
+                        </li>
+                        <li class="cf-feat" data-kind="local">
+                            <span class="cf-feat__icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="9" r="4"/><path d="M4.5 20a7.5 7.5 0 0 1 15 0"/></svg></span>
+                            <span class="cf-feat__body"><span class="cf-feat__name">Rostos: detectar, agrupar, nomear</span><span class="cf-feat__how">YuNet, SFace e DBSCAN</span></span>
+                            <span class="cf-feat__state" data-off="Local" data-on="Continua">Local</span>
+                        </li>
+                        <li class="cf-feat" data-kind="local">
+                            <span class="cf-feat__icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h2M7 8v8M11 5v14M15 9v6M19 7v10M21 12h0"/></svg></span>
+                            <span class="cf-feat__body"><span class="cf-feat__name">Medição e tratamento de áudio</span><span class="cf-feat__how">FFmpeg; denoise DPDFNet opcional</span></span>
+                            <span class="cf-feat__state" data-off="Local" data-on="Continua">Local</span>
+                        </li>
+                        <li class="cf-feat" data-kind="local">
+                            <span class="cf-feat__icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h18M3 17h18"/><rect x="4" y="9.5" width="7" height="5" rx="1"/><rect x="12.5" y="9.5" width="7.5" height="5" rx="1"/><path d="M15 3.5v17"/></svg></span>
+                            <span class="cf-feat__body"><span class="cf-feat__name">Timeline, render e exportação</span><span class="cf-feat__how">MP4, .otio, .xml e .edl</span></span>
+                            <span class="cf-feat__state" data-off="Local" data-on="Continua">Local</span>
+                        </li>
+                        <li class="cf-feat" data-kind="local">
+                            <span class="cf-feat__icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 20h14"/></svg></span>
+                            <span class="cf-feat__body"><span class="cf-feat__name">Transcrição local</span><span class="cf-feat__how">Whisper na CPU, com o modelo baixado</span></span>
+                            <span class="cf-feat__state" data-off="Local" data-on="Continua">Local</span>
+                        </li>
+                        <li class="cf-feat" data-kind="cloud">
+                            <span class="cf-feat__icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/></svg></span>
+                            <span class="cf-feat__body"><span class="cf-feat__name">Descrição visual dos quadros</span><span class="cf-feat__how">Modelo de visão via OpenRouter</span></span>
+                            <span class="cf-feat__state" data-off="Nuvem" data-on="Precisa de chave">Nuvem</span>
+                        </li>
+                        <li class="cf-feat" data-kind="cloud">
+                            <span class="cf-feat__icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h11M4 18h7"/></svg></span>
+                            <span class="cf-feat__body"><span class="cf-feat__name">Títulos executivos, temas e resumos</span><span class="cf-feat__how">Modelo de texto via OpenRouter</span></span>
+                            <span class="cf-feat__state" data-off="Nuvem" data-on="Precisa de chave">Nuvem</span>
+                        </li>
+                        <li class="cf-feat" data-kind="cloud">
+                            <span class="cf-feat__icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M5 5h14a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1h-8l-4 3.5V16H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z"/><path d="M8.5 10.5h.01M12 10.5h.01M15.5 10.5h.01"/></svg></span>
+                            <span class="cf-feat__body"><span class="cf-feat__name">Agente de IA (copiloto)</span><span class="cf-feat__how">Modelo de texto via OpenRouter</span></span>
+                            <span class="cf-feat__state" data-off="Nuvem" data-on="Precisa de chave">Nuvem</span>
+                        </li>
+                        <li class="cf-feat" data-kind="cloud">
+                            <span class="cf-feat__icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4v16M12 4v16M19 4v16"/><rect x="3" y="13" width="4" height="3" rx="1"/><rect x="10" y="7" width="4" height="3" rx="1"/><rect x="17" y="11" width="4" height="3" rx="1"/></svg></span>
+                            <span class="cf-feat__body"><span class="cf-feat__name">Restauração no Auphonic</span><span class="cf-feat__how">Dereverb, AutoEQ; 2 h/mês grátis no plano deles</span></span>
+                            <span class="cf-feat__state" data-off="Nuvem" data-on="Precisa de chave">Nuvem</span>
+                        </li>
+                    </ul>
+                    <p class="cf-local__foot">Transcrição em nuvem (AssemblyAI ou Deepgram) também pede chave — e tem o Whisper local como alternativa. Para descrições, títulos, temas, resumos e o agente, hoje não há modelo local: eles dependem de nuvem. Os modelos locais só baixam quando você pede, em <a class="inline-link" href="comecar.html#modelos-locais">Configurações › Modelos locais</a>.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- ═══════════════ 04 — CUSTOS ═══════════════ -->
+        <section class="section section--alt" id="custos" aria-labelledby="custos-titulo">
+            <div class="container">
+                <header class="section-head">
+                    <p class="eyebrow eyebrow--amber" data-reveal>04 — Custos</p>
+                    <h2 class="section-title" id="custos-titulo" data-reveal>Por que a conta da nuvem fica pequena</h2>
+                    <p class="lead" data-reveal>O programa é grátis — sem assinatura, sem conta, sem plano pago. O que pode custar são as APIs de nuvem, cobradas por uso direto pelo provedor, com a sua chave. E o Talho foi desenhado para mandar o mínimo.</p>
+                </header>
+
+                <div class="cf-cost">
+                    <figure class="cf-funnel" data-inview>
+                        <div class="cf-funnel__row" style="--w: 1; --d: 0ms">
+                            <span class="cf-funnel__bar cf-funnel__bar--video"></span>
+                            <p class="cf-funnel__label"><b>Vídeo original 4K</b> fica no seu HD</p>
+                        </div>
+                        <div class="cf-funnel__row" style="--w: .44; --d: 380ms">
+                            <span class="cf-funnel__bar cf-funnel__bar--proxy"></span>
+                            <p class="cf-funnel__label"><b>Proxy 720p</b> fica na sua máquina, para o player</p>
+                        </div>
+                        <div class="cf-funnel__row" style="--w: .07; --d: 760ms">
+                            <span class="cf-funnel__bar cf-funnel__bar--mp3"></span>
+                            <p class="cf-funnel__label"><b>MP3 mono 16 kHz</b> é isso que viaja para a transcrição</p>
+                        </div>
+                        <p class="cf-funnel__big"><span class="cf-funnel__pre">mais de</span> <span class="cf-funnel__num"><span data-count-to="99" data-count-suffix="%" data-count-duration="1.6">99%</span></span> <span class="cf-funnel__post">menor que o vídeo</span></p>
+                        <figcaption class="cf-funnel__cap">Proporções ilustrativas, fora de escala. A redução de mais de 99% compara o MP3 mono de 16 kHz com o vídeo 4K original (docs/costs_and_security.md).</figcaption>
+                    </figure>
+
+                    <div class="cf-ref" data-reveal>
+                        <p class="cf-ref__kicker">Referência de projeto</p>
+                        <p class="cf-ref__value"><span data-count-to="20">20</span>&nbsp;h <span class="cf-ref__unit">de vídeo</span></p>
+                        <p class="cf-ref__money">por menos de <strong>R$&nbsp;30</strong></p>
+                        <p class="cf-ref__note">É a meta com que o Talho foi desenhado, registrada em <a class="inline-link" href="https://github.com/fernangcortes/capiau-talho-v03/blob/main/docs/costs_and_security.md">docs/costs_and_security.md</a> — <strong>não é garantia nem orçamento</strong>. O valor real depende dos provedores e modelos que você escolher, do câmbio e de quanto do material é entrevista.</p>
+                    </div>
+                </div>
+
+                <div class="grid grid--3 cf-reasons" data-reveal-stagger="80">
+                    <article class="card" data-reveal data-glow>
+                        <div class="card__icon card__icon--emerald" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h2M7 8v8M11 5v14M15 9v6M19 7v10M21 12h0"/></svg></div>
+                        <h3 class="card__title">Áudio leve</h3>
+                        <p class="card__text">A transcrição recebe um MP3 mono de 16 kHz gerado na sua máquina — mais de 99% menor que o vídeo 4K. Sobe em segundos e gasta pouca banda.</p>
+                    </article>
+                    <article class="card" data-reveal data-glow>
+                        <div class="card__icon card__icon--emerald" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16l-6 7.5V19l-4-2v-4.5z"/></svg></div>
+                        <h3 class="card__title">Só entrevista é transcrita</h3>
+                        <p class="card__text">A transcrição em lote pula mídias marcadas como B-roll e imagens silenciosas. Plano de cobertura sem fala não gasta nada.</p>
+                    </article>
+                    <article class="card" data-reveal data-glow>
+                        <div class="card__icon card__icon--emerald" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="m20.5 16-4.5-4.5L6 19"/></svg></div>
+                        <h3 class="card__title">1 keyframe por trecho</h3>
+                        <p class="card__text">A visão recebe um quadro representativo de cada corte ou beat, achado localmente — não um quadro a cada 10 segundos.</p>
+                    </article>
+                    <article class="card" data-reveal data-glow>
+                        <div class="card__icon card__icon--emerald" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></svg></div>
+                        <h3 class="card__title">Busca e similares de graça</h3>
+                        <p class="card__text">Os vetores CLIP e MiniLM moram no Qdrant da sua máquina. Buscar e clicar em Encontrar Similares não chama API nenhuma.</p>
+                    </article>
+                    <article class="card" data-reveal data-glow>
+                        <div class="card__icon card__icon--emerald" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4v16M12 4v16M19 4v16"/><rect x="3" y="13" width="4" height="3" rx="1"/><rect x="10" y="7" width="4" height="3" rx="1"/><rect x="17" y="11" width="4" height="3" rx="1"/></svg></div>
+                        <h3 class="card__title">Áudio na nuvem, só o trecho</h3>
+                        <p class="card__text">Ao Auphonic vai só o trecho selecionado, e o plano gratuito do Auphonic dá 2 h/mês. Sem chave ou sem cota, o Talho recusa antes de tocar na rede.</p>
+                    </article>
+                    <article class="card" data-reveal data-glow>
+                        <div class="card__icon card__icon--emerald" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4"/></svg></div>
+                        <h3 class="card__title">Alternativas locais</h3>
+                        <p class="card__text">O Whisper transcreve na CPU sem custo de API — a versão large-v3-turbo leva ~0,4× o tempo do áudio. Os modelos só baixam quando você pede.</p>
+                    </article>
+                </div>
+
+                <div class="callout callout--emerald cf-limit" data-reveal>
+                    <p><strong>Ponha um teto de gastos.</strong> Configure limite e alertas no painel de cada provedor: no OpenRouter, em <em>Settings › Limits</em> (por exemplo, US$ 5 por mês); na AssemblyAI, acompanhe o consumo no painel de faturamento. A conta é sua, direto com o provedor — o Talho não cobra nem intermedeia nada.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- ═══════════════ 05 — TECNOLOGIA ═══════════════ -->
+        <section class="section" id="tecnologia" aria-labelledby="tecnologia-titulo">
+            <div class="container">
+                <header class="section-head">
+                    <p class="eyebrow" data-reveal>05 — Tecnologia</p>
+                    <h2 class="section-title" id="tecnologia-titulo" data-reveal>A pilha, camada por camada</h2>
+                    <p class="lead" data-reveal>Peças abertas e conhecidas, escolhidas para rodar bem em CPU. Cada item abaixo está no <code class="inline">requirements.txt</code> ou no código em <code class="inline">src/</code> — confira.</p>
+                </header>
+
+                <div class="cf-stack">
+                    <article class="cf-tech cf-tech--data" data-reveal>
+                        <header class="cf-tech__head">
+                            <span class="cf-tech__lane" aria-hidden="true">Dados</span>
+                            <h3 class="cf-tech__title">Armazenamento e dados</h3>
+                            <p class="cf-tech__where">Sua máquina</p>
+                        </header>
+                        <ul class="cf-tech__list" role="list">
+                            <li><b>SQLite</b><span>catálogo, projetos, cortes, transcrições e configurações</span></li>
+                            <li><b>Qdrant</b><span>banco vetorial em modo arquivo, local: busca por similaridade</span></li>
+                            <li><b>Pastas do projeto</b><span>originais no lugar; proxies, miniaturas e WAVs em <code class="inline">data/</code></span></li>
+                        </ul>
+                    </article>
+
+                    <article class="cf-tech cf-tech--back" data-reveal>
+                        <header class="cf-tech__head">
+                            <span class="cf-tech__lane" aria-hidden="true">Backend</span>
+                            <h3 class="cf-tech__title">Python na sua CPU</h3>
+                            <p class="cf-tech__where">Python 3.12 (3.10+ compatível)</p>
+                        </header>
+                        <ul class="cf-tech__list cf-tech__list--2" role="list">
+                            <li><b>FastAPI + Uvicorn</b><span>API REST local, em localhost:8000</span></li>
+                            <li><b>Pydantic</b><span>validação dos dados da API</span></li>
+                            <li><b>TASK_MANAGER</b><span>tarefas longas com progresso e cancelamento</span></li>
+                            <li><b>FFmpeg + ffprobe</b><span>proxies, MP3, formas de onda, medição de áudio e render</span></li>
+                            <li><b>PySceneDetect</b><span>detecção dos cortes reais</span></li>
+                            <li><b>OpenCV</b><span>movimento de câmera, cor e rostos (YuNet + SFace)</span></li>
+                            <li><b>sentence-transformers + PyTorch CPU</b><span>MiniLM multilíngue e CLIP multilíngue</span></li>
+                            <li><b>scikit-learn</b><span>DBSCAN para agrupar rostos</span></li>
+                            <li><b>OpenTimelineIO</b><span>.otio, .xml (FCP7) e .edl</span></li>
+                            <li><b>Pillow + rawpy</b><span>fotos de set, inclusive RAW</span></li>
+                            <li><b>Playwright</b><span>títulos no render, com o Edge ou Chrome já instalado</span></li>
+                        </ul>
+                    </article>
+
+                    <article class="cf-tech cf-tech--front" data-reveal>
+                        <header class="cf-tech__head">
+                            <span class="cf-tech__lane" aria-hidden="true">Frontend</span>
+                            <h3 class="cf-tech__title">No navegador</h3>
+                            <p class="cf-tech__where">Sem frameworks</p>
+                        </header>
+                        <ul class="cf-tech__list" role="list">
+                            <li><b>JavaScript moderno</b><span>interface modular, sem framework pesado</span></li>
+                            <li><b>Canvas 2D</b><span>timeline, réguas e formas de onda</span></li>
+                            <li><b>WebAudio</b><span>EQ, gate, compressor e ganho ao vivo, sem gerar arquivo</span></li>
+                        </ul>
+                    </article>
+
+                    <article class="cf-tech cf-tech--models" data-reveal>
+                        <header class="cf-tech__head">
+                            <span class="cf-tech__lane" aria-hidden="true">Modelos</span>
+                            <h3 class="cf-tech__title">Modelos locais opcionais</h3>
+                            <p class="cf-tech__where">Baixados só quando você pede</p>
+                        </header>
+                        <ul class="cf-tech__list cf-tech__list--2" role="list">
+                            <li><b>faster-whisper</b><span>transcrição na CPU, do tiny ao large-v3-turbo</span></li>
+                            <li><b>Canary 1B v2 · SenseVoice</b><span>outras transcrições locais (SenseVoice: zh, en, ja, ko, yue)</span></li>
+                            <li><b>Nemotron 3 Diarization · pyannote</b><span>separar falantes sem nuvem</span></li>
+                            <li><b>PANNs</b><span>tipo de som: trilha, fala, efeito, ambiente</span></li>
+                            <li><b>YOLO-World · OWLv2 · Grounding DINO · Florence-2</b><span>detecção de objetos</span></li>
+                            <li><b>Laya</b><span>triagem local</span></li>
+                            <li><b>DPDFNet (sherpa-onnx)</b><span>denoise por IA na CPU, instalado à parte</span></li>
+                            <li><b>InsightFace (ONNX)</b><span>backend alternativo de rostos, instalado à parte</span></li>
+                        </ul>
+                    </article>
+
+                    <article class="cf-tech cf-tech--cloud" data-reveal>
+                        <header class="cf-tech__head">
+                            <span class="cf-tech__lane" aria-hidden="true">Nuvem</span>
+                            <h3 class="cf-tech__title">Nuvem opcional</h3>
+                            <p class="cf-tech__where">Com a sua chave, pago por uso</p>
+                        </header>
+                        <ul class="cf-tech__list" role="list">
+                            <li><b>AssemblyAI</b><span>transcrição com falantes (Universal 3.5 Pro, padrão)</span></li>
+                            <li><b>Deepgram</b><span>transcrição Nova-3, alternativa</span></li>
+                            <li><b>OpenRouter</b><span>visão (Gemini 2.5 Flash) e texto e agente (DeepSeek V4.1 Flash), por padrão</span></li>
+                            <li><b>Auphonic</b><span>restauração de áudio; plano gratuito de 2 h/mês</span></li>
+                            <li><b>Azure Face</b><span>rostos em nuvem, alternativa ao motor local</span></li>
+                            <li><b>Amazon S3</b><span>proxies e miniaturas remotos, desligado por padrão</span></li>
+                        </ul>
+                    </article>
+                </div>
+
+                <div class="cf-repo" data-reveal>
+                    <p class="cf-repo__text">O Docker recomendado já traz Python 3.12, FFmpeg, PyTorch CPU, OpenCV e OpenTimelineIO. Em 29/10/2026, o repositório tinha <strong>~49 mil linhas de Python</strong> em <code class="inline">src/</code>, <strong>~89 mil de JavaScript</strong> em <code class="inline">src/ui/</code>, <strong>78 arquivos de teste pytest</strong> e <strong>83 autotestes Node</strong>.</p>
+                    <div class="cluster">
+                        <a class="link-arrow" href="https://github.com/fernangcortes/capiau-talho-v03/wiki/15.-Arquitetura-Tecnica-e-API-REST">Arquitetura e API REST na wiki
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                        </a>
+                        <a class="link-arrow" href="contribuir.html#ambiente">Montar o ambiente de desenvolvimento
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ═══════════════ 06 — PRINCÍPIOS ═══════════════ -->
+        <section class="section section--alt" id="principios" aria-labelledby="principios-titulo">
+            <div class="container">
+                <header class="section-head">
+                    <p class="eyebrow eyebrow--rose" data-reveal>06 — Princípios</p>
+                    <h2 class="section-title" id="principios-titulo" data-reveal>As regras da casa</h2>
+                    <p class="lead" data-reveal>Escolhas que valem para o código inteiro — e que você pode cobrar em cada pull request.</p>
+                </header>
+
+                <div class="grid grid--3 cf-rules" data-reveal-stagger="90">
+                    <article class="card cf-rule" data-reveal data-live>
+                        <div class="cf-rule__anim cf-anim-orig" aria-hidden="true">
+                            <span class="cf-ao__file"><span class="cf-ao__lock"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></span><span class="cf-ao__name">MOV_0492.MOV</span></span>
+                            <span class="cf-ao__pen"></span>
+                            <span class="cf-ao__copies"><span class="cf-ao__copy">proxy 720p</span><span class="cf-ao__copy">WAV tratado</span></span>
+                        </div>
+                        <h3 class="card__title">O original nunca é tocado</h3>
+                        <p class="card__text">O Talho lê seus arquivos onde eles estão. Tudo o que ele cria — proxies, miniaturas, WAVs tratados — é derivado e mora em <code class="inline">data/</code>. Tirar uma mídia do catálogo não apaga o arquivo do disco.</p>
+                    </article>
+
+                    <article class="card cf-rule" data-reveal data-live>
+                        <div class="cf-rule__anim cf-anim-pre" aria-hidden="true">
+                            <ul class="cf-ap__list" role="list">
+                                <li class="cf-ap__ok">Timeline salva</li>
+                                <li class="cf-ap__ok">Mídias encontradas</li>
+                                <li class="cf-ap__bad">HD dos originais</li>
+                            </ul>
+                            <span class="cf-ap__stamp">Bloqueado</span>
+                        </div>
+                        <h3 class="card__title">Nada é degradado em silêncio</h3>
+                        <p class="card__text">Antes do render, o <em>preflight</em> confere tudo: mídia ausente ou master sem o HD dos originais bloqueia, em vez de sair preto. Motor pedido que não está instalado gera aviso — nunca finge que rodou.</p>
+                    </article>
+
+                    <article class="card cf-rule" data-reveal data-live>
+                        <div class="cf-rule__anim cf-anim-meter" aria-hidden="true">
+                            <span class="cf-am__bars"><i style="--h: .55"></i><i style="--h: .8"></i><i style="--h: .4"></i><i style="--h: .95"></i><i style="--h: .65"></i><i style="--h: .3"></i></span>
+                            <span class="cf-am__arrow"></span>
+                            <span class="cf-am__chip">preset sugerido</span>
+                        </div>
+                        <h3 class="card__title">Medição antes de sugestão</h3>
+                        <p class="card__text">No áudio, nada parte de chute: um passe de ~3 s mede loudness, pico real, clipping e piso de ruído, e só então vem o preset sugerido. Até o ganho do denoise por IA foi medido, não prometido.</p>
+                    </article>
+
+                    <article class="card cf-rule" data-reveal data-live>
+                        <div class="cf-rule__anim cf-anim-dl" aria-hidden="true">
+                            <span class="cf-ad__btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 20h14"/></svg>Baixar · 1,6 GB</span>
+                            <span class="cf-ad__cursor"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M5 3l14 8-6 1.5L10 19z"/></svg></span>
+                            <span class="cf-ad__bar"><i></i></span>
+                            <span class="cf-ad__note">só quando você clica</span>
+                        </div>
+                        <h3 class="card__title">Nenhum modelo grande baixa sozinho</h3>
+                        <p class="card__text">Cada modelo local mostra o tamanho e só baixa quando você clica, em Configurações › Modelos locais. Faltou algum? O motor diz o que falta e onde baixar, e segue por um caminho que funciona.</p>
+                    </article>
+
+                    <article class="card cf-rule" data-reveal data-live>
+                        <div class="cf-rule__anim cf-anim-lock" aria-hidden="true">
+                            <span class="cf-al__dot" style="--x: 18%; --y: 30%; --mx: 24px; --my: 14px"></span>
+                            <span class="cf-al__dot" style="--x: 30%; --y: 64%; --mx: -14px; --my: -18px"></span>
+                            <span class="cf-al__dot" style="--x: 44%; --y: 38%; --mx: 30px; --my: 20px"></span>
+                            <span class="cf-al__dot" style="--x: 70%; --y: 70%; --mx: -26px; --my: -10px"></span>
+                            <span class="cf-al__dot" style="--x: 82%; --y: 34%; --mx: -20px; --my: 22px"></span>
+                            <span class="cf-al__dot cf-al__dot--c" style="--x: 60%; --y: 26%; --mx: 16px; --my: 26px"></span>
+                            <span class="cf-al__dot cf-al__dot--c" style="--x: 88%; --y: 62%; --mx: -30px; --my: -16px"></span>
+                            <span class="cf-al__me"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>Zé</span>
+                        </div>
+                        <h3 class="card__title">Suas correções manuais são protegidas</h3>
+                        <p class="card__text">Nomeou um rosto, fundiu grupos, auditou um perfil de cor? Reagrupamentos e reanálises automáticas não passam por cima: decisão manual confirmada sempre ganha.</p>
+                    </article>
+
+                    <article class="card cf-rule" data-reveal data-live>
+                        <div class="cf-rule__anim cf-anim-par" aria-hidden="true">
+                            <span class="cf-apx__frame"><span class="cf-apx__tag">Monitor</span><span class="cf-apx__img"></span><span class="cf-apx__scan"></span></span>
+                            <span class="cf-apx__eq">=</span>
+                            <span class="cf-apx__frame"><span class="cf-apx__tag">Render</span><span class="cf-apx__img"></span><span class="cf-apx__scan"></span></span>
+                        </div>
+                        <h3 class="card__title">O que você vê é o que sai</h3>
+                        <p class="card__text">O render traduz a timeline num grafo de FFmpeg que reproduz o monitor de Programa efeito por efeito, na ordem do navegador: enquadramento → cor → borrão → opacidade → recorte → transformação → composição. Rascunho e master saem do mesmo grafo.</p>
+                    </article>
+                </div>
+            </div>
+        </section>
+
+        <!-- ═══════════════ CHAMADA FINAL ═══════════════ -->
+        <section class="section section--tight" aria-labelledby="cta-titulo">
+            <div class="container">
+                <div class="cta-band" data-reveal="scale">
+                    <p class="eyebrow eyebrow--rec">Grátis · sem assinatura · código aberto</p>
+                    <h2 class="cta-band__title" id="cta-titulo">Viu por dentro? Agora ponha o seu acervo para rodar.</h2>
+                    <p class="lead cta-band__lead">Instale na sua máquina com Docker ou Python e comece pela ingestão — seus arquivos ficam onde estão. E se você programa, desenha, testa ou escreve: cada peça desta página tem um arquivo correspondente no repositório, esperando por você.</p>
+                    <div class="cluster cta-band__actions">
+                        <a class="btn btn--primary btn--lg" href="comecar.html">Começar agora
+                            <svg class="btn__arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                        </a>
+                        <a class="btn btn--ghost btn--lg" href="contribuir.html">Quero contribuir</a>
+                    </div>
+                    <p class="cta-band__note">GPL-3.0 · roda em CPU · exporta para Kdenlive, Premiere, Resolve e Final Cut</p>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- ═══════════════ RODAPÉ (idêntico em todas as páginas) ═══════════════ -->
+    <footer class="site-footer">
+        <div class="container">
+            <div class="site-footer__grid">
+                <div class="site-footer__brand">
+                    <a class="brand" href="index.html" aria-label="CapIAu-Talho — página inicial">
+                        <img src="assets/img/logo.svg" width="34" height="34" alt="">
+                        <span class="brand__name">CapIAu-<span class="brand__talho">Talho</span></span>
+                    </a>
+                    <p class="site-footer__about">Ilha de pré-edição, decupagem e assistência por IA para documentários e grandes acervos audiovisuais. Grátis, sem assinatura e de código aberto.</p>
+                    <div class="cluster site-footer__badges">
+                        <span class="chip chip--emerald"><span class="chip__dot"></span>Grátis</span>
+                        <span class="chip chip--violet">GPL-3.0</span>
+                        <span class="chip chip--cyan">Roda em CPU</span>
+                    </div>
+                </div>
+                <nav aria-labelledby="rodape-site">
+                    <h2 class="site-footer__title" id="rodape-site">Site</h2>
+                    <ul class="site-footer__links">
+                        <li><a href="index.html">Início</a></li>
+                        <li><a href="recursos.html">Recursos</a></li>
+                        <li><a href="como-funciona.html">Como funciona</a></li>
+                        <li><a href="comecar.html">Começar</a></li>
+                        <li><a href="contribuir.html">Contribuir</a></li>
+                    </ul>
+                </nav>
+                <nav aria-labelledby="rodape-docs">
+                    <h2 class="site-footer__title" id="rodape-docs">Documentação</h2>
+                    <ul class="site-footer__links">
+                        <li><a href="https://github.com/fernangcortes/capiau-talho-v03/wiki">Wiki oficial</a></li>
+                        <li><a href="https://github.com/fernangcortes/capiau-talho-v03/blob/main/USER_MANUAL.md">Manual do usuário</a></li>
+                        <li><a href="https://github.com/fernangcortes/capiau-talho-v03/blob/main/docs/shortcuts.md">Atalhos de teclado</a></li>
+                        <li><a href="https://github.com/fernangcortes/capiau-talho-v03/blob/main/docs/costs_and_security.md">Custos e segurança</a></li>
+                    </ul>
+                </nav>
+                <nav aria-labelledby="rodape-comunidade">
+                    <h2 class="site-footer__title" id="rodape-comunidade">Comunidade</h2>
+                    <ul class="site-footer__links">
+                        <li><a href="https://github.com/fernangcortes/capiau-talho-v03">Código no GitHub</a></li>
+                        <li><a href="https://github.com/fernangcortes/capiau-talho-v03/issues">Relatar um problema</a></li>
+                        <li><a href="https://github.com/fernangcortes/capiau-talho-v03/blob/main/docs/PLANO_IMPLEMENTACAO.md">Plano e roadmap</a></li>
+                        <li><a href="https://github.com/fernangcortes/capiau-talho-v03/blob/main/LICENSE">Licença GPL-3.0</a></li>
+                    </ul>
+                </nav>
+            </div>
+            <div class="site-footer__bottom">
+                <p>© <span data-year>2026</span> CapIAu-Talho e colaboradores · Software livre sob a <a href="https://github.com/fernangcortes/capiau-talho-v03/blob/main/LICENSE">GPL-3.0</a>.</p>
+                <div class="cluster">
+                    <button class="text-btn" type="button" data-motion-toggle>
+                        <svg class="motion-icon-pause" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 6v12M15 6v12"/></svg>
+                        <svg class="motion-icon-play" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M8 5.5v13l11-6.5z"/></svg>
+                        <span data-motion-label>Pausar animações</span>
+                    </button>
+                    <a class="text-btn" href="#conteudo">Voltar ao topo ↑</a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+</body>
+</html>
