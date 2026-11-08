@@ -114,7 +114,7 @@
 @media (max-width: 760px) {
     .cf-flow__ruler { display: none; }
     .cf-flow__body { padding: 22px 16px 24px; }
-    .cf-flow__stations { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+    .cf-flow__stations { grid-template-columns: minmax(0, 1fr); gap: 22px; }
     .cf-st { flex-direction: row; text-align: left; gap: 14px; }
     .cf-st__node { width: 44px; height: 44px; border-radius: 13px; box-shadow: 0 0 0 5px #0c0b13; }
     .cf-st.is-hit .cf-st__node { box-shadow: 0 0 0 5px #0c0b13, 0 0 22px 2px color-mix(in srgb, var(--st) 45%, transparent); }

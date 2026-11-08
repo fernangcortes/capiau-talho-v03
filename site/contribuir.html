@@ -3,10 +3,6 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <!-- MODELO DE PÁGINA. Para criar uma página nova: copie este arquivo, troque
-         TITULO, DESCRICAO e PAGINA (o id usado em data-page, no CSS e no JS),
-         e escreva o conteúdo dentro de <main>. Cabeçalho e rodapé ficam IGUAIS
-         em todas as páginas (o base.js marca o item do menu da página atual). -->
     <title>Contribuir — CapIAu-Talho</title>
     <meta name="description" content="Construa o Talho junto: código em Python e JavaScript, testes com material real, documentação, design e divulgação. Roadmap sem datas, primeiro PR passo a passo, ambiente, testes, padrões da casa e a GPL-3.0 em linguagem simples.">
     <meta name="theme-color" content="#07060b">
@@ -68,7 +64,7 @@
                     <svg class="motion-icon-play" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M8 5.5v13l11-6.5z"/></svg>
                 </button>
                 <a class="icon-btn" data-github href="https://github.com/fernangcortes/capiau-talho-v03" aria-label="Código-fonte no GitHub">
-                    <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.290 6.53 5.470 7.590.4.070.55-.17.55-.38 0-.19-.01-.82-.01-1.490-2.010.37-2.530-.49-2.690-.94-.09-.23-.48-.94-.82-1.130-.28-.15-.68-.52-.01-.53.630-.01 1.080.58 1.230.82.72 1.210 1.870.87 2.330.66.07-.52.28-.87.51-1.070-1.780-.2-3.640-.89-3.640-3.950 0-.87.31-1.590.82-2.150-.08-.2-.36-1.020.08-2.120 0 0 .67-.21 2.200.82.64-.18 1.320-.27 2-.27.68 0 1.360.09 2 .27 1.530-1.040 2.200-.82 2.200-.82.44 1.100.16 1.920.08 2.120.51.56.82 1.270.82 2.150 0 3.070-1.870 3.750-3.650 3.950.29.25.54.73.54 1.480 0 1.070-.01 1.930-.01 2.200 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.420-3.580-8-8-8z"/></svg>
+                    <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
                 </a>
                 <a class="btn btn--primary btn--sm header-cta" href="comecar.html">Baixar grátis</a>
                 <button class="icon-btn nav-toggle" type="button" aria-controls="site-nav" aria-expanded="false" aria-label="Abrir menu">
@@ -80,6 +76,1195 @@
     </header>
 
     <main id="conteudo">
+        <!-- ═══════════════ TOPO: o grafo de git como uma timeline ═══════════════ -->
+        <section class="page-hero gl-hero" aria-labelledby="contribuir-titulo">
+            <div class="container">
+                <div class="gl-hero__grid">
+                    <div class="gl-hero__text">
+                        <p class="eyebrow eyebrow--rec" data-reveal>Contribuir · software livre</p>
+                        <h1 class="page-hero__title" id="contribuir-titulo" data-reveal style="--d: 80ms">O Talho é de quem monta. <span class="text-gradient">Vem construir junto.</span></h1>
+                        <p class="lead page-hero__lead" data-reveal style="--d: 160ms">O CapIAu-Talho é software livre para o cinema documental e independente, em desenvolvimento ativo: muita coisa já funciona e muita coisa está por fazer. Tem lugar para quem programa em Python ou JavaScript — e para quem testa, escreve, desenha, revisa ou espalha a notícia.</p>
+                        <div class="cluster page-hero__actions" data-reveal style="--d: 240ms">
+                            <a class="btn btn--primary btn--lg" href="https://github.com/fernangcortes/capiau-talho-v03">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m8 7-5 5 5 5M16 7l5 5-5 5"/></svg>
+                                Ver o código no GitHub
+                            </a>
+                            <a class="btn btn--ghost btn--lg" href="https://github.com/fernangcortes/capiau-talho-v03/issues/new">Abrir um issue</a>
+                        </div>
+                        <a class="link-arrow gl-hero__jump" href="#primeiro-pr" data-reveal style="--d: 300ms">Seu primeiro PR em cinco passos
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                        </a>
+                    </div>
+                    <dl class="gl-facts" data-reveal="right" style="--d: 220ms">
+                        <div class="gl-facts__row"><dt>Licença</dt><dd>GPL-3.0 — livre para sempre</dd></div>
+                        <div class="gl-facts__row"><dt>Backend</dt><dd>Python 3.12 · FastAPI · SQLite · Qdrant</dd></div>
+                        <div class="gl-facts__row"><dt>Interface</dt><dd>JavaScript sem frameworks · Canvas 2D</dd></div>
+                        <div class="gl-facts__row"><dt>Testes</dt><dd>pytest + autotestes em Node</dd></div>
+                        <div class="gl-facts__row"><dt>Situação</dt><dd>MVP em desenvolvimento ativo</dd></div>
+                    </dl>
+                </div>
+
+                <figure class="gl" data-reveal="scale" style="--d: 200ms" aria-labelledby="gl-legenda">
+                    <div class="gl__bar" aria-hidden="true">
+                        <span class="gl__dots"><i></i><i></i><i></i></span>
+                        <span class="gl__title">Sequência <b>main</b><span class="gl__repo"> · capiau-talho-v03</span></span>
+                        <span class="gl__tc timecode" data-gl-tc>00:00:00:00</span>
+                    </div>
+                    <div class="gl__stage" data-gl aria-hidden="true"></div>
+                    <div class="gl__term" aria-hidden="true"><span class="gl__prompt">$</span><span class="gl__cmd" data-gl-cmd>git log --graph --oneline</span><span class="gl__caret"></span></div>
+                    <figcaption class="sr-only" id="gl-legenda">Ilustração: o histórico do projeto desenhado como uma timeline de edição. Da linha principal, a main, nascem ramos de recurso, de correção e de documentação; cada um recebe commits no padrão feat, fix e docs e volta para a main por um Pull Request revisado. No fim, um ramo tracejado espera o seu primeiro PR.</figcaption>
+                </figure>
+            </div>
+        </section>
+
+        <nav class="subnav" data-subnav aria-label="Seções desta página">
+            <ul class="subnav__list">
+                <li><a href="#por-que">Por que contribuir</a></li>
+                <li><a href="#formas">Formas de ajudar</a></li>
+                <li><a href="#roadmap">Roadmap</a></li>
+                <li><a href="#primeiro-pr">Primeiro PR</a></li>
+                <li><a href="#ambiente">Ambiente</a></li>
+                <li><a href="#testes">Testes</a></li>
+                <li><a href="#padroes">Padrões</a></li>
+                <li><a href="#licenca">Licença</a></li>
+            </ul>
+        </nav>
+
+        <!-- ═══════════════ 01 — POR QUE ═══════════════ -->
+        <section class="section" id="por-que" aria-labelledby="por-que-titulo">
+            <div class="container">
+                <div class="pq">
+                    <div class="pq__text">
+                        <header class="section-head">
+                            <p class="eyebrow eyebrow--violet" data-reveal>01 — Por que contribuir</p>
+                            <h2 class="section-title" id="por-que-titulo" data-reveal>Uma ferramenta de cinema que <span class="text-gradient">ninguém pode fechar</span></h2>
+                            <p class="lead" data-reveal>Documentário e cinema independente vivem de acervos enormes, orçamento curto e material sensível. O Talho existe para esse mundo — e, por ser livre, continua existindo mesmo que o mercado de assinaturas mude de ideia.</p>
+                        </header>
+                        <ul class="pq-reasons" role="list" data-reveal-stagger="90">
+                            <li class="pq-reason" data-reveal>
+                                <span class="pq-reason__icon" aria-hidden="true">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 5 6v5c0 4.4 3 8.3 7 9.5 4-1.2 7-5.1 7-9.5V6z"/><path d="m9 12 2.2 2.2L15.5 10"/></svg>
+                                </span>
+                                <div>
+                                    <h3 class="pq-reason__title">Livre de verdade, para sempre</h3>
+                                    <p>Com a GPL-3.0, ninguém pode pegar o código, trancar e alugar de volta. Toda versão distribuída continua aberta — inclusive as que ainda nem existem.</p>
+                                </div>
+                            </li>
+                            <li class="pq-reason" data-reveal>
+                                <span class="pq-reason__icon pq-reason__icon--rose" aria-hidden="true">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="7" r="2.5"/><circle cx="6" cy="17" r="2.5"/><path d="M8.2 8.4 20 18M8.2 15.6 20 6"/></svg>
+                                </span>
+                                <div>
+                                    <h3 class="pq-reason__title">Pensada a partir da sala de montagem</h3>
+                                    <p>As regras vêm de quem edita: medir antes de sugerir, nunca cortar silêncio automaticamente, nunca tocar no arquivo original. Quem monta sabe o que falta — e aqui pode construir.</p>
+                                </div>
+                            </li>
+                            <li class="pq-reason" data-reveal>
+                                <span class="pq-reason__icon pq-reason__icon--cyan" aria-hidden="true">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m8 7-5 5 5 5M16 7l5 5-5 5"/></svg>
+                                </span>
+                                <div>
+                                    <h3 class="pq-reason__title">Um projeto de verdade, aberto por inteiro</h3>
+                                    <p>Cerca de 49 mil linhas de Python e 89 mil de JavaScript, testes automatizados e planos que registram o que deu certo e o que deu errado. Dá para aprender lendo — e ensinar contribuindo.</p>
+                                </div>
+                            </li>
+                        </ul>
+                    </div>
+
+                    <div class="fr" data-play>
+                        <p class="fr__kicker" data-reveal>As quatro liberdades do software livre, garantidas pela GPL-3.0</p>
+                        <ol class="fr__grid" role="list" data-reveal-stagger="110">
+                            <li class="fr-card fr-card--use" data-reveal>
+                                <span class="fr-card__n" aria-hidden="true">0</span>
+                                <svg class="fr-ill" viewBox="0 0 96 64" aria-hidden="true">
+                                    <rect class="fr-ill__frame" x="8" y="5" width="80" height="44" rx="7"/>
+                                    <path class="fr-ill__play" d="M42 17v16l13-8z"/>
+                                    <rect class="fr-ill__track" x="8" y="56" width="80" height="3" rx="1.5"/>
+                                    <rect class="fr-ill__bar" x="8" y="56" width="80" height="3" rx="1.5"/>
+                                    <rect class="fr-ill__head" x="55" y="52" width="2" height="11" rx="1"/>
+                                </svg>
+                                <h3 class="fr-card__title">Usar</h3>
+                                <p class="fr-card__text">Para qualquer finalidade: o seu filme, o acervo da instituição, a aula, o trabalho pago. Sem conta e sem assinatura.</p>
+                            </li>
+                            <li class="fr-card fr-card--study" data-reveal>
+                                <span class="fr-card__n" aria-hidden="true">1</span>
+                                <svg class="fr-ill" viewBox="0 0 96 64" aria-hidden="true">
+                                    <rect class="fr-ill__code" x="8" y="9" width="44" height="4" rx="2"/>
+                                    <rect class="fr-ill__code fr-ill__code--hi" x="16" y="20" width="56" height="4" rx="2"/>
+                                    <rect class="fr-ill__code" x="16" y="31" width="36" height="4" rx="2"/>
+                                    <rect class="fr-ill__code" x="8" y="42" width="28" height="4" rx="2"/>
+                                    <g class="fr-ill__lens"><circle cx="60" cy="27" r="11"/><path d="m68 35 10 10"/></g>
+                                </svg>
+                                <h3 class="fr-card__title">Estudar</h3>
+                                <p class="fr-card__text">Todo o código está aberto. Dá para ler como a busca, a timeline e o render funcionam — e adaptar ao seu jeito.</p>
+                            </li>
+                            <li class="fr-card fr-card--share" data-reveal>
+                                <span class="fr-card__n" aria-hidden="true">2</span>
+                                <svg class="fr-ill" viewBox="0 0 96 64" aria-hidden="true">
+                                    <g class="fr-ill__copy fr-ill__copy--l"><path class="fr-ill__file" d="M37 14h15l7 7v27H37z"/></g>
+                                    <g class="fr-ill__copy fr-ill__copy--r"><path class="fr-ill__file" d="M37 14h15l7 7v27H37z"/></g>
+                                    <path class="fr-ill__file fr-ill__file--main" d="M37 14h15l7 7v27H37z"/>
+                                    <path class="fr-ill__fold" d="M52 14v7h7M42 30h12M42 36h9"/>
+                                </svg>
+                                <h3 class="fr-card__title">Redistribuir</h3>
+                                <p class="fr-card__text">Copie e passe adiante: para a turma, a produtora, o coletivo, o festival.</p>
+                            </li>
+                            <li class="fr-card fr-card--improve" data-reveal>
+                                <span class="fr-card__n" aria-hidden="true">3</span>
+                                <svg class="fr-ill" viewBox="0 0 96 64" aria-hidden="true">
+                                    <rect class="fr-ill__code" x="8" y="11" width="50" height="4" rx="2"/>
+                                    <rect class="fr-ill__code" x="8" y="25" width="22" height="4" rx="2"/>
+                                    <rect class="fr-ill__old" x="34" y="25" width="26" height="4" rx="2"/>
+                                    <rect class="fr-ill__new" x="34" y="24" width="34" height="6" rx="3"/>
+                                    <rect class="fr-ill__code" x="8" y="39" width="40" height="4" rx="2"/>
+                                    <rect class="fr-ill__laser" x="33" y="18" width="2" height="18" rx="1"/>
+                                    <rect class="fr-ill__tag" x="62" y="44" width="28" height="14" rx="4"/>
+                                    <text class="fr-ill__tagtxt" x="76" y="54" text-anchor="middle">GPL</text>
+                                </svg>
+                                <h3 class="fr-card__title">Melhorar e compartilhar</h3>
+                                <p class="fr-card__text">Modifique e distribua a sua versão — desde que ela continue livre, sob a mesma GPL-3.0.</p>
+                            </li>
+                        </ol>
+                        <p class="fr__note" data-reveal>As liberdades contam a partir do zero, como todo bom índice.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ═══════════════ 02 — FORMAS DE AJUDAR ═══════════════ -->
+        <section class="section section--alt" id="formas" aria-labelledby="formas-titulo">
+            <div class="container">
+                <header class="section-head">
+                    <p class="eyebrow" data-reveal>02 — Formas de ajudar</p>
+                    <h2 class="section-title" id="formas-titulo" data-reveal>Tem lugar para quem programa <span class="text-gradient">e para quem não programa</span></h2>
+                    <p class="lead" data-reveal>Software livre se faz com código, mas não só com código. Um relato de bug bem escrito, um passo de instalação esclarecido ou uma tela redesenhada valem tanto quanto uma função nova.</p>
+                </header>
+
+                <div class="fm-group">
+                    <div class="fm-group__head" data-reveal>
+                        <h3 class="fm-group__title">Se você programa</h3>
+                        <div class="cluster fm-group__chips">
+                            <span class="chip chip--violet">Python · FastAPI</span>
+                            <span class="chip chip--cyan">JavaScript · Canvas 2D</span>
+                            <span class="chip chip--emerald">pytest · Node</span>
+                        </div>
+                    </div>
+                    <div class="grid grid--3" data-reveal-stagger="90">
+                        <article class="card fm-card" data-reveal data-glow>
+                            <div class="card__icon card__icon--violet" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="6" rx="1.5"/><rect x="4" y="14" width="16" height="6" rx="1.5"/><path d="M8 7h.01M8 17h.01M12 7h4M12 17h4"/></svg>
+                            </div>
+                            <h4 class="card__title">Backend em Python</h4>
+                            <p class="card__text">FastAPI, SQLite, Qdrant, FFmpeg, OpenCV, PyTorch em CPU e ONNX. Rotas em <code class="inline">src/api</code>, regras de negócio em <code class="inline">src/services</code>, render em <code class="inline">src/export/video_render</code>.</p>
+                            <a class="link-arrow fm-card__link" href="https://github.com/fernangcortes/capiau-talho-v03/tree/main/src">Explorar o <span class="mono">src/</span> no GitHub
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                            </a>
+                        </article>
+                        <article class="card fm-card" data-reveal data-glow>
+                            <div class="card__icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="9" height="4" rx="1"/><rect x="8" y="11" width="12" height="4" rx="1"/><rect x="4" y="17" width="7" height="3" rx="1"/><path d="M15 3v18"/></svg>
+                            </div>
+                            <h4 class="card__title">Frontend sem frameworks</h4>
+                            <p class="card__text">JavaScript moderno e modular, sem frameworks pesados. A timeline é desenhada em Canvas 2D; o player, a biblioteca e o agente vivem em <code class="inline">src/ui/js</code>.</p>
+                            <a class="link-arrow fm-card__link" href="https://github.com/fernangcortes/capiau-talho-v03/tree/main/src/ui/js">Ver os módulos da interface
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                            </a>
+                        </article>
+                        <article class="card fm-card" data-reveal data-glow>
+                            <div class="card__icon card__icon--emerald" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 1.8 3h10.4A2 2 0 0 0 19 18l-5-9V3"/><path d="M7.5 14h9"/></svg>
+                            </div>
+                            <h4 class="card__title">Testes automatizados</h4>
+                            <p class="card__text">Achou um defeito? Um teste que o reproduz já é meio conserto. pytest no backend, autotestes em Node para a timeline e a interface.</p>
+                            <a class="link-arrow fm-card__link" href="https://github.com/fernangcortes/capiau-talho-v03/tree/main/tests">Abrir a pasta <span class="mono">tests/</span>
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                            </a>
+                        </article>
+                    </div>
+                </div>
+
+                <div class="fm-group">
+                    <div class="fm-group__head" data-reveal>
+                        <h3 class="fm-group__title">Se você não programa (ou ainda não)</h3>
+                        <div class="cluster fm-group__chips">
+                            <span class="chip chip--amber">Montadores</span>
+                            <span class="chip chip--rose">Arquivistas</span>
+                            <span class="chip chip--emerald">Pesquisadores e estudantes</span>
+                        </div>
+                    </div>
+                    <div class="grid grid--3" data-reveal-stagger="80">
+                        <article class="card fm-card" data-reveal data-glow>
+                            <div class="card__icon card__icon--rose" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="8" width="10" height="12" rx="5"/><path d="M12 11v9M9.5 5.5 10.5 8M14.5 5.5 13.5 8M3.5 13H7M17 13h3.5M4.5 8.5l2.8 1.8M19.5 8.5l-2.8 1.8M4.5 18.5l2.8-1.8M19.5 18.5l-2.8-1.8"/></svg>
+                            </div>
+                            <h4 class="card__title">Testar com material real</h4>
+                            <p class="card__text">Rode no seu acervo (numa cópia, se preferir) e conte o que quebrou: o que você fez, o que esperava, o que aconteceu, se usa Docker ou <span class="mono">.venv</span> e o trecho do log.</p>
+                            <a class="link-arrow fm-card__link" href="https://github.com/fernangcortes/capiau-talho-v03/issues/new">Relatar um problema
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                            </a>
+                        </article>
+                        <article class="card fm-card" data-reveal data-glow>
+                            <div class="card__icon card__icon--amber" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z"/><path d="M5 17a3 3 0 0 1 3-3h11M9 8h6"/></svg>
+                            </div>
+                            <h4 class="card__title">Documentação e wiki</h4>
+                            <p class="card__text">Um passo confuso no manual, uma tela que mudou, um atalho desatualizado. A wiki tem 18 capítulos — do conceito ao glossário — esperando olhos atentos.</p>
+                            <a class="link-arrow fm-card__link" href="https://github.com/fernangcortes/capiau-talho-v03/wiki">Abrir a wiki
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                            </a>
+                        </article>
+                        <article class="card fm-card" data-reveal data-glow>
+                            <div class="card__icon card__icon--violet" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 9 5-9 5-9-5z"/><path d="m3 13 9 5 9-5"/></svg>
+                            </div>
+                            <h4 class="card__title">Design e experiência</h4>
+                            <p class="card__text">Fluxos, ícones, legibilidade, acessibilidade. A interface segue um design system próprio, flat e sem espaço desperdiçado — e ele pode evoluir com você.</p>
+                            <a class="link-arrow fm-card__link" href="https://github.com/fernangcortes/capiau-talho-v03/blob/main/.agents/skills/capiau-nle-design-system/SKILL.md">Ler o design system
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                            </a>
+                        </article>
+                        <article class="card fm-card" data-reveal data-glow>
+                            <div class="card__icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h9M8.5 4v2c0 4-2 7-5 8.5M6 10c1 2 3 3.5 6 4.5"/><path d="m13 20 4-9 4 9M14.5 17h5"/></svg>
+                            </div>
+                            <h4 class="card__title">Revisar textos e traduzir</h4>
+                            <p class="card__text">A documentação nasceu em português. Revisar, simplificar e, quem sabe, levar para outros idiomas abre o Talho para mais gente — combine num issue antes de começar.</p>
+                            <a class="link-arrow fm-card__link" href="https://github.com/fernangcortes/capiau-talho-v03/blob/main/README.md">Começar pelo README
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                            </a>
+                        </article>
+                        <article class="card fm-card" data-reveal data-glow>
+                            <div class="card__icon card__icon--amber" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z"/></svg>
+                            </div>
+                            <h4 class="card__title">Propor ideias</h4>
+                            <p class="card__text">Tem um jeito de montar que o Talho deveria entender? Descreva o problema antes da solução: quem é você, o que tentou fazer e onde travou.</p>
+                            <a class="link-arrow fm-card__link" href="https://github.com/fernangcortes/capiau-talho-v03/issues/new">Abrir um issue com a ideia
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                            </a>
+                        </article>
+                        <article class="card fm-card" data-reveal data-glow>
+                            <div class="card__icon card__icon--emerald" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/></svg>
+                            </div>
+                            <h4 class="card__title">Divulgar e dar estrela</h4>
+                            <p class="card__text">Mostre para a sua turma, o seu coletivo, a sua produtora. Uma estrela no GitHub ajuda o projeto a ser encontrado por quem precisa dele.</p>
+                            <a class="link-arrow fm-card__link" href="https://github.com/fernangcortes/capiau-talho-v03">Dar uma estrela
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                            </a>
+                        </article>
+                    </div>
+                </div>
+
+                <div class="callout callout--emerald fm-tip" data-reveal>
+                    <p><strong>Primeira vez?</strong> Comece pequeno: corrija um erro de digitação na wiki, esclareça um passo do README ou conte um bug com o passo a passo para reproduzir. Antes de abrir um issue, procure se ele <a class="inline-link" href="https://github.com/fernangcortes/capiau-talho-v03/issues">já existe</a>; para mudanças grandes, converse num issue antes de programar.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- ═══════════════ 03 — ROADMAP ═══════════════ -->
+        <section class="section" id="roadmap" aria-labelledby="roadmap-titulo">
+            <div class="container">
+                <div class="rm">
+                    <div class="rm__aside">
+                        <header class="section-head">
+                            <p class="eyebrow eyebrow--emerald" data-reveal>03 — Roadmap</p>
+                            <h2 class="section-title" id="roadmap-titulo" data-reveal>Onde o Talho está — <span class="text-gradient">e para onde vai</span></h2>
+                            <p class="lead" data-reveal>Sem datas e sem promessas: um projeto em construção avança no ritmo de quem constrói. A agulha marca onde estamos agora.</p>
+                        </header>
+                        <ul class="rm-legend" role="list" aria-label="Legenda" data-reveal>
+                            <li><span class="rm-key rm-key--done" aria-hidden="true"></span>Concluída</li>
+                            <li><span class="rm-key rm-key--wip" aria-hidden="true"></span>Em andamento</li>
+                            <li><span class="rm-key rm-key--plan" aria-hidden="true"></span>Planejada</li>
+                        </ul>
+                        <div class="callout callout--violet rm-note" data-reveal>
+                            <p><strong>Quer saber o que vem antes do quê?</strong> A <a class="inline-link" href="https://github.com/fernangcortes/capiau-talho-v03/blob/main/docs/ORDEM_DE_IMPLEMENTACAO.md">ordem de implementação</a>, conferida contra o código, organiza os próximos passos em ondas — de “destravar” e “sanear” até “cena e filme”. Os documentos às vezes ficam atrás do código; ajudar a mantê-los fiéis também é contribuição.</p>
+                        </div>
+                    </div>
+
+                    <div class="rm__body" data-play>
+                        <ol class="rm-list" role="list" data-roadmap>
+                            <li class="rm-item rm-item--done" data-reveal>
+                                <span class="rm-item__node" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span>
+                                <div class="rm-item__card">
+                                    <p class="rm-item__status"><span class="chip chip--emerald">Concluída</span></p>
+                                    <h3 class="rm-item__title">Etapa 1 — Sanear a base</h3>
+                                    <p class="rm-item__text">Limpeza do pipeline de análise: a fundação sobre a qual todo o resto foi construído.</p>
+                                </div>
+                            </li>
+                            <li class="rm-item rm-item--done" data-reveal>
+                                <span class="rm-item__node" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span>
+                                <div class="rm-item__card">
+                                    <p class="rm-item__status"><span class="chip chip--emerald">Concluída</span></p>
+                                    <h3 class="rm-item__title">Etapa 2 — Segmentação e CLIP local</h3>
+                                    <p class="rm-item__text">Cortes reais em shots e beats, busca visual por CLIP na sua própria máquina e análise que gasta mais só onde a categoria pede.</p>
+                                </div>
+                            </li>
+                            <li class="rm-item rm-item--done" data-reveal>
+                                <span class="rm-item__node" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span>
+                                <div class="rm-item__card">
+                                    <p class="rm-item__status"><span class="chip chip--emerald">Concluída</span></p>
+                                    <h3 class="rm-item__title">Suíte NLE Clássico — Tasks 0 a 15</h3>
+                                    <p class="rm-item__text">Layout em duas zonas, ferramentas Lâmina, Slip, Slide e Rolling, montagem de 3 e 4 pontos, Match Frame, Replace Edit, subclipes, timecode, freeze frame, velocidade, Rate Stretch e crossfade de áudio.</p>
+                                </div>
+                            </li>
+                            <li class="rm-item rm-item--wip rm-item--now" data-reveal>
+                                <span class="rm-now" aria-hidden="true"><span class="rm-now__pill">agora</span><span class="rm-now__line"></span></span>
+                                <span class="rm-item__node" aria-hidden="true"><i></i></span>
+                                <div class="rm-item__card">
+                                    <p class="rm-item__status"><span class="chip chip--cyan"><span class="chip__dot"></span>Em andamento</span></p>
+                                    <h3 class="rm-item__title">Etapa 3 — Sala de Projeto &amp; IA de Montagem</h3>
+                                    <p class="rm-item__text">Cartão de contexto do projeto, sugestões de transição e escaleta. A parte de roteiro já chegou: extração estruturada de cenas e personagens, com curadoria.</p>
+                                </div>
+                            </li>
+                            <li class="rm-item rm-item--wip" data-reveal>
+                                <span class="rm-item__node" aria-hidden="true"><i></i></span>
+                                <div class="rm-item__card">
+                                    <p class="rm-item__status"><span class="chip chip--cyan"><span class="chip__dot"></span>Em andamento</span></p>
+                                    <h3 class="rm-item__title">Etapa 4 — Vídeo, Cor &amp; Efeitos NLE</h3>
+                                    <p class="rm-item__text">Transições, camada de ajuste, cor sólida e os recursos de áudio e organização que faltam na timeline.</p>
+                                    <div class="rm-meter" data-inview>
+                                        <span class="rm-meter__track" aria-hidden="true"><span class="rm-meter__fill"></span></span>
+                                        <span class="rm-meter__label">5 de 10 tarefas concluídas</span>
+                                    </div>
+                                    <ul class="rm-tasks" role="list">
+                                        <li class="rm-task rm-task--done"><svg class="rm-task__ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg><span class="rm-task__n">16</span><span><span class="sr-only">Concluída: </span>Transições de vídeo (Cross Dissolve e dips)</span></li>
+                                        <li class="rm-task rm-task--done"><svg class="rm-task__ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg><span class="rm-task__n">17</span><span><span class="sr-only">Concluída: </span>Camada de ajuste</span></li>
+                                        <li class="rm-task rm-task--done"><svg class="rm-task__ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg><span class="rm-task__n">18</span><span><span class="sr-only">Concluída: </span>Geradores de cor sólida</span></li>
+                                        <li class="rm-task"><svg class="rm-task__ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="3 3" aria-hidden="true"><circle cx="12" cy="12" r="7"/></svg><span class="rm-task__n">19</span><span><span class="sr-only">Planejada: </span>VU meter estéreo ao vivo</span></li>
+                                        <li class="rm-task"><svg class="rm-task__ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="3 3" aria-hidden="true"><circle cx="12" cy="12" r="7"/></svg><span class="rm-task__n">20</span><span><span class="sr-only">Planejada: </span>Keyframes de volume na timeline</span></li>
+                                        <li class="rm-task"><svg class="rm-task__ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="3 3" aria-hidden="true"><circle cx="12" cy="12" r="7"/></svg><span class="rm-task__n">21</span><span><span class="sr-only">Planejada: </span>Auto-ducking da trilha</span></li>
+                                        <li class="rm-task"><svg class="rm-task__ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="3 3" aria-hidden="true"><circle cx="12" cy="12" r="7"/></svg><span class="rm-task__n">22</span><span><span class="sr-only">Planejada: </span>Rótulos de cor nos clipes</span></li>
+                                        <li class="rm-task rm-task--done"><svg class="rm-task__ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg><span class="rm-task__n">23</span><span><span class="sr-only">Concluída: </span>Trava de pista com cadeado</span></li>
+                                        <li class="rm-task rm-task--done"><svg class="rm-task__ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg><span class="rm-task__n">24</span><span><span class="sr-only">Concluída: </span>Margens de segurança no Program</span></li>
+                                        <li class="rm-task"><svg class="rm-task__ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="3 3" aria-hidden="true"><circle cx="12" cy="12" r="7"/></svg><span class="rm-task__n">25</span><span><span class="sr-only">Planejada: </span>Múltiplas timelines em abas</span></li>
+                                    </ul>
+                                </div>
+                            </li>
+                            <li class="rm-item rm-item--plan" data-reveal>
+                                <span class="rm-item__node" aria-hidden="true"></span>
+                                <div class="rm-item__card">
+                                    <p class="rm-item__status"><span class="chip">Planejada</span></p>
+                                    <h3 class="rm-item__title">Etapa 5 — Busca multi-vetor e agentes</h3>
+                                    <p class="rm-item__text">Busca em três passos, chat com ferramentas de busca e um servidor MCP do próprio Talho, para assistentes externos consultarem o acervo.</p>
+                                </div>
+                            </li>
+                        </ol>
+
+                        <div class="rm-horizon">
+                            <h3 class="rm-horizon__title" data-reveal>No horizonte</h3>
+                            <p class="rm-horizon__note" data-reveal>Ideias e propostas, não promessas. Quer puxar uma delas? Abra um issue para conversar antes de começar.</p>
+                            <ul class="rm-ideas" role="list" data-reveal-stagger="70">
+                                <li class="rm-idea" data-reveal>Sincronização multicâmera pelo áudio</li>
+                                <li class="rm-idea" data-reveal>Construtor de storyline a partir dos depoimentos</li>
+                                <li class="rm-idea" data-reveal>Auto B-roll: coberturas sugeridas na V2</li>
+                                <li class="rm-idea" data-reveal>Scopes de vídeo: vectorscope, waveform RGB e histograma</li>
+                                <li class="rm-idea" data-reveal>Revisão colaborativa por WebRTC</li>
+                                <li class="rm-idea rm-idea--link" data-reveal><a href="https://github.com/fernangcortes/capiau-talho-v03/blob/main/docs/PROPOSTA_SEQUENCIA_FANTASMA_IA.md">Sequência Fantasma e Mesa de Montagem <span class="rm-idea__tag">proposta</span></a></li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ═══════════════ 04 — PRIMEIRO PR ═══════════════ -->
+        <section class="section section--alt" id="primeiro-pr" aria-labelledby="pr-titulo">
+            <div class="container">
+                <header class="section-head">
+                    <p class="eyebrow eyebrow--amber" data-reveal>04 — Primeiro PR</p>
+                    <h2 class="section-title" id="pr-titulo" data-reveal>Seu primeiro Pull Request <span class="text-gradient">em cinco passos</span></h2>
+                    <p class="lead" data-reveal>Pull Request (PR) é o pedido para juntar a sua mudança ao projeto. Parece cerimônia, mas é só isto: copiar, mexer num ramo seu, registrar, enviar e pedir revisão.</p>
+                </header>
+
+                <div class="pr">
+                    <ol class="pr-steps" role="list" data-pr-steps>
+                        <li class="pr-step" data-reveal>
+                            <span class="pr-step__node" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="5" r="2"/><circle cx="18" cy="5" r="2"/><circle cx="12" cy="19" r="2"/><path d="M6 7v2a3 3 0 0 0 3 3h6a3 3 0 0 0 3-3V7M12 12v5"/></svg>
+                            </span>
+                            <p class="pr-step__kicker">Passo 1</p>
+                            <h3 class="pr-step__title">Fork: a sua cópia</h3>
+                            <p class="pr-step__text">No GitHub, clique em <strong>Fork</strong> no topo do repositório. Você ganha uma cópia na sua conta, onde pode mexer à vontade. Depois, traga essa cópia para a sua máquina:</p>
+                            <div class="code">
+                                <div class="code__bar"><span class="code__lang">Terminal</span>
+                                    <button class="copy-btn" type="button" data-copy aria-label="Copiar os comandos do passo 1">
+                                        <svg class="copy-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg>
+                                        <svg class="copy-ok" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
+                                        Copiar
+                                    </button>
+                                </div>
+<pre><span class="k">git clone</span> https://github.com/<span class="v">SEU-USUARIO</span>/capiau-talho-v03.git
+<span class="k">cd</span> capiau-talho-v03
+<span class="c"># o repositório original, para buscar novidades depois</span>
+<span class="k">git remote add</span> upstream https://github.com/fernangcortes/capiau-talho-v03.git</pre>
+                            </div>
+                        </li>
+                        <li class="pr-step" data-reveal>
+                            <span class="pr-step__node" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="5" r="2.2"/><circle cx="6" cy="19" r="2.2"/><circle cx="18" cy="8" r="2.2"/><path d="M6 7.2v9.6M18 10.2c0 4.2-5.5 4-11 6.3"/></svg>
+                            </span>
+                            <p class="pr-step__kicker">Passo 2</p>
+                            <h3 class="pr-step__title">Branch: um ramo por assunto</h3>
+                            <p class="pr-step__text">Nunca trabalhe direto na <span class="mono">main</span>. Abra um ramo com nome que diga o quê: <span class="mono">feature/…</span> para recurso, <span class="mono">fix/…</span> para correção, <span class="mono">docs/…</span> para documentação.</p>
+                            <div class="code">
+                                <div class="code__bar"><span class="code__lang">Terminal</span>
+                                    <button class="copy-btn" type="button" data-copy aria-label="Copiar o comando do passo 2">
+                                        <svg class="copy-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg>
+                                        <svg class="copy-ok" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
+                                        Copiar
+                                    </button>
+                                </div>
+<pre><span class="k">git checkout -b</span> <span class="v">feature/minha-melhoria</span></pre>
+                            </div>
+                        </li>
+                        <li class="pr-step" data-reveal>
+                            <span class="pr-step__node" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.5"/><path d="M3 12h5.5M15.5 12H21"/></svg>
+                            </span>
+                            <p class="pr-step__kicker">Passo 3</p>
+                            <h3 class="pr-step__title">Commit: registre o que mudou</h3>
+                            <p class="pr-step__text">Confira o que mudou, adicione só os arquivos da mudança e escreva a mensagem no padrão da casa (veja ao lado). O <span class="mono">.env</span> com as suas chaves nunca entra — o <span class="mono">.gitignore</span> já o ignora, mas confira.</p>
+                            <div class="code">
+                                <div class="code__bar"><span class="code__lang">Terminal</span>
+                                    <button class="copy-btn" type="button" data-copy aria-label="Copiar os comandos do passo 3">
+                                        <svg class="copy-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg>
+                                        <svg class="copy-ok" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
+                                        Copiar
+                                    </button>
+                                </div>
+<pre><span class="k">git status</span>
+<span class="k">git add</span> <span class="v">caminho/do/arquivo</span>
+<span class="k">git commit -m</span> <span class="s">"docs(wiki): esclarece um passo da instalação"</span></pre>
+                            </div>
+                        </li>
+                        <li class="pr-step" data-reveal>
+                            <span class="pr-step__node" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20V9m0 0-4.5 4.5M12 9l4.5 4.5M5 4h14"/></svg>
+                            </span>
+                            <p class="pr-step__kicker">Passo 4</p>
+                            <h3 class="pr-step__title">Push: envie para o seu fork</h3>
+                            <p class="pr-step__text">O ramo sobe para a sua cópia no GitHub. Nada muda no projeto original até alguém revisar e aceitar.</p>
+                            <div class="code">
+                                <div class="code__bar"><span class="code__lang">Terminal</span>
+                                    <button class="copy-btn" type="button" data-copy aria-label="Copiar o comando do passo 4">
+                                        <svg class="copy-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg>
+                                        <svg class="copy-ok" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
+                                        Copiar
+                                    </button>
+                                </div>
+<pre><span class="k">git push origin</span> <span class="v">feature/minha-melhoria</span></pre>
+                            </div>
+                        </li>
+                        <li class="pr-step" data-reveal>
+                            <span class="pr-step__node" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="2.2"/><circle cx="6" cy="18" r="2.2"/><circle cx="18" cy="18" r="2.2"/><path d="M6 8.2v7.6M18 15.8V10a3 3 0 0 0-3-3h-4m0 0 2.5-2.5M11 7l2.5 2.5"/></svg>
+                            </span>
+                            <p class="pr-step__kicker">Passo 5</p>
+                            <h3 class="pr-step__title">Pull Request: peça para juntar</h3>
+                            <p class="pr-step__text">No GitHub, abra o Pull Request do seu ramo para a <span class="mono">main</span> do projeto. <strong>Conte o que mudou e quais testes você rodou</strong> — isso acelera a revisão. Um roteiro para a descrição:</p>
+                            <div class="code">
+                                <div class="code__bar"><span class="code__lang">Descrição do PR</span>
+                                    <button class="copy-btn" type="button" data-copy aria-label="Copiar o roteiro da descrição do PR">
+                                        <svg class="copy-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg>
+                                        <svg class="copy-ok" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
+                                        Copiar
+                                    </button>
+                                </div>
+<pre><span class="k">## O que mudou</span>
+- …
+<span class="k">## Por quê</span>
+- …
+<span class="k">## Testes que rodei</span>
+- python -m pytest tests/ -v
+- node tests/autoteste_match_frame.mjs</pre>
+                            </div>
+                        </li>
+                    </ol>
+
+                    <aside class="pr-aside" aria-labelledby="padrao-commit-titulo">
+                        <div class="pr-conv" data-reveal>
+                            <p class="eyebrow eyebrow--violet">Convenção de commits</p>
+                            <h3 class="pr-conv__title" id="padrao-commit-titulo"><span class="mono">tipo(escopo): descrição</span></h3>
+                            <p class="pr-conv__text">É o estilo real do histórico: o tipo, a área entre parênteses e uma descrição curta, em português e em minúsculas.</p>
+                            <dl class="pr-types">
+                                <div><dt class="pr-t pr-t--feat">feat</dt><dd>recurso novo</dd></div>
+                                <div><dt class="pr-t pr-t--fix">fix</dt><dd>correção</dd></div>
+                                <div><dt class="pr-t pr-t--docs">docs</dt><dd>documentação</dd></div>
+                                <div><dt class="pr-t pr-t--perf">perf</dt><dd>desempenho</dd></div>
+                                <div><dt class="pr-t pr-t--test">test</dt><dd>testes</dd></div>
+                            </dl>
+                            <p class="pr-conv__label">Exemplos tirados do histórico</p>
+                            <ul class="pr-examples" role="list">
+                                <li><b class="pr-t--feat">feat(ui):</b> gerador de cor sólida isolado na biblioteca e transições de junção na timeline</li>
+                                <li><b class="pr-t--fix">fix(player):</b> corrigir geometria de caixas faciais e descarte no Source Player</li>
+                                <li><b class="pr-t--docs">docs(ordem):</b> aplicar a revisão adversarial da ordem de implementação</li>
+                                <li><b class="pr-t--test">test(nle):</b> autotestes de transições de vídeo, camada de ajuste e render cache</li>
+                            </ul>
+                        </div>
+
+                        <form class="cb" data-commit-builder data-reveal aria-labelledby="cb-titulo">
+                            <h3 class="cb__title" id="cb-titulo">Monte a sua mensagem</h3>
+                            <fieldset class="cb__types">
+                                <legend class="cb__legend">Tipo</legend>
+                                <label class="cb__type"><input type="radio" name="cb-type" value="feat" checked><span>feat</span></label>
+                                <label class="cb__type"><input type="radio" name="cb-type" value="fix"><span>fix</span></label>
+                                <label class="cb__type"><input type="radio" name="cb-type" value="docs"><span>docs</span></label>
+                                <label class="cb__type"><input type="radio" name="cb-type" value="perf"><span>perf</span></label>
+                                <label class="cb__type"><input type="radio" name="cb-type" value="test"><span>test</span></label>
+                            </fieldset>
+                            <div class="cb__fields">
+                                <div class="cb__field">
+                                    <label for="cb-scope">Escopo <span class="cb__hint">(a área)</span></label>
+                                    <input id="cb-scope" name="cb-scope" type="text" value="timeline" list="cb-scopes" autocomplete="off" spellcheck="false" maxlength="24">
+                                    <datalist id="cb-scopes">
+                                        <option value="timeline"></option>
+                                        <option value="player"></option>
+                                        <option value="render"></option>
+                                        <option value="ui"></option>
+                                        <option value="biblioteca"></option>
+                                        <option value="audio"></option>
+                                        <option value="wiki"></option>
+                                        <option value="readme"></option>
+                                    </datalist>
+                                </div>
+                                <div class="cb__field">
+                                    <label for="cb-desc">Descrição</label>
+                                    <input id="cb-desc" name="cb-desc" type="text" placeholder="o que mudou, em poucas palavras" autocomplete="off" maxlength="90">
+                                </div>
+                            </div>
+                            <div class="code cb__out">
+                                <div class="code__bar"><span class="code__lang">Seu commit</span>
+                                    <button class="copy-btn" type="button" data-copy="git commit -m &quot;feat(timeline): o que mudou, em poucas palavras&quot;" aria-label="Copiar o comando de commit">
+                                        <svg class="copy-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg>
+                                        <svg class="copy-ok" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
+                                        Copiar
+                                    </button>
+                                </div>
+                                <pre><output data-cb-out for="cb-scope cb-desc"><span class="k">git commit -m</span> <span class="s">"feat(timeline): o que mudou, em poucas palavras"</span></output></pre>
+                            </div>
+                        </form>
+                    </aside>
+                </div>
+            </div>
+        </section>
+
+        <!-- ═══════════════ 05 — AMBIENTE ═══════════════ -->
+        <section class="section" id="ambiente" aria-labelledby="ambiente-titulo">
+            <div class="container">
+                <header class="section-head">
+                    <p class="eyebrow" data-reveal>05 — Ambiente</p>
+                    <h2 class="section-title" id="ambiente-titulo" data-reveal>Prepare o ambiente <span class="text-gradient">em poucos minutos</span></h2>
+                    <p class="lead" data-reveal>Backend em Python na sua máquina, interface no navegador, em <span class="mono">http://localhost:8000</span>. Não precisa de GPU.</p>
+                </header>
+
+                <div class="env">
+                    <div class="env__side">
+                        <h3 class="env__title" data-reveal>Antes de tudo</h3>
+                        <ul class="env-req" role="list" data-reveal-stagger="70">
+                            <li data-reveal><span class="env-req__k">Git</span><span>o <span class="mono">pip</span> também usa: uma dependência vem direto de um repositório</span></li>
+                            <li data-reveal><span class="env-req__k">Python 3.12</span><span>o recomendado (3.10 ou mais novo é compatível)</span></li>
+                            <li data-reveal><span class="env-req__k">FFmpeg</span><span>o <span class="mono">ffmpeg</span> e o <span class="mono">ffprobe</span>, os dois no PATH</span></li>
+                            <li data-reveal><span class="env-req__k">Node.js</span><span>para os autotestes da timeline e da interface</span></li>
+                        </ul>
+                        <div class="callout callout--rose env-note" data-reveal>
+                            <p><strong>Segurança:</strong> a API não tem autenticação — use só na sua máquina (no Docker, publique em <span class="mono">127.0.0.1:8000:8000</span>). E nunca faça commit do <span class="mono">.env</span>.</p>
+                        </div>
+                        <div class="callout callout--amber env-note" data-reveal>
+                            <p><strong>Sobre o <span class="mono">--reload</span>:</strong> no Windows, rodando sem console, o recarregamento já derrubou o servidor em vez de reiniciá-lo. Se acontecer, rode sem ele e reinicie a cada mudança no backend.</p>
+                        </div>
+                        <p class="env-docker" data-reveal>Prefere Docker? <span class="mono">docker compose up --build</span> sobe tudo, e o código em <span class="mono">src/</span> recarrega ao ser editado. <a class="inline-link" href="comecar.html#instalar">Instalação passo a passo</a>.</p>
+                    </div>
+
+                    <div class="env__main" data-tabs data-reveal>
+                        <div class="tabs__list" role="tablist" aria-label="Sistema operacional">
+                            <button class="tabs__tab" type="button" role="tab" id="tab-env-unix" aria-controls="env-unix" aria-selected="true">Linux e macOS</button>
+                            <button class="tabs__tab" type="button" role="tab" id="tab-env-win" aria-controls="env-win" aria-selected="false" tabindex="-1">Windows</button>
+                        </div>
+                        <div class="tabs__panel" role="tabpanel" id="env-unix" aria-labelledby="tab-env-unix">
+                            <div class="code">
+                                <div class="code__bar"><span class="code__lang">bash</span>
+                                    <button class="copy-btn" type="button" data-copy aria-label="Copiar os comandos para Linux e macOS">
+                                        <svg class="copy-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg>
+                                        <svg class="copy-ok" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
+                                        Copiar
+                                    </button>
+                                </div>
+<pre><span class="c"># 1. ambiente virtual com Python 3.12</span>
+<span class="k">python3.12 -m venv</span> .venv
+<span class="k">source</span> .venv/bin/activate
+<span class="c"># 2. dependências</span>
+<span class="k">pip install -r</span> requirements.txt
+<span class="c"># 3. configuração: preencha só as chaves que for usar</span>
+<span class="k">cp</span> .env.example .env
+<span class="c"># 4. servidor com recarga automática</span>
+<span class="k">uvicorn</span> src.api.server:app <span class="v">--reload</span></pre>
+                            </div>
+                        </div>
+                        <div class="tabs__panel" role="tabpanel" id="env-win" aria-labelledby="tab-env-win" hidden>
+                            <div class="code">
+                                <div class="code__bar"><span class="code__lang">PowerShell</span>
+                                    <button class="copy-btn" type="button" data-copy aria-label="Copiar os comandos para Windows">
+                                        <svg class="copy-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg>
+                                        <svg class="copy-ok" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
+                                        Copiar
+                                    </button>
+                                </div>
+<pre><span class="c"># 1. ambiente virtual com Python 3.12 (ou: uv venv .venv --python 3.12)</span>
+<span class="k">py -3.12 -m venv</span> .venv
+<span class="c"># 2. dependências (ou: uv pip install -r requirements.txt)</span>
+<span class="k">.venv\Scripts\pip install -r</span> requirements.txt
+<span class="c"># 3. configuração: preencha só as chaves que for usar</span>
+<span class="k">Copy-Item</span> .env.example .env
+<span class="c"># 4. servidor com recarga automática</span>
+<span class="k">.venv\Scripts\python -m uvicorn</span> src.api.server:app <span class="v">--reload</span></pre>
+                            </div>
+                        </div>
+                        <p class="env-open">Depois, abra <span class="mono">http://localhost:8000</span> no navegador.</p>
+                    </div>
+                </div>
+
+                <div class="ex-head">
+                    <h3 class="ex-head__title" data-reveal>Mapa do repositório</h3>
+                    <p class="ex-head__text" data-reveal>Clique numa pasta (ou use as setas do teclado) para ver para que ela serve, alguns arquivos de exemplo e quando faz sentido mexer ali.</p>
+                </div>
+
+                <div class="ex" data-tabs data-explorer data-reveal>
+                    <div class="ex__tree">
+                        <p class="ex__root" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+                            capiau-talho-v03/
+                        </p>
+                        <div class="ex__tabs" role="tablist" aria-orientation="vertical" aria-label="Pastas do repositório">
+                            <span class="ex__hl" aria-hidden="true"></span>
+                            <button class="ex__tab ex__tab--src" type="button" role="tab" id="ex-t-src" aria-controls="ex-p-src" aria-selected="false" tabindex="-1">src/</button>
+                            <button class="ex__tab ex__tab--child" type="button" role="tab" id="ex-t-api" aria-controls="ex-p-api" aria-selected="true"><span class="sr-only">src/</span>api/</button>
+                            <button class="ex__tab ex__tab--child" type="button" role="tab" id="ex-t-color" aria-controls="ex-p-color" aria-selected="false" tabindex="-1"><span class="sr-only">src/</span>color/</button>
+                            <button class="ex__tab ex__tab--child" type="button" role="tab" id="ex-t-core" aria-controls="ex-p-core" aria-selected="false" tabindex="-1"><span class="sr-only">src/</span>core/</button>
+                            <button class="ex__tab ex__tab--child" type="button" role="tab" id="ex-t-db" aria-controls="ex-p-db" aria-selected="false" tabindex="-1"><span class="sr-only">src/</span>db/</button>
+                            <button class="ex__tab ex__tab--child" type="button" role="tab" id="ex-t-export" aria-controls="ex-p-export" aria-selected="false" tabindex="-1"><span class="sr-only">src/</span>export/</button>
+                            <button class="ex__tab ex__tab--child" type="button" role="tab" id="ex-t-ingest" aria-controls="ex-p-ingest" aria-selected="false" tabindex="-1"><span class="sr-only">src/</span>ingest/</button>
+                            <button class="ex__tab ex__tab--child" type="button" role="tab" id="ex-t-media" aria-controls="ex-p-media" aria-selected="false" tabindex="-1"><span class="sr-only">src/</span>media/</button>
+                            <button class="ex__tab ex__tab--child" type="button" role="tab" id="ex-t-nlp" aria-controls="ex-p-nlp" aria-selected="false" tabindex="-1"><span class="sr-only">src/</span>nlp/</button>
+                            <button class="ex__tab ex__tab--child" type="button" role="tab" id="ex-t-search" aria-controls="ex-p-search" aria-selected="false" tabindex="-1"><span class="sr-only">src/</span>search/</button>
+                            <button class="ex__tab ex__tab--child" type="button" role="tab" id="ex-t-services" aria-controls="ex-p-services" aria-selected="false" tabindex="-1"><span class="sr-only">src/</span>services/</button>
+                            <button class="ex__tab ex__tab--child" type="button" role="tab" id="ex-t-transcription" aria-controls="ex-p-transcription" aria-selected="false" tabindex="-1"><span class="sr-only">src/</span>transcription/</button>
+                            <button class="ex__tab ex__tab--child" type="button" role="tab" id="ex-t-ui" aria-controls="ex-p-ui" aria-selected="false" tabindex="-1"><span class="sr-only">src/</span>ui/</button>
+                            <button class="ex__tab ex__tab--child ex__tab--last" type="button" role="tab" id="ex-t-vision" aria-controls="ex-p-vision" aria-selected="false" tabindex="-1"><span class="sr-only">src/</span>vision/</button>
+                            <button class="ex__tab" type="button" role="tab" id="ex-t-tests" aria-controls="ex-p-tests" aria-selected="false" tabindex="-1">tests/</button>
+                            <button class="ex__tab" type="button" role="tab" id="ex-t-docs" aria-controls="ex-p-docs" aria-selected="false" tabindex="-1">docs/</button>
+                            <button class="ex__tab" type="button" role="tab" id="ex-t-wiki" aria-controls="ex-p-wiki" aria-selected="false" tabindex="-1">wiki/</button>
+                            <button class="ex__tab" type="button" role="tab" id="ex-t-scripts" aria-controls="ex-p-scripts" aria-selected="false" tabindex="-1">scripts/</button>
+                            <button class="ex__tab" type="button" role="tab" id="ex-t-agents" aria-controls="ex-p-agents" aria-selected="false" tabindex="-1">.agents/</button>
+                        </div>
+                    </div>
+
+                    <div class="ex__panels" id="ex-paineis">
+                        <div class="ex__panel" role="tabpanel" id="ex-p-src" aria-labelledby="ex-t-src" hidden>
+                            <p class="ex__path">src/</p>
+                            <h4 class="ex__title">O código do programa</h4>
+                            <p class="ex__desc">Tudo o que roda: o backend em Python (FastAPI) e a interface que abre no navegador. São cerca de 49 mil linhas de Python e 89 mil de JavaScript.</p>
+                            <p class="ex__label">Pastas de exemplo</p>
+                            <ul class="ex__files" role="list"><li>api/</li><li>services/</li><li>vision/</li><li>search/</li><li>export/</li><li>ui/</li></ul>
+                            <p class="ex__tip"><strong>Por onde começar:</strong> <span class="mono">src/api/server.py</span> é o app que o uvicorn sobe — dali dá para seguir como as peças se ligam.</p>
+                            <a class="link-arrow" href="https://github.com/fernangcortes/capiau-talho-v03/tree/main/src">Ver <span class="mono">src/</span> no GitHub <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+                        </div>
+                        <div class="ex__panel" role="tabpanel" id="ex-p-api" aria-labelledby="ex-t-api">
+                            <p class="ex__path">src/api/</p>
+                            <h4 class="ex__title">A porta de entrada do backend</h4>
+                            <p class="ex__desc">O app FastAPI e as rotas HTTP que a interface chama: mídia, projetos, cenas, rostos, entidades, modelos e configurações.</p>
+                            <p class="ex__label">Arquivos de exemplo</p>
+                            <ul class="ex__files" role="list"><li>server.py</li><li>dependencies.py</li><li>schemas.py</li><li>routes/media.py</li><li>routes/projects.py</li><li>routes/narrative.py</li><li>routes/settings.py</li></ul>
+                            <p class="ex__tip"><strong>Quando mexer aqui:</strong> rota nova ou mudança no contrato da API. A referência dos endpoints está em <span class="mono">docs/api_endpoints.md</span>.</p>
+                            <a class="link-arrow" href="https://github.com/fernangcortes/capiau-talho-v03/tree/main/src/api">Ver <span class="mono">src/api/</span> no GitHub <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+                        </div>
+                        <div class="ex__panel" role="tabpanel" id="ex-p-color" aria-labelledby="ex-t-color" hidden>
+                            <p class="ex__path">src/color/</p>
+                            <h4 class="ex__title">O perfil de cor de cada mídia</h4>
+                            <p class="ex__desc">Resolve o perfil de cor do arquivo — sRGB, Rec.709, V-Log, S-Log, D-Log, HLG… — a partir das tags que o FFprobe devolve.</p>
+                            <p class="ex__label">Arquivos de exemplo</p>
+                            <ul class="ex__files" role="list"><li>deteccao.py</li><li>__init__.py</li></ul>
+                            <p class="ex__tip"><strong>Quando mexer aqui:</strong> uma câmera ou um perfil Log que o Talho ainda não reconhece.</p>
+                            <a class="link-arrow" href="https://github.com/fernangcortes/capiau-talho-v03/tree/main/src/color">Ver <span class="mono">src/color/</span> no GitHub <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+                        </div>
+                        <div class="ex__panel" role="tabpanel" id="ex-p-core" aria-labelledby="ex-t-core" hidden>
+                            <p class="ex__path">src/core/</p>
+                            <h4 class="ex__title">Peças compartilhadas</h4>
+                            <p class="ex__desc">O gerenciador de tarefas em segundo plano (<span class="mono">TASK_MANAGER</span>), com progresso e cancelamento, além do logging e das exceções comuns.</p>
+                            <p class="ex__label">Arquivos de exemplo</p>
+                            <ul class="ex__files" role="list"><li>tasks.py</li><li>logging.py</li><li>exceptions.py</li></ul>
+                            <p class="ex__tip"><strong>Quando mexer aqui:</strong> raramente. Mas toda tarefa longa nova passa por ele: registra o progresso e checa o cancelamento a cada iteração.</p>
+                            <a class="link-arrow" href="https://github.com/fernangcortes/capiau-talho-v03/tree/main/src/core">Ver <span class="mono">src/core/</span> no GitHub <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+                        </div>
+                        <div class="ex__panel" role="tabpanel" id="ex-p-db" aria-labelledby="ex-t-db" hidden>
+                            <p class="ex__path">src/db/</p>
+                            <h4 class="ex__title">O banco SQLite</h4>
+                            <p class="ex__desc">Schema, conexões e repositórios de persistência. O arquivo original nunca entra no banco: só o caminho dele.</p>
+                            <p class="ex__label">Arquivos de exemplo</p>
+                            <ul class="ex__files" role="list"><li>schema.py</li><li>connection.py</li><li>operations.py</li><li>repositories/media.py</li><li>repositories/projects.py</li><li>repositories/scenes.py</li></ul>
+                            <p class="ex__tip"><strong>Quando mexer aqui:</strong> coluna ou tabela nova — sempre com migração segura (<span class="mono">PRAGMA table_info</span> + <span class="mono">ALTER TABLE ADD COLUMN</span>), sem quebrar banco existente.</p>
+                            <a class="link-arrow" href="https://github.com/fernangcortes/capiau-talho-v03/tree/main/src/db">Ver <span class="mono">src/db/</span> no GitHub <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+                        </div>
+                        <div class="ex__panel" role="tabpanel" id="ex-p-export" aria-labelledby="ex-t-export" hidden>
+                            <p class="ex__path">src/export/</p>
+                            <h4 class="ex__title">Tudo o que sai do Talho</h4>
+                            <p class="ex__desc">Timeline em <span class="mono">.otio</span>, <span class="mono">.xml</span> (FCP7) e <span class="mono">.edl</span>, legendas, stems de áudio e o render de vídeo pelo FFmpeg, montado como um grafo em <span class="mono">video_render/</span>.</p>
+                            <p class="ex__label">Arquivos de exemplo</p>
+                            <ul class="ex__files" role="list"><li>otio_export.py</li><li>otio_import.py</li><li>subtitles_export.py</li><li>audio_stems.py</li><li>video_render/grafo_video.py</li><li>video_render/geometria.py</li></ul>
+                            <p class="ex__tip"><strong>Quando mexer aqui:</strong> formato de saída novo ou ajuste no render — com paridade com o player e a bateria multipista em cascata.</p>
+                            <a class="link-arrow" href="https://github.com/fernangcortes/capiau-talho-v03/tree/main/src/export">Ver <span class="mono">src/export/</span> no GitHub <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+                        </div>
+                        <div class="ex__panel" role="tabpanel" id="ex-p-ingest" aria-labelledby="ex-t-ingest" hidden>
+                            <p class="ex__path">src/ingest/</p>
+                            <h4 class="ex__title">A pasta observada</h4>
+                            <p class="ex__desc">Vigia a pasta de entrada para a ingestão in-place: a mídia é catalogada onde está, sem cópia e sem mover nada.</p>
+                            <p class="ex__label">Arquivos de exemplo</p>
+                            <ul class="ex__files" role="list"><li>watcher.py</li></ul>
+                            <p class="ex__tip"><strong>Bom saber:</strong> a varredura e o hash SHA-256 que evita catalogar duas vezes ficam em <span class="mono">src/services/ingest.py</span>.</p>
+                            <a class="link-arrow" href="https://github.com/fernangcortes/capiau-talho-v03/tree/main/src/ingest">Ver <span class="mono">src/ingest/</span> no GitHub <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+                        </div>
+                        <div class="ex__panel" role="tabpanel" id="ex-p-media" aria-labelledby="ex-t-media" hidden>
+                            <p class="ex__path">src/media/</p>
+                            <h4 class="ex__title">FFmpeg e áudio</h4>
+                            <p class="ex__desc">Wrappers de FFmpeg e o processamento de áudio: medição de loudness, cadeia de tratamento, denoise, formas de onda e classificação de sons.</p>
+                            <p class="ex__label">Arquivos de exemplo</p>
+                            <ul class="ex__files" role="list"><li>ffmpeg.py</li><li>audio_analysis.py</li><li>audio_chain.py</li><li>audio_denoise.py</li><li>audio_waveform.py</li><li>audio_classificador.py</li></ul>
+                            <p class="ex__tip"><strong>Regra da casa:</strong> medir antes de sugerir — e nunca cortar silêncio automaticamente.</p>
+                            <a class="link-arrow" href="https://github.com/fernangcortes/capiau-talho-v03/tree/main/src/media">Ver <span class="mono">src/media/</span> no GitHub <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+                        </div>
+                        <div class="ex__panel" role="tabpanel" id="ex-p-nlp" aria-labelledby="ex-t-nlp" hidden>
+                            <p class="ex__path">src/nlp/</p>
+                            <h4 class="ex__title">Linguagem</h4>
+                            <p class="ex__desc">Títulos executivos, temas, resumos, enriquecimento e o registro de prompts que dá para editar pelo painel de configurações.</p>
+                            <p class="ex__label">Arquivos de exemplo</p>
+                            <ul class="ex__files" role="list"><li>prompt_registry.py</li><li>prompt_templates.py</li><li>theme_engine.py</li><li>summary_engine.py</li><li>enrichment_engine.py</li><li>llm_text.py</li></ul>
+                            <p class="ex__tip"><strong>Quando mexer aqui:</strong> prompt novo entra no <span class="mono">PROMPT_REGISTRY</span>, com rótulo, categoria e variáveis, para aparecer no painel.</p>
+                            <a class="link-arrow" href="https://github.com/fernangcortes/capiau-talho-v03/tree/main/src/nlp">Ver <span class="mono">src/nlp/</span> no GitHub <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+                        </div>
+                        <div class="ex__panel" role="tabpanel" id="ex-p-search" aria-labelledby="ex-t-search" hidden>
+                            <p class="ex__path">src/search/</p>
+                            <h4 class="ex__title">A busca, na sua máquina</h4>
+                            <p class="ex__desc">Embeddings de texto (MiniLM) e de imagem (CLIP multilíngue) gravados no Qdrant local. É daqui que vem a busca por “contraluz na janela”.</p>
+                            <p class="ex__label">Arquivos de exemplo</p>
+                            <ul class="ex__files" role="list"><li>semantic.py</li><li>image_semantic.py</li><li>batch_utils.py</li></ul>
+                            <p class="ex__tip"><strong>Bom saber:</strong> o Qdrant embutido abre em um processo por vez — não suba duas instâncias do servidor ao mesmo tempo.</p>
+                            <a class="link-arrow" href="https://github.com/fernangcortes/capiau-talho-v03/tree/main/src/search">Ver <span class="mono">src/search/</span> no GitHub <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+                        </div>
+                        <div class="ex__panel" role="tabpanel" id="ex-p-services" aria-labelledby="ex-t-services" hidden>
+                            <p class="ex__path">src/services/</p>
+                            <h4 class="ex__title">As regras de negócio</h4>
+                            <p class="ex__desc">O pipeline de análise, o agente de edição, a busca híbrida (RAG), rostos, rajadas de fotos, a extração de roteiro e o registro de configurações.</p>
+                            <p class="ex__label">Arquivos de exemplo</p>
+                            <ul class="ex__files" role="list"><li>pipeline.py</li><li>chat_agent.py</li><li>rag.py</li><li>face_service.py</li><li>burst_service.py</li><li>script_extract.py</li><li>settings_registry.py</li></ul>
+                            <p class="ex__tip"><strong>Quando mexer aqui:</strong> quase toda lógica nova. Parâmetro novo vai para o <span class="mono">settings_registry.py</span>, nunca chumbado no código.</p>
+                            <a class="link-arrow" href="https://github.com/fernangcortes/capiau-talho-v03/tree/main/src/services">Ver <span class="mono">src/services/</span> no GitHub <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+                        </div>
+                        <div class="ex__panel" role="tabpanel" id="ex-p-transcription" aria-labelledby="ex-t-transcription" hidden>
+                            <p class="ex__path">src/transcription/</p>
+                            <h4 class="ex__title">Transcrição e diarização</h4>
+                            <p class="ex__desc">Os motores de transcrição — na nuvem com a sua chave, ou locais como o Whisper — e a separação das falas por pessoa (diarização).</p>
+                            <p class="ex__label">Arquivos de exemplo</p>
+                            <ul class="ex__files" role="list"><li>asr_engine.py</li><li>motores.py</li><li>venv_nemo_worker.py</li></ul>
+                            <p class="ex__tip"><strong>Regra da casa:</strong> denoise nunca antes da transcrição, e nenhum modelo grande baixa sem você pedir.</p>
+                            <a class="link-arrow" href="https://github.com/fernangcortes/capiau-talho-v03/tree/main/src/transcription">Ver <span class="mono">src/transcription/</span> no GitHub <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+                        </div>
+                        <div class="ex__panel" role="tabpanel" id="ex-p-ui" aria-labelledby="ex-t-ui" hidden>
+                            <p class="ex__path">src/ui/</p>
+                            <h4 class="ex__title">A interface no navegador</h4>
+                            <p class="ex__desc">HTML, CSS e mais de 50 módulos JavaScript sem framework. A timeline é desenhada em Canvas 2D; player, biblioteca e agente moram em <span class="mono">js/</span>.</p>
+                            <p class="ex__label">Arquivos de exemplo</p>
+                            <ul class="ex__files" role="list"><li>index.html</li><li>js/timelineState.js</li><li>js/timelineRenderer.js</li><li>js/player.js</li><li>js/library.js</li><li>js/renderCache.js</li><li>js/keymapService.js</li></ul>
+                            <p class="ex__tip"><strong>Quando mexer aqui:</strong> qualquer coisa que o editor vê. Siga o design system de <span class="mono">.agents/skills/</span> e rode os autotestes Node da timeline.</p>
+                            <a class="link-arrow" href="https://github.com/fernangcortes/capiau-talho-v03/tree/main/src/ui">Ver <span class="mono">src/ui/</span> no GitHub <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+                        </div>
+                        <div class="ex__panel" role="tabpanel" id="ex-p-vision" aria-labelledby="ex-t-vision" hidden>
+                            <p class="ex__path">src/vision/</p>
+                            <h4 class="ex__title">Visão computacional</h4>
+                            <p class="ex__desc">Segmentação em shots e beats, rostos (detecção, vetores e agrupamento), escala de plano, paleta de cor e detectores de objetos.</p>
+                            <p class="ex__label">Arquivos de exemplo</p>
+                            <ul class="ex__files" role="list"><li>segmentation.py</li><li>face_engine.py</li><li>face_pipeline.py</li><li>shot_scale.py</li><li>palette.py</li><li>detectores.py</li><li>backends/insightface_backend.py</li></ul>
+                            <p class="ex__tip"><strong>Bom saber:</strong> correções manuais de rosto ficam travadas contra reagrupamentos. Mudança aqui não pode desfazer o que a pessoa decidiu.</p>
+                            <a class="link-arrow" href="https://github.com/fernangcortes/capiau-talho-v03/tree/main/src/vision">Ver <span class="mono">src/vision/</span> no GitHub <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+                        </div>
+                        <div class="ex__panel" role="tabpanel" id="ex-p-tests" aria-labelledby="ex-t-tests" hidden>
+                            <p class="ex__path">tests/</p>
+                            <h4 class="ex__title">As duas baterias</h4>
+                            <p class="ex__desc">pytest para o backend e autotestes em Node (<span class="mono">.mjs</span>) para a timeline e a interface: 78 arquivos <span class="mono">.py</span> e 83 <span class="mono">.mjs</span>.</p>
+                            <p class="ex__label">Arquivos de exemplo</p>
+                            <ul class="ex__files" role="list"><li>test_render_composicao_multipista_cascata.py</li><li>test_f11_export.py</li><li>test_p0_qdrant_unavailable.py</li><li>autoteste_composicao_multipista_cascata.mjs</li><li>autoteste_match_frame.mjs</li><li>autoteste_track_lock.mjs</li><li>autoteste_safe_margins.mjs</li></ul>
+                            <p class="ex__tip"><strong>Quando mexer aqui:</strong> sempre que mexer em outra pasta. Um teste que reproduz um bug é um ótimo primeiro PR.</p>
+                            <a class="link-arrow" href="https://github.com/fernangcortes/capiau-talho-v03/tree/main/tests">Ver <span class="mono">tests/</span> no GitHub <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+                        </div>
+                        <div class="ex__panel" role="tabpanel" id="ex-p-docs" aria-labelledby="ex-t-docs" hidden>
+                            <p class="ex__path">docs/</p>
+                            <h4 class="ex__title">Planos e referências</h4>
+                            <p class="ex__desc">O plano de implementação, a ordem em ondas, a proposta da Sequência Fantasma, atalhos, API, custos e os diagramas em SVG.</p>
+                            <p class="ex__label">Arquivos de exemplo</p>
+                            <ul class="ex__files" role="list"><li>PLANO_IMPLEMENTACAO.md</li><li>ORDEM_DE_IMPLEMENTACAO.md</li><li>PLANO_SUITE_NLE_CLASSICO.md</li><li>PROPOSTA_SEQUENCIA_FANTASMA_IA.md</li><li>shortcuts.md</li><li>api_endpoints.md</li><li>images/</li></ul>
+                            <p class="ex__tip"><strong>Antes de mexer numa área:</strong> leia o plano dela. Os planos registram o que deu certo, o que deu errado e por quê.</p>
+                            <a class="link-arrow" href="https://github.com/fernangcortes/capiau-talho-v03/tree/main/docs">Ver <span class="mono">docs/</span> no GitHub <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+                        </div>
+                        <div class="ex__panel" role="tabpanel" id="ex-p-wiki" aria-labelledby="ex-t-wiki" hidden>
+                            <p class="ex__path">wiki/</p>
+                            <h4 class="ex__title">A documentação oficial</h4>
+                            <p class="ex__desc">As páginas publicadas na Wiki do GitHub: 18 capítulos, do conceito ao glossário, mais a página inicial e a barra lateral.</p>
+                            <p class="ex__label">Arquivos de exemplo</p>
+                            <ul class="ex__files" role="list"><li>Home.md</li><li>_Sidebar.md</li><li>01.-Visao-Geral-e-Conceito.md</li><li>14.-Guia-Completo-de-Atalhos.md</li><li>17.-Roadmap-e-Guia-de-Contribuicao.md</li><li>18.-Glossario-Visual-e-Terminologia.md</li></ul>
+                            <p class="ex__tip"><strong>Bom saber:</strong> as páginas nascem aqui e são publicadas por <span class="mono">scripts/deploy_wiki.py</span> — proponha as mudanças nestes arquivos.</p>
+                            <a class="link-arrow" href="https://github.com/fernangcortes/capiau-talho-v03/tree/main/wiki">Ver <span class="mono">wiki/</span> no GitHub <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+                        </div>
+                        <div class="ex__panel" role="tabpanel" id="ex-p-scripts" aria-labelledby="ex-t-scripts" hidden>
+                            <p class="ex__path">scripts/</p>
+                            <h4 class="ex__title">Utilitários</h4>
+                            <p class="ex__desc">Lançadores (Docker e local), publicação da wiki, comparação de bancos e as rodadas de triagem e calibração.</p>
+                            <p class="ex__label">Arquivos de exemplo</p>
+                            <ul class="ex__files" role="list"><li>run-docker.ps1</li><li>run-local.ps1</li><li>deploy_wiki.py</li><li>comparar_bancos.py</li><li>launch_detached.py</li><li>triagem_rodada.py</li></ul>
+                            <p class="ex__tip"><strong>Ideia de contribuição:</strong> os lançadores são para Windows (PowerShell); um equivalente para Linux e macOS ajudaria muita gente.</p>
+                            <a class="link-arrow" href="https://github.com/fernangcortes/capiau-talho-v03/tree/main/scripts">Ver <span class="mono">scripts/</span> no GitHub <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+                        </div>
+                        <div class="ex__panel" role="tabpanel" id="ex-p-agents" aria-labelledby="ex-t-agents" hidden>
+                            <p class="ex__path">.agents/</p>
+                            <h4 class="ex__title">Guias para agentes de IA — e para gente</h4>
+                            <p class="ex__desc">Regras permanentes e skills que orientam quem programa com assistentes de IA no projeto: paridade do render, design system e padrão de documentação.</p>
+                            <p class="ex__label">Arquivos de exemplo</p>
+                            <ul class="ex__files" role="list"><li>rules/nle-parity-and-media-lifecycle.md</li><li>skills/capiau-nle-design-system/SKILL.md</li><li>skills/github-docs-and-wiki-standard/SKILL.md</li></ul>
+                            <p class="ex__tip"><strong>Usa um assistente de código?</strong> Aponte para estes arquivos antes de pedir mudanças — e leia você também.</p>
+                            <a class="link-arrow" href="https://github.com/fernangcortes/capiau-talho-v03/tree/main/.agents">Ver <span class="mono">.agents/</span> no GitHub <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ═══════════════ 06 — TESTES ═══════════════ -->
+        <section class="section section--alt" id="testes" aria-labelledby="testes-titulo">
+            <div class="container">
+                <header class="section-head">
+                    <p class="eyebrow eyebrow--emerald" data-reveal>06 — Testes</p>
+                    <h2 class="section-title" id="testes-titulo" data-reveal>Rode os testes <span class="text-gradient">antes do PR</span></h2>
+                    <p class="lead" data-reveal>Duas baterias: pytest para o backend e autotestes em Node para a timeline e a interface. Rode as que tocam no que você mudou — e conte no PR quais foram.</p>
+                </header>
+
+                <div class="ts">
+                    <div class="ts__main">
+                        <div class="ts-stats" data-reveal-stagger="100">
+                            <div class="ts-stat" data-reveal>
+                                <p class="stat__value"><span data-count-to="78">78</span></p>
+                                <p class="stat__label">arquivos Python em <span class="mono">tests/</span> — a bateria do pytest</p>
+                            </div>
+                            <div class="ts-stat ts-stat--cyan" data-reveal>
+                                <p class="stat__value"><span data-count-to="83">83</span></p>
+                                <p class="stat__label">arquivos <span class="mono">.mjs</span> — os autotestes em Node, quase todos <span class="mono">autoteste_*.mjs</span></p>
+                            </div>
+                        </div>
+                        <div class="code" data-reveal>
+                            <div class="code__bar"><span class="code__lang">Backend · pytest</span>
+                                <button class="copy-btn" type="button" data-copy aria-label="Copiar os comandos do pytest">
+                                    <svg class="copy-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg>
+                                    <svg class="copy-ok" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
+                                    Copiar
+                                </button>
+                            </div>
+<pre><span class="c"># na raiz do projeto, com o .venv ativo</span>
+<span class="k">pip install</span> pytest
+<span class="k">python -m pytest</span> tests/ <span class="v">-v</span>
+<span class="c"># só um arquivo</span>
+<span class="k">python -m pytest</span> tests/test_f11_export.py <span class="v">-v</span></pre>
+                        </div>
+                        <div class="code" data-reveal>
+                            <div class="code__bar"><span class="code__lang">Interface · Node</span>
+                                <button class="copy-btn" type="button" data-copy aria-label="Copiar os comandos dos autotestes">
+                                    <svg class="copy-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg>
+                                    <svg class="copy-ok" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
+                                    Copiar
+                                </button>
+                            </div>
+<pre><span class="c"># um autoteste específico</span>
+<span class="k">node</span> tests/autoteste_match_frame.mjs
+<span class="c"># todos, em sequência (Linux e macOS)</span>
+<span class="k">for</span> f <span class="k">in</span> tests/autoteste_*.mjs; <span class="k">do</span> node <span class="s">"$f"</span> || <span class="k">break</span>; <span class="k">done</span></pre>
+                        </div>
+                        <p class="ts-more" data-reveal>No Windows, o <a class="inline-link" href="https://github.com/fernangcortes/capiau-talho-v03/blob/main/README.md#testes">README</a> traz um comando de uma linha, em Node, que roda todas as baterias em qualquer sistema.</p>
+                        <div class="callout callout--amber" data-reveal>
+                            <p><strong>Cuidado com o seu acervo:</strong> hoje, parte dos testes ainda abre o banco real em <span class="mono">data/</span> — trocar isso por um banco temporário está na lista de consertos da ordem de implementação. Rode a suíte com o servidor fechado e, se houver um acervo de verdade ali, faça backup antes. (Aliás: esse conserto daria um belo PR.)</p>
+                        </div>
+                    </div>
+
+                    <figure class="cas" data-play data-reveal aria-labelledby="cas-legenda">
+                        <p class="cas__kicker">A regra do motor de render</p>
+                        <div class="cas__tracks" aria-hidden="true">
+                            <div class="cas__track">
+                                <span class="cas__label">V2</span>
+                                <div class="cas__lane">
+                                    <div class="cas__adj">
+                                        <svg class="cas__curve" viewBox="0 0 100 30" preserveAspectRatio="none"><path d="M0 28C12 28 12 4 25 4H75C88 4 88 28 100 28"/></svg>
+                                        <span>Camada de ajuste</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="cas__track">
+                                <span class="cas__label">V1</span>
+                                <div class="cas__lane">
+                                    <div class="cas__clip cas__clip--a"><span>Clipe A</span></div>
+                                    <div class="cas__clip cas__clip--b"><span>Clipe B</span></div>
+                                    <div class="cas__x"><svg viewBox="0 0 20 20" preserveAspectRatio="none"><path d="M0 0 20 20M20 0 0 20"/></svg></div>
+                                </div>
+                            </div>
+                            <div class="cas__phwrap"><span class="cas__ph"></span></div>
+                        </div>
+                        <div class="cas__mons" aria-hidden="true">
+                            <div class="cas__mon">
+                                <span class="cas__monlabel">Player · navegador</span>
+                                <div class="cas__frame"><span class="cas__fa"></span><span class="cas__fb"></span><span class="cas__fadj"></span></div>
+                            </div>
+                            <span class="cas__eq">=</span>
+                            <div class="cas__mon">
+                                <span class="cas__monlabel">Export · FFmpeg</span>
+                                <div class="cas__frame"><span class="cas__fa"></span><span class="cas__fb"></span><span class="cas__fadj"></span></div>
+                            </div>
+                        </div>
+                        <figcaption class="cas__cap" id="cas-legenda">Mexeu no render ou no player? A regra da casa pede o cenário composto canônico: na V2, uma camada de ajuste sobre a junção, com fade em curva S, cor e modo de mesclagem; na V1, dois clipes com Cross Dissolve. O monitor e o export precisam mostrar o mesmo quadro — teste só com uma pista não basta.</figcaption>
+                        <div class="code cas__code">
+                            <div class="code__bar"><span class="code__lang">Bateria em cascata</span>
+                                <button class="copy-btn" type="button" data-copy aria-label="Copiar os comandos da bateria em cascata">
+                                    <svg class="copy-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg>
+                                    <svg class="copy-ok" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
+                                    Copiar
+                                </button>
+                            </div>
+<pre><span class="k">node</span> tests/autoteste_composicao_multipista_cascata.mjs
+<span class="k">python -m pytest</span> tests/test_render_composicao_multipista_cascata.py</pre>
+                        </div>
+                    </figure>
+                </div>
+            </div>
+        </section>
+
+        <!-- ═══════════════ 07 — PADRÕES ═══════════════ -->
+        <section class="section" id="padroes" aria-labelledby="padroes-titulo">
+            <div class="container">
+                <header class="section-head">
+                    <p class="eyebrow eyebrow--violet" data-reveal>07 — Padrões da casa</p>
+                    <h2 class="section-title" id="padroes-titulo" data-reveal>Regras curtas, <span class="text-gradient">nascidas de casos reais</span></h2>
+                    <p class="lead" data-reveal>Poucas regras, todas com motivo. Elas estão no guia de contribuição da wiki, nos planos em <span class="mono">docs/</span> e nos guias de <span class="mono">.agents/</span>.</p>
+                </header>
+
+                <div class="grid grid--3 pd-grid" data-reveal-stagger="70">
+                    <article class="card pd-card" data-reveal data-glow>
+                        <div class="card__icon card__icon--violet" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m8 7-5 5 5 5M16 7l5 5-5 5"/></svg></div>
+                        <h3 class="card__title">Python com PEP 8</h3>
+                        <p class="card__text">Estilo PEP 8, anotações de tipo (type hints) e docstrings claras.</p>
+                        <p class="pd-card__src">wiki · capítulo 17</p>
+                    </article>
+                    <article class="card pd-card" data-reveal data-glow>
+                        <div class="card__icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="9" height="4" rx="1"/><rect x="8" y="11" width="12" height="4" rx="1"/><rect x="4" y="17" width="7" height="3" rx="1"/><path d="M15 3v18"/></svg></div>
+                        <h3 class="card__title">JavaScript sem frameworks</h3>
+                        <p class="card__text">ES6+ modular, sem frameworks pesados, para a interface carregar na hora. A timeline é Canvas 2D puro.</p>
+                        <p class="pd-card__src">wiki · capítulo 17</p>
+                    </article>
+                    <article class="card pd-card" data-reveal data-glow>
+                        <div class="card__icon card__icon--amber" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg></div>
+                        <h3 class="card__title">Tarefa longa mostra progresso</h3>
+                        <p class="card__text">Todo processamento em lote registra o andamento no <span class="mono">TASK_MANAGER</span> e checa o cancelamento a cada iteração. Nada roda escondido.</p>
+                        <p class="pd-card__src">wiki · capítulo 17 · design system</p>
+                    </article>
+                    <article class="card pd-card" data-reveal data-glow>
+                        <div class="card__icon card__icon--emerald" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></div>
+                        <h3 class="card__title">O original é intocável</h3>
+                        <p class="card__text">Nunca modifique os arquivos do usuário. Proxies, áudio tratado e análises são derivados, guardados em <span class="mono">data/</span>.</p>
+                        <p class="pd-card__src">wiki · capítulo 17</p>
+                    </article>
+                    <article class="card pd-card" data-reveal data-glow>
+                        <div class="card__icon card__icon--rose" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="8" height="6" rx="1.5"/><rect x="13" y="5" width="8" height="6" rx="1.5"/><path d="M7 15v4M17 15v4M9.5 17h5"/></svg></div>
+                        <h3 class="card__title">Player e export iguais</h3>
+                        <p class="card__text">O que o monitor mostra é o que o render entrega. Mudou o motor? Rode a bateria multipista em cascata — teste só com uma pista não basta.</p>
+                        <p class="pd-card__src">.agents/rules · paridade NLE</p>
+                    </article>
+                    <article class="card pd-card" data-reveal data-glow>
+                        <div class="card__icon card__icon--violet" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 9 5-9 5-9-5z"/><path d="m3 13 9 5 9-5"/></svg></div>
+                        <h3 class="card__title">Design system da interface</h3>
+                        <p class="card__text">Flat e sem espaço desperdiçado; a cor de interação vem sempre do token <span class="mono">var(--accent)</span>, nunca de um hexadecimal chumbado.</p>
+                        <p class="pd-card__src">.agents/skills · capiau-nle-design-system</p>
+                    </article>
+                    <article class="card pd-card" data-reveal data-glow>
+                        <div class="card__icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></svg></div>
+                        <h3 class="card__title">Diagramas em SVG, não Mermaid</h3>
+                        <p class="card__text">Na documentação, diagramas viram SVG vetorial (o Mermaid complexo quebra no GitHub) e tabelas usam o formato GFM com barras.</p>
+                        <p class="pd-card__src">.agents/skills · github-docs-and-wiki-standard</p>
+                    </article>
+                    <article class="card pd-card" data-reveal data-glow>
+                        <div class="card__icon card__icon--amber" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg></div>
+                        <h3 class="card__title">Tudo configurável, migração segura</h3>
+                        <p class="card__text">Parâmetro novo entra no <span class="mono">settings_registry.py</span>; coluna nova chega por migração que nunca quebra um banco existente.</p>
+                        <p class="pd-card__src">docs · plano de implementação</p>
+                    </article>
+                    <article class="card pd-card" data-reveal data-glow>
+                        <div class="card__icon card__icon--rose" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h2M7 8v8M11 5v14M15 9v6M19 7v10"/></svg></div>
+                        <h3 class="card__title">Regras de documentário</h3>
+                        <p class="card__text">Nunca cortar silêncio ou hesitação automaticamente. Nenhum modelo grande baixa sem consentimento. Denoise nunca antes da transcrição.</p>
+                        <p class="pd-card__src">docs · ordem de implementação</p>
+                    </article>
+                </div>
+
+                <div class="pd-lessons">
+                    <h3 class="pd-lessons__title" data-reveal>Lições que viraram regra</h3>
+                    <div class="grid grid--3" data-reveal-stagger="90">
+                        <div class="pd-lesson" data-reveal>
+                            <p class="pd-lesson__k">Log não pode mudar o pipeline</p>
+                            <p>Uma seta num log não cabia no console do Windows; o erro era engolido por um <span class="mono">try</span> amplo e a análise voltava, em silêncio, para o relógio fixo de 10 s. Hoje: log simples e fora do <span class="mono">try</span>.</p>
+                        </div>
+                        <div class="pd-lesson" data-reveal>
+                            <p class="pd-lesson__k">Teste com o tipo real, não com um dublê</p>
+                            <p>Os testes de rajadas de fotos passavam usando um dicionário no lugar da classe de configuração — e o código quebrava de verdade. Hoje os testes usam a classe real.</p>
+                        </div>
+                        <div class="pd-lesson" data-reveal>
+                            <p class="pd-lesson__k">Valide no programa que vai abrir o arquivo</p>
+                            <p>Um <span class="mono">.otio</span> correto pelo padrão não abria no Kdenlive. Só o teste no programa real mostrou o problema — e mudou o jeito de gravar o caminho da mídia.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ═══════════════ 08 — LICENÇA ═══════════════ -->
+        <section class="section section--alt" id="licenca" aria-labelledby="licenca-titulo">
+            <div class="container">
+                <div class="lic">
+                    <div class="lic__text">
+                        <header class="section-head">
+                            <p class="eyebrow eyebrow--emerald" data-reveal>08 — Licença</p>
+                            <h2 class="section-title" id="licenca-titulo" data-reveal>GPL-3.0, <span class="text-gradient">em linguagem simples</span></h2>
+                            <p class="lead" data-reveal>A licença é o que garante que o Talho continue livre — para você, para quem vier depois e para quem nem conhece o projeto ainda.</p>
+                        </header>
+                        <div class="lic-cols">
+                            <div data-reveal>
+                                <h3 class="lic__sub">O que você pode fazer</h3>
+                                <ul class="lic-list lic-list--yes" role="list">
+                                    <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg><span>Usar para qualquer finalidade, inclusive em trabalho pago.</span></li>
+                                    <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg><span>Estudar o código e adaptá-lo ao seu jeito.</span></li>
+                                    <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg><span>Copiar e distribuir o programa.</span></li>
+                                    <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg><span>Modificar e distribuir a sua versão.</span></li>
+                                </ul>
+                            </div>
+                            <div data-reveal style="--d: 120ms">
+                                <h3 class="lic__sub">O que ela pede em troca</h3>
+                                <ul class="lic-list lic-list--ask" role="list">
+                                    <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg><span>Quem distribui uma versão modificada entrega também o código-fonte, sob a mesma GPL-3.0.</span></li>
+                                    <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg><span>Mantenha os avisos de licença e de autoria, e indique o que você mudou.</span></li>
+                                    <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg><span>Não acrescente restrições: quem recebe tem as mesmas liberdades que você teve.</span></li>
+                                    <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg><span>Mudou só para uso próprio, sem distribuir? Aí não precisa publicar nada.</span></li>
+                                </ul>
+                            </div>
+                        </div>
+                        <p class="lic-note" data-reveal>O programa vem sem garantia, “como está”. Este resumo ajuda, mas não substitui o texto oficial: leia o <a class="inline-link" href="https://github.com/fernangcortes/capiau-talho-v03/blob/main/LICENSE">LICENSE do repositório</a> ou a <a class="inline-link" href="https://www.gnu.org/licenses/gpl-3.0.html">GPL-3.0 no site do GNU</a>.</p>
+                    </div>
+
+                    <figure class="rel" data-inview aria-labelledby="rel-legenda">
+                        <ol class="rel__chain" role="list" aria-hidden="true">
+                            <li class="rel__node" style="--i: 0">
+                                <span class="rel__icon"><img src="assets/img/logo.svg" width="30" height="30" alt=""></span>
+                                <span class="rel__name">CapIAu-Talho<small>o projeto</small></span>
+                                <span class="rel__stamp">GPL-3.0</span>
+                            </li>
+                            <li class="rel__node" style="--i: 1">
+                                <span class="rel__icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="5" r="2"/><circle cx="18" cy="5" r="2"/><circle cx="12" cy="19" r="2"/><path d="M6 7v2a3 3 0 0 0 3 3h6a3 3 0 0 0 3-3V7M12 12v5"/></svg></span>
+                                <span class="rel__name">A sua versão<small>com as suas melhorias</small></span>
+                                <span class="rel__stamp">GPL-3.0</span>
+                            </li>
+                            <li class="rel__node" style="--i: 2">
+                                <span class="rel__icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19a5.5 5.5 0 0 1 11 0"/><circle cx="17" cy="9" r="2.4"/><path d="M15.5 14.2A4.5 4.5 0 0 1 21 18.5"/></svg></span>
+                                <span class="rel__name">A versão de outra pessoa<small>que partiu da sua</small></span>
+                                <span class="rel__stamp">GPL-3.0</span>
+                            </li>
+                        </ol>
+                        <figcaption class="rel__cap" id="rel-legenda"><strong>Copyleft: a liberdade passa adiante.</strong> Cada versão distribuída leva junto o código-fonte e a mesma licença — ninguém no meio do caminho consegue fechar a porta.</figcaption>
+                    </figure>
+                </div>
+            </div>
+        </section>
+
+        <div class="container"><div class="talho-cut" data-inview></div></div>
+
+        <!-- ═══════════════ CHAMADA FINAL ═══════════════ -->
+        <section class="section section--tight" aria-labelledby="cta-titulo">
+            <div class="container">
+                <div class="cta-band" data-reveal="scale">
+                    <p class="eyebrow eyebrow--rec">Grátis · sem assinatura · código aberto</p>
+                    <h2 class="cta-band__title" id="cta-titulo">Dê uma estrela, abra um issue, mande seu primeiro PR.</h2>
+                    <p class="lead cta-band__lead">Cada contribuição deixa o Talho mais útil para quem monta documentário — e ele continua sendo de todo mundo.</p>
+                    <div class="cluster cta-band__actions">
+                        <a class="btn btn--primary btn--lg" href="https://github.com/fernangcortes/capiau-talho-v03">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/></svg>
+                            Dar uma estrela no GitHub
+                        </a>
+                        <a class="btn btn--ghost btn--lg" href="https://github.com/fernangcortes/capiau-talho-v03/issues/new">Abrir um issue
+                            <svg class="btn__arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                        </a>
+                    </div>
+                    <p class="cta-band__note">Ainda não programa? Comece testando: <a class="inline-link" href="comecar.html">instale o Talho</a> e conte o que encontrar.</p>
+                </div>
+            </div>
+        </section>
     </main>
+
+    <!-- ═══════════════ RODAPÉ (idêntico em todas as páginas) ═══════════════ -->
+    <footer class="site-footer">
+        <div class="container">
+            <div class="site-footer__grid">
+                <div class="site-footer__brand">
+                    <a class="brand" href="index.html" aria-label="CapIAu-Talho — página inicial">
+                        <img src="assets/img/logo.svg" width="34" height="34" alt="">
+                        <span class="brand__name">CapIAu-<span class="brand__talho">Talho</span></span>
+                    </a>
+                    <p class="site-footer__about">Ilha de pré-edição, decupagem e assistência por IA para documentários e grandes acervos audiovisuais. Grátis, sem assinatura e de código aberto.</p>
+                    <div class="cluster site-footer__badges">
+                        <span class="chip chip--emerald"><span class="chip__dot"></span>Grátis</span>
+                        <span class="chip chip--violet">GPL-3.0</span>
+                        <span class="chip chip--cyan">Roda em CPU</span>
+                    </div>
+                </div>
+                <nav aria-labelledby="rodape-site">
+                    <h2 class="site-footer__title" id="rodape-site">Site</h2>
+                    <ul class="site-footer__links">
+                        <li><a href="index.html">Início</a></li>
+                        <li><a href="recursos.html">Recursos</a></li>
+                        <li><a href="como-funciona.html">Como funciona</a></li>
+                        <li><a href="comecar.html">Começar</a></li>
+                        <li><a href="contribuir.html">Contribuir</a></li>
+                    </ul>
+                </nav>
+                <nav aria-labelledby="rodape-docs">
+                    <h2 class="site-footer__title" id="rodape-docs">Documentação</h2>
+                    <ul class="site-footer__links">
+                        <li><a href="https://github.com/fernangcortes/capiau-talho-v03/wiki">Wiki oficial</a></li>
+                        <li><a href="https://github.com/fernangcortes/capiau-talho-v03/blob/main/USER_MANUAL.md">Manual do usuário</a></li>
+                        <li><a href="https://github.com/fernangcortes/capiau-talho-v03/blob/main/docs/shortcuts.md">Atalhos de teclado</a></li>
+                        <li><a href="https://github.com/fernangcortes/capiau-talho-v03/blob/main/docs/costs_and_security.md">Custos e segurança</a></li>
+                    </ul>
+                </nav>
+                <nav aria-labelledby="rodape-comunidade">
+                    <h2 class="site-footer__title" id="rodape-comunidade">Comunidade</h2>
+                    <ul class="site-footer__links">
+                        <li><a href="https://github.com/fernangcortes/capiau-talho-v03">Código no GitHub</a></li>
+                        <li><a href="https://github.com/fernangcortes/capiau-talho-v03/issues">Relatar um problema</a></li>
+                        <li><a href="https://github.com/fernangcortes/capiau-talho-v03/blob/main/docs/PLANO_IMPLEMENTACAO.md">Plano e roadmap</a></li>
+                        <li><a href="https://github.com/fernangcortes/capiau-talho-v03/blob/main/LICENSE">Licença GPL-3.0</a></li>
+                    </ul>
+                </nav>
+            </div>
+            <div class="site-footer__bottom">
+                <p>© <span data-year>2026</span> CapIAu-Talho e colaboradores · Software livre sob a <a href="https://github.com/fernangcortes/capiau-talho-v03/blob/main/LICENSE">GPL-3.0</a>.</p>
+                <div class="cluster">
+                    <button class="text-btn" type="button" data-motion-toggle>
+                        <svg class="motion-icon-pause" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 6v12M15 6v12"/></svg>
+                        <svg class="motion-icon-play" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M8 5.5v13l11-6.5z"/></svg>
+                        <span data-motion-label>Pausar animações</span>
+                    </button>
+                    <a class="text-btn" href="#conteudo">Voltar ao topo ↑</a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
 </body>
 </html>

@@ -1,0 +1,966 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Começar — CapIAu-Talho</title>
+    <meta name="description" content="Baixe e rode o CapIAu-Talho de graça: sem conta, sem assinatura, sem GPU. Docker ou Python local, chaves opcionais, modelos locais e o primeiro corte em 5 passos.">
+    <meta name="theme-color" content="#07060b">
+    <meta name="color-scheme" content="dark">
+    <meta property="og:type" content="website">
+    <meta property="og:locale" content="pt_BR">
+    <meta property="og:site_name" content="CapIAu-Talho">
+    <meta property="og:title" content="Começar — CapIAu-Talho">
+    <meta property="og:description" content="Baixe e rode o CapIAu-Talho de graça: sem conta, sem assinatura, sem GPU. Docker ou Python local, chaves opcionais, modelos locais e o primeiro corte em 5 passos.">
+    <meta property="og:image" content="https://fernangcortes.github.io/capiau-talho-v03/assets/img/og-image.png">
+    <meta name="twitter:card" content="summary_large_image">
+    <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="assets/img/favicon-32x32.png" sizes="32x32" type="image/png">
+    <link rel="apple-touch-icon" href="assets/img/apple-touch-icon.png">
+    <link rel="preload" href="assets/fonts/inter-var.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="preload" href="assets/fonts/barlow-semi-condensed-700.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="stylesheet" href="assets/css/base.css">
+    <link rel="stylesheet" href="assets/css/comecar.css">
+    <script>
+        /* antes de pintar: marca que há JS e aplica a escolha de animações (sem piscar) */
+        (function (r) {
+            r.classList.add("js");
+            try {
+                var m = localStorage.getItem("talho-motion");
+                if (m === "off" || (!m && matchMedia("(prefers-reduced-motion: reduce)").matches)) r.dataset.motion = "off";
+            } catch (e) {}
+        })(document.documentElement);
+    </script>
+    <script src="assets/js/base.js" defer></script>
+    <script src="assets/js/comecar.js" defer></script>
+</head>
+<body data-page="comecar">
+    <a class="skip-link" href="#conteudo">Pular para o conteúdo</a>
+
+    <!-- ═══════════════ CABEÇALHO (idêntico em todas as páginas) ═══════════════ -->
+    <header class="site-header" data-header>
+        <div class="site-header__inner">
+            <a class="brand" href="index.html" aria-label="CapIAu-Talho — página inicial">
+                <img src="assets/img/logo.svg" width="34" height="34" alt="">
+                <span class="brand__name">CapIAu-<span class="brand__talho">Talho</span></span>
+            </a>
+            <nav class="site-nav" id="site-nav" aria-label="Principal">
+                <a href="index.html" data-nav-id="inicio">Início</a>
+                <a href="recursos.html" data-nav-id="recursos">Recursos</a>
+                <a href="como-funciona.html" data-nav-id="como-funciona">Como funciona</a>
+                <a href="comecar.html" data-nav-id="comecar">Começar</a>
+                <a href="contribuir.html" data-nav-id="contribuir">Contribuir</a>
+                <div class="site-nav__mobile-cta">
+                    <a class="btn btn--primary" href="comecar.html">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 20h14"/></svg>
+                        Baixar grátis
+                    </a>
+                </div>
+            </nav>
+            <div class="header-actions">
+                <span class="header-tc" aria-hidden="true" title="A página como uma sequência: o timecode acompanha a rolagem" data-scroll-timecode>00:00:00:00</span>
+                <button class="icon-btn" type="button" data-motion-toggle aria-label="Pausar animações">
+                    <svg class="motion-icon-pause" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 6v12M15 6v12"/></svg>
+                    <svg class="motion-icon-play" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M8 5.5v13l11-6.5z"/></svg>
+                </button>
+                <a class="icon-btn" data-github href="https://github.com/fernangcortes/capiau-talho-v03" aria-label="Código-fonte no GitHub">
+                    <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
+                </a>
+                <a class="btn btn--primary btn--sm header-cta" href="comecar.html">Baixar grátis</a>
+                <button class="icon-btn nav-toggle" type="button" aria-controls="site-nav" aria-expanded="false" aria-label="Abrir menu">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+                </button>
+            </div>
+        </div>
+        <div class="scroll-playhead" aria-hidden="true"><span></span></div>
+    </header>
+
+    <main id="conteudo">
+        <!-- ═══════════════ TOPO: comece hoje, grátis — e o terminal que digita ═══════════════ -->
+        <section class="page-hero cm-hero" aria-labelledby="comecar-titulo">
+            <div class="container cm-hero__grid">
+                <div class="cm-hero__copy">
+                    <p class="eyebrow eyebrow--rec" data-reveal>Começar · do zero ao primeiro corte</p>
+                    <h1 class="page-hero__title" id="comecar-titulo" data-reveal style="--d: 80ms">Comece hoje. <span class="text-gradient">Grátis.</span></h1>
+                    <p class="lead page-hero__lead" data-reveal style="--d: 160ms">Sem conta, sem assinatura, sem instalador. Você baixa o código, sobe o servidor na sua própria máquina e abre o Talho no navegador. Daqui até o primeiro corte são poucos comandos — todos nesta página, prontos para copiar.</p>
+                    <ul class="cluster cm-hero__chips" role="list" aria-label="O que o Talho não pede" data-reveal style="--d: 220ms">
+                        <li class="chip chip--emerald"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>sem conta</li>
+                        <li class="chip chip--emerald"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>sem assinatura</li>
+                        <li class="chip chip--cyan"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4"/></svg>sem GPU</li>
+                        <li class="chip chip--violet"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m8 7-5 5 5 5M16 7l5 5-5 5"/></svg>código aberto · GPL-3.0</li>
+                    </ul>
+                    <div class="cluster page-hero__actions" data-reveal style="--d: 280ms">
+                        <a class="btn btn--primary btn--lg" href="#instalar">Instalar agora <svg class="btn__arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+                        <a class="btn btn--ghost btn--lg" href="https://github.com/fernangcortes/capiau-talho-v03/archive/refs/heads/main.zip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 20h14"/></svg>Baixar o ZIP</a>
+                    </div>
+                    <p class="cm-hero__note" data-reveal style="--d: 340ms">A primeira montagem do Docker baixa bastante coisa (PyTorch, FFmpeg, OpenCV): é a hora do café. Das próximas vezes, é bem mais rápido.</p>
+                </div>
+
+                <figure class="cm-term cm-anim" data-term data-reveal="scale" style="--d: 180ms">
+                    <div class="cm-term__bar">
+                        <span class="cm-term__dots" aria-hidden="true"><i></i><i></i><i></i></span>
+                        <span class="cm-term__title" aria-hidden="true">terminal · capiau-talho-v03</span>
+                        <button class="cm-term__replay" type="button" data-term-replay aria-label="Repetir a animação do terminal" title="Repetir"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3"/><path d="M4.5 4.5v3.6h3.6"/></svg></button>
+                    </div>
+                    <div class="cm-term__screen" aria-hidden="true">
+                        <p class="cm-term__line" data-cmd><span class="cm-term__ps">$</span> <span data-type>git clone https://github.com/fernangcortes/capiau-talho-v03.git</span></p>
+                        <p class="cm-term__line cm-term__line--dim">Cloning into 'capiau-talho-v03'...</p>
+                        <p class="cm-term__line" data-cmd><span class="cm-term__ps">$</span> <span data-type>cd capiau-talho-v03</span></p>
+                        <p class="cm-term__line" data-cmd><span class="cm-term__ps">$</span> <span data-type>docker compose up --build</span></p>
+                        <p class="cm-term__line cm-term__line--dim">[+] Building talho: Python 3.12 · FFmpeg · PyTorch CPU · OpenCV</p>
+                        <p class="cm-term__line cm-term__progress"><span class="cm-term__meter"><span></span></span><span class="cm-term__pct">100%</span></p>
+                        <p class="cm-term__line"><span class="cm-term__ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span>Container capiau-talho  Created</p>
+                        <p class="cm-term__line cm-term__line--dim">Attaching to capiau-talho</p>
+                        <p class="cm-term__line cm-term__line--log"><span class="cm-term__svc">capiau-talho  |</span> INFO:     Uvicorn running on http://0.0.0.0:8000</p>
+                        <p class="cm-term__line cm-term__line--log"><span class="cm-term__svc">capiau-talho  |</span> INFO:     Application startup complete.</p>
+                        <p class="cm-term__line cm-term__line--go">→ abra http://localhost:8000<span class="cm-term__cursor"></span></p>
+                    </div>
+                    <figcaption class="sr-only">Ilustração de um terminal: clonar o repositório com git, entrar na pasta, rodar docker compose up --build, esperar o servidor subir e abrir http://localhost:8000 no navegador.</figcaption>
+                </figure>
+            </div>
+            <div class="container cm-hero__foot" aria-hidden="true">
+                <div class="ruler"></div>
+                <div class="talho-cut" data-inview></div>
+            </div>
+        </section>
+
+        <!-- ═══════════════ SUBNAVEGAÇÃO: os 8 passos da página ═══════════════ -->
+        <nav class="subnav cm-subnav" data-subnav aria-label="Passos desta página">
+            <div class="subnav__list">
+                <a href="#baixar"><span class="cm-subnav__n" aria-hidden="true">01</span><svg class="cm-subnav__ok" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Baixar</a>
+                <a href="#requisitos"><span class="cm-subnav__n" aria-hidden="true">02</span><svg class="cm-subnav__ok" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Requisitos</a>
+                <a href="#instalar"><span class="cm-subnav__n" aria-hidden="true">03</span><svg class="cm-subnav__ok" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Instalar</a>
+                <a href="#chaves"><span class="cm-subnav__n" aria-hidden="true">04</span><svg class="cm-subnav__ok" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Chaves</a>
+                <a href="#modelos-locais"><span class="cm-subnav__n" aria-hidden="true">05</span><svg class="cm-subnav__ok" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Modelos locais</a>
+                <a href="#primeiros-passos"><span class="cm-subnav__n" aria-hidden="true">06</span><svg class="cm-subnav__ok" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Primeiros passos</a>
+                <a href="#seguranca"><span class="cm-subnav__n" aria-hidden="true">07</span><svg class="cm-subnav__ok" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Segurança</a>
+                <a href="#problemas"><span class="cm-subnav__n" aria-hidden="true">08</span><svg class="cm-subnav__ok" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Problemas</a>
+            </div>
+        </nav>
+
+        <!-- ═══════════════ 01 BAIXAR ═══════════════ -->
+        <section class="section" id="baixar" aria-labelledby="baixar-titulo">
+            <div class="container">
+                <header class="section-head">
+                    <p class="eyebrow" data-reveal>01 — Baixar</p>
+                    <h2 class="section-title" id="baixar-titulo" data-reveal>Pegue o código. <span class="text-gradient">É só isso.</span></h2>
+                    <p class="lead" data-reveal>Não existe instalador nem cadastro. O Talho é software livre (GPL-3.0): “baixar” é trazer a pasta do projeto para o seu computador — de um destes dois jeitos.</p>
+                </header>
+                <ul class="cm-nope" role="list" aria-label="O que o Talho não pede" data-inview>
+                    <li style="--d: 0ms"><span class="cm-nope__sem">sem</span><span class="cm-nope__word">conta</span></li>
+                    <li style="--d: 120ms"><span class="cm-nope__sem">sem</span><span class="cm-nope__word">assinatura</span></li>
+                    <li style="--d: 240ms"><span class="cm-nope__sem">sem</span><span class="cm-nope__word">instalador</span></li>
+                    <li style="--d: 360ms"><span class="cm-nope__sem">sem</span><span class="cm-nope__word">plano pago</span></li>
+                    <li style="--d: 480ms"><span class="cm-nope__sem">sem</span><span class="cm-nope__word">recurso trancado</span></li>
+                </ul>
+                <div class="grid grid--2 cm-get" data-reveal-stagger="110">
+                    <article class="card cm-get__card" data-reveal data-glow>
+                        <div class="card__icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m8 7-5 5 5 5M16 7l5 5-5 5"/></svg></div>
+                        <h3 class="card__title">Clonar com git</h3>
+                        <p class="card__text">O jeito mais prático, se você já usa git: para atualizar depois, basta um <code class="inline">git pull</code> dentro da pasta.</p>
+                        <div class="code">
+                            <div class="code__bar"><span class="code__lang">terminal</span><button class="copy-btn" type="button" data-copy><svg class="copy-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg><svg class="copy-ok" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Copiar</button></div>
+<pre><code><span class="k">git clone</span> https://github.com/fernangcortes/capiau-talho-v03.git
+<span class="k">cd</span> capiau-talho-v03</code></pre>
+                        </div>
+                    </article>
+                    <article class="card cm-get__card" data-reveal data-glow>
+                        <div class="card__icon card__icon--emerald" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 20h14"/></svg></div>
+                        <h3 class="card__title">Baixar o ZIP</h3>
+                        <p class="card__text">Sem git? Baixe o pacote do ramo <code class="inline">main</code>, descompacte onde quiser e abra a pasta <code class="inline">capiau-talho-v03-main</code> no terminal.</p>
+                        <div class="cm-get__zip">
+                            <a class="btn btn--cyan" href="https://github.com/fernangcortes/capiau-talho-v03/archive/refs/heads/main.zip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 20h14"/></svg>Baixar o ZIP (ramo main)</a>
+                            <p class="cm-small">Vai pelo Python local? Tenha o git mesmo assim: o <code class="inline">pip</code> usa o git para instalar uma das dependências.</p>
+                        </div>
+                    </article>
+                </div>
+            </div>
+        </section>
+
+        <!-- ═══════════════ 02 REQUISITOS ═══════════════ -->
+        <section class="section section--alt" id="requisitos" aria-labelledby="requisitos-titulo">
+            <div class="container">
+                <header class="section-head">
+                    <p class="eyebrow" data-reveal>02 — Requisitos</p>
+                    <h2 class="section-title" id="requisitos-titulo" data-reveal>O que a sua máquina precisa</h2>
+                    <p class="lead" data-reveal>Um computador comum dá conta: o Talho foi pensado para a CPU. E se você for de Docker, quase tudo desta lista já vem dentro do container.</p>
+                </header>
+                <div class="cm-req">
+                    <div class="table-wrap cm-req__wrap" data-reveal>
+                        <table class="table cm-req__table">
+                            <caption class="sr-only">Requisitos para rodar o CapIAu-Talho</caption>
+                            <thead>
+                                <tr><th scope="col">Item</th><th scope="col">Precisa de</th><th scope="col">Observação</th></tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <th scope="row">Python</th>
+                                    <td><strong>3.12</strong> <span class="cm-req__soft">(3.10+ compatível)</span></td>
+                                    <td>Só no caminho Python local. O Docker já traz o 3.12.</td>
+                                </tr>
+                                <tr>
+                                    <th scope="row">FFmpeg e ffprobe</th>
+                                    <td><strong>Os dois no <code class="inline">PATH</code></strong></td>
+                                    <td>Ter o <code class="inline">ffmpeg.exe</code> numa pasta qualquer não basta. O Docker já traz.</td>
+                                </tr>
+                                <tr>
+                                    <th scope="row">Memória (RAM)</th>
+                                    <td><strong>8 GB</strong></td>
+                                    <td>16 GB recomendados para acervos grandes.</td>
+                                </tr>
+                                <tr>
+                                    <th scope="row">Placa de vídeo (GPU)</th>
+                                    <td><strong>Não é necessária</strong></td>
+                                    <td>Se houver, o encode dos proxies usa NVENC, QSV ou AMF — e volta sozinho para a CPU quando precisa.</td>
+                                </tr>
+                                <tr>
+                                    <th scope="row">Docker</th>
+                                    <td><strong>Opcional</strong> <span class="cm-req__soft">— recomendado</span></td>
+                                    <td>Traz Python 3.12, FFmpeg, PyTorch CPU, OpenCV e OpenTimelineIO prontos.</td>
+                                </tr>
+                                <tr>
+                                    <th scope="row">Git</th>
+                                    <td><strong>Para clonar</strong></td>
+                                    <td>No Python local, o <code class="inline">pip</code> também usa: o <code class="inline">requirements.txt</code> instala o CLIP direto do GitHub.</td>
+                                </tr>
+                                <tr>
+                                    <th scope="row">Disco</th>
+                                    <td><strong>Espaço para os proxies</strong></td>
+                                    <td>E para os modelos locais que você escolher baixar — de 25 MB a 6,4 GB cada.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <aside class="cm-req__check" aria-labelledby="conferir-titulo" data-reveal style="--d: 120ms">
+                        <h3 class="cm-req__h" id="conferir-titulo">Confira em 10 segundos</h3>
+                        <p>Rode no terminal. Cada linha deve responder com uma versão.</p>
+                        <div class="code">
+                            <div class="code__bar"><span class="code__lang">terminal</span><button class="copy-btn" type="button" data-copy><svg class="copy-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg><svg class="copy-ok" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Copiar</button></div>
+<pre><code><span class="k">python</span> --version   <span class="c"># 3.12 (ou 3.10+); no Linux: python3</span>
+<span class="k">ffmpeg</span> -version
+<span class="k">ffprobe</span> -version
+<span class="k">git</span> --version
+<span class="k">docker</span> --version   <span class="c"># só se for usar Docker</span></code></pre>
+                        </div>
+                        <p class="cm-small">Falta o FFmpeg? No Windows: <code class="inline">winget install Gyan.FFmpeg</code>. No Debian/Ubuntu: <code class="inline">sudo apt install -y ffmpeg</code>. Depois, abra um terminal novo.</p>
+                    </aside>
+                </div>
+            </div>
+        </section>
+
+        <!-- ═══════════════ 03 INSTALAR (abas Docker / Python local) ═══════════════ -->
+        <section class="section" id="instalar" aria-labelledby="instalar-titulo">
+            <div class="container">
+                <header class="section-head">
+                    <p class="eyebrow" data-reveal>03 — Instalar</p>
+                    <h2 class="section-title" id="instalar-titulo" data-reveal>Instale do seu jeito</h2>
+                    <p class="lead" data-reveal>O Docker é o caminho mais curto: um comando e tudo vem pronto, isolado do resto da máquina. Prefere o Python direto no computador? Também dá — e, no Windows, um script faz o trabalho pesado.</p>
+                </header>
+
+                <div class="cm-tabs" data-tabs data-reveal>
+                    <div class="tabs__list" role="tablist" aria-label="Forma de instalar">
+                        <button class="tabs__tab" type="button" role="tab" id="aba-docker" aria-controls="painel-docker" aria-selected="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 4 7.5v9L12 21l8-4.5v-9z"/><path d="M4 7.5 12 12l8-4.5M12 12v9"/></svg>Docker <span class="cm-tab__tag">(recomendado)</span></button>
+                        <button class="tabs__tab" type="button" role="tab" id="aba-python" aria-controls="painel-python" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="m7 9 3 3-3 3M13 15h4"/></svg>Python local</button>
+                    </div>
+
+                    <div class="tabs__panel" role="tabpanel" id="painel-docker" aria-labelledby="aba-docker" tabindex="0">
+                        <ol class="cm-steps" role="list">
+                            <li class="cm-step" data-cm-lit>
+                                <span class="cm-step__n" aria-hidden="true">00:01</span>
+                                <div class="cm-step__body">
+                                    <h3 class="cm-step__title">Abra o terminal na pasta do projeto</h3>
+                                    <p>Com o Docker instalado e aberto, use o PowerShell (Windows) ou o terminal de sempre (Linux). Se você baixou o ZIP, a pasta se chama <code class="inline">capiau-talho-v03-main</code>.</p>
+                                    <div class="code">
+                                        <div class="code__bar"><span class="code__lang">terminal</span><button class="copy-btn" type="button" data-copy><svg class="copy-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg><svg class="copy-ok" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Copiar</button></div>
+<pre><code><span class="k">cd</span> capiau-talho-v03</code></pre>
+                                    </div>
+                                </div>
+                            </li>
+                            <li class="cm-step" data-cm-lit>
+                                <span class="cm-step__n" aria-hidden="true">00:02</span>
+                                <div class="cm-step__body">
+                                    <h3 class="cm-step__title">Crie o seu <code class="inline">.env</code> (pode ficar sem chaves)</h3>
+                                    <p>É ali que entram as chaves de API, se você quiser usar a nuvem — veja <a class="inline-link" href="#chaves">Chaves</a>. O compose sobe mesmo sem ele, e o script do Windows faz esta cópia sozinho.</p>
+                                    <div class="cm-duo">
+                                        <div class="code">
+                                            <div class="code__bar"><span class="code__lang">PowerShell</span><button class="copy-btn" type="button" data-copy><svg class="copy-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg><svg class="copy-ok" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Copiar</button></div>
+<pre><code><span class="k">Copy-Item</span> .env.example .env</code></pre>
+                                        </div>
+                                        <div class="code">
+                                            <div class="code__bar"><span class="code__lang">bash</span><button class="copy-btn" type="button" data-copy><svg class="copy-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg><svg class="copy-ok" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Copiar</button></div>
+<pre><code><span class="k">cp</span> .env.example .env</code></pre>
+                                        </div>
+                                    </div>
+                                </div>
+                            </li>
+                            <li class="cm-step" data-cm-lit>
+                                <span class="cm-step__n" aria-hidden="true">00:03</span>
+                                <div class="cm-step__body">
+                                    <h3 class="cm-step__title">Deixe a porta só para você</h3>
+                                    <p>A API do Talho não tem autenticação, e o <code class="inline">docker-compose.yml</code> vem publicando a porta para a rede inteira. Abra o arquivo e troque a linha da porta para ela responder só nesta máquina:</p>
+                                    <div class="code">
+                                        <div class="code__bar"><span class="code__lang">docker-compose.yml</span><button class="copy-btn" type="button" data-copy='- "127.0.0.1:8000:8000"'><svg class="copy-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg><svg class="copy-ok" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Copiar a linha nova</button></div>
+<pre><code>    <span class="v">ports</span>:
+<span class="cm-del">      - "8000:8000"</span>             <span class="c"># antes: aberta para a rede</span>
+<span class="cm-add">      - "127.0.0.1:8000:8000"</span>   <span class="c"># depois: só nesta máquina</span></code></pre>
+                                    </div>
+                                </div>
+                            </li>
+                            <li class="cm-step" data-cm-lit>
+                                <span class="cm-step__n" aria-hidden="true">00:04</span>
+                                <div class="cm-step__body">
+                                    <h3 class="cm-step__title">Suba o Talho</h3>
+                                    <p>No Windows, o script faz tudo (e ainda cria o <code class="inline">.env</code>, se faltar). Em qualquer sistema, o comando do Docker é o mesmo. A primeira vez demora: o Docker baixa e monta Python 3.12, FFmpeg, PyTorch CPU, OpenCV e OpenTimelineIO. Para parar, <kbd>Ctrl</kbd>+<kbd>C</kbd> no terminal.</p>
+                                    <div class="cm-duo">
+                                        <div class="code">
+                                            <div class="code__bar"><span class="code__lang">PowerShell</span><button class="copy-btn" type="button" data-copy><svg class="copy-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg><svg class="copy-ok" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Copiar</button></div>
+<pre><code><span class="k">.\scripts\run-docker.ps1</span></code></pre>
+                                        </div>
+                                        <div class="code">
+                                            <div class="code__bar"><span class="code__lang">qualquer sistema</span><button class="copy-btn" type="button" data-copy><svg class="copy-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg><svg class="copy-ok" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Copiar</button></div>
+<pre><code><span class="k">docker compose up</span> --build</code></pre>
+                                        </div>
+                                    </div>
+                                </div>
+                            </li>
+                            <li class="cm-step" data-cm-lit>
+                                <span class="cm-step__n" aria-hidden="true">00:05</span>
+                                <div class="cm-step__body">
+                                    <h3 class="cm-step__title">Abra no navegador</h3>
+                                    <p>Pronto. Suas mídias (<code class="inline">watch/</code>) e o banco, os proxies e os modelos (<code class="inline">data/</code>) ficam no seu disco, fora do container — nada se perde quando você reconstrói a imagem.</p>
+                                    <a class="btn btn--cyan" href="http://localhost:8000"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 5.5v13l11-6.5z"/></svg>Abrir http://localhost:8000</a>
+                                </div>
+                            </li>
+                        </ol>
+                    </div>
+
+                    <div class="tabs__panel" role="tabpanel" id="painel-python" aria-labelledby="aba-python" tabindex="0" hidden>
+                        <ol class="cm-steps" role="list">
+                            <li class="cm-step" data-cm-lit>
+                                <span class="cm-step__n" aria-hidden="true">00:01</span>
+                                <div class="cm-step__body">
+                                    <h3 class="cm-step__title">Tenha o Python 3.12, o FFmpeg e o git</h3>
+                                    <p>O 3.12 é o recomendado (do 3.10 em diante funciona). O <code class="inline">ffmpeg</code> e o <code class="inline">ffprobe</code> precisam responder no terminal — e o git também, porque o <code class="inline">pip</code> instala uma dependência direto do GitHub. A lista completa está em <a class="inline-link" href="#requisitos">Requisitos</a>.</p>
+                                </div>
+                            </li>
+                            <li class="cm-step" data-cm-lit>
+                                <span class="cm-step__n" aria-hidden="true">00:02</span>
+                                <div class="cm-step__body">
+                                    <h3 class="cm-step__title">Windows: deixe o script fazer tudo</h3>
+                                    <p>Na primeira vez, ele cria o <code class="inline">.venv</code> com Python 3.12 (usando o <code class="inline">uv</code>, se você tiver), instala o <code class="inline">requirements.txt</code>, copia o <code class="inline">.env.example</code> para <code class="inline">.env</code> e sobe o servidor em <code class="inline">127.0.0.1:8000</code>. Nas próximas, só sobe.</p>
+                                    <div class="code">
+                                        <div class="code__bar"><span class="code__lang">PowerShell</span><button class="copy-btn" type="button" data-copy><svg class="copy-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg><svg class="copy-ok" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Copiar</button></div>
+<pre><code><span class="k">.\scripts\run-local.ps1</span></code></pre>
+                                    </div>
+                                    <p class="cm-small">O PowerShell se recusou a rodar o script? Rode assim, do mesmo jeito que o <code class="inline">criar-atalho.bat</code> faz: <code class="inline">powershell -ExecutionPolicy Bypass -File .\scripts\run-local.ps1</code></p>
+                                </div>
+                            </li>
+                            <li class="cm-step" data-cm-lit>
+                                <span class="cm-step__n" aria-hidden="true">00:03</span>
+                                <div class="cm-step__body">
+                                    <h3 class="cm-step__title">Ou faça à mão</h3>
+                                    <p>Os mesmos passos, um a um. No Linux, troque o PowerShell pelo bash. O servidor sobe em <code class="inline">127.0.0.1:8000</code>, o padrão do Uvicorn.</p>
+                                    <div class="cm-duo cm-duo--tall">
+                                        <div class="code">
+                                            <div class="code__bar"><span class="code__lang">PowerShell</span><button class="copy-btn" type="button" data-copy><svg class="copy-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg><svg class="copy-ok" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Copiar</button></div>
+<pre><code><span class="c"># ambiente virtual com Python 3.12</span>
+<span class="k">uv venv</span> .venv --python 3.12
+<span class="c"># ou: py -3.12 -m venv .venv</span>
+
+<span class="c"># dependências</span>
+<span class="k">uv pip install</span> -r requirements.txt
+<span class="c"># ou: .venv\Scripts\pip install -r requirements.txt</span>
+
+<span class="c"># servidor</span>
+<span class="k">.venv\Scripts\python</span> -m uvicorn src.api.server:app --reload</code></pre>
+                                        </div>
+                                        <div class="code">
+                                            <div class="code__bar"><span class="code__lang">bash (Linux)</span><button class="copy-btn" type="button" data-copy><svg class="copy-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg><svg class="copy-ok" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Copiar</button></div>
+<pre><code><span class="c"># ambiente virtual (python3 --version: 3.12, ou 3.10+)</span>
+<span class="k">python3</span> -m venv .venv
+<span class="k">source</span> .venv/bin/activate
+
+<span class="c"># dependências</span>
+<span class="k">pip install</span> -r requirements.txt
+
+<span class="c"># servidor</span>
+<span class="k">python</span> -m uvicorn src.api.server:app --reload</code></pre>
+                                        </div>
+                                    </div>
+                                </div>
+                            </li>
+                            <li class="cm-step" data-cm-lit>
+                                <span class="cm-step__n" aria-hidden="true">00:04</span>
+                                <div class="cm-step__body">
+                                    <h3 class="cm-step__title">Abra no navegador</h3>
+                                    <p>Vai deixar o servidor rodando por horas no Windows? Use o <a class="inline-link" href="#faq-desgrudado">lançador desgrudado</a>, que não morre quando a janela do terminal fecha.</p>
+                                    <a class="btn btn--cyan" href="http://localhost:8000"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 5.5v13l11-6.5z"/></svg>Abrir http://localhost:8000</a>
+                                </div>
+                            </li>
+                        </ol>
+                    </div>
+                </div>
+
+                <div class="grid grid--2 cm-after">
+                    <article class="card cm-shortcut" data-reveal data-glow>
+                        <div class="cm-shortcut__head">
+                            <div class="card__icon card__icon--violet" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="1.5"/><path d="M8 20h8M12 16v4"/></svg></div>
+                            <h3 class="card__title">Windows: um atalho de duplo clique</h3>
+                        </div>
+                        <p class="card__text">Dê dois cliques em <code class="inline">criar-atalho.bat</code>, na raiz do projeto. Ele cria o ícone <strong>CapIAu</strong> na Área de Trabalho (e outro na própria pasta), que dá para fixar na barra de tarefas. Ao abrir, o atalho decide sozinho:</p>
+                        <ol class="cm-flow cm-anim" role="list">
+                            <li style="--i: 0"><span class="cm-flow__if">O Talho já está no ar?</span><span class="cm-flow__arrow" aria-hidden="true"><svg class="btn__arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span><span class="cm-flow__then">só abre o navegador</span></li>
+                            <li style="--i: 1"><span class="cm-flow__if">O Docker está aberto?</span><span class="cm-flow__arrow" aria-hidden="true"><svg class="btn__arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span><span class="cm-flow__then">sobe o container em segundo plano</span></li>
+                            <li style="--i: 2"><span class="cm-flow__if">Nenhum dos dois?</span><span class="cm-flow__arrow" aria-hidden="true"><svg class="btn__arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span><span class="cm-flow__then">liga o Python local (<code class="inline">.venv</code>)</span></li>
+                        </ol>
+                        <p class="cm-small">Em todos os casos, termina no navegador, em <code class="inline">http://localhost:8000</code>.</p>
+                    </article>
+                    <aside class="callout callout--rose cm-net" aria-labelledby="rede-titulo" data-reveal style="--d: 120ms">
+                        <h3 class="cm-callout__title" id="rede-titulo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 5 6v5c0 4.4 3 8.3 7 9.5 4-1.2 7-5.1 7-9.5V6z"/></svg>A porta fica só na sua máquina</h3>
+                        <p>A API do Talho <strong>não tem autenticação</strong>: quem alcança a porta usa o programa. O Python local já sobe em <code class="inline">127.0.0.1</code>; no Docker, faça a troca do passo 3 (<code class="inline">127.0.0.1:8000:8000</code>).</p>
+                        <p>Não exponha o Talho à rede local nem à internet sem autenticação e uma política de CORS restritiva.</p>
+                        <p class="cm-net__links"><a class="link-arrow" href="#seguranca">Os três cuidados de segurança <svg class="btn__arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a></p>
+                        <p class="cm-net__dev">Vai mexer no código? O ambiente de quem contribui está em <a class="inline-link" href="contribuir.html#ambiente">Contribuir</a>.</p>
+                    </aside>
+                </div>
+            </div>
+        </section>
+
+        <!-- ═══════════════ 04 CHAVES ═══════════════ -->
+        <section class="section section--alt" id="chaves" aria-labelledby="chaves-titulo">
+            <div class="container">
+                <header class="section-head">
+                    <p class="eyebrow eyebrow--violet" data-reveal>04 — Chaves</p>
+                    <h2 class="section-title" id="chaves-titulo" data-reveal>Chaves de API: opcionais, suas e sob o seu controle</h2>
+                    <p class="lead" data-reveal>Dá para começar sem chave nenhuma. As chaves só ligam as partes em nuvem — que o provedor cobra por uso, direto da sua conta. O Talho não intermedeia nem cobra nada.</p>
+                </header>
+
+                <div class="cm-keys">
+                    <div class="cm-keys__env" data-reveal>
+                        <div class="prose">
+                            <p>O <code>.env</code> é um arquivo de texto na raiz do projeto, com uma configuração por linha, no formato <code>NOME=valor</code>. Ele nasce como cópia do <code>.env.example</code> — os scripts do Windows fazem essa cópia sozinhos — e o Git o ignora de propósito, porque ele guarda segredos.</p>
+                        </div>
+                        <div class="code cm-env">
+                            <div class="code__bar"><span class="code__lang">.env — exemplo</span></div>
+<pre><code><span class="c"># na raiz do projeto · o Git ignora este arquivo</span>
+<span class="v">OPENROUTER_API_KEY</span>=<span class="s">cole_sua_chave</span>   <span class="c"># visão, títulos, temas, resumos, agente</span>
+<span class="v">ASSEMBLYAI_API_KEY</span>=<span class="s">cole_sua_chave</span>   <span class="c"># transcrição em nuvem</span>
+<span class="v">DEEPGRAM_API_KEY</span>=                   <span class="c"># vazia = desligada</span></code></pre>
+                        </div>
+                        <div class="callout callout--violet cm-keys__panel">
+                            <p><strong>O painel tem prioridade.</strong> Chaves e modelos também se ajustam em <strong>Configurações › Modelos &amp; Chaves</strong>, sem reiniciar — e o valor salvo no painel vale mais que o do <code class="inline">.env</code>. Lá, as chaves aparecem mascaradas.</p>
+                        </div>
+                    </div>
+
+                    <div class="cm-sim" data-keysim data-reveal style="--d: 120ms">
+                        <h3 class="cm-sim__title">Comece sem chave nenhuma</h3>
+                        <p class="cm-sim__hint">O que está aceso em verde já funciona na sua máquina. Ligue uma chave para ver o que ela acende.</p>
+                        <div class="cm-sim__keys" role="group" aria-label="Simular chaves de nuvem">
+                            <button class="cm-key" type="button" data-key="openrouter" aria-pressed="false"><span class="cm-key__switch" aria-hidden="true"></span>OpenRouter</button>
+                            <button class="cm-key" type="button" data-key="asr" aria-pressed="false"><span class="cm-key__switch" aria-hidden="true"></span>AssemblyAI ou Deepgram</button>
+                            <button class="cm-key" type="button" data-key="auphonic" aria-pressed="false"><span class="cm-key__switch" aria-hidden="true"></span>Auphonic</button>
+                        </div>
+                        <ul class="cm-sim__list" role="list">
+                            <li class="cm-feat is-on" data-need="local"><span class="cm-feat__led" aria-hidden="true"></span><span class="cm-feat__name">Catalogar o acervo sem copiar nada</span><span class="cm-feat__tag">local</span></li>
+                            <li class="cm-feat is-on" data-need="local"><span class="cm-feat__led" aria-hidden="true"></span><span class="cm-feat__name">Proxies leves e miniaturas</span><span class="cm-feat__tag">local</span></li>
+                            <li class="cm-feat is-on" data-need="local"><span class="cm-feat__led" aria-hidden="true"></span><span class="cm-feat__name">Achar os cortes e os beats</span><span class="cm-feat__tag">local</span></li>
+                            <li class="cm-feat is-on" data-need="local"><span class="cm-feat__led" aria-hidden="true"></span><span class="cm-feat__name">Busca visual e “Encontrar Similares”</span><span class="cm-feat__tag">local</span></li>
+                            <li class="cm-feat is-on" data-need="local"><span class="cm-feat__led" aria-hidden="true"></span><span class="cm-feat__name">Detectar e agrupar rostos</span><span class="cm-feat__tag">local</span></li>
+                            <li class="cm-feat is-on" data-need="local"><span class="cm-feat__led" aria-hidden="true"></span><span class="cm-feat__name">Medir e tratar o áudio</span><span class="cm-feat__tag">local</span></li>
+                            <li class="cm-feat is-on" data-need="local"><span class="cm-feat__led" aria-hidden="true"></span><span class="cm-feat__name">Transcrever com o Whisper local</span><span class="cm-feat__tag">local*</span></li>
+                            <li class="cm-feat is-on" data-need="local"><span class="cm-feat__led" aria-hidden="true"></span><span class="cm-feat__name">Timeline, títulos e legendas</span><span class="cm-feat__tag">local</span></li>
+                            <li class="cm-feat is-on" data-need="local"><span class="cm-feat__led" aria-hidden="true"></span><span class="cm-feat__name">Exportar .otio, .xml e .edl</span><span class="cm-feat__tag">local</span></li>
+                            <li class="cm-feat is-on" data-need="local"><span class="cm-feat__led" aria-hidden="true"></span><span class="cm-feat__name">Renderizar MP4</span><span class="cm-feat__tag">local</span></li>
+                            <li class="cm-feat" data-need="openrouter"><span class="cm-feat__led" aria-hidden="true"></span><span class="cm-feat__name">Descrever os quadros (visão)</span><span class="cm-feat__tag">OpenRouter</span></li>
+                            <li class="cm-feat" data-need="openrouter"><span class="cm-feat__led" aria-hidden="true"></span><span class="cm-feat__name">Títulos executivos</span><span class="cm-feat__tag">OpenRouter</span></li>
+                            <li class="cm-feat" data-need="openrouter"><span class="cm-feat__led" aria-hidden="true"></span><span class="cm-feat__name">Temas e resumos</span><span class="cm-feat__tag">OpenRouter</span></li>
+                            <li class="cm-feat" data-need="openrouter"><span class="cm-feat__led" aria-hidden="true"></span><span class="cm-feat__name">Agente de montagem</span><span class="cm-feat__tag">OpenRouter</span></li>
+                            <li class="cm-feat" data-need="asr"><span class="cm-feat__led" aria-hidden="true"></span><span class="cm-feat__name">Transcrição em nuvem, por falante</span><span class="cm-feat__tag">AssemblyAI · Deepgram</span></li>
+                            <li class="cm-feat" data-need="auphonic"><span class="cm-feat__led" aria-hidden="true"></span><span class="cm-feat__name">Tratamento de áudio na nuvem</span><span class="cm-feat__tag">Auphonic</span></li>
+                        </ul>
+                        <p class="cm-sim__foot">* Depois de baixar um Whisper em Configurações › Modelos locais.</p>
+                        <p class="cm-sim__status" data-keysim-status aria-live="polite">Sem chave nenhuma: 10 de 16 itens desta lista já funcionam — todos na sua máquina.</p>
+                    </div>
+                </div>
+
+                <h3 class="cm-sub" data-reveal>Cada chave, em poucas linhas</h3>
+                <div class="grid grid--3 cm-keycards" data-reveal-stagger="70">
+                    <article class="card cm-keycard" data-reveal data-glow>
+                        <div class="cm-keycard__top"><h4 class="cm-keycard__name">OpenRouter</h4><span class="chip chip--emerald">opcional</span></div>
+                        <code class="cm-keycard__var">OPENROUTER_API_KEY</code>
+                        <p class="cm-keycard__text"><strong>Liga:</strong> a descrição visual dos quadros, os títulos executivos, temas, resumos e o agente de montagem. Padrões: Gemini 2.5 Flash na visão, DeepSeek V4.1 Flash no texto.</p>
+                        <p class="cm-keycard__text"><strong>Sem ela:</strong> essas funções ficam desligadas; o resto segue.</p>
+                        <a class="link-arrow cm-keycard__link" href="https://openrouter.ai/keys">Criar chave no OpenRouter <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 5h5v5M19 5l-8 8M18 14v4a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h4"/></svg></a>
+                    </article>
+                    <article class="card cm-keycard" data-reveal data-glow>
+                        <div class="cm-keycard__top"><h4 class="cm-keycard__name">AssemblyAI</h4><span class="chip chip--emerald">opcional</span></div>
+                        <code class="cm-keycard__var">ASSEMBLYAI_API_KEY</code>
+                        <p class="cm-keycard__text"><strong>Liga:</strong> a transcrição em nuvem padrão, em pt-BR, com as falas separadas por pessoa.</p>
+                        <p class="cm-keycard__text"><strong>Sem ela:</strong> o Whisper local transcreve de graça, na sua CPU.</p>
+                        <a class="link-arrow cm-keycard__link" href="https://www.assemblyai.com/app/account">Criar chave na AssemblyAI <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 5h5v5M19 5l-8 8M18 14v4a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h4"/></svg></a>
+                    </article>
+                    <article class="card cm-keycard" data-reveal data-glow>
+                        <div class="cm-keycard__top"><h4 class="cm-keycard__name">Deepgram</h4><span class="chip chip--emerald">opcional</span></div>
+                        <code class="cm-keycard__var">DEEPGRAM_API_KEY</code>
+                        <p class="cm-keycard__text"><strong>Liga:</strong> uma transcrição alternativa em nuvem, a Nova-3.</p>
+                        <p class="cm-keycard__text"><strong>Sem ela:</strong> nada muda — é só mais uma opção.</p>
+                        <a class="link-arrow cm-keycard__link" href="https://console.deepgram.com">Criar chave na Deepgram <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 5h5v5M19 5l-8 8M18 14v4a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h4"/></svg></a>
+                    </article>
+                    <article class="card cm-keycard" data-reveal data-glow>
+                        <div class="cm-keycard__top"><h4 class="cm-keycard__name">Auphonic</h4><span class="chip chip--violet">no painel</span></div>
+                        <code class="cm-keycard__var">Configurações › Modelos &amp; Chaves</code>
+                        <p class="cm-keycard__text"><strong>Liga:</strong> o tratamento de áudio na nuvem — dereverb, AutoEQ, denoise que preserva a ambiência. O plano gratuito do Auphonic dá 2 h por mês.</p>
+                        <p class="cm-keycard__text"><strong>Onde:</strong> cadastre no painel; o <code class="inline">AUPHONIC_API_KEY</code> do <code class="inline">.env</code> só serve de reserva. Sem ela, a medição e o tratamento local seguem.</p>
+                        <a class="link-arrow cm-keycard__link" href="https://auphonic.com/">Conhecer o Auphonic <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 5h5v5M19 5l-8 8M18 14v4a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h4"/></svg></a>
+                    </article>
+                    <article class="card cm-keycard" data-reveal data-glow>
+                        <div class="cm-keycard__top"><h4 class="cm-keycard__name">Hugging Face</h4><span class="chip chip--emerald">opcional</span></div>
+                        <code class="cm-keycard__var">HF_TOKEN</code>
+                        <p class="cm-keycard__text"><strong>Liga:</strong> o download de modelos locais que pedem aceite de termos, como a separação de falantes pyannote.</p>
+                        <p class="cm-keycard__text"><strong>Sem ele:</strong> os modelos sem termos baixam normalmente.</p>
+                        <a class="link-arrow cm-keycard__link" href="https://huggingface.co/settings/tokens">Criar token no Hugging Face <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 5h5v5M19 5l-8 8M18 14v4a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h4"/></svg></a>
+                    </article>
+                    <article class="card cm-keycard" data-reveal data-glow>
+                        <div class="cm-keycard__top"><h4 class="cm-keycard__name">Typesafe</h4><span class="chip chip--emerald">opcional</span></div>
+                        <code class="cm-keycard__var">TYPESAFE_API_KEY</code>
+                        <p class="cm-keycard__text"><strong>Liga:</strong> a triagem ultrarrápida do material em nuvem (o “Sistema 1”).</p>
+                        <p class="cm-keycard__text"><strong>Sem ela:</strong> a alternativa local é a Laya — veja <a class="inline-link" href="#modelos-locais">Modelos locais</a>.</p>
+                        <a class="link-arrow cm-keycard__link" href="https://console.typesafe.ai">Abrir o console Typesafe <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 5h5v5M19 5l-8 8M18 14v4a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h4"/></svg></a>
+                    </article>
+                </div>
+                <p class="cm-keys__more" data-reveal>Também cabem no <code class="inline">.env</code>, todos opcionais: chaves diretas de provedores (Gemini, Anthropic, DeepSeek, NVIDIA NIM), o Azure Face (<code class="inline">AZURE_FACE_ENDPOINT</code> e <code class="inline">AZURE_FACE_KEY</code>) como alternativa ao reconhecimento facial local, o armazenamento S3 (<code class="inline">USE_S3_STORAGE</code>, desligado por padrão), a troca de modelos (<code class="inline">TEXT_MODEL</code>, <code class="inline">VISION_MODEL</code>, <code class="inline">AGENT_MODEL</code>…), o desempenho (<code class="inline">MAX_CONVERSION_WORKERS</code>) e as pastas. Está tudo comentado no próprio <a class="inline-link" href="https://github.com/fernangcortes/capiau-talho-v03/blob/main/.env.example">.env.example</a>.</p>
+
+                <div class="grid grid--2 cm-keys__tips">
+                    <aside class="callout callout--emerald" aria-labelledby="teto-titulo" data-reveal>
+                        <h3 class="cm-callout__title" id="teto-titulo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 17a8 8 0 1 1 15 0"/><path d="m12 13.5 3.5-4"/><circle cx="12" cy="13.5" r="1.2"/></svg>Ponha um teto de gastos</h3>
+                        <p>No OpenRouter, defina um limite mensal em <em>Settings › Limits</em> (por exemplo, US$ 5). Na AssemblyAI, acompanhe o consumo no painel de faturamento.</p>
+                        <p>Para ter uma ideia: o projeto foi desenhado para processar <strong>20 horas de vídeo por menos de R$ 30</strong>. O áudio sobe como MP3 mono de 16 kHz, só as entrevistas vão para a transcrição (o B-roll fica de fora) e só um quadro por trecho vai para a visão.</p>
+                        <p class="cm-net__links"><a class="link-arrow" href="como-funciona.html#custos">Como o Talho economiza <svg class="btn__arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a></p>
+                    </aside>
+                    <aside class="callout callout--amber" aria-labelledby="free-titulo" data-reveal style="--d: 100ms">
+                        <h3 class="cm-callout__title" id="free-titulo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4 2.5 20h19z"/><path d="M12 10v4M12 17h.01"/></svg>Modelos gratuitos têm limite</h3>
+                        <p>No OpenRouter, os modelos <code class="inline">:free</code> aceitam 20 pedidos por minuto e 50 por dia — ou 1000 por dia, se a conta já comprou US$ 10. Em lotes grandes, eles também falham por timeout.</p>
+                        <p>Por isso a visão usa um modelo pago por padrão e deixa o gratuito como reserva (<code class="inline">VISION_MODEL_FALLBACK</code>).</p>
+                    </aside>
+                </div>
+            </div>
+        </section>
+
+        <!-- ═══════════════ 05 MODELOS LOCAIS ═══════════════ -->
+        <section class="section" id="modelos-locais" aria-labelledby="modelos-titulo">
+            <div class="container">
+                <header class="section-head">
+                    <p class="eyebrow eyebrow--emerald" data-reveal>05 — Modelos locais</p>
+                    <h2 class="section-title" id="modelos-titulo" data-reveal>Modelos que rodam na sua CPU — <span class="text-gradient">quando você quiser</span></h2>
+                    <p class="lead" data-reveal>Nada baixa sozinho. Em <strong>Configurações › Modelos locais</strong> você vê o catálogo, o tamanho de cada modelo e baixa só o que for usar. Eles rodam na sua máquina, sem custo de API.</p>
+                </header>
+
+                <div class="cm-models">
+                    <article class="cm-mgroup cm-mgroup--asr" data-reveal>
+                        <header class="cm-mgroup__head">
+                            <span class="card__icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></span>
+                            <div><h3 class="cm-mgroup__title">Transcrição</h3><p class="cm-mgroup__sub">fala vira texto, palavra a palavra</p></div>
+                        </header>
+                        <ul class="cm-mlist" role="list">
+                            <li class="cm-model" style="--w: 50%; --d: 0ms"><div class="cm-model__top"><span class="cm-model__name">Whisper large-v3-turbo</span><span class="cm-model__size">1,6 GB</span></div><span class="cm-model__bar" aria-hidden="true"><span></span></span><p class="cm-model__use">O padrão do Whisper: transcreve em cerca de 0,4× o tempo do áudio, na CPU.</p><div class="cm-model__tags"><span class="chip chip--emerald">padrão</span></div></li>
+                            <li class="cm-model" style="--w: 28%; --d: 70ms"><div class="cm-model__top"><span class="cm-model__name">Whisper small</span><span class="cm-model__size">484 MB</span></div><span class="cm-model__bar" aria-hidden="true"><span></span></span><p class="cm-model__use">Leve: uma reserva para quando não houver internet.</p></li>
+                            <li class="cm-model" style="--w: 49%; --d: 140ms"><div class="cm-model__top"><span class="cm-model__name">Whisper medium</span><span class="cm-model__size">1,5 GB</span></div><span class="cm-model__bar" aria-hidden="true"><span></span></span><p class="cm-model__use">Transcrição local de porte médio.</p></li>
+                            <li class="cm-model" style="--w: 70%; --d: 210ms"><div class="cm-model__top"><span class="cm-model__name">Whisper large-v3</span><span class="cm-model__size">3,1 GB</span></div><span class="cm-model__bar" aria-hidden="true"><span></span></span><p class="cm-model__use">Grande; mais lento que a turbo.</p></li>
+                            <li class="cm-model" style="--w: 15%; --d: 280ms"><div class="cm-model__top"><span class="cm-model__name">Whisper tiny · base</span><span class="cm-model__size">76 · 145 MB</span></div><span class="cm-model__bar" aria-hidden="true"><span></span></span><p class="cm-model__use">Os mínimos — fracos em português.</p></li>
+                            <li class="cm-model" style="--w: 100%; --d: 350ms"><div class="cm-model__top"><span class="cm-model__name">NVIDIA Canary 1B v2</span><span class="cm-model__size">6,4 GB</span></div><span class="cm-model__bar" aria-hidden="true"><span></span></span><p class="cm-model__use">Cerca de 1,5× o tempo do áudio na CPU; pode repetir frases em áudio ruidoso. Depois de baixado, ocupa 6 GB.</p><div class="cm-model__tags"><span class="chip chip--amber">.venv-nemo</span></div></li>
+                            <li class="cm-model" style="--w: 38%; --d: 420ms"><div class="cm-model__top"><span class="cm-model__name">SenseVoice Small</span><span class="cm-model__size">940 MB</span></div><span class="cm-model__bar" aria-hidden="true"><span></span></span><p class="cm-model__use">Rápido, mas só chinês, inglês, japonês, coreano e cantonês.</p><div class="cm-model__tags"><span class="chip chip--amber">.venv-nemo</span></div></li>
+                        </ul>
+                        <p class="cm-mgroup__note">Há também versões do Whisper só para inglês (as <code class="inline">.en</code> e as <code class="inline">distil</code>).</p>
+                    </article>
+
+                    <article class="cm-mgroup" data-reveal style="--d: 80ms">
+                        <header class="cm-mgroup__head">
+                            <span class="card__icon card__icon--violet" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="9" r="3"/><circle cx="17" cy="10" r="2.5"/><path d="M2.5 19a5.5 5.5 0 0 1 11 0M14 19a4 4 0 0 1 7.5-1.5"/></svg></span>
+                            <div><h3 class="cm-mgroup__title">Separar falantes</h3><p class="cm-mgroup__sub">quem fala quando (a diarização)</p></div>
+                        </header>
+                        <ul class="cm-mlist" role="list">
+                            <li class="cm-model" style="--w: 25%; --d: 0ms"><div class="cm-model__top"><span class="cm-model__name">NVIDIA Nemotron 3 Diarization</span><span class="cm-model__size">400 MB</span></div><span class="cm-model__bar" aria-hidden="true"><span></span></span><p class="cm-model__use">Até 8 vozes, inclusive com fala sobreposta.</p><div class="cm-model__tags"><span class="chip chip--amber">.venv-nemo</span></div></li>
+                            <li class="cm-model" style="--w: 7%; --d: 70ms"><div class="cm-model__top"><span class="cm-model__name">pyannote community-1</span><span class="cm-model__size">32 MB</span></div><span class="cm-model__bar" aria-hidden="true"><span></span></span><p class="cm-model__use">Pede aceitar os termos no Hugging Face (use o HF_TOKEN).</p><div class="cm-model__tags"><span class="chip chip--amber">.venv-nemo</span><span class="chip chip--violet">termos</span></div></li>
+                        </ul>
+                    </article>
+
+                    <article class="cm-mgroup" data-reveal style="--d: 160ms">
+                        <header class="cm-mgroup__head">
+                            <span class="card__icon card__icon--amber" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3"/><circle cx="12" cy="12" r="3"/></svg></span>
+                            <div><h3 class="cm-mgroup__title">Objetos no quadro</h3><p class="cm-mgroup__sub">achar coisas dentro da imagem</p></div>
+                        </header>
+                        <ul class="cm-mlist" role="list">
+                            <li class="cm-model" style="--w: 24%; --d: 0ms"><div class="cm-model__top"><span class="cm-model__name">YOLO-World v2 (s) + CLIP ViT-B/32</span><span class="cm-model__size">380 MB</span></div><span class="cm-model__bar" aria-hidden="true"><span></span></span><p class="cm-model__use">O mais rápido: cerca de 0,5 s por quadro.</p></li>
+                            <li class="cm-model" style="--w: 27%; --d: 70ms"><div class="cm-model__top"><span class="cm-model__name">Florence-2 base</span><span class="cm-model__size">465 MB</span></div><span class="cm-model__bar" aria-hidden="true"><span></span></span><p class="cm-model__use">Não informa confiança e marca toda classe pedida.</p></li>
+                            <li class="cm-model" style="--w: 31%; --d: 140ms"><div class="cm-model__top"><span class="cm-model__name">OWLv2 base</span><span class="cm-model__size">620 MB</span></div><span class="cm-model__bar" aria-hidden="true"><span></span></span><p class="cm-model__use">Cerca de 4 s por quadro.</p></li>
+                            <li class="cm-model" style="--w: 33%; --d: 210ms"><div class="cm-model__top"><span class="cm-model__name">Grounding DINO tiny</span><span class="cm-model__size">690 MB</span></div><span class="cm-model__bar" aria-hidden="true"><span></span></span><p class="cm-model__use">Cerca de 8 s por quadro.</p></li>
+                        </ul>
+                    </article>
+
+                    <article class="cm-mgroup" data-reveal style="--d: 240ms">
+                        <header class="cm-mgroup__head">
+                            <span class="card__icon card__icon--emerald" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12h2M7 8v8M11 5v14M15 9v6M19 7v10"/></svg></span>
+                            <div><h3 class="cm-mgroup__title">Som e triagem</h3><p class="cm-mgroup__sub">o tipo de som e a primeira separação do material</p></div>
+                        </header>
+                        <ul class="cm-mlist" role="list">
+                            <li class="cm-model" style="--w: 6%; --d: 0ms"><div class="cm-model__top"><span class="cm-model__name">PANNs Cnn10 (AudioSet)</span><span class="cm-model__size">25 MB</span></div><span class="cm-model__bar" aria-hidden="true"><span></span></span><p class="cm-model__use">Diz o tipo de som — trilha, fala, efeito, ambiente, room tone — em ~2 s por arquivo.</p></li>
+                            <li class="cm-model" style="--w: 32%; --d: 70ms"><div class="cm-model__top"><span class="cm-model__name">Laya multilíngue</span><span class="cm-model__size">650 MB</span></div><span class="cm-model__bar" aria-hidden="true"><span></span></span><p class="cm-model__use">Triagem local na CPU (o Sistema 1), em modo sombra (só observa) ou decidindo.</p></li>
+                        </ul>
+                        <div class="cm-mgroup__extra">
+                            <p>O denoise por IA (DPDFNet) instala à parte, no ambiente do Talho:</p>
+                            <div class="code">
+                                <div class="code__bar"><span class="code__lang">terminal</span><button class="copy-btn" type="button" data-copy><svg class="copy-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg><svg class="copy-ok" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Copiar</button></div>
+<pre><code><span class="k">pip install</span> sherpa-onnx soundfile
+<span class="k">python</span> scripts/baixar_modelo_denoise.py</code></pre>
+                            </div>
+                        </div>
+                    </article>
+                </div>
+                <p class="cm-models__legend" data-reveal>A barra mostra o peso do download, em escala comprimida. Tamanhos do catálogo do próprio programa.</p>
+
+                <div class="grid grid--2 cm-models__foot">
+                    <details class="faq cm-nemo" data-reveal>
+                        <summary>O que é o <code class="inline">.venv-nemo</code> e como montar</summary>
+                        <div class="faq__body">
+                            <p>Canary, SenseVoice, Nemotron Diarization e pyannote rodam num segundo ambiente Python, fora do <code class="inline">.venv</code> principal, porque pedem versões de bibliotecas diferentes. No Windows, na raiz do projeto:</p>
+                            <div class="code">
+                                <div class="code__bar"><span class="code__lang">PowerShell</span><button class="copy-btn" type="button" data-copy><svg class="copy-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg><svg class="copy-ok" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Copiar</button></div>
+<pre><code><span class="k">uv venv</span> .venv-nemo --python 3.12
+<span class="k">uv pip install</span> --python .venv-nemo\Scripts\python.exe torch --index-url https://download.pytorch.org/whl/cpu
+<span class="k">uv pip install</span> --python .venv-nemo\Scripts\python.exe -r requirements-nemo.txt</code></pre>
+                            </div>
+                            <p>Montou em outro lugar? Aponte a variável <code class="inline">CAPIAU_VENV_NEMO</code> para a pasta do ambiente.</p>
+                        </div>
+                    </details>
+                    <aside class="callout callout--amber cm-missing" aria-labelledby="falta-titulo" data-reveal style="--d: 100ms">
+                        <h3 class="cm-callout__title" id="falta-titulo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4 2.5 20h19z"/><path d="M12 10v4M12 17h.01"/></svg>O que ainda não existe</h3>
+                        <p>Não há modelo local de linguagem nem de visão para descrever imagens, gerar títulos, temas e resumos ou conversar com o agente. Essas partes dependem de uma chave de nuvem (OpenRouter).</p>
+                    </aside>
+                </div>
+            </div>
+        </section>
+
+        <!-- ═══════════════ 06 PRIMEIROS PASSOS ═══════════════ -->
+        <section class="section section--alt" id="primeiros-passos" aria-labelledby="passos-titulo">
+            <div class="container">
+                <header class="section-head">
+                    <p class="eyebrow eyebrow--rose" data-reveal>06 — Primeiros passos</p>
+                    <h2 class="section-title" id="passos-titulo" data-reveal>Do zero ao primeiro corte, <span class="text-gradient">em 5 passos</span></h2>
+                    <p class="lead" data-reveal>O guia de 3 minutos da wiki, passo a passo. As ilustrações são estilizadas: evocam o programa, não são capturas de tela.</p>
+                </header>
+
+                <ol class="cm-walk" role="list">
+                    <li class="cm-walk__step" data-cm-lit>
+                        <div class="cm-walk__text">
+                            <span class="cm-walk__n" aria-hidden="true">01</span>
+                            <h3 class="cm-walk__title">Traga a mídia</h3>
+                            <p>Coloque vídeos, áudios ou fotos na pasta <code class="inline">watch/</code>, dentro do projeto — ou aponte o seu HD externo pela interface. Nada é copiado nem modificado: o Talho guarda só o caminho de cada arquivo.</p>
+                            <p class="cm-small">No Docker, o container só enxerga as pastas montadas no compose (<code class="inline">watch/</code> e <code class="inline">data/</code>). Para trabalhar direto num HD externo, o Python local é o caminho mais simples.</p>
+                        </div>
+                        <figure class="cm-mini cm-mini--ingest cm-anim" aria-hidden="true"><svg class="cm-mini__svg" viewBox="0 0 320 200" focusable="false"><defs><linearGradient id="mi1-folder" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#a78bfa" stop-opacity=".34"/><stop offset="1" stop-color="#22d3ee" stop-opacity=".2"/></linearGradient></defs><path class="mi-link" d="M152 44C178 44 180 88 206 92"/><path class="mi-link" d="M152 86C176 86 182 94 206 95"/><path class="mi-link" d="M152 128C178 128 180 102 206 98"/><g class="mi-file" style="--i: 0"><rect class="mi-card" x="18" y="30" width="134" height="28" rx="7"/><rect class="mi-ico-v" x="26" y="37" width="20" height="14" rx="3"/><path class="mi-ico-play" d="M33.5 40.5v7l5.5-3.5z"/><text class="mi-t" x="54" y="48">MOV_0492.MOV</text></g><g class="mi-file" style="--i: 1"><rect class="mi-card" x="18" y="72" width="134" height="28" rx="7"/><rect class="mi-ico-v" x="26" y="79" width="20" height="14" rx="3"/><path class="mi-ico-play" d="M33.5 82.5v7l5.5-3.5z"/><text class="mi-t" x="54" y="90">00012.MTS</text></g><g class="mi-file" style="--i: 2"><rect class="mi-card" x="18" y="114" width="134" height="28" rx="7"/><rect class="mi-ico-p" x="26" y="121" width="20" height="14" rx="3"/><path class="mi-ico-mtn" d="M28 133l5-5 4 3.5 3-2.5 4 4z"/><text class="mi-t" x="54" y="132">IMG_2231.CR2</text></g><g class="mi-folder"><path class="mi-folder__back" d="M206 60a6 6 0 0 1 6-6h24l8 8h40a6 6 0 0 1 6 6v62a6 6 0 0 1-6 6h-72a6 6 0 0 1-6-6z" fill="url(#mi1-folder)"/><text class="mi-t mi-t--strong" x="248" y="102" text-anchor="middle">watch/</text></g><g class="mi-check"><circle class="mi-check__bg" cx="288" cy="56" r="10"/><path class="mi-check__ok" d="M283.5 56.2l3.2 3.2 5.8-6.4"/></g><g class="mi-note"><rect class="mi-pill" x="46" y="160" width="228" height="24" rx="12"/><text class="mi-t" x="160" y="175.5" text-anchor="middle">SHA-256 · guarda só o caminho</text></g></svg></figure>
+                    </li>
+                    <li class="cm-walk__step" data-cm-lit>
+                        <div class="cm-walk__text">
+                            <span class="cm-walk__n" aria-hidden="true">02</span>
+                            <h3 class="cm-walk__title">Escaneie e indexe</h3>
+                            <p>Clique para escanear a pasta <code class="inline">watch/</code>. O Talho lê os metadados com o FFprobe, gera proxies leves (720p) para o player, acha os cortes reais e indexa os quadros com o CLIP — tudo na sua CPU.</p>
+                        </div>
+                        <figure class="cm-mini cm-mini--scan cm-anim" aria-hidden="true"><svg class="cm-mini__svg" viewBox="0 0 320 200" focusable="false"><defs><linearGradient id="mi2-a" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f59e0b"/><stop offset="1" stop-color="#be185d"/></linearGradient><linearGradient id="mi2-b" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1e1b4b"/><stop offset="1" stop-color="#0e7490"/></linearGradient><linearGradient id="mi2-c" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1e1b4b"/><stop offset="1" stop-color="#6d28d9"/></linearGradient><linearGradient id="mi2-d" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0891b2"/><stop offset="1" stop-color="#164e63"/></linearGradient><linearGradient id="mi2-e" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#065f46"/><stop offset="1" stop-color="#10b981"/></linearGradient><linearGradient id="mi2-f" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3b0764"/><stop offset="1" stop-color="#9d174d"/></linearGradient></defs><text class="mi-t" x="18" y="22">Escaneando watch/</text><text class="mi-t mi-t--dim" x="302" y="22" text-anchor="end">6 arquivos</text><rect class="mi-track" x="18" y="30" width="284" height="5" rx="2.5"/><rect class="mi-fill" x="18" y="30" width="284" height="5" rx="2.5"/><g class="mi-thumb" style="--i: 0"><rect x="18" y="46" width="88" height="48" rx="5" fill="url(#mi2-a)"/><circle class="mi-sun" cx="82" cy="64" r="7"/><path class="mi-sil" d="M18 82q18-12 34-4t30-6 24 6V94H18z"/></g><g class="mi-thumb" style="--i: 1"><rect x="116" y="46" width="88" height="48" rx="5" fill="url(#mi2-b)"/><rect class="mi-win" x="162" y="54" width="24" height="30" rx="1.5"/><circle class="mi-sil" cx="150" cy="71" r="6"/><path class="mi-sil" d="M138 94q12-20 24 0z"/></g><g class="mi-thumb" style="--i: 2"><rect x="214" y="46" width="88" height="48" rx="5" fill="url(#mi2-c)"/><circle class="mi-moon" cx="278" cy="61" r="6"/><circle class="mi-star" cx="232" cy="58" r="1"/><circle class="mi-star" cx="252" cy="66" r="1"/><path class="mi-sil" d="M214 86h20v-10h10v6h16v-14h12v18h30v8H214z"/></g><g class="mi-thumb" style="--i: 3"><rect x="18" y="102" width="88" height="48" rx="5" fill="url(#mi2-d)"/><path class="mi-sea" d="M18 132h88v18H18z"/><path class="mi-foam" d="M26 138q6-3 12 0t12 0M64 143q6-3 12 0t12 0"/></g><g class="mi-thumb" style="--i: 4"><rect x="116" y="102" width="88" height="48" rx="5" fill="url(#mi2-e)"/><path class="mi-sil" d="M126 150l10-26 10 26zM146 150l13-34 13 34zM172 150l9-22 9 22z"/></g><g class="mi-thumb" style="--i: 5"><rect x="214" y="102" width="88" height="48" rx="5" fill="url(#mi2-f)"/><circle class="mi-face" cx="258" cy="122" r="9"/><path class="mi-face" d="M240 150q18-22 36 0z"/></g><g class="mi-tag" style="--i: 0"><rect class="mi-pill mi-pill--cyan" x="18" y="162" width="84" height="22" rx="11"/><text class="mi-t mi-t--cyan" x="60" y="176.5" text-anchor="middle">proxy 720p</text></g><g class="mi-tag" style="--i: 1"><rect class="mi-pill mi-pill--amber" x="108" y="162" width="104" height="22" rx="11"/><text class="mi-t mi-t--amber" x="160" y="176.5" text-anchor="middle">cortes e beats</text></g><g class="mi-tag" style="--i: 2"><rect class="mi-pill mi-pill--violet" x="218" y="162" width="84" height="22" rx="11"/><text class="mi-t mi-t--violet" x="260" y="176.5" text-anchor="middle">vetores CLIP</text></g></svg></figure>
+                    </li>
+                    <li class="cm-walk__step" data-cm-lit>
+                        <div class="cm-walk__text">
+                            <span class="cm-walk__n" aria-hidden="true">03</span>
+                            <h3 class="cm-walk__title">Transcreva uma entrevista</h3>
+                            <p>Abra a entrevista no player Source e use <strong>Transcrever Áudio (ASR)</strong>. A fala aparece palavra a palavra — e, com a diarização, separada por pessoa. Sem chave de nuvem? Baixe um Whisper em Modelos locais.</p>
+                        </div>
+                        <figure class="cm-mini cm-mini--asr cm-anim" aria-hidden="true"><svg class="cm-mini__svg" viewBox="0 0 320 200" focusable="false"><rect class="mi-panel" x="18" y="14" width="284" height="54" rx="8"/><g class="mi-wave"><rect x="28" y="39.0" width="3" height="4" rx="1.5"/><rect x="34" y="31.1" width="3" height="19.7" rx="1.5"/><rect x="40" y="31.4" width="3" height="19.2" rx="1.5"/><rect x="46" y="30.4" width="3" height="21.1" rx="1.5"/><rect x="52" y="34.5" width="3" height="13.0" rx="1.5"/><rect x="58" y="36.0" width="3" height="10.0" rx="1.5"/><rect x="64" y="36.8" width="3" height="8.4" rx="1.5"/><rect x="70" y="35.3" width="3" height="11.4" rx="1.5"/><rect x="76" y="31.8" width="3" height="18.5" rx="1.5"/><rect x="82" y="31.1" width="3" height="19.8" rx="1.5"/><rect x="88" y="30.0" width="3" height="22.0" rx="1.5"/><rect x="94" y="36.2" width="3" height="9.6" rx="1.5"/><rect x="100" y="32.5" width="3" height="17.1" rx="1.5"/><rect x="106" y="29.3" width="3" height="23.4" rx="1.5"/><rect x="112" y="23.4" width="3" height="35.2" rx="1.5"/><rect x="118" y="25.9" width="3" height="30.1" rx="1.5"/><rect x="124" y="28.9" width="3" height="24.2" rx="1.5"/><rect x="130" y="36.4" width="3" height="9.3" rx="1.5"/><rect x="136" y="31.6" width="3" height="18.7" rx="1.5"/><rect x="142" y="28.1" width="3" height="25.8" rx="1.5"/><rect x="148" y="28.9" width="3" height="24.2" rx="1.5"/><rect x="154" y="30.6" width="3" height="20.9" rx="1.5"/><rect x="160" y="36.0" width="3" height="10.0" rx="1.5"/><rect x="166" y="35.8" width="3" height="10.4" rx="1.5"/><rect x="172" y="38.6" width="3" height="4.7" rx="1.5"/><rect x="178" y="34.4" width="3" height="13.3" rx="1.5"/><rect x="184" y="34.5" width="3" height="13.1" rx="1.5"/><rect x="190" y="31.6" width="3" height="18.7" rx="1.5"/><rect x="196" y="35.2" width="3" height="11.5" rx="1.5"/><rect x="202" y="34.2" width="3" height="13.5" rx="1.5"/><rect x="208" y="29.2" width="3" height="23.5" rx="1.5"/><rect x="214" y="25.4" width="3" height="31.1" rx="1.5"/><rect x="220" y="24.5" width="3" height="33.0" rx="1.5"/><rect x="226" y="29.4" width="3" height="23.3" rx="1.5"/><rect x="232" y="34.2" width="3" height="13.6" rx="1.5"/><rect x="238" y="33.5" width="3" height="14.9" rx="1.5"/><rect x="244" y="26.4" width="3" height="29.2" rx="1.5"/><rect x="250" y="28.1" width="3" height="25.7" rx="1.5"/><rect x="256" y="27.9" width="3" height="26.3" rx="1.5"/><rect x="262" y="34.1" width="3" height="13.7" rx="1.5"/><rect x="268" y="36.2" width="3" height="9.5" rx="1.5"/><rect x="274" y="35.4" width="3" height="11.2" rx="1.5"/><rect x="280" y="35.4" width="3" height="11.2" rx="1.5"/><rect x="286" y="36.0" width="3" height="9.9" rx="1.5"/></g><g class="mi-head"><line class="mi-head__line" x1="28" y1="16" x2="28" y2="66"/><path class="mi-head__cap" d="M24 14h8l-4 5z"/></g><g class="mi-row mi-row--1"><rect class="mi-spk mi-spk--a" x="18" y="82" width="20" height="16" rx="4"/><text class="mi-t mi-t--spk" x="28" y="93.5" text-anchor="middle">A</text><rect class="mi-word" x="46" y="86" width="26" height="8" rx="4"/><rect class="mi-word" x="78" y="86" width="18" height="8" rx="4"/><rect class="mi-word" x="102" y="86" width="34" height="8" rx="4"/><rect class="mi-word" x="142" y="86" width="14" height="8" rx="4"/><rect class="mi-word" x="162" y="86" width="28" height="8" rx="4"/><rect class="mi-word" x="196" y="86" width="22" height="8" rx="4"/><text class="mi-t mi-t--dim" x="302" y="93" text-anchor="end">00:00:04</text></g><g class="mi-row mi-row--2"><rect class="mi-spk mi-spk--b" x="18" y="114" width="20" height="16" rx="4"/><text class="mi-t mi-t--spk" x="28" y="125.5" text-anchor="middle">B</text><rect class="mi-word" x="46" y="118" width="20" height="8" rx="4"/><rect class="mi-word" x="72" y="118" width="30" height="8" rx="4"/><rect class="mi-word" x="108" y="118" width="16" height="8" rx="4"/><rect class="mi-word" x="130" y="118" width="38" height="8" rx="4"/><rect class="mi-word" x="174" y="118" width="24" height="8" rx="4"/><text class="mi-t mi-t--dim" x="302" y="125" text-anchor="end">00:00:09</text></g><g class="mi-row mi-row--3"><rect class="mi-spk mi-spk--a" x="18" y="146" width="20" height="16" rx="4"/><text class="mi-t mi-t--spk" x="28" y="157.5" text-anchor="middle">A</text><rect class="mi-word" x="46" y="150" width="32" height="8" rx="4"/><rect class="mi-word" x="84" y="150" width="16" height="8" rx="4"/><rect class="mi-word" x="106" y="150" width="26" height="8" rx="4"/><rect class="mi-word" x="138" y="150" width="20" height="8" rx="4"/><rect class="mi-word" x="164" y="150" width="30" height="8" rx="4"/><rect class="mi-word" x="200" y="150" width="14" height="8" rx="4"/><text class="mi-t mi-t--dim" x="302" y="157" text-anchor="end">00:00:15</text></g></svg></figure>
+                    </li>
+                    <li class="cm-walk__step" data-cm-lit>
+                        <div class="cm-walk__text">
+                            <span class="cm-walk__n" aria-hidden="true">04</span>
+                            <h3 class="cm-walk__title">Monte</h3>
+                            <p>Selecione um trecho no texto e tecle <kbd>Shift</kbd>+<kbd>E</kbd>: a fala vai direto para a timeline. Prefere pelo player? Marque <kbd>I</kbd> (entrada) e <kbd>O</kbd> (saída) e use <kbd>Shift</kbd>+<kbd>E</kbd> para adicionar ao fim, ou <kbd>,</kbd> para inserir na agulha.</p>
+                            <p class="cm-small">Todos os atalhos, com os 6 perfis (CapIAu, Kdenlive, Premiere Pro, DaVinci Resolve, Final Cut Pro e Custom), estão no <a class="inline-link" href="https://github.com/fernangcortes/capiau-talho-v03/wiki/14.-Guia-Completo-de-Atalhos">guia de atalhos</a>.</p>
+                        </div>
+                        <figure class="cm-mini cm-mini--edit cm-anim" aria-hidden="true"><svg class="cm-mini__svg" viewBox="0 0 320 200" focusable="false"><rect class="mi-panel" x="18" y="12" width="284" height="40" rx="8"/><rect class="mi-spk mi-spk--a" x="26" y="24" width="20" height="16" rx="4"/><text class="mi-t mi-t--spk" x="36" y="35.5" text-anchor="middle">A</text><rect class="mi-sel" x="103" y="22" width="128" height="20" rx="4"/><rect class="mi-word" x="54" y="28" width="20" height="8" rx="4"/><rect class="mi-word" x="80" y="28" width="18" height="8" rx="4"/><rect class="mi-word mi-word--sel" x="104" y="28" width="30" height="8" rx="4"/><rect class="mi-word mi-word--sel" x="140" y="28" width="22" height="8" rx="4"/><rect class="mi-word mi-word--sel" x="168" y="28" width="26" height="8" rx="4"/><rect class="mi-word mi-word--sel" x="200" y="28" width="22" height="8" rx="4"/><rect class="mi-word" x="228" y="28" width="28" height="8" rx="4"/><rect class="mi-word" x="262" y="28" width="24" height="8" rx="4"/><g class="mi-cap mi-cap--a"><rect class="mi-key" x="114" y="60" width="50" height="24" rx="5"/><text class="mi-t mi-t--key" x="139" y="76" text-anchor="middle">Shift</text></g><text class="mi-t mi-t--dim" x="172" y="76" text-anchor="middle">+</text><g class="mi-cap mi-cap--b"><rect class="mi-key" x="180" y="60" width="28" height="24" rx="5"/><text class="mi-t mi-t--key" x="194" y="76" text-anchor="middle">E</text></g><path class="mi-ruler" d="M44 100H302M44 100v5M52 100v2.5M60 100v2.5M68 100v2.5M76 100v5M84 100v2.5M92 100v2.5M100 100v2.5M108 100v5M116 100v2.5M124 100v2.5M132 100v2.5M140 100v5M148 100v2.5M156 100v2.5M164 100v2.5M172 100v5M180 100v2.5M188 100v2.5M196 100v2.5M204 100v5M212 100v2.5M220 100v2.5M228 100v2.5M236 100v5M244 100v2.5M252 100v2.5M260 100v2.5M268 100v5M276 100v2.5M284 100v2.5M292 100v2.5M300 100v5"/><text class="mi-t mi-t--dim" x="20" y="127">V1</text><text class="mi-t mi-t--dim" x="20" y="159">A1</text><rect class="mi-lane" x="44" y="110" width="258" height="26" rx="4"/><rect class="mi-lane" x="44" y="142" width="258" height="26" rx="4"/><rect class="mi-clip mi-clip--v" x="48" y="112" width="90" height="22" rx="3"/><rect class="mi-clip mi-clip--a" x="48" y="144" width="90" height="22" rx="3"/><g class="mi-drop"><rect class="mi-clip mi-clip--v mi-clip--new" x="140" y="112" width="86" height="22" rx="3"/><rect class="mi-clip mi-clip--a mi-clip--new" x="140" y="144" width="86" height="22" rx="3"/></g><g class="mi-ph"><line class="mi-head__line" x1="226" y1="96" x2="226" y2="172"/><path class="mi-head__cap" d="M222 94h8l-4 5z"/></g></svg></figure>
+                    </li>
+                    <li class="cm-walk__step" data-cm-lit>
+                        <div class="cm-walk__text">
+                            <span class="cm-walk__n" aria-hidden="true">05</span>
+                            <h3 class="cm-walk__title">Exporte</h3>
+                            <p>Leve o primeiro corte em <code class="inline">.otio</code> para o Kdenlive 25.04+, que abre o arquivo nativamente, ou em <code class="inline">.xml</code> (FCP7) para o Premiere Pro ou o DaVinci Resolve. Também sai <code class="inline">.edl</code> — e o Talho renderiza MP4 pelo FFmpeg.</p>
+                            <p class="cm-small"><a class="link-arrow" href="recursos.html#exportacao">Tudo sobre a exportação <svg class="btn__arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a></p>
+                        </div>
+                        <figure class="cm-mini cm-mini--export cm-anim" aria-hidden="true"><svg class="cm-mini__svg" viewBox="0 0 320 200" focusable="false"><rect class="mi-panel" x="18" y="36" width="118" height="128" rx="8"/><text class="mi-t mi-t--dim" x="28" y="54">timeline</text><rect class="mi-clip mi-clip--b" x="28" y="64" width="38" height="18" rx="3"/><rect class="mi-clip mi-clip--b" x="88" y="64" width="30" height="18" rx="3"/><rect class="mi-clip mi-clip--v" x="28" y="90" width="54" height="18" rx="3"/><rect class="mi-clip mi-clip--v" x="84" y="90" width="42" height="18" rx="3"/><rect class="mi-clip mi-clip--a" x="28" y="116" width="98" height="18" rx="3"/><rect class="mi-clip mi-clip--t" x="44" y="140" width="56" height="12" rx="3"/><g class="mi-ph5"><line class="mi-head__line" x1="110" y1="58" x2="110" y2="158"/><path class="mi-head__cap" d="M106 56h8l-4 5z"/></g><path class="mi-flow" d="M142 100H174"/><path class="mi-chev" d="M168 94l6 6-6 6"/><g class="mi-out" style="--i: 0"><rect class="mi-card mi-card--violet" x="182" y="28" width="120" height="38" rx="7"/><text class="mi-ext mi-t--violet" x="194" y="45">.otio</text><text class="mi-t mi-t--dim mi-t--xs" x="194" y="58">Kdenlive 25.04+</text></g><g class="mi-out" style="--i: 1"><rect class="mi-card mi-card--cyan" x="182" y="81" width="120" height="38" rx="7"/><text class="mi-ext mi-t--cyan" x="194" y="98">.xml</text><text class="mi-t mi-t--dim mi-t--xs" x="194" y="111">Premiere · Resolve</text></g><g class="mi-out" style="--i: 2"><rect class="mi-card mi-card--amber" x="182" y="134" width="120" height="38" rx="7"/><text class="mi-ext mi-t--amber" x="194" y="151">.edl</text><text class="mi-t mi-t--dim mi-t--xs" x="194" y="164">CMX 3600</text></g></svg></figure>
+                    </li>
+                </ol>
+            </div>
+        </section>
+
+        <!-- ═══════════════ 07 SEGURANÇA ═══════════════ -->
+        <section class="section" id="seguranca" aria-labelledby="seguranca-titulo">
+            <div class="container">
+                <header class="section-head">
+                    <p class="eyebrow eyebrow--rose" data-reveal>07 — Segurança</p>
+                    <h2 class="section-title" id="seguranca-titulo" data-reveal>Três cuidados que valem para todo mundo</h2>
+                    <p class="lead" data-reveal>O Talho roda na sua máquina e confia em quem está nela. Por isso, mantenha-o só nela — e as chaves, só com você.</p>
+                </header>
+
+                <div class="cm-wire" data-inview aria-hidden="true">
+                    <div class="cm-wire__node cm-wire__node--me">
+                        <span class="cm-wire__icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5" width="16" height="11" rx="1.5"/><path d="M2 19h20"/></svg></span>
+                        <span class="cm-wire__label">sua máquina</span>
+                        <span class="cm-wire__addr">127.0.0.1:8000</span>
+                    </div>
+                    <div class="cm-wire__line"><span class="cm-wire__a"></span><span class="cm-wire__b"></span><span class="cm-wire__cut"></span></div>
+                    <div class="cm-wire__node cm-wire__node--net">
+                        <span class="cm-wire__icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z"/></svg></span>
+                        <span class="cm-wire__label">rede e internet</span>
+                        <span class="cm-wire__addr">sem acesso</span>
+                    </div>
+                </div>
+
+                <div class="grid grid--3" data-reveal-stagger="90">
+                    <article class="card" data-reveal data-glow>
+                        <div class="card__icon card__icon--rose" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 5 6v5c0 4.4 3 8.3 7 9.5 4-1.2 7-5.1 7-9.5V6z"/></svg></div>
+                        <h3 class="card__title">Só no 127.0.0.1</h3>
+                        <p class="card__text">A API não tem autenticação: quem alcança a porta usa o programa. Deixe-a presa a esta máquina — <code class="inline">127.0.0.1:8000:8000</code> no compose; o Python local já sobe assim. Nada de expor à rede ou à internet sem autenticação e CORS restritivo.</p>
+                    </article>
+                    <article class="card" data-reveal data-glow>
+                        <div class="card__icon card__icon--amber" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></div>
+                        <h3 class="card__title">O <code class="inline">.env</code> não sai daqui</h3>
+                        <p class="card__text">Ele guarda segredos e já está no <code class="inline">.gitignore</code>. Nunca force a entrada dele num commit, nem cole chaves em issues, prints ou logs. Para mostrar a configuração a alguém, use o <code class="inline">.env.example</code>, com os campos vazios.</p>
+                    </article>
+                    <article class="card" data-reveal data-glow>
+                        <div class="card__icon card__icon--violet" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 12a8 8 0 0 1-14.3 4.9M4 12a8 8 0 0 1 14.3-4.9"/><path d="M18.5 3.5v4h-4M5.5 20.5v-4h4"/></svg></div>
+                        <h3 class="card__title">Troque as chaves de tempos em tempos</h3>
+                        <p class="card__text">A cada 6 meses — ou na hora, se suspeitar de vazamento. Gere a nova no site do provedor, cole no painel ou no <code class="inline">.env</code> e revogue a antiga lá. No OpenRouter, dá também para restringir a chave e limitar os gastos.</p>
+                    </article>
+                </div>
+            </div>
+        </section>
+
+        <!-- ═══════════════ 08 PROBLEMAS ═══════════════ -->
+        <section class="section section--alt" id="problemas" aria-labelledby="problemas-titulo">
+            <div class="container container--narrow">
+                <header class="section-head">
+                    <p class="eyebrow eyebrow--amber" data-reveal>08 — Problemas</p>
+                    <h2 class="section-title" id="problemas-titulo" data-reveal>Travou? Quase sempre é um destes</h2>
+                    <p class="lead" data-reveal>Os tropeços mais comuns, com a correção pronta para copiar. Não achou o seu? Abra um issue contando o erro — relato de instalação também ajuda o projeto.</p>
+                </header>
+
+                <div class="cm-faq">
+                    <details class="faq" id="faq-tokenizers" data-reveal>
+                        <summary>O servidor não abre, e o erro fala em <code class="inline">tokenizers</code> ou <code class="inline">transformers</code></summary>
+                        <div class="faq__body">
+                            <p>Mensagem típica:</p>
+                            <div class="code">
+                                <div class="code__bar"><span class="code__lang">erro</span></div>
+<pre><code>ImportError: tokenizers&gt;=0.22.0,&lt;=0.23.0 is required for a normal functioning
+of this module, but found tokenizers==0.23.1</code></pre>
+                            </div>
+                            <p>Alguma instalação avulsa atualizou o <code class="inline">tokenizers</code> além do que o <code class="inline">transformers</code> aceita. Volte para a versão compatível, no ambiente do Talho:</p>
+                            <div class="code">
+                                <div class="code__bar"><span class="code__lang">terminal</span><button class="copy-btn" type="button" data-copy><svg class="copy-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg><svg class="copy-ok" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Copiar</button></div>
+<pre><code><span class="k">pip install</span> <span class="s">"tokenizers==0.22.2"</span></code></pre>
+                            </div>
+                            <p class="cm-small">A <code class="inline">0.23.0</code> nunca saiu em versão final — o salto foi da <code class="inline">0.22.2</code> para a <code class="inline">0.23.1</code>. Para não acontecer de novo, use um ambiente virtual só do Talho (o <code class="inline">.venv</code>): sem ele, qualquer projeto Python da máquina mexe nas dependências deste.</p>
+                        </div>
+                    </details>
+
+                    <details class="faq" id="faq-ffmpeg" data-reveal>
+                        <summary><code class="inline">ffmpeg</code> não é reconhecido como comando</summary>
+                        <div class="faq__body">
+                            <p>O Talho chama o FFmpeg pelo nome, então ele precisa estar no <code class="inline">PATH</code> — ter o <code class="inline">ffmpeg.exe</code> numa pasta qualquer não basta. Sintoma típico: a ingestão até roda, mas nenhum proxy é gerado e a transcrição nunca começa. Confira onde ele está:</p>
+                            <div class="cm-duo">
+                                <div class="code">
+                                    <div class="code__bar"><span class="code__lang">PowerShell</span><button class="copy-btn" type="button" data-copy><svg class="copy-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg><svg class="copy-ok" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Copiar</button></div>
+<pre><code><span class="k">Get-Command</span> ffmpeg</code></pre>
+                                </div>
+                                <div class="code">
+                                    <div class="code__bar"><span class="code__lang">bash</span><button class="copy-btn" type="button" data-copy><svg class="copy-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg><svg class="copy-ok" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Copiar</button></div>
+<pre><code><span class="k">ffmpeg</span> -version</code></pre>
+                                </div>
+                            </div>
+                            <p>Não apareceu nada? Instale e abra um terminal novo:</p>
+                            <div class="cm-duo">
+                                <div class="code">
+                                    <div class="code__bar"><span class="code__lang">PowerShell</span><button class="copy-btn" type="button" data-copy><svg class="copy-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg><svg class="copy-ok" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Copiar</button></div>
+<pre><code><span class="k">winget install</span> Gyan.FFmpeg</code></pre>
+                                </div>
+                                <div class="code">
+                                    <div class="code__bar"><span class="code__lang">Debian/Ubuntu</span><button class="copy-btn" type="button" data-copy><svg class="copy-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg><svg class="copy-ok" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Copiar</button></div>
+<pre><code><span class="k">sudo apt update</span> &amp;&amp; <span class="k">sudo apt install</span> -y ffmpeg</code></pre>
+                                </div>
+                            </div>
+                            <p class="cm-small">Já tem o FFmpeg numa pasta? Adicione essa pasta (a que contém <code class="inline">ffmpeg.exe</code> e <code class="inline">ffprobe.exe</code>) às variáveis de ambiente do Windows. No Docker, nada disso: o FFmpeg já vem no container.</p>
+                        </div>
+                    </details>
+
+                    <details class="faq" id="faq-desgrudado" data-reveal>
+                        <summary>O servidor morre sozinho depois de horas rodando (Windows)</summary>
+                        <div class="faq__body">
+                            <p>Se a janela do terminal que iniciou o servidor fecha, o Windows manda um <code class="inline">CTRL_CLOSE_EVENT</code> e o runtime MKL/PyTorch aborta — derrubando o servidor e os workers juntos. A saída é o lançador desgrudado, que sobe o servidor sem console nenhum (sem janela, não há o que fechar):</p>
+                            <div class="code">
+                                <div class="code__bar"><span class="code__lang">PowerShell</span><button class="copy-btn" type="button" data-copy><svg class="copy-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg><svg class="copy-ok" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Copiar</button></div>
+<pre><code><span class="k">.venv\Scripts\python</span> scripts\launch_detached.py .venv\Scripts\python.exe -m uvicorn src.api.server:app --host 127.0.0.1 --port 8000 --stdout logs\servidor.log --stderr logs\servidor-erros.log</code></pre>
+                            </div>
+                            <p class="cm-small">Ele mostra o <code class="inline">PID</code> do servidor, e a saída vai para os dois arquivos em <code class="inline">logs\</code>. Para encerrar depois: <code class="inline">Stop-Process -Id</code> seguido desse número.</p>
+                        </div>
+                    </details>
+
+                    <details class="faq" id="faq-busca" data-reveal>
+                        <summary>A busca não retorna nada, ou avisa que o índice está indisponível</summary>
+                        <div class="faq__body">
+                            <p>O banco vetorial (Qdrant) fica em <code class="inline">data/qdrant.db</code>. Se o acervo foi indexado antes de uma troca de <code class="inline">EMBEDDING_MODEL</code>, os vetores antigos não conversam com as buscas novas. Reindexe, com o Talho no ar:</p>
+                            <div class="cm-duo">
+                                <div class="code">
+                                    <div class="code__bar"><span class="code__lang">bash</span><button class="copy-btn" type="button" data-copy><svg class="copy-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg><svg class="copy-ok" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Copiar</button></div>
+<pre><code><span class="k">curl</span> -X POST http://localhost:8000/api/search/reindex</code></pre>
+                                </div>
+                                <div class="code">
+                                    <div class="code__bar"><span class="code__lang">PowerShell</span><button class="copy-btn" type="button" data-copy><svg class="copy-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg><svg class="copy-ok" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Copiar</button></div>
+<pre><code><span class="k">Invoke-RestMethod</span> -Method Post -Uri http://localhost:8000/api/search/reindex</code></pre>
+                                </div>
+                            </div>
+                        </div>
+                    </details>
+
+                    <details class="faq" id="faq-exportacao" data-reveal>
+                        <summary>A exportação falha, ou avisa sobre o worker de exportação</summary>
+                        <div class="faq__body">
+                            <p>Mensagem típica no console:</p>
+                            <div class="code">
+                                <div class="code__bar"><span class="code__lang">console</span></div>
+<pre><code>[EXPORT] Aviso: 'opentimelineio' sem wheel neste Python; exportacao usara o worker
+do venv 3.12 (data/venv312) se ele existir.</code></pre>
+                            </div>
+                            <p>A exportação depende do <code class="inline">opentimelineio</code> e de dois adaptadores que não são opcionais: sem o <code class="inline">otio-fcp-adapter</code> não sai XML; sem o <code class="inline">otio-cmx3600-adapter</code> não sai EDL. Instale os três no ambiente do Talho:</p>
+                            <div class="code">
+                                <div class="code__bar"><span class="code__lang">terminal</span><button class="copy-btn" type="button" data-copy><svg class="copy-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg><svg class="copy-ok" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Copiar</button></div>
+<pre><code><span class="k">pip install</span> opentimelineio otio-fcp-adapter otio-cmx3600-adapter</code></pre>
+                            </div>
+                            <p>Num Python sem wheel do <code class="inline">opentimelineio</code> (como o 3.14), crie o interpretador auxiliar 3.12 que a exportação procura sozinha:</p>
+                            <div class="code">
+                                <div class="code__bar"><span class="code__lang">PowerShell</span><button class="copy-btn" type="button" data-copy><svg class="copy-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg><svg class="copy-ok" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Copiar</button></div>
+<pre><code><span class="k">uv venv</span> data/venv312 --python 3.12
+<span class="k">uv pip install</span> --python data/venv312/Scripts/python.exe opentimelineio otio-fcp-adapter otio-cmx3600-adapter python-dotenv</code></pre>
+                            </div>
+                        </div>
+                    </details>
+
+                    <details class="faq" id="faq-504" data-reveal>
+                        <summary>As análises de visão falham com timeout ou erro 504</summary>
+                        <div class="faq__body">
+                            <p>Costuma acontecer com modelos gratuitos (<code class="inline">:free</code>) sob carga: o gateway do OpenRouter espera o modelo responder e desiste. Use um modelo pago como <code class="inline">VISION_MODEL</code> (troque no painel de configurações) e deixe o gratuito só como reserva — é a configuração padrão, justamente por isso:</p>
+                            <div class="code">
+                                <div class="code__bar"><span class="code__lang">.env</span><button class="copy-btn" type="button" data-copy><svg class="copy-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg><svg class="copy-ok" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Copiar</button></div>
+<pre><code><span class="v">VISION_MODEL</span>=<span class="s">google/gemini-2.5-flash</span>
+<span class="v">VISION_MODEL_FALLBACK</span>=<span class="s">nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free</span></code></pre>
+                            </div>
+                        </div>
+                    </details>
+
+                    <details class="faq" id="faq-porta" data-reveal>
+                        <summary>“Address already in use”: a porta 8000 está ocupada</summary>
+                        <div class="faq__body">
+                            <p>Outro programa já está ouvindo na porta 8000 — muitas vezes, o próprio Talho, aberto em outra janela ou no Docker. Se ele já está no ar, é só abrir <code class="inline">http://localhost:8000</code>. Se a porta está com outro programa, suba o Talho (Python local) em outra porta e abra <code class="inline">http://localhost:8080</code>:</p>
+                            <div class="code">
+                                <div class="code__bar"><span class="code__lang">PowerShell</span><button class="copy-btn" type="button" data-copy><svg class="copy-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg><svg class="copy-ok" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Copiar</button></div>
+<pre><code><span class="k">.venv\Scripts\python</span> -m uvicorn src.api.server:app --port 8080 --reload</code></pre>
+                            </div>
+                        </div>
+                    </details>
+
+                    <details class="faq" id="faq-offline" data-reveal>
+                        <summary>Funciona sem internet?</summary>
+                        <div class="faq__body">
+                            <p>As partes locais, sim — depois de instaladas e com os modelos que você escolheu já baixados: catalogar, gerar proxies, achar cortes, buscar por imagem, agrupar rostos, medir e tratar áudio, transcrever com o Whisper, montar e exportar.</p>
+                            <p>Descrição visual, títulos executivos, temas, resumos e o agente dependem de uma chave de nuvem — e, portanto, de internet. A transcrição em nuvem (AssemblyAI ou Deepgram) e o Auphonic também.</p>
+                        </div>
+                    </details>
+                </div>
+
+                <p class="cm-faq__more" data-reveal>Mais respostas no <a class="inline-link" href="https://github.com/fernangcortes/capiau-talho-v03#solucao-de-problemas">README</a> e na <a class="inline-link" href="https://github.com/fernangcortes/capiau-talho-v03/wiki/16.-Solucao-de-Problemas-e-FAQ">wiki</a>. Nada resolveu? <a class="inline-link" href="https://github.com/fernangcortes/capiau-talho-v03/issues/new">Abra um issue</a> com a mensagem de erro e o que você já tentou.</p>
+            </div>
+        </section>
+
+        <!-- ═══════════════ CHAMADA FINAL ═══════════════ -->
+        <section class="section section--tight" aria-labelledby="cta-titulo">
+            <div class="container">
+                <div class="cta-band" data-reveal="scale">
+                    <p class="eyebrow eyebrow--rec">Grátis · sem assinatura · código aberto</p>
+                    <h2 class="cta-band__title" id="cta-titulo">Primeiro corte feito? Agora o acervo é seu.</h2>
+                    <p class="lead cta-band__lead">A wiki e o manual explicam cada tela, cada atalho e cada exportação. E se algo travou no caminho, conte para a gente: relato de instalação, teste com material real e documentação também são contribuição.</p>
+                    <div class="cluster cta-band__actions">
+                        <a class="btn btn--primary btn--lg" href="https://github.com/fernangcortes/capiau-talho-v03/wiki"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5z"/><path d="M4 20.5A2.5 2.5 0 0 1 6.5 18H20v3H6.5"/></svg>Abrir a wiki</a>
+                        <a class="btn btn--ghost btn--lg" href="https://github.com/fernangcortes/capiau-talho-v03/blob/main/USER_MANUAL.md">Manual do usuário</a>
+                        <a class="btn btn--ghost btn--lg" href="contribuir.html">Quero contribuir <svg class="btn__arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+                    </div>
+                    <p class="cta-band__note">Seus arquivos ficam com você, e o corte sai para o editor que você quiser.</p>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- ═══════════════ RODAPÉ (idêntico em todas as páginas) ═══════════════ -->
+    <footer class="site-footer">
+        <div class="container">
+            <div class="site-footer__grid">
+                <div class="site-footer__brand">
+                    <a class="brand" href="index.html" aria-label="CapIAu-Talho — página inicial">
+                        <img src="assets/img/logo.svg" width="34" height="34" alt="">
+                        <span class="brand__name">CapIAu-<span class="brand__talho">Talho</span></span>
+                    </a>
+                    <p class="site-footer__about">Ilha de pré-edição, decupagem e assistência por IA para documentários e grandes acervos audiovisuais. Grátis, sem assinatura e de código aberto.</p>
+                    <div class="cluster site-footer__badges">
+                        <span class="chip chip--emerald"><span class="chip__dot"></span>Grátis</span>
+                        <span class="chip chip--violet">GPL-3.0</span>
+                        <span class="chip chip--cyan">Roda em CPU</span>
+                    </div>
+                </div>
+                <nav aria-labelledby="rodape-site">
+                    <h2 class="site-footer__title" id="rodape-site">Site</h2>
+                    <ul class="site-footer__links">
+                        <li><a href="index.html">Início</a></li>
+                        <li><a href="recursos.html">Recursos</a></li>
+                        <li><a href="como-funciona.html">Como funciona</a></li>
+                        <li><a href="comecar.html">Começar</a></li>
+                        <li><a href="contribuir.html">Contribuir</a></li>
+                    </ul>
+                </nav>
+                <nav aria-labelledby="rodape-docs">
+                    <h2 class="site-footer__title" id="rodape-docs">Documentação</h2>
+                    <ul class="site-footer__links">
+                        <li><a href="https://github.com/fernangcortes/capiau-talho-v03/wiki">Wiki oficial</a></li>
+                        <li><a href="https://github.com/fernangcortes/capiau-talho-v03/blob/main/USER_MANUAL.md">Manual do usuário</a></li>
+                        <li><a href="https://github.com/fernangcortes/capiau-talho-v03/blob/main/docs/shortcuts.md">Atalhos de teclado</a></li>
+                        <li><a href="https://github.com/fernangcortes/capiau-talho-v03/blob/main/docs/costs_and_security.md">Custos e segurança</a></li>
+                    </ul>
+                </nav>
+                <nav aria-labelledby="rodape-comunidade">
+                    <h2 class="site-footer__title" id="rodape-comunidade">Comunidade</h2>
+                    <ul class="site-footer__links">
+                        <li><a href="https://github.com/fernangcortes/capiau-talho-v03">Código no GitHub</a></li>
+                        <li><a href="https://github.com/fernangcortes/capiau-talho-v03/issues">Relatar um problema</a></li>
+                        <li><a href="https://github.com/fernangcortes/capiau-talho-v03/blob/main/docs/PLANO_IMPLEMENTACAO.md">Plano e roadmap</a></li>
+                        <li><a href="https://github.com/fernangcortes/capiau-talho-v03/blob/main/LICENSE">Licença GPL-3.0</a></li>
+                    </ul>
+                </nav>
+            </div>
+            <div class="site-footer__bottom">
+                <p>© <span data-year>2026</span> CapIAu-Talho e colaboradores · Software livre sob a <a href="https://github.com/fernangcortes/capiau-talho-v03/blob/main/LICENSE">GPL-3.0</a>.</p>
+                <div class="cluster">
+                    <button class="text-btn" type="button" data-motion-toggle>
+                        <svg class="motion-icon-pause" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 6v12M15 6v12"/></svg>
+                        <svg class="motion-icon-play" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M8 5.5v13l11-6.5z"/></svg>
+                        <span data-motion-label>Pausar animações</span>
+                    </button>
+                    <a class="text-btn" href="#conteudo">Voltar ao topo ↑</a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+</body>
+</html>
