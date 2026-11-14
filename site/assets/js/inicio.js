@@ -367,7 +367,7 @@
         const tools = $$(".nle-tool", hero);
 
         const CYCLE = 13.2, VIEW = 60, CUT = 22, CUT_END = 30, DELTA = 8, END_PH = 47;
-        const INTRO = 0.85, STATIC_T = 8.3; // quadro parado: ghost clip à espera de aprovação
+        const INTRO = 0.45, STATIC_T = 8.3; // quadro parado: ghost clip à espera de aprovação
         const P = {
             play1: [1.55, 4.5], laser: [4.7, 5.4], split: 4.9, tint: [5.12, 5.4], lift: [5.42, 5.95],
             ripple: [6.0, 6.8], ghost: [6.95, 7.4], bubble: [7.35, 9.25], cursor: [7.8, 8.6], press: [8.6, 8.84],
@@ -438,7 +438,7 @@
         const mmss = (s) => `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
 
         function playhead(ct) {
-            if (ct < P.play1[0]) return 0;
+            if (ct < P.play1[0] || ct >= P.out[1]) return 0; // no intervalo entre ciclos, a agulha volta ao zero
             if (ct < P.play1[1]) return CUT * (1 - Math.pow(1 - seg(ct, P.play1[0], P.play1[1]), 1.6));
             if (ct < P.play2[0]) return CUT;
             if (ct < P.play2[1]) return lerp(CUT, END_PH, seg(ct, P.play2[0], P.play2[1]));

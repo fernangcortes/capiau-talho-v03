@@ -70,7 +70,7 @@ body[data-page="inicio"] {
     width: fit-content;
     max-width: 100%;
     margin-top: 20px;
-    font-size: clamp(2.75rem, 0.9rem + 5vw, 5.9rem);
+    font-size: clamp(2.75rem, 0.9rem + 5vw, 5.4rem);
     line-height: 0.93;
     letter-spacing: -0.02em;
     text-wrap: initial;
@@ -112,18 +112,18 @@ body[data-page="inicio"] {
 .hero__chip-export { white-space: normal; }
 
 /* coreografia de entrada (CSS puro; com movimento desligado, nada disso roda) */
-.hero__eyebrow { animation: hero-rise 0.8s var(--ease-out) 0.05s backwards; }
-.hero__title-in { animation: hero-wipe 1.15s var(--ease-in-out) 0.25s backwards; }
-.hero__title::after { animation: hero-laser 1.15s var(--ease-in-out) 0.25s backwards; }
-.hero__lead { animation: hero-rise 0.9s var(--ease-out) 0.85s backwards; }
-.hero__actions { animation: hero-rise 0.9s var(--ease-out) 1s backwards; }
-.hero__chips > li { animation: hero-rise 0.8s var(--ease-out) backwards; }
-.hero__chips > li:nth-child(1) { animation-delay: 1.12s; }
-.hero__chips > li:nth-child(2) { animation-delay: 1.2s; }
-.hero__chips > li:nth-child(3) { animation-delay: 1.28s; }
-.hero__chips > li:nth-child(4) { animation-delay: 1.36s; }
-.hero__monitor { animation: hero-screen 1.2s var(--ease-out) 0.4s backwards; }
-.hero__timeline { animation: hero-rise 1s var(--ease-out) 0.6s backwards; }
+.hero__eyebrow { animation: hero-rise 0.6s var(--ease-out) backwards; }
+.hero__title-in { animation: hero-wipe 0.85s var(--ease-in-out) 0.1s backwards; }
+.hero__title::after { animation: hero-laser 0.85s var(--ease-in-out) 0.1s backwards; }
+.hero__lead { animation: hero-rise 0.7s var(--ease-out) 0.3s backwards; }
+.hero__actions { animation: hero-rise 0.7s var(--ease-out) 0.4s backwards; }
+.hero__chips > li { animation: hero-rise 0.6s var(--ease-out) backwards; }
+.hero__chips > li:nth-child(1) { animation-delay: 0.5s; }
+.hero__chips > li:nth-child(2) { animation-delay: 0.56s; }
+.hero__chips > li:nth-child(3) { animation-delay: 0.62s; }
+.hero__chips > li:nth-child(4) { animation-delay: 0.68s; }
+.hero__monitor { animation: hero-screen 0.9s var(--ease-out) 0.15s backwards; }
+.hero__timeline { animation: hero-rise 0.8s var(--ease-out) 0.25s backwards; }
 
 @keyframes hero-rise { from { opacity: 0; transform: translate3d(0, 18px, 0); } }
 @keyframes hero-wipe { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
@@ -202,7 +202,7 @@ body[data-page="inicio"] {
 .nle-panel__tl {
     display: block;
     width: 100%;
-    height: clamp(190px, 28vh, 272px);
+    height: clamp(180px, 25vh, 272px);
 }
 
 .nle-tools { display: inline-flex; gap: 4px; margin-left: auto; }
