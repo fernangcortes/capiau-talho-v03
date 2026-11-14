@@ -906,6 +906,7 @@ capiau-talho/
 
 | Documento | Conteúdo |
 |---|---|
+| 🎬 [**Site de apresentação**](site/README.md) | Site estático em `site/` que apresenta o Talho e convida a usar e contribuir; publicado no GitHub Pages |
 | 🌐 [**Wiki Oficial no GitHub**](https://github.com/fernangcortes/capiau-talho-v03/wiki) | Manual completo da plataforma |
 | 📖 [**Manual do Usuário**](USER_MANUAL.md) | Operação completa das funcionalidades visuais da tela |
 | 🎬 [**Fluxo com o Kdenlive**](docs/kdenlive_workflow.md) | Sincronização e exportação para edição offline |

@@ -1565,8 +1565,9 @@
             ctx.lineWidth = 2;
             ctx.lineJoin = "round";
             ctx.stroke();
-            if (m > 0.05) {
-                glowDot(ctx, last[0], last[1], C.rose);
+            if (m > 0.05) glowDot(ctx, last[0], last[1], C.rose);
+            // o rótulo só aparece quando a linha já subiu acima do "Talho: R$ 0" (senão eles se sobrepõem)
+            if (m > 0.05 && y0 - last[1] > 30) {
                 ctx.font = `600 11px ${F.body}`;
                 ctx.fillStyle = rgba(C.roseSoft);
                 ctx.textBaseline = "middle";
