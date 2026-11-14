@@ -62,7 +62,7 @@ Explore a documentação completa através dos módulos abaixo:
 1. **Ingestão:** Coloque seus vídeos, áudios ou fotos na pasta `watch/` ou aponte seus discos rígidos externos na interface.
 2. **Indexação Automática:** Clique em **Escanear watch/**. O backend extrai metadados via FFprobe, gera proxies H.264 ultra-leves e indexa os vetores visuais CLIP.
 3. **Transcrição:** Abra uma entrevista no player Source e clique em **Transcrever Vídeo**. Os diálogos aparecem divididos por personagens com marcação palavra a palavra.
-4. **Montagem Rápida:** Selecione trechos de texto e tecle `Shift+E` para jogá-los direto na Timeline, ou use `I` (In), `O` (Out) e `E` para inserir trechos de vídeo.
+4. **Montagem Rápida:** Selecione trechos de texto e tecle `Shift+E` para jogá-los direto na Timeline, ou marque `I` (In) e `O` (Out) no player Source e tecle `Shift+E` para acrescentar o trecho à Timeline (ou `,` para inserir na agulha). No perfil padrão do CapIAu, `E` sozinho divide o clipe (Split); nos perfis Premiere, Resolve, Kdenlive e Final Cut, `E` acrescenta.
 5. **Exportação:** Exporte seu rough cut em **OpenTimelineIO (`.otio`)** para continuar a pós-produção no **Kdenlive 25.04+**, ou em **XML FCP7** para **Premiere Pro / DaVinci Resolve**.
 
 ---

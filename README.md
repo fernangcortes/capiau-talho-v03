@@ -573,6 +573,8 @@ Abra no navegador: [http://localhost:8000](http://localhost:8000)
 | **RAM** | 8 GB | 16 GB recomendados para acervos grandes |
 | **GPU** | não é necessária | Todo o processamento local roda em CPU |
 
+### Passo a passo <a id="passo-a-passo"></a>
+
 **1. Inicie com o script automatizado:**
 
 No Windows (PowerShell):
@@ -595,7 +597,25 @@ uv pip install -r requirements.txt
 .venv\Scripts\python -m uvicorn src.api.server:app --reload
 ```
 
+### Executando <a id="executando"></a>
+
+Com o ambiente pronto, o servidor sobe com `.\scripts\run-local.ps1` ou com o último comando acima.
+
 **Acesse:** 👉 **http://localhost:8000/**
+
+**Sessões longas no Windows: use o lançador desgrudado.** Se a janela do terminal que iniciou o
+servidor for fechada, o Windows envia `CTRL_CLOSE_EVENT` a tudo que está preso a ela e o runtime
+MKL/PyTorch aborta, derrubando servidor e workers juntos. O
+[`scripts/launch_detached.py`](scripts/launch_detached.py) inicia o processo sem console nenhum, então
+não há janela para fechar:
+
+```powershell
+.venv\Scripts\python scripts\launch_detached.py .venv\Scripts\python -m uvicorn src.api.server:app --host 127.0.0.1 --port 8000 --stdout data\logs\server.out.log --stderr data\logs\server.err.log
+```
+
+Rode assim **sem** `--reload`: sem console, o recarregamento automático derruba o servidor em vez de
+recarregar (veja o item E1.T6 do [plano](docs/PLANO_IMPLEMENTACAO.md)). Depois de mudar o backend,
+reinicie o processo.
 
 ---
 
@@ -705,7 +725,7 @@ pip install "tokenizers==0.22.2"
 > A versão `0.23.0` nunca foi publicada em formato final — o salto foi de `0.22.2` para `0.23.1`.
 > Por isso `0.22.2` é a maior que satisfaz o requisito.
 
-**Como evitar:** use um ambiente virtual dedicado (passo 3 da [montagem](#passo-a-passo)). Sem ele,
+**Como evitar:** use um ambiente virtual dedicado (veja o [passo a passo](#passo-a-passo)). Sem ele,
 qualquer projeto Python da máquina pode mexer nas dependências deste.
 
 </details>
@@ -771,8 +791,10 @@ Mensagem típica no console:
 do venv 3.12 (data/venv312) se ele existir.
 ```
 
-A exportação depende de três pacotes que **não estão no `requirements.txt`**, porque a
-disponibilidade do `opentimelineio` varia conforme a versão do Python. Instale-os:
+A exportação depende de três pacotes que o `requirements.txt` só instala em Python **anterior ao
+3.14** (`python_version < "3.14"`), porque o `opentimelineio` ainda não tem wheel para todas as
+versões. Num ambiente 3.12 criado como no [passo a passo](#passo-a-passo) eles já vêm junto; se
+faltarem, instale-os:
 
 ```bash
 pip install opentimelineio otio-fcp-adapter otio-cmx3600-adapter
@@ -781,8 +803,13 @@ pip install opentimelineio otio-fcp-adapter otio-cmx3600-adapter
 Os dois adaptadores não são opcionais: sem `otio-fcp-adapter` não sai XML, e sem
 `otio-cmx3600-adapter` não sai EDL.
 
-Se o `opentimelineio` não instalar no seu Python, crie o interpretador auxiliar 3.12 descrito no
-[passo 6 da montagem](#passo-a-passo).
+Se o `opentimelineio` não instalar no seu Python (ex.: 3.14), crie o interpretador auxiliar 3.12 em
+`data/venv312`; a exportação o detecta sozinha e roda o worker nele:
+
+```powershell
+uv venv data/venv312 --python 3.12
+uv pip install --python data/venv312/Scripts/python.exe opentimelineio otio-fcp-adapter otio-cmx3600-adapter python-dotenv
+```
 
 </details>
 
