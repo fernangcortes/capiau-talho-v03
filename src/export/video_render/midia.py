@@ -1,6 +1,6 @@
 """Resolucao de fonte de midia: original x proxy x WAV tratado (pacote C).
 
-DECISAO DE PRODUTO DO DONO DO PROJETO (PLANO_EXPORTACAO_VIDEO.md secao 2),
+DECISAO DE PRODUTO DO DONO DO PROJETO (plano de exportação de vídeo, não versionado, secao 2),
 que este modulo apenas executa -- nao reabre:
 
     master   = ORIGINAL

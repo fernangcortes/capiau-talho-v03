@@ -1,4 +1,4 @@
-"""Gerenciamento de cor do CapIAu-Talho (docs/PLANO_COR_OCIO.md).
+"""Gerenciamento de cor do CapIAu-Talho (docs/planos/PLANO_COR_OCIO.md).
 
 Este pacote é a CAMADA TÉCNICA de cor: ele responde "esses números representam
 qual luz?". Ele NÃO tem opinião estética -- quem tem é a camada criativa, que já

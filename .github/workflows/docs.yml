@@ -1,0 +1,19 @@
+name: Documentação
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  verificar-docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Verificar documentação (links, env, modelos, caminhos, tabelas geradas)
+        run: python scripts/verificar_docs.py

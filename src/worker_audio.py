@@ -11,7 +11,7 @@ Uso:
     python -m src.worker_audio --motor gtcrn   # previa 16 kHz (nunca entrega)
     python -m src.worker_audio --autoteste     # autoteste com dubles e banco temporario
 
-Fila: linhas da tabela audio_render com status='pending' (docs/PLANO_AJUSTES_DE_AUDIO.md,
+Fila: linhas da tabela audio_render com status='pending' (plano de ajustes de áudio, não versionado,
 secao 3). Cada linha traz video_id, in_s/out_s, chain_hash e chain_json; quem enfileira
 (e a rota de render ou o dono do projeto) ja fixou a identidade (video, intervalo, cadeia).
 O worker NAO recalcula hash: consome o chain_hash da linha como chave unica e grava o WAV

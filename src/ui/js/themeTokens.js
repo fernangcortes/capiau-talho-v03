@@ -1,6 +1,6 @@
 // Tokens de tema (--t-*) para quem desenha em canvas, onde o CSS não alcança.
 // Mesma regra do CSS: se o preset ativo não define o token (Clássico), vale a cor original passada
-// como fallback. Plano: docs/PLANO_TEMA_NEUTRO.md.
+// como fallback. Plano: docs/planos/PLANO_TEMA_NEUTRO.md.
 
 const cache = new Map();
 

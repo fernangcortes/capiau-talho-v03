@@ -55,7 +55,7 @@ PROFILES: Dict[str, EffortProfile] = {
 # ── Mapa categoria -> esforço ────────────────────────────────────────────────
 
 # Números provisórios (os mesmos da taxonomia anterior, com as chaves novas): a calibração
-# por categoria está em docs/REVISAO_CATEGORIAS.md, seção 12.
+# por categoria está em docs/planos/REVISAO_CATEGORIAS.md, seção 12.
 DEFAULT_EFFORT_BY_CATEGORY: Dict[str, str] = {
     "cena": EFFORT_FULL,
     "bastidor": EFFORT_FULL,

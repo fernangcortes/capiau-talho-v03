@@ -1,4 +1,4 @@
-// Reabrir as janelas destacadas da sessão anterior (decisão 8 do plano docs/PLANO_JANELAS_DRAG_DOCK.md).
+// Reabrir as janelas destacadas da sessão anterior (decisão 8 do plano docs/agentes/HANDOFF_JANELAS_DRAG_DOCK.md).
 // Padrão "auto": tenta reabrir sozinho. Sem permissão de pop-ups para o site o navegador bloqueia
 // janelas abertas sem clique, e cada clique abre só uma janela (medido no spike F0): nesse caso
 // aparece a faixa "Restaurar janelas", que reabre uma por clique. Modo "ask": sempre a faixa.

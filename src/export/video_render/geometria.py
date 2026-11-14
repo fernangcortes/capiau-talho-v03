@@ -5,7 +5,7 @@ ocupa 100% da moldura (player.js aplica object-fit/transform num <img>/<video>
 que preenche a caixa).
 
 ORDEM DE APLICACAO - a ordem da especificacao CSS, que NAO e a ordem em que o
-JS escreve as propriedades (PLANO_EXPORTACAO_VIDEO.md secao 3.1):
+JS escreve as propriedades (plano de exportação de vídeo, não versionado, secao 3.1):
 
     1. conteudo na caixa W x H   (object-fit: contain | cover)
     2. cor + blur                (cor.py)

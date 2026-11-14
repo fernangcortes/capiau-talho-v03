@@ -1,4 +1,4 @@
-"""Testes da pre-analise de audio (contrato C1 da ETAPA 1 de PLANO_AJUSTES_DE_AUDIO).
+"""Testes da pre-analise de audio (contrato C1 da ETAPA 1 do plano de ajustes de áudio, não versionado).
 
 Por que existe: o diagnostico do painel "Ajustes" (secao 4 do plano) precisa ler
 o stderr bruto do ffmpeg (ebur128 + astats) sem quebrar em saida vazia, em piso

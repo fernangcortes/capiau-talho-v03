@@ -1,4 +1,4 @@
-"""Denoise por IA local (sherpa-onnx): ETAPA 4 de docs/PLANO_AJUSTES_DE_AUDIO.md.
+"""Denoise por IA local (sherpa-onnx): ETAPA 4 do plano de ajustes de áudio, não versionado.
 
 Restricao que define este modulo: sherpa-onnx e o modelo ONNX NAO estao
 instalados nesta maquina (decisao do dono do projeto). Entao:

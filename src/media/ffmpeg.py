@@ -6,7 +6,7 @@ import subprocess
 from pathlib import Path
 from typing import Dict, Any, Optional, Callable
 
-# Metadados de COR lidos da stream de vídeo (Fase 0 de docs/PLANO_COR_OCIO.md).
+# Metadados de COR lidos da stream de vídeo (Fase 0 de docs/planos/PLANO_COR_OCIO.md).
 # Ausência de tag é informação: a camcorder AVCHD do acervo não etiqueta nada e a
 # Canon etiqueta full range. Por isso o valor ausente vira None e NUNCA um default
 # inventado -- quem decide o que fazer com o silêncio é src/color/deteccao.py.

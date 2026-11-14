@@ -1,5 +1,5 @@
 /* ── TEMA DA INTERFACE ──────────────────────────────────────────────────────
-   Plano: docs/PLANO_TEMA_NEUTRO.md
+   Plano: docs/planos/PLANO_TEMA_NEUTRO.md
 
    Fundos, linhas e brilhos da UI usam var(--t-<token>, <cor original>). O preset
    Clássico NÃO define os --t-*: vale a cor original de cada lugar (o visual de sempre).

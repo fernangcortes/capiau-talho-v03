@@ -1,4 +1,4 @@
-"""Bancada da camada 2 do áudio (docs/PLANO_AUDIO_CATEGORIAS.md, seção 6). Só leitura.
+"""Bancada da camada 2 do áudio (docs/planos/PLANO_AUDIO_CATEGORIAS.md, seção 6). Só leitura.
 
 Junte exemplos em subpastas com o nome da categoria esperada:
 

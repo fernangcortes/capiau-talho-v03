@@ -558,6 +558,96 @@ await runBattery("Composição em Resolução Nativa e Transições de Vídeo (c
     STATE.activeTimelineCuts = [];
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// Bateria 11: Suporte a Undo/Redo na Pré-Renderização e Preservação do Cache (I/O)
+// ─────────────────────────────────────────────────────────────────────────────
+await runBattery("Suporte a Undo e Redo (Ctrl+Z / Ctrl+Y) na Pré-renderização com I/O", async () => {
+    const { TIMELINE_HISTORY } = await import("../src/ui/js/timelineState.js");
+    const manager = new RenderCacheManager();
+
+    // 1. Configura clipe com efeito pesado (blur) da timeline: frame 0 a 100
+    STATE.activeTimelineCuts = [
+        {
+            id: "cut_davinci",
+            kind: "media",
+            track: "V1",
+            timelineStartFrame: 0,
+            inFrame: 0,
+            outFrame: 100,
+            effects: [{ type: "color", blur: 8 }]
+        }
+    ];
+    TIMELINE_STATE.tracks = [{ id: "V1", name: "Vídeo 1", kind: "video" }];
+    TIMELINE_HISTORY.clear();
+
+    // 2. Define intervalo com pontos IN e OUT (ex: frame 14 a 24)
+    TIMELINE_STATE.inFrame = 14;
+    TIMELINE_STATE.outFrame = 24;
+
+    // Antes de renderizar: frames devem estar unrendered (vermelhos)
+    assert.strictEqual(manager.getFrameStatus(14), "unrendered", "Frame 14 deve requerer renderização");
+    assert.strictEqual(manager.getFrameStatus(20), "unrendered", "Frame 20 deve requerer renderização");
+    assert.strictEqual(manager.hasFrame(20), false, "Não deve haver frame no cache antes da renderização");
+    assert.strictEqual(TIMELINE_HISTORY.undoStack.length, 0, "Pilha de Undo deve estar vazia inicialmente");
+
+    // 3. Executa pré-renderização In/Out
+    const renderRes = await manager.renderInOut();
+    assert.strictEqual(renderRes.rendered, 11, "Deve renderizar 11 frames (14 a 24)");
+    assert.strictEqual(manager.hasFrame(14), true, "Frame 14 deve estar no cache");
+    assert.strictEqual(manager.hasFrame(20), true, "Frame 20 deve estar no cache");
+    assert.strictEqual(manager.getFrameStatus(14), "cached", "Frame 14 deve estar em cache (verde)");
+    assert.strictEqual(manager.getFrameStatus(20), "cached", "Frame 20 deve estar em cache (verde)");
+    assert.strictEqual(TIMELINE_HISTORY.undoStack.length, 1, "TIMELINE_HISTORY deve conter 1 snapshot após renderizar");
+
+    // 4. Executa UNDO (Ctrl+Z)
+    // A pré-renderização deve ser desfeita (linha volta a ser vermelha/unrendered e frames são removidos)
+    const undoRes = TIMELINE_HISTORY.undo();
+    assert.strictEqual(undoRes, true, "Undo deve retornar true");
+    assert.strictEqual(manager.hasFrame(20), false, "Frame 20 NÃO deve mais estar ativo no cache após Undo");
+    assert.strictEqual(manager.getFrameStatus(20), "unrendered", "Frame 20 deve voltar a status unrendered após Undo");
+    assert.strictEqual(TIMELINE_HISTORY.redoStack.length, 1, "Pilha de Redo deve conter o snapshot da pré-renderização");
+
+    // 5. Executa REDO (Ctrl+Y)
+    // A renderização NÃO DEVE SUMIR! Ela deve ser reativada no cache instantaneamente (linha verde volta)
+    const redoRes = TIMELINE_HISTORY.redo();
+    assert.strictEqual(redoRes, true, "Redo deve retornar true");
+    assert.strictEqual(manager.hasFrame(20), true, "Frame 20 DEVE retornar ao cache após Redo");
+    assert.strictEqual(manager.getFrameStatus(20), "cached", "Frame 20 DEVE voltar a ser cached (verde) após Redo");
+    assert.strictEqual(manager.hasFrame(14), true, "Frame 14 inicial do trecho I/O deve estar preservado");
+    assert.strictEqual(manager.hasFrame(24), true, "Frame 24 final do trecho I/O deve estar preservado");
+
+    // 6. Teste de Edição + Undo: o usuário move um clipe, desfaz a edição e os frames continuam em cache
+    TIMELINE_HISTORY.record(() => {
+        STATE.activeTimelineCuts = [
+            {
+                id: "cut_davinci",
+                kind: "media",
+                track: "V1",
+                timelineStartFrame: 50,
+                inFrame: 0,
+                outFrame: 100,
+                effects: [{ type: "color", blur: 8 }]
+            }
+        ];
+        STATE.emit("timelineCutsChanged", STATE.activeTimelineCuts);
+    });
+
+    assert.strictEqual(manager.hasFrame(20), false, "Frame 20 não deve estar no cache ativo após mover o clipe");
+
+    // Desfaz a movimentação do clipe com Undo
+    TIMELINE_HISTORY.undo();
+    assert.strictEqual(STATE.activeTimelineCuts[0].timelineStartFrame, 0, "Clipe deve voltar para o frame 0");
+    assert.strictEqual(manager.hasFrame(20), true, "Render cache dos frames originais deve ser restaurado no Undo!");
+    assert.strictEqual(manager.getFrameStatus(20), "cached", "Status deve voltar a ser cached (verde)!");
+
+    // Limpa estado
+    TIMELINE_HISTORY.clear();
+    STATE.activeTimelineCuts = [];
+    TIMELINE_STATE.inFrame = null;
+    TIMELINE_STATE.outFrame = null;
+});
+
 console.log("===============================================================================");
 console.log(`  RESULTADO: ${passedCount}/${totalCount} baterias concluídas com 100% de sucesso!`);
 console.log("===============================================================================\n");

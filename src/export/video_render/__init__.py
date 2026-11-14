@@ -1,4 +1,4 @@
-"""Motor de renderizacao de video da timeline (PLANO_EXPORTACAO_VIDEO.md).
+"""Motor de renderizacao de video da timeline (plano de exportação de vídeo, não versionado).
 
 Traduz o `sequence_json` de uma timeline no MESMO resultado que o monitor de
 Programa mostra na tela, so que em arquivo. O alvo nao e "um MP4qualquer": e

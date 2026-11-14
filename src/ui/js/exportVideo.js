@@ -32,7 +32,7 @@
 // render ainda não está instalado nesta versão" e continua utilizável — nenhuma
 // exceção sobe e nenhum console.error é emitido por este módulo.
 //
-// Contratos usados (docs/PLANO_EXPORTACAO_VIDEO.md §5/§6/§7/§8):
+// Contratos usados (plano de exportação de vídeo, não versionado, §5/§6/§7/§8):
 //   POST /api/timeline/{id}/render/preflight  → { duracao_s, clipes, fps, largura,
 //       altura, pistas[], midia{}, avisos[], saida{} }
 //   POST /api/timeline/{id}/render            → { task_key, saida_prevista }

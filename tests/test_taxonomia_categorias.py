@@ -1,4 +1,4 @@
-"""Taxonomia de triagem em dois eixos (docs/REVISAO_CATEGORIAS.md, proposta B).
+"""Taxonomia de triagem em dois eixos (docs/planos/REVISAO_CATEGORIAS.md, proposta B).
 
 Banco SQLite em memória; visão, Laya e ffmpeg falsos. Nada toca o banco real nem a rede.
 """

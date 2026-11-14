@@ -1,4 +1,4 @@
-"""Auditoria de cor do acervo -- Fase 0.4 de docs/PLANO_COR_OCIO.md.
+"""Auditoria de cor do acervo -- Fase 0.4 de docs/planos/PLANO_COR_OCIO.md.
 
 O que faz: le as tags de cor de cada midia (original E proxy), grava nas colunas
 novas da Fase 0.2 e imprime o mapa de cor do acervo inteiro. NAO decodifica
@@ -172,7 +172,7 @@ def _relatorio_videos(resultados: list) -> None:
     if entrelacados:
         print(f"\n  ! {len(entrelacados)} videos ENTRELACADOS (field_order) e o proxy nao "
               f"desentrelaca.\n    Fora do escopo do plano de cor -- ver secao 9 de "
-              f"docs/PLANO_COR_OCIO.md.")
+              f"docs/planos/PLANO_COR_OCIO.md.")
 
 
 def _relatorio_fotos(resultados: list) -> None:

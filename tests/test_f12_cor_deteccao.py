@@ -1,4 +1,4 @@
-"""Testes da Fase 0 do gerenciamento de cor (docs/PLANO_COR_OCIO.md).
+"""Testes da Fase 0 do gerenciamento de cor (docs/planos/PLANO_COR_OCIO.md).
 
 - get_media_metadata devolve as chaves de cor SEMPRE (inclusive no caminho de erro)
 - deteccao resolve perfil e range sem inventar tag crua

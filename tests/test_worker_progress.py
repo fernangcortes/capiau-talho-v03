@@ -4,7 +4,7 @@
 - Colisão de chave: os dois usam str(video_id) (src/services/pipeline.py:349 e :649).
 - PID: base da recusa de segundo worker do mesmo tipo.
 
-Ver docs/PLANO_HISTORICO_METADADOS_E_WORKER_ASR.md.
+Ver plano de histórico de metadados e worker ASR (não versionado).
 Tudo em diretório temporário. Nenhum teste aqui toca Qdrant, ASR ou o banco.
 """
 import json

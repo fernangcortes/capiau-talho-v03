@@ -1,4 +1,4 @@
-"""Cadeia ffmpeg RENDERIZADA de audio (contrato F1 da ETAPA 3 de PLANO_AJUSTES_DE_AUDIO).
+"""Cadeia ffmpeg RENDERIZADA de audio (contrato F1 da ETAPA 3 do plano de ajustes de áudio, não versionado).
 
 Tipo B do plano (secao 2): tratamento que GERA ARQUIVO. Roda offline, produz um
 WAV 48 kHz 24 bits em data/audio_tratado/<video_id>/<chain_hash>.wav, e o clipe

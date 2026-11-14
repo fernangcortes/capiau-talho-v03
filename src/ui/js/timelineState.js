@@ -9103,6 +9103,17 @@ STATE.on("timelineCutsUpdated", () => {
 
 // --- HISTÓRICO DE UNDO/REDO (snapshots de clipes, pistas e sugestões) ---
 
+let _renderCacheProvider = null;
+export function registerRenderCacheProvider(provider) {
+    _renderCacheProvider = provider;
+}
+export function getRenderCacheProvider() {
+    if (_renderCacheProvider) return _renderCacheProvider;
+    if (typeof globalThis !== "undefined" && globalThis.RENDER_CACHE_MANAGER) return globalThis.RENDER_CACHE_MANAGER;
+    if (typeof window !== "undefined" && window.RENDER_CACHE_MANAGER) return window.RENDER_CACHE_MANAGER;
+    return null;
+}
+
 const safeHistoryReplacer = (key, value) => {
     if (key && typeof key === "string" && key.startsWith("_")) return undefined;
     return value;
@@ -9114,9 +9125,11 @@ class TimelineHistory {
         this.redoStack = [];
         this.pending = null; // snapshot pré-transação (para drags contínuos)
         this.limit = 100;
+        this.isRestoring = false; // Flag para suprimir invalidações espúrias durante Undo/Redo
     }
 
     _capture() {
+        const rc = getRenderCacheProvider();
         return JSON.parse(JSON.stringify({
             cuts: STATE.activeTimelineCuts,
             tracks: TIMELINE_STATE.tracks,
@@ -9131,7 +9144,8 @@ class TimelineHistory {
             selectedMarkerIds: Array.from(TIMELINE_STATE.selectedMarkerIds || []),
             transitions: (TIMELINE_STATE.transitions || []).map(t => ({ ...t })),
             selectedTransitionId: TIMELINE_STATE.selectedTransitionId || null,
-            playheadFrame: (TIMELINE_STATE.playheadFrame !== undefined && TIMELINE_STATE.playheadFrame !== null) ? TIMELINE_STATE.playheadFrame : 0
+            playheadFrame: (TIMELINE_STATE.playheadFrame !== undefined && TIMELINE_STATE.playheadFrame !== null) ? TIMELINE_STATE.playheadFrame : 0,
+            renderCacheToken: (rc && typeof rc.getCurrentToken === "function") ? rc.getCurrentToken() : null
         }, safeHistoryReplacer));
     }
 
@@ -9153,6 +9167,17 @@ class TimelineHistory {
         if (this.undoStack.length > this.limit) this.undoStack.shift();
         this.redoStack = [];
         this._notify();
+
+        // Limpa snapshots órfãos de render cache
+        const rc = getRenderCacheProvider();
+        if (rc && typeof rc.pruneSnapshots === "function") {
+            const activeTokens = new Set();
+            for (const s of this.undoStack) if (s && s.renderCacheToken) activeTokens.add(s.renderCacheToken);
+            for (const s of this.redoStack) if (s && s.renderCacheToken) activeTokens.add(s.renderCacheToken);
+            if (this.pending && this.pending.renderCacheToken) activeTokens.add(this.pending.renderCacheToken);
+            if (rc.getCurrentToken && rc.getCurrentToken()) activeTokens.add(rc.getCurrentToken());
+            rc.pruneSnapshots(activeTokens);
+        }
     }
 
     /** Envolve uma operação pontual numa transação própria (ou adere à transação aberta). */
@@ -9170,39 +9195,51 @@ class TimelineHistory {
     }
 
     _restore(snap) {
-        TIMELINE_STATE.selectedClipId = snap.selectedClipId !== undefined ? snap.selectedClipId : null;
-        TIMELINE_STATE.selectedClipIds = new Set(snap.selectedClipIds || (snap.selectedClipId ? [snap.selectedClipId] : []));
-        if (snap.activeTool) {
-            TIMELINE_STATE.activeTool = snap.activeTool;
-            STATE.emit("timelineToolChanged", TIMELINE_STATE.activeTool);
-        }
-        TIMELINE_STATE.selectedGhostClipId = snap.selectedGhostClipId !== undefined ? snap.selectedGhostClipId : null;
-        TIMELINE_STATE.setTracks(snap.tracks);
-        STATE.activeTimelineCuts = snap.cuts || [];
-        TIMELINE_STATE.ghostTrack = snap.ghosts || [];
-        if (snap.inFrame !== undefined) TIMELINE_STATE.inFrame = snap.inFrame;
-        if (snap.outFrame !== undefined) TIMELINE_STATE.outFrame = snap.outFrame;
-        if (snap.markers !== undefined) {
-            TIMELINE_STATE.markers = JSON.parse(JSON.stringify(snap.markers));
-            TIMELINE_STATE.selectedMarkerIds = new Set(snap.selectedMarkerIds || []);
-            STATE.emit("timelineMarkersChanged", TIMELINE_STATE.markers);
-        }
-        if (snap.transitions !== undefined) {
-            TIMELINE_STATE.transitions = (snap.transitions || []).map(t => ({ ...t }));
-            TIMELINE_STATE.selectedTransitionId = snap.selectedTransitionId || null;
-            STATE.emit("timelineTransitionsChanged", TIMELINE_STATE.transitions);
-        }
-        if (snap.playheadFrame !== undefined && snap.playheadFrame !== null) {
-            if (typeof TIMELINE_STATE.setPlayheadFrame === "function") {
-                TIMELINE_STATE.setPlayheadFrame(snap.playheadFrame);
-            } else {
-                TIMELINE_STATE.playheadFrame = snap.playheadFrame;
+        this.isRestoring = true;
+        try {
+            TIMELINE_STATE.selectedClipId = snap.selectedClipId !== undefined ? snap.selectedClipId : null;
+            TIMELINE_STATE.selectedClipIds = new Set(snap.selectedClipIds || (snap.selectedClipId ? [snap.selectedClipId] : []));
+            if (snap.activeTool) {
+                TIMELINE_STATE.activeTool = snap.activeTool;
+                STATE.emit("timelineToolChanged", TIMELINE_STATE.activeTool);
             }
+            TIMELINE_STATE.selectedGhostClipId = snap.selectedGhostClipId !== undefined ? snap.selectedGhostClipId : null;
+            TIMELINE_STATE.setTracks(snap.tracks);
+            STATE.activeTimelineCuts = snap.cuts || [];
+            TIMELINE_STATE.ghostTrack = snap.ghosts || [];
+            if (snap.inFrame !== undefined) TIMELINE_STATE.inFrame = snap.inFrame;
+            if (snap.outFrame !== undefined) TIMELINE_STATE.outFrame = snap.outFrame;
+            if (snap.markers !== undefined) {
+                TIMELINE_STATE.markers = JSON.parse(JSON.stringify(snap.markers));
+                TIMELINE_STATE.selectedMarkerIds = new Set(snap.selectedMarkerIds || []);
+                STATE.emit("timelineMarkersChanged", TIMELINE_STATE.markers);
+            }
+            if (snap.transitions !== undefined) {
+                TIMELINE_STATE.transitions = (snap.transitions || []).map(t => ({ ...t }));
+                TIMELINE_STATE.selectedTransitionId = snap.selectedTransitionId || null;
+                STATE.emit("timelineTransitionsChanged", TIMELINE_STATE.transitions);
+            }
+            if (snap.playheadFrame !== undefined && snap.playheadFrame !== null) {
+                if (typeof TIMELINE_STATE.setPlayheadFrame === "function") {
+                    TIMELINE_STATE.setPlayheadFrame(snap.playheadFrame);
+                } else {
+                    TIMELINE_STATE.playheadFrame = snap.playheadFrame;
+                }
+            }
+
+            // Restaura o snapshot de Render Cache correspondente ao momento histórico
+            const rc = getRenderCacheProvider();
+            if (rc && typeof rc.restoreSnapshot === "function") {
+                rc.restoreSnapshot(snap.renderCacheToken || null);
+            }
+
+            STATE.emit("timelineInOutChanged", { inFrame: TIMELINE_STATE.inFrame, outFrame: TIMELINE_STATE.outFrame });
+            STATE.emit("timelineGhostUpdated", TIMELINE_STATE.ghostTrack);
+            STATE.emit("timelineRestored");
+            this._notify();
+        } finally {
+            this.isRestoring = false;
         }
-        STATE.emit("timelineInOutChanged", { inFrame: TIMELINE_STATE.inFrame, outFrame: TIMELINE_STATE.outFrame });
-        STATE.emit("timelineGhostUpdated", TIMELINE_STATE.ghostTrack);
-        STATE.emit("timelineRestored");
-        this._notify();
     }
 
     undo() {
@@ -9228,6 +9265,13 @@ class TimelineHistory {
         this.redoStack = [];
         this.pending = null;
         this._notify();
+
+        const rc = getRenderCacheProvider();
+        if (rc && typeof rc.pruneSnapshots === "function") {
+            const activeTokens = new Set();
+            if (rc.getCurrentToken && rc.getCurrentToken()) activeTokens.add(rc.getCurrentToken());
+            rc.pruneSnapshots(activeTokens);
+        }
     }
 
     _notify() {

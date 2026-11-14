@@ -241,7 +241,7 @@ class PromptUpdatePayload(BaseModel):
     project_id: Optional[int] = None
 
 
-# ── Render de vídeo da timeline (docs/PLANO_EXPORTACAO_VIDEO.md, seção 5) ────
+# ── Render de vídeo da timeline (plano de exportação de vídeo, não versionado, seção 5) ────
 # Corpo do POST .../render e .../render/preflight, espelhando modelo.Pedido
 # (src/export/video_render/modelo.py, CONTRATO). A montagem do dataclass fica
 # NESTE ponto único (pedido_render_do_payload): as rotas não espalham a tradução.

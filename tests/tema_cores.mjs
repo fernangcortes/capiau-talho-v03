@@ -1,5 +1,5 @@
 // Regra única de "o que é cor de tema" — usada pela migração (scripts/tema_tokenizar.mjs) e pela
-// trava (tests/autoteste_tema_tokens.mjs). Plano: docs/PLANO_TEMA_NEUTRO.md.
+// trava (tests/autoteste_tema_tokens.mjs). Plano: docs/planos/PLANO_TEMA_NEUTRO.md.
 //
 // Toda cor de FUNDO, LINHA ou GLOW que não carrega significado vira `var(--t-<token>, <cor original>)`.
 // O preset Clássico não define os --t-*, então o fallback (a cor de hoje) é o que aparece; os outros

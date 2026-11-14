@@ -1,4 +1,4 @@
-// Migração do tema (docs/PLANO_TEMA_NEUTRO.md): troca cores de fundo/linha/glow fixas por
+// Migração do tema (docs/planos/PLANO_TEMA_NEUTRO.md): troca cores de fundo/linha/glow fixas por
 // var(--t-<token>, <cor original>) (F0), font-size em px por calc(Npx * var(--font-scale, 1)) (F3)
 // e esse calc pelo degrau da escala, var(--fs-N) (definidos em theme.css).
 // No preset Clássico e escala 1 as cores não mudam; os tamanhos só arredondam o meio-pixel.

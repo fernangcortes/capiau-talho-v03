@@ -3,6 +3,7 @@
 * [[01. Visão Geral e Conceito|01.-Visao-Geral-e-Conceito]]
 * [[02. Instalação e Configuração|02.-Instalacao-e-Configuracao]]
 * [[03. Design System e Interface NLE|03.-Design-System-e-Interface-NLE]]
+* [[19. Primeiros 15 Minutos e Receitas|19.-Primeiros-15-Minutos-e-Receitas]]
 
 ---
 
@@ -22,7 +23,7 @@
 
 ### 🎨 Áudio, Cor & FX
 * [[10. Diagnóstico e Restauração de Áudio|10.-Audio-Diagnostico-e-Restauracao]]
-* [[11. Cor, OCIO e Viewport NLE|11.-Cor-Grading-e-Transformacoes-Visuais]]
+* [[11. Cor e Viewport NLE|11.-Cor-Grading-e-Transformacoes-Visuais]]
 
 ---
 

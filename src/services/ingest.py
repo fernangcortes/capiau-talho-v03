@@ -23,7 +23,7 @@ SUPPORTED_PHOTO = {
 }
 
 def _registrar_cor_video(conn, video_id: int, filename: str, meta: Dict[str, Any]) -> None:
-    """Grava o bloco de cor do vídeo na ingestão (Fase 0 de docs/PLANO_COR_OCIO.md).
+    """Grava o bloco de cor do vídeo na ingestão (Fase 0 de docs/planos/PLANO_COR_OCIO.md).
 
     As tags já vieram no `meta` do FFprobe -- não há chamada extra a disco aqui.
     Falha NUNCA derruba a ingestão: cor é acessório, mídia ingerida é o principal

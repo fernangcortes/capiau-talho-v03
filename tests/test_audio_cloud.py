@@ -1,4 +1,4 @@
-"""Testes do servico de nuvem de audio (ETAPA 5 de PLANO_AJUSTES_DE_AUDIO).
+"""Testes do servico de nuvem de audio (ETAPA 5 do plano de ajustes de áudio, não versionado).
 
 Cobre o miolo provavel da etapa sem NENHUMA requisicao de rede: o transporte
 HTTP e um duble (TransporteFalso) roteirizado resposta a resposta. Cenarios de

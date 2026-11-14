@@ -107,7 +107,7 @@ def scan_watch_folder(project_id: int = 1) -> None:
         print(f"[WATCH-DAW] ERRO geral no escaneamento do retorno da DAW: {e}")
 
 
-# == ETAPA 6: retorno da DAW (docs/PLANO_AJUSTES_DE_AUDIO.md, secao 9) ========
+# == ETAPA 6: retorno da DAW (plano de ajustes de áudio, não versionado, secao 9) ========
 # Fluxo da ponte: o Talho exporta o audio do clipe em WAV 48/24 (G1,
 # src/export/audio_stems.py), o usuario trata na DAW com o que quiser e
 # devolve o arquivo para uma pasta observada com o MESMO NOME-BASE do arquivo

@@ -1,7 +1,7 @@
 // Aparência da interface: tema (Neutro/Clássico/Personalizado), fonte, peso e tamanho do texto,
 // cor de interação e cor das trilhas da timeline.
 // Lê as chaves ui.* das Configurações (global com override por projeto), calcula as variáveis CSS e
-// entrega ao js/themeBoot.js, que aplica e sincroniza as janelas destacadas. Plano: docs/PLANO_TEMA_NEUTRO.md.
+// entrega ao js/themeBoot.js, que aplica e sincroniza as janelas destacadas. Plano: docs/planos/PLANO_TEMA_NEUTRO.md.
 
 export const THEME_DEFAULTS = {
     "ui.theme": "neutro",

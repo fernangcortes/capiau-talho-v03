@@ -12,7 +12,7 @@ afins por canal (brightness, contrast) seguidas de QUATRO feColorMatrix 3x3
 exatamente como o pixel ja esta armazenado depois do decode. Por isso esta
 traducao NAO usa o filtro `eq`: ele trabalha em YUV com brilho ADITIVO, enquanto
 o brightness() do CSS e MULTIPLICATIVO em sRGB. Um pelo outro erra a imagem
-inteira (PLANO_EXPORTACAO_VIDEO.md, secao 3.3).
+inteira (plano de exportação de vídeo, não versionado, secao 3.3).
 
 Decisoes registradas (o "por que", nao o "o que"):
 

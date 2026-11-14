@@ -13027,7 +13027,7 @@ input[type="number"] {
 
 /* ══════════════════════════════════════════════════════════════════════
    EXPLICAÇÕES NA INTERFACE — ícone (i) + painel detalhado (.capiau-explica)
-   Bloco NOVO acrescentado na rodada de fecho de docs/PLANO_AJUSTES_DE_AUDIO
+   Bloco NOVO acrescentado na rodada de fecho do plano de ajustes de áudio, não versionado
    (BRIEFING8 / contrato N3). Pedido literal do dono: "tooltips em line icons
    (i) bem sutis e pequenos que ficam sem muita opacidade quando nao em hover.
    esses tooltips temos que clicar pra ver, ai vem uma explicacao bem
@@ -15705,7 +15705,7 @@ body.layout-monitors-split .btn-swap-player {
 /* ── WELCOME HUB ─────────────────────────────────────────────────────────────
    Cabeçalho de 36 px no padrão do editor + canvas único: mídias à esquerda (área de
    soltar sempre aberta, um cartão por arquivo) e a conversa à direita.
-   Protótipo: docs/prototipos/welcome-hub-v2.html */
+   Protótipo: docs/arquivo/prototipos/welcome-hub-v2.html */
 .welcome-hub-overlay {
     position: fixed;
     inset: 0;

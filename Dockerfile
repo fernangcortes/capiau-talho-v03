@@ -10,8 +10,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PIP_NO_CACHE_DIR=1 \
     PORT=8000
 
-# Instalar dependências de sistema essenciais (FFmpeg, bibliotecas gráficas para OpenCV e utilitários).
-# git: o requirements.txt instala o CLIP direto do GitHub (clip @ git+https://...), e o pip precisa dele.
+# Instalar dependências de sistema essenciais (FFmpeg, bibliotecas gráficas para OpenCV e utilitários)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
     libgl1 \

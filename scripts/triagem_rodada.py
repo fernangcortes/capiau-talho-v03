@@ -1,4 +1,4 @@
-"""Rodada só de triagem nos vídeos sem categoria (docs/REVISAO_CATEGORIAS.md, seção 8, passo 3).
+"""Rodada só de triagem nos vídeos sem categoria (docs/planos/REVISAO_CATEGORIAS.md, seção 8, passo 3).
 
 Para cada vídeo: natureza (áudio vai ao tipo de som, local) -> ASR se faltar fala ->
 planos -> Laya (sombra) -> triagem por visão (PipelineService.triar_video). Não roda a

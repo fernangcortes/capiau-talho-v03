@@ -11,7 +11,7 @@ from src.db.connection import get_db
 
 # ── Catálogo de Prompts Padrão do Sistema ────────────────────────────────────
 
-# Taxonomia de triagem, eixo 1: o que o material é (docs/REVISAO_CATEGORIAS.md, proposta B).
+# Taxonomia de triagem, eixo 1: o que o material é (docs/planos/REVISAO_CATEGORIAS.md, proposta B).
 # Descreve o que está diante da câmera, não o valor editorial. "Interessa ao projeto?" é o
 # eixo 2, uma marca à parte (fora_do_projeto), e não categoria.
 TRIAGE_CATEGORIES: Dict[str, str] = {
@@ -25,7 +25,7 @@ TRIAGE_CATEGORIES: Dict[str, str] = {
     "terceiros": "material que não foi gravado pela produção: recebido, banco de imagens, histórico",
 }
 
-# Categorias do material de áudio (video.natureza = 'audio'; docs/PLANO_AUDIO_CATEGORIAS.md).
+# Categorias do material de áudio (video.natureza = 'audio'; docs/planos/PLANO_AUDIO_CATEGORIAS.md).
 # Mesmo campo video.category; 'depoimento' é a mesma chave do vídeo, de propósito: a busca
 # acha entrevista em vídeo e em áudio juntas.
 AUDIO_CATEGORIES: Dict[str, str] = {
