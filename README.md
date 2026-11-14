@@ -185,6 +185,7 @@ implementado** (veja a [Ordem de implementação](docs/planos/ORDEM_DE_IMPLEMENT
 
 | Documento | Conteúdo |
 |---|---|
+| [Site de apresentação](site/README.md) | Site estático em `site/`, publicado no GitHub Pages |
 | [Manual do Usuário](USER_MANUAL.md) | Operação das funcionalidades, para quem usa a ferramenta |
 | [Wiki: Home](https://github.com/fernangcortes/capiau-talho-v03/wiki) | Manual completo por tema |
 | [Wiki: Primeiros 15 minutos](https://github.com/fernangcortes/capiau-talho-v03/wiki/19.-Primeiros-15-Minutos-e-Receitas) | Do zero ao primeiro rough cut, com receitas |

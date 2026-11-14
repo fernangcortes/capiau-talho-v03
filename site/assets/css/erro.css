@@ -1,0 +1,171 @@
+/* =============================================================================
+   404 — "Corte perdido": monitor sem sinal e uma timeline com o vão do clipe
+   que falta, com a agulha procurando por ele.
+   ========================================================================== */
+.erro {
+    min-height: 100vh;
+    display: grid;
+    align-items: center;
+    padding: calc(var(--header-h) + 48px) 0 80px;
+}
+.erro__inner {
+    display: grid;
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+    gap: clamp(32px, 6vw, 88px);
+    align-items: center;
+}
+.erro__titulo { font-size: var(--fs-hero); line-height: 0.95; margin: 16px 0 20px; }
+.erro__acoes { margin-top: 32px; }
+
+/* monitor sem sinal */
+.erro__monitor {
+    position: relative;
+    aspect-ratio: 16 / 9;
+    border-radius: var(--radius-3);
+    overflow: hidden;
+    background:
+        radial-gradient(120% 90% at 50% 40%, rgba(139, 92, 246, 0.18), transparent 60%),
+        #0a0910;
+    border: 1px solid var(--line-2);
+    box-shadow: var(--shadow-2);
+    display: grid;
+    place-items: center;
+}
+.erro__monitor::after {
+    /* linhas de varredura */
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(180deg, rgba(255, 255, 255, 0.035) 0 1px, transparent 1px 4px);
+    pointer-events: none;
+}
+.erro__tc {
+    position: absolute;
+    top: 14px;
+    left: 16px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font: 500 0.8rem/1 var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    color: var(--fg-2);
+    letter-spacing: 0.06em;
+}
+.erro__rec {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--rose);
+    box-shadow: 0 0 10px var(--rose);
+    animation: talho-rec 1.4s steps(1, end) infinite;
+}
+.erro__glitch {
+    position: relative;
+    font: 700 clamp(4.5rem, 3rem + 7vw, 9rem)/1 var(--font-display);
+    letter-spacing: 0.02em;
+    color: var(--fg-1);
+    text-shadow: 0 0 40px rgba(139, 92, 246, 0.45);
+}
+.erro__glitch::before,
+.erro__glitch::after {
+    content: attr(data-text);
+    position: absolute;
+    inset: 0;
+    opacity: 0.8;
+    pointer-events: none;
+}
+.erro__glitch::before { color: var(--cyan); clip-path: inset(0 0 62% 0); transform: translate(-3px, 0); animation: erro-glitch-a 3.2s steps(1, end) infinite; }
+.erro__glitch::after { color: var(--magenta); clip-path: inset(58% 0 0 0); transform: translate(3px, 0); animation: erro-glitch-b 2.7s steps(1, end) infinite; }
+@keyframes erro-glitch-a {
+    0%, 100% { clip-path: inset(0 0 62% 0); transform: translate(-3px, 0); }
+    18% { clip-path: inset(22% 0 50% 0); transform: translate(-7px, 1px); }
+    19% { clip-path: inset(0 0 62% 0); transform: translate(-3px, 0); }
+    63% { clip-path: inset(70% 0 6% 0); transform: translate(-5px, -1px); }
+    64% { clip-path: inset(0 0 62% 0); transform: translate(-3px, 0); }
+}
+@keyframes erro-glitch-b {
+    0%, 100% { clip-path: inset(58% 0 0 0); transform: translate(3px, 0); }
+    31% { clip-path: inset(10% 0 74% 0); transform: translate(8px, 0); }
+    32% { clip-path: inset(58% 0 0 0); transform: translate(3px, 0); }
+    81% { clip-path: inset(40% 0 38% 0); transform: translate(5px, 1px); }
+    82% { clip-path: inset(58% 0 0 0); transform: translate(3px, 0); }
+}
+.erro__bars {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 12%;
+    opacity: 0.55;
+    background: linear-gradient(90deg,
+        #c0c0c0 0 14.28%, #c0c000 14.28% 28.57%, #00c0c0 28.57% 42.85%, #00c000 42.85% 57.14%,
+        #c000c0 57.14% 71.42%, #c00000 71.42% 85.71%, #0000c0 85.71% 100%);
+}
+
+/* timeline com o vão */
+.erro__timeline {
+    position: relative;
+    margin-top: 18px;
+    padding: 10px 12px 12px;
+    border-radius: var(--radius-2);
+    background: var(--bg-1);
+    border: 1px solid var(--line-1);
+}
+.erro__ruler { margin-bottom: 8px; }
+.erro__track {
+    display: flex;
+    gap: 3px;
+    height: 34px;
+}
+.erro__track + .erro__track { margin-top: 6px; height: 26px; }
+.erro__clip {
+    border-radius: 5px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+}
+.erro__clip--a { flex: 3; background: linear-gradient(180deg, rgba(139, 92, 246, 0.55), rgba(109, 40, 217, 0.4)); }
+.erro__clip--b { flex: 2.4; background: linear-gradient(180deg, rgba(139, 92, 246, 0.55), rgba(109, 40, 217, 0.4)); }
+.erro__clip--c { flex: 3; background: rgba(26, 230, 128, 0.25); }
+.erro__clip--d { flex: 2.4; background: rgba(26, 230, 128, 0.25); }
+.erro__gap {
+    flex: 1.6;
+    display: grid;
+    place-items: center;
+    border-radius: 5px;
+    border: 1px dashed rgba(235, 71, 126, 0.55);
+    background: repeating-linear-gradient(-45deg, rgba(235, 71, 126, 0.08) 0 6px, transparent 6px 12px);
+    font: 500 0.7rem/1 var(--font-mono);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--rose-soft);
+}
+.erro__gap--audio { border-color: rgba(235, 71, 126, 0.35); }
+.erro__playhead {
+    position: absolute;
+    top: 6px;
+    bottom: 6px;
+    left: 46%;
+    width: 2px;
+    background: var(--rose);
+    box-shadow: 0 0 12px var(--rose);
+    animation: erro-busca 4.8s var(--ease-in-out) infinite alternate;
+}
+.erro__playhead::before {
+    content: "";
+    position: absolute;
+    top: -2px;
+    left: -5px;
+    border: 6px solid transparent;
+    border-top: 8px solid var(--rose);
+    border-bottom: 0;
+}
+@keyframes erro-busca {
+    0% { left: 8%; }
+    45% { left: 46%; }
+    55% { left: 46%; }
+    100% { left: 90%; }
+}
+
+@media (max-width: 860px) {
+    .erro__inner { grid-template-columns: minmax(0, 1fr); }
+    .erro__visual { order: 2; }
+}

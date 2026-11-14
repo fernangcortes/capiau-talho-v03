@@ -1,0 +1,791 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>CapIAu-Talho — ilha de pré-edição com IA, grátis e de código aberto</title>
+    <meta name="description" content="Ilha de pré-edição, decupagem e assistência por IA para documentários e grandes acervos. Roda no seu computador, sem GPU. Grátis, sem assinatura e de código aberto (GPL-3.0).">
+    <meta name="theme-color" content="#07060b">
+    <meta name="color-scheme" content="dark">
+    <meta property="og:type" content="website">
+    <meta property="og:locale" content="pt_BR">
+    <meta property="og:site_name" content="CapIAu-Talho">
+    <meta property="og:title" content="CapIAu-Talho — ilha de pré-edição com IA, grátis e de código aberto">
+    <meta property="og:description" content="Ilha de pré-edição, decupagem e assistência por IA para documentários e grandes acervos. Roda no seu computador, sem GPU. Grátis, sem assinatura e de código aberto (GPL-3.0).">
+    <meta property="og:image" content="https://fernangcortes.github.io/capiau-talho-v03/assets/img/og-image.png">
+    <meta name="twitter:card" content="summary_large_image">
+    <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="assets/img/favicon-32x32.png" sizes="32x32" type="image/png">
+    <link rel="apple-touch-icon" href="assets/img/apple-touch-icon.png">
+    <link rel="preload" href="assets/fonts/inter-var.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="preload" href="assets/fonts/barlow-semi-condensed-700.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="stylesheet" href="assets/css/base.css">
+    <link rel="stylesheet" href="assets/css/inicio.css">
+    <script>
+        /* antes de pintar: marca que há JS e aplica a escolha de animações (sem piscar) */
+        (function (r) {
+            r.classList.add("js");
+            try {
+                var m = localStorage.getItem("talho-motion");
+                if (m === "off" || (!m && matchMedia("(prefers-reduced-motion: reduce)").matches)) r.dataset.motion = "off";
+            } catch (e) {}
+        })(document.documentElement);
+    </script>
+    <script src="assets/js/base.js" defer></script>
+    <script src="assets/js/inicio.js" defer></script>
+</head>
+<body data-page="inicio">
+    <a class="skip-link" href="#conteudo">Pular para o conteúdo</a>
+
+    <!-- ═══════════════ CABEÇALHO (idêntico em todas as páginas) ═══════════════ -->
+    <header class="site-header" data-header>
+        <div class="site-header__inner">
+            <a class="brand" href="index.html" aria-label="CapIAu-Talho — página inicial">
+                <img src="assets/img/logo.svg" width="34" height="34" alt="">
+                <span class="brand__name">CapIAu-<span class="brand__talho">Talho</span></span>
+            </a>
+            <nav class="site-nav" id="site-nav" aria-label="Principal">
+                <a href="index.html" data-nav-id="inicio">Início</a>
+                <a href="recursos.html" data-nav-id="recursos">Recursos</a>
+                <a href="como-funciona.html" data-nav-id="como-funciona">Como funciona</a>
+                <a href="comecar.html" data-nav-id="comecar">Começar</a>
+                <a href="contribuir.html" data-nav-id="contribuir">Contribuir</a>
+                <div class="site-nav__mobile-cta">
+                    <a class="btn btn--primary" href="comecar.html">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 20h14"/></svg>
+                        Baixar grátis
+                    </a>
+                </div>
+            </nav>
+            <div class="header-actions">
+                <span class="header-tc" aria-hidden="true" title="A página como uma sequência: o timecode acompanha a rolagem" data-scroll-timecode>00:00:00:00</span>
+                <button class="icon-btn" type="button" data-motion-toggle aria-label="Pausar animações">
+                    <svg class="motion-icon-pause" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 6v12M15 6v12"/></svg>
+                    <svg class="motion-icon-play" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M8 5.5v13l11-6.5z"/></svg>
+                </button>
+                <a class="icon-btn" data-github href="https://github.com/fernangcortes/capiau-talho-v03" aria-label="Código-fonte no GitHub">
+                    <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
+                </a>
+                <a class="btn btn--primary btn--sm header-cta" href="comecar.html">Baixar grátis</a>
+                <button class="icon-btn nav-toggle" type="button" aria-controls="site-nav" aria-expanded="false" aria-label="Abrir menu">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+                </button>
+            </div>
+        </div>
+        <div class="scroll-playhead" aria-hidden="true"><span></span></div>
+    </header>
+
+    <main id="conteudo">
+        <!-- ═══════════════ ABERTURA: a timeline viva ═══════════════ -->
+        <section class="hero" id="abertura" aria-labelledby="hero-titulo" data-hero>
+            <div class="hero__bg" aria-hidden="true"></div>
+            <div class="container--wide hero__grid">
+                <div class="hero__text">
+                    <p class="eyebrow eyebrow--rec hero__eyebrow">Software livre · grátis · sem assinatura</p>
+                    <h1 class="hero__title" id="hero-titulo"><span class="hero__title-in">Do bruto ao<br> <span class="text-gradient">primeiro corte.</span></span></h1>
+                    <p class="lead hero__lead">O CapIAu-Talho é uma ilha de pré-edição, decupagem e assistência por IA para documentários e grandes acervos. Roda no seu computador, sem GPU, e entrega a timeline para o editor que você já usa.</p>
+                    <div class="cluster hero__actions">
+                        <a class="btn btn--primary btn--lg" href="comecar.html">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 20h14"/></svg>
+                            Baixar grátis
+                        </a>
+                        <a class="btn btn--ghost btn--lg" href="contribuir.html">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m8 7-5 5 5 5M16 7l5 5-5 5"/></svg>
+                            Contribuir
+                        </a>
+                    </div>
+                    <ul class="hero__chips" role="list" aria-label="Em resumo">
+                        <li><span class="chip chip--emerald"><span class="chip__dot"></span>R$ 0 · sem assinatura</span></li>
+                        <li><span class="chip chip--violet">Código aberto · GPL-3.0</span></li>
+                        <li><span class="chip chip--cyan"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4"/></svg>Roda em CPU</span></li>
+                        <li><span class="chip chip--amber hero__chip-export">Exporta para Premiere, Resolve, Final Cut e Kdenlive</span></li>
+                    </ul>
+                </div>
+
+                <div class="nle-panel hero__monitor" aria-hidden="true">
+                    <div class="nle-panel__bar">
+                        <span class="nle-panel__name"><span class="nle-panel__dot"></span>Programa · Sequência 01</span>
+                        <span class="nle-panel__transport" data-hero-transport>
+                            <svg class="nle-ico-play" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l11-6.5z"/></svg>
+                            <svg class="nle-ico-pause" viewBox="0 0 24 24" fill="currentColor"><path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z"/></svg>
+                            <span class="nle-panel__tc" data-hero-tc>00:00:00:00</span>
+                        </span>
+                    </div>
+                    <canvas class="nle-panel__screen" data-hero-monitor></canvas>
+                </div>
+
+                <div class="nle-panel hero__timeline" aria-hidden="true">
+                    <div class="nle-panel__bar">
+                        <span class="nle-panel__name">Timeline · Primeiro corte</span>
+                        <span class="nle-tools">
+                            <span class="nle-tool" data-tool="play" title="Reproduzir"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M8 5.5v13l11-6.5z"/></svg></span>
+                            <span class="nle-tool" data-tool="cut" title="Lâmina"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="6" cy="7" r="2.5"/><circle cx="6" cy="17" r="2.5"/><path d="M8.2 8.4 20 18M8.2 15.6 20 6"/></svg></span>
+                            <span class="nle-tool" data-tool="ai" title="Sugestão da IA"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 3l1.9 5.6L19.5 10.5l-5.6 1.9L12 18l-1.9-5.6L4.5 10.5l5.6-1.9z"/></svg></span>
+                        </span>
+                        <span class="nle-status" data-hero-status data-tone="cyan">Montando a sequência</span>
+                    </div>
+                    <canvas class="nle-panel__tl" data-hero-timeline></canvas>
+                </div>
+            </div>
+            <p class="sr-only">Ilustração animada de uma timeline de edição com duas pistas de vídeo e duas de áudio: os clipes chegam, a agulha de reprodução para, um corte a laser divide um clipe, o pedaço descartado sai e os clipes seguintes fecham o vão; depois a IA sugere um plano de cobertura tracejado, que é aprovado e vira um clipe de verdade.</p>
+        </section>
+
+        <div class="container"><div class="talho-cut" data-inview></div></div>
+
+        <!-- ═══════════════ 01 — O PROBLEMA → A VIRADA ═══════════════ -->
+        <section class="section prob" id="problema" aria-labelledby="problema-titulo">
+            <div class="container">
+                <header class="section-head">
+                    <p class="eyebrow eyebrow--rose" data-reveal>01 — O problema</p>
+                    <h2 class="section-title" id="problema-titulo" data-reveal>Horas de bruto. <span class="text-gradient">Minutos de tela.</span></h2>
+                    <p class="lead" data-reveal>Em documentário, a conta entre o que se grava e o que vai para a tela passa fácil de 50:1 — às vezes de 100:1. São horas de entrevista, arquivos com nome de câmera e material sob sigilo. Antes do primeiro corte, alguém precisa assistir a tudo e decupar: anotar o que tem em cada trecho.</p>
+                </header>
+
+                <div class="prob__grid">
+                    <article class="card prob-card" data-reveal>
+                        <div class="prob-card__head">
+                            <p class="prob-card__kicker">O problema</p>
+                            <p class="prob-card__ratio" aria-hidden="true">100<span>:</span>1</p>
+                        </div>
+                        <div class="ratio" data-ratio data-play aria-hidden="true">
+                            <div class="ratio__grid" data-ratio-grid></div>
+                            <span class="ratio__scan"></span>
+                            <span class="ratio__pick"><span>vai para a tela</span></span>
+                        </div>
+                        <div class="ratio__legend" aria-hidden="true">
+                            <span><i class="ratio__key ratio__key--v"></i>entrevista</span>
+                            <span><i class="ratio__key ratio__key--c"></i>B-roll</span>
+                            <span><i class="ratio__key ratio__key--e"></i>som</span>
+                            <span><i class="ratio__key ratio__key--a"></i>arquivo</span>
+                        </div>
+                        <h3 class="card__title">Achar o minuto certo é o trabalho.</h3>
+                        <p class="card__text">Cem trechos no HD para um na tela. A fala certa, o detalhe, o plano que cobre um corte: está tudo gravado — mas onde?</p>
+                    </article>
+
+                    <div class="prob__turn" aria-hidden="true">
+                        <span class="prob__turn-line"></span>
+                        <span class="prob__turn-badge">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                        </span>
+                        <span class="prob__turn-label">a virada</span>
+                    </div>
+
+                    <article class="card prob-card prob-card--turn" data-reveal style="--d: 140ms">
+                        <div class="prob-card__head">
+                            <p class="prob-card__kicker prob-card__kicker--violet">A virada</p>
+                            <p class="prob-card__note" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 3l1.9 5.6L19.5 10.5l-5.6 1.9L12 18l-1.9-5.6L4.5 10.5l5.6-1.9z"/></svg>títulos por IA</p>
+                        </div>
+                        <ul class="rename" data-rename data-play role="list" aria-hidden="true">
+                            <li class="rename__row" data-rename-row data-from="MOV_0492.MOV" data-to="Zé: Crítica ao primeiro corte" data-mode="done">
+                                <span class="rename__thumb rename__thumb--ze"></span>
+                                <span class="rename__body">
+                                    <span class="rename__name"><span data-name>Zé: Crítica ao primeiro corte</span><span class="rename__caret"></span></span>
+                                    <span class="rename__meta"><span class="rename__file">MOV_0492.MOV</span><span>Entrevista · 00:42:17</span></span>
+                                </span>
+                                <span class="rename__ai">IA</span>
+                            </li>
+                            <li class="rename__row" data-rename-row data-from="00012.MTS" data-to="Detalhe das mãos no vinil" data-mode="done">
+                                <span class="rename__thumb rename__thumb--vinil"></span>
+                                <span class="rename__body">
+                                    <span class="rename__name"><span data-name>Detalhe das mãos no vinil</span><span class="rename__caret"></span></span>
+                                    <span class="rename__meta"><span class="rename__file">00012.MTS</span><span>B-roll · 00:01:08</span></span>
+                                </span>
+                                <span class="rename__ai">IA</span>
+                            </li>
+                            <li class="rename__row" data-rename-row data-from="C0047.MP4" data-to="Dona Lia: A loja em 1985" data-mode="done">
+                                <span class="rename__thumb rename__thumb--lia"></span>
+                                <span class="rename__body">
+                                    <span class="rename__name"><span data-name>Dona Lia: A loja em 1985</span><span class="rename__caret"></span></span>
+                                    <span class="rename__meta"><span class="rename__file">C0047.MP4</span><span>Entrevista · 01:12:40</span></span>
+                                </span>
+                                <span class="rename__ai">IA</span>
+                            </li>
+                            <li class="rename__row" data-rename-row data-from="DJI_0113.MP4" data-to="Fachada da loja ao entardecer" data-mode="done">
+                                <span class="rename__thumb rename__thumb--fachada"></span>
+                                <span class="rename__body">
+                                    <span class="rename__name"><span data-name>Fachada da loja ao entardecer</span><span class="rename__caret"></span></span>
+                                    <span class="rename__meta"><span class="rename__file">DJI_0113.MP4</span><span>B-roll · 00:00:52</span></span>
+                                </span>
+                                <span class="rename__ai">IA</span>
+                            </li>
+                            <li class="rename__row" data-rename-row data-from="IMG_2231.MOV" data-to="Seu Antônio: O último disco" data-mode="done">
+                                <span class="rename__thumb rename__thumb--antonio"></span>
+                                <span class="rename__body">
+                                    <span class="rename__name"><span data-name>Seu Antônio: O último disco</span><span class="rename__caret"></span></span>
+                                    <span class="rename__meta"><span class="rename__file">IMG_2231.MOV</span><span>Entrevista · 00:27:05</span></span>
+                                </span>
+                                <span class="rename__ai">IA</span>
+                            </li>
+                        </ul>
+                        <h3 class="card__title">O acervo ganha nome e endereço.</h3>
+                        <p class="card__text">O Talho acha os cortes reais de cada vídeo, transcreve as falas e troca o nome de câmera por um título de 3 a 6 palavras — como <q>Zé: Crítica ao primeiro corte</q> no lugar de <code class="inline">MOV_0492.MOV</code>. Você corrige com um duplo clique. Os títulos usam IA em nuvem, com a sua chave.</p>
+                    </article>
+                </div>
+            </div>
+        </section>
+
+        <!-- ═══════════════ 02 — RECURSOS ═══════════════ -->
+        <section class="section section--alt" id="recursos" aria-labelledby="recursos-titulo">
+            <div class="container">
+                <header class="section-head">
+                    <p class="eyebrow eyebrow--violet" data-reveal>02 — Recursos</p>
+                    <h2 class="section-title" id="recursos-titulo" data-reveal>Tudo o que vem antes do corte final.</h2>
+                    <p class="lead" data-reveal>Decupar, transcrever, buscar, reconhecer rostos, medir o áudio e montar — no mesmo lugar, com a IA ligada direto na timeline, e não num programa à parte.</p>
+                </header>
+
+                <div class="grid grid--3 feats" data-reveal-stagger="90">
+                    <!-- 1. Decupagem -->
+                    <a class="card feat" href="recursos.html#decupagem" data-reveal data-glow>
+                        <div class="feat__viz fx-scenes" data-play aria-hidden="true">
+                            <div class="fx-scenes__strip">
+                                <i class="fx-f fx-f--v"></i><i class="fx-f fx-f--v"></i><i class="fx-f fx-f--v"></i>
+                                <i class="fx-f fx-f--c"></i><i class="fx-f fx-f--c"></i>
+                                <i class="fx-f fx-f--a"></i><i class="fx-f fx-f--a"></i><i class="fx-f fx-f--a"></i><i class="fx-f fx-f--a"></i>
+                            </div>
+                            <span class="fx-scenes__mark" style="--p: 0.3333"><b>corte</b></span>
+                            <span class="fx-scenes__mark" style="--p: 0.5555"><b>corte</b></span>
+                            <span class="fx-scenes__mark fx-scenes__mark--beat" style="--p: 0.7777"><b>beat</b></span>
+                            <span class="fx-scenes__scan"></span>
+                            <span class="fx-scenes__key" style="--p: 0.1666"></span>
+                            <span class="fx-scenes__key" style="--p: 0.4444"></span>
+                            <span class="fx-scenes__key" style="--p: 0.6666"></span>
+                            <span class="fx-scenes__key" style="--p: 0.8888"></span>
+                        </div>
+                        <h3 class="card__title">Decupagem por cenas</h3>
+                        <p class="card__text">Os cortes reais do vídeo viram trechos; planos longos se dividem em beats (os momentos de dentro do plano). Cada trecho ganha um quadro-chave e o tipo de movimento de câmera.</p>
+                        <span class="feat__more">Ver decupagem<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+                    </a>
+
+                    <!-- 2. Edição por texto -->
+                    <a class="card feat" href="recursos.html#transcricao" data-reveal data-glow>
+                        <div class="feat__viz fx-words" data-play aria-hidden="true">
+                            <p class="fx-words__who">Zé</p>
+                            <p class="fx-words__line fx-words__line--1"><span>a gente guardava tudo:</span></p>
+                            <p class="fx-words__line fx-words__line--2"><span class="fx-words__sel"></span><span>cada fita, cada disco.</span></p>
+                            <span class="fx-words__keys"><kbd>Shift</kbd><kbd>E</kbd></span>
+                            <span class="fx-words__track"><span class="fx-words__clip"></span></span>
+                        </div>
+                        <h3 class="card__title">Edição por texto</h3>
+                        <p class="card__text">A entrevista vira texto palavra a palavra, separado por falante. Selecione a frase, aperte <kbd>Shift</kbd>+<kbd>E</kbd> e ela entra na timeline já aparada.</p>
+                        <span class="feat__more">Ver transcrição<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+                    </a>
+
+                    <!-- 3. Busca -->
+                    <a class="card feat" href="recursos.html#busca" data-reveal data-glow>
+                        <div class="feat__viz fx-search" data-play aria-hidden="true">
+                            <span class="fx-search__field">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></svg>
+                                <span class="fx-search__q">contraluz na janela</span><span class="fx-search__caret"></span>
+                            </span>
+                            <span class="fx-search__results">
+                                <i class="fx-thumb fx-thumb--1"></i>
+                                <i class="fx-thumb fx-thumb--hit"><b></b></i>
+                                <i class="fx-thumb fx-thumb--3"></i>
+                                <i class="fx-thumb fx-thumb--4"></i>
+                            </span>
+                            <span class="fx-search__ms">achado em &lt; 5 ms</span>
+                        </div>
+                        <h3 class="card__title">Busca por conceito</h3>
+                        <p class="card__text">Digite <q>contraluz na janela</q> e ache o plano mesmo sem essa palavra na descrição. A busca visual e o <em>Encontrar Similares</em> rodam na sua máquina.</p>
+                        <span class="feat__more">Ver busca<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+                    </a>
+
+                    <!-- 4. Rostos -->
+                    <a class="card feat" href="recursos.html#rostos" data-reveal data-glow>
+                        <div class="feat__viz fx-faces" data-play aria-hidden="true">
+                            <span class="fx-faces__ring fx-faces__ring--1"><b>Zé</b></span>
+                            <span class="fx-faces__ring fx-faces__ring--2"><b>Dona Lia</b></span>
+                            <span class="fx-faces__ring fx-faces__ring--3"><b>Seu Antônio</b></span>
+                            <i class="fx-face" style="--x0: 12%; --y0: 22%; --x1: 19%; --y1: 40%; --g: var(--violet)"></i>
+                            <i class="fx-face" style="--x0: 46%; --y0: 70%; --x1: 26%; --y1: 58%; --g: var(--violet)"></i>
+                            <i class="fx-face" style="--x0: 30%; --y0: 30%; --x1: 13%; --y1: 62%; --g: var(--violet)"></i>
+                            <i class="fx-face" style="--x0: 70%; --y0: 20%; --x1: 46%; --y1: 33%; --g: var(--cyan)"></i>
+                            <i class="fx-face" style="--x0: 20%; --y0: 72%; --x1: 54%; --y1: 46%; --g: var(--cyan)"></i>
+                            <i class="fx-face" style="--x0: 84%; --y0: 60%; --x1: 50%; --y1: 58%; --g: var(--cyan)"></i>
+                            <i class="fx-face" style="--x0: 56%; --y0: 40%; --x1: 78%; --y1: 34%; --g: var(--amber)"></i>
+                            <i class="fx-face" style="--x0: 62%; --y0: 78%; --x1: 86%; --y1: 52%; --g: var(--amber)"></i>
+                            <i class="fx-face" style="--x0: 88%; --y0: 28%; --x1: 76%; --y1: 60%; --g: var(--amber)"></i>
+                            <span class="fx-faces__local">100% local</span>
+                        </div>
+                        <h3 class="card__title">Rostos, na sua máquina</h3>
+                        <p class="card__text">Detecta e agrupa os rostos para você nomear elenco e equipe — sem mandar biometria para fora. Suas correções ficam travadas contra novos agrupamentos.</p>
+                        <span class="feat__more">Ver rostos<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+                    </a>
+
+                    <!-- 5. Áudio -->
+                    <a class="card feat" href="recursos.html#audio" data-reveal data-glow>
+                        <div class="feat__viz fx-audio" data-play aria-hidden="true">
+                            <span class="fx-audio__wave">
+                                <i style="--h: .32"></i><i style="--h: .58"></i><i style="--h: .81"></i><i style="--h: .46"></i><i style="--h: .67"></i><i style="--h: .92"></i><i style="--h: .54"></i><i style="--h: .38"></i><i style="--h: .72"></i><i style="--h: .88"></i><i style="--h: .49"></i><i style="--h: .3"></i><i style="--h: .63"></i><i style="--h: .84"></i><i style="--h: .57"></i><i style="--h: .41"></i><i style="--h: .76"></i><i style="--h: .95"></i><i style="--h: .52"></i><i style="--h: .36"></i><i style="--h: .69"></i><i style="--h: .8"></i><i style="--h: .44"></i><i style="--h: .6"></i>
+                            </span>
+                            <span class="fx-audio__floor"><b>ruído</b></span>
+                            <span class="fx-audio__meter"><span class="fx-audio__fill"></span><span class="fx-audio__target"><b>-16 LUFS</b></span></span>
+                            <span class="fx-audio__peak">pico ≤ -1,5 dBTP</span>
+                        </div>
+                        <h3 class="card__title">Áudio medido, não chutado</h3>
+                        <p class="card__text">Mede loudness, pico, clipping e piso de ruído antes de sugerir qualquer coisa. O tratamento gera um arquivo novo e o original fica intocado.</p>
+                        <span class="feat__more">Ver áudio<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+                    </a>
+
+                    <!-- 6. Timeline e exportação -->
+                    <a class="card feat" href="recursos.html#timeline" data-reveal data-glow>
+                        <div class="feat__viz fx-tl" data-play aria-hidden="true">
+                            <span class="fx-tl__track"><i class="fx-tl__clip fx-tl__clip--c" style="--s: 18%; --w: 22%"></i><i class="fx-tl__clip fx-tl__clip--c" style="--s: 58%; --w: 16%"></i></span>
+                            <span class="fx-tl__track"><i class="fx-tl__clip fx-tl__clip--v" style="--s: 2%; --w: 34%"></i><i class="fx-tl__clip fx-tl__clip--v" style="--s: 37%; --w: 25%"></i><i class="fx-tl__clip fx-tl__clip--v" style="--s: 63%; --w: 30%"></i></span>
+                            <span class="fx-tl__track fx-tl__track--a"><i class="fx-tl__clip fx-tl__clip--e" style="--s: 2%; --w: 34%"></i><i class="fx-tl__clip fx-tl__clip--e" style="--s: 37%; --w: 25%"></i><i class="fx-tl__clip fx-tl__clip--e" style="--s: 63%; --w: 30%"></i></span>
+                            <span class="fx-tl__head"></span>
+                            <span class="fx-tl__files"><b>.otio</b><b>.xml</b><b>.edl</b></span>
+                        </div>
+                        <h3 class="card__title">Timeline e exportação</h3>
+                        <p class="card__text">Pistas, ripple, In/Out, JKL e os atalhos do editor que você já usa. Quando o corte fica bom, ele sai em <code class="inline">.otio</code>, <code class="inline">.xml</code> ou <code class="inline">.edl</code>.</p>
+                        <span class="feat__more">Ver timeline<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+                    </a>
+                </div>
+
+                <p class="feats__more" data-reveal>E ainda: um <a class="inline-link" href="recursos.html#agente">agente de IA</a> que propõe cortes como <em>ghost clips</em> — rascunhos tracejados que você aprova ou descarta —, o <a class="inline-link" href="recursos.html#titulos">Titler</a> para letreiros e legendas e um <a class="inline-link" href="recursos.html#render">render</a> que respeita o que o monitor mostra.
+                    <a class="link-arrow" href="recursos.html">Ver todos os recursos<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+                </p>
+            </div>
+        </section>
+
+        <!-- ═══════════════ 03 — EDIÇÃO POR TEXTO (demo) ═══════════════ -->
+        <section class="section tx" id="edicao-por-texto" aria-labelledby="texto-titulo">
+            <div class="container">
+                <div class="tx__split">
+                    <div class="tx__copy">
+                        <p class="eyebrow" data-reveal>03 — Edição por texto</p>
+                        <h2 class="section-title tx__title" id="texto-titulo" data-reveal>Selecione a frase. Aperte <kbd>Shift</kbd>+<kbd>E</kbd>. Está na timeline.</h2>
+                        <p class="lead" data-reveal>A transcrição vem palavra a palavra e separada por falante — é a diarização: saber quem falou o quê. Clique numa palavra e o player pula para ela. Selecione um trecho, aperte <kbd>Shift</kbd>+<kbd>E</kbd>, e ele entra em V1 e A1 na posição da agulha, com In e Out no começo e no fim da frase.</p>
+                        <ol class="tx__steps" role="list" data-reveal-stagger="90">
+                            <li data-reveal><span class="tx__step-n">1</span><span><strong>Transcreva.</strong> Na nuvem, com a sua chave (AssemblyAI ou Deepgram), ou no seu computador, com o Whisper na CPU.</span></li>
+                            <li data-reveal><span class="tx__step-n">2</span><span><strong>Leia como um roteiro.</strong> As palavras acendem enquanto o vídeo toca.</span></li>
+                            <li data-reveal><span class="tx__step-n">3</span><span><strong>Selecione e aperte <kbd>Shift</kbd>+<kbd>E</kbd>.</strong> O trecho cai na timeline, já aparado.</span></li>
+                        </ol>
+                        <a class="link-arrow" href="recursos.html#transcricao" data-reveal>Transcrição e edição por texto<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+                    </div>
+
+                    <div class="tx-demo" data-demo data-reveal="scale">
+                        <div class="tx-demo__win">
+                            <div class="tx-demo__bar">
+                                <span class="tx-demo__name"><span class="tx-demo__dot"></span>Transcrição · Zé: As fitas da loja</span>
+                                <span class="tx-demo__tc" data-demo-tc aria-hidden="true">00:00:12:20</span>
+                            </div>
+                            <div class="tx-demo__body" data-demo-text>
+                                <p class="tx-turn tx-turn--a"><span class="tx-turn__who" aria-hidden="true">Entrevistadora</span><span class="sr-only">Entrevistadora: </span><span class="tx-turn__line">E quando a loja fechou, o que ficou com você?</span></p>
+                                <p class="tx-turn tx-turn--b"><span class="tx-turn__who" aria-hidden="true">Zé</span><span class="sr-only">Zé: </span><span class="tx-turn__line">Ficaram as fitas. Mais de trezentas horas, tudo sem nome. <span data-target>Eu sabia que a história estava ali dentro, só não sabia onde.</span></span></p>
+                                <p class="tx-turn tx-turn--a"><span class="tx-turn__who" aria-hidden="true">Entrevistadora</span><span class="sr-only">Entrevistadora: </span><span class="tx-turn__line">E como você achou?</span></p>
+                                <p class="tx-turn tx-turn--b"><span class="tx-turn__who" aria-hidden="true">Zé</span><span class="sr-only">Zé: </span><span class="tx-turn__line">Ouvindo de novo. Uma por uma, com um caderno do lado.</span></p>
+                            </div>
+                            <div class="tx-demo__keys" aria-hidden="true">
+                                <kbd data-key="shift">Shift</kbd><span class="tx-demo__plus">+</span><kbd data-key="e">E</kbd>
+                                <span class="tx-demo__keyhint" data-demo-keyhint>insere o trecho na timeline</span>
+                            </div>
+                            <div class="tx-tl" data-demo-tl aria-hidden="true">
+                                <div class="tx-tl__ruler"><span>00:00</span><span>00:06</span><span>00:12</span><span>00:18</span></div>
+                                <div class="tx-tl__row"><span class="tx-tl__label">V1</span><div class="tx-tl__lane" data-lane="v"><span class="tx-tl__clip tx-tl__clip--v" style="--s: 0; --e: 6">Abertura</span><span class="tx-tl__clip tx-tl__clip--v tx-tl__clip--new" data-demo-clip style="--s: 6; --e: 10.4">Zé: “Eu sabia que a história…”</span></div></div>
+                                <div class="tx-tl__row"><span class="tx-tl__label">A1</span><div class="tx-tl__lane" data-lane="a"><span class="tx-tl__clip tx-tl__clip--a" style="--s: 0; --e: 6"></span><span class="tx-tl__clip tx-tl__clip--a tx-tl__clip--new" data-demo-clip style="--s: 6; --e: 10.4"></span></div></div>
+                                <span class="tx-tl__playhead" data-demo-playhead style="--t: 10.4"></span>
+                            </div>
+                        </div>
+                        <div class="tx-demo__controls">
+                            <button class="btn btn--ghost btn--sm" type="button" data-demo-replay>
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12a8 8 0 0 1 13.7-5.7L20 8.5M20 4v4.5h-4.5M20 12a8 8 0 0 1-13.7 5.7L4 15.5M4 20v-4.5h4.5"/></svg>
+                                Repetir
+                            </button>
+                            <button class="btn btn--cyan btn--sm" type="button" data-demo-insert disabled>Inserir seleção</button>
+                            <p class="tx-demo__hint">Experimente: selecione palavras na transcrição e aperte <kbd>Shift</kbd>+<kbd>E</kbd> (ou o botão).</p>
+                        </div>
+                        <p class="sr-only" aria-live="polite" data-demo-live></p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ═══════════════ 04 — GRÁTIS ═══════════════ -->
+        <section class="section free" id="gratis" aria-labelledby="gratis-titulo">
+            <div class="free__glow" aria-hidden="true"></div>
+            <div class="container">
+                <header class="section-head">
+                    <p class="eyebrow eyebrow--emerald" data-reveal>04 — Quanto custa</p>
+                    <h2 class="section-title" id="gratis-titulo" data-reveal>Grátis de verdade.</h2>
+                    <p class="lead" data-reveal>Sem assinatura, sem conta, sem plano pago, sem recurso trancado. O programa inteiro é seu — e o código também.</p>
+                </header>
+
+                <div class="free__grid">
+                    <div class="free-price" data-reveal>
+                        <p class="free-price__value"><span class="free-price__cur">R$</span>0</p>
+                        <p class="free-price__sub">Sem mensalidade. Sem período de teste. Sem cartão.</p>
+                        <div class="free-chart">
+                            <div class="free-chart__legend" aria-hidden="true">
+                                <span class="free-chart__key free-chart__key--sub">Uma mensalidade qualquer</span>
+                                <span class="free-chart__key free-chart__key--talho">Talho</span>
+                                <span class="free-chart__month" data-price-month>mês 36</span>
+                            </div>
+                            <canvas class="free-chart__canvas" data-price-chart aria-hidden="true"></canvas>
+                            <p class="free-chart__caption">A assinatura soma todo mês e não para. O Talho fica no zero: no mês 1 e no mês 36.</p>
+                        </div>
+                    </div>
+
+                    <div class="free-lists">
+                        <div class="free-list free-list--ok" data-reveal>
+                            <h3 class="free-list__title"><span class="free-list__icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span>Grátis, sem pegadinha</h3>
+                            <ul class="free-list__items" role="list">
+                                <li>O programa inteiro, com todo o código aberto</li>
+                                <li>Busca visual e <em>Encontrar Similares</em>, locais</li>
+                                <li>Rostos no módulo local, medição e tratamento de áudio</li>
+                                <li>Timeline, render e exportação</li>
+                            </ul>
+                        </div>
+                        <div class="free-list free-list--opt" data-reveal>
+                            <h3 class="free-list__title"><span class="free-list__icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 18h10a4 4 0 0 0 .6-7.96A6 6 0 0 0 6.1 9.2 4.5 4.5 0 0 0 7 18z"/></svg></span>Opcional, na nuvem, com a sua chave</h3>
+                            <ul class="free-list__items" role="list">
+                                <li>Transcrição — AssemblyAI ou Deepgram</li>
+                                <li>Descrição visual, títulos, temas, resumos e o agente — OpenRouter</li>
+                                <li>Tratamento de áudio no Auphonic, que tem plano gratuito de 2 h por mês</li>
+                            </ul>
+                            <p class="free-list__note">Quem cobra é o provedor, por uso, direto de você. O Talho não intermedeia nem cobra nada.</p>
+                        </div>
+                        <div class="free-list free-list--local" data-reveal>
+                            <h3 class="free-list__title"><span class="free-list__icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4"/></svg></span>Prefere não usar nuvem?</h3>
+                            <p class="free-list__text">Transcreva com o Whisper na CPU — a versão turbo leva cerca de 0,4× a duração do áudio —, com diarização local. Nenhum modelo grande baixa sozinho: você escolhe em Configurações › Modelos locais. Descrição visual, títulos, temas e o agente ainda dependem de chave de nuvem.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="free__bottom">
+                    <div class="free-ref" data-reveal>
+                        <p class="free-ref__label">Referência do projeto</p>
+                        <p class="free-ref__value">20 horas de vídeo por menos de <span class="nowrap">R$ 30</span></p>
+                        <p class="free-ref__text">É uma referência de projeto, não uma garantia: depende do provedor, do câmbio e do seu material. O segredo está no desenho: o áudio sobe como MP3 mono de 16 kHz (mais de 99% menor que o vídeo), só entrevistas vão para a transcrição, só um quadro por trecho vai para a visão — e busca e similares são 100% locais.</p>
+                        <a class="link-arrow" href="como-funciona.html#custos">Como o custo fica baixo<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+                    </div>
+                    <div class="free-gpl" data-reveal style="--d: 120ms">
+                        <p class="free-ref__label">Por que é livre</p>
+                        <p class="free-gpl__value">GPL-3.0</p>
+                        <p class="free-ref__text">O código é aberto e vai continuar aberto: quem distribuir uma versão modificada do Talho tem de abrir o código dela também. Dá para usar, estudar, mudar e compartilhar.</p>
+                        <a class="link-arrow" href="https://github.com/fernangcortes/capiau-talho-v03/blob/main/LICENSE">Ler a licença<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ═══════════════ 05 — PRIVACIDADE ═══════════════ -->
+        <section class="section section--alt" id="privacidade" aria-labelledby="privacidade-titulo">
+            <div class="container">
+                <header class="section-head">
+                    <p class="eyebrow eyebrow--emerald" data-reveal>05 — Privacidade</p>
+                    <h2 class="section-title" id="privacidade-titulo" data-reveal>Seus arquivos não saem de casa.</h2>
+                    <p class="lead" data-reveal>O Talho cataloga o acervo onde ele está: grava só o caminho de cada arquivo e nunca copia, envia ou modifica o original. Banco, vetores, rostos do módulo local e áudio ficam no seu computador. O que pode ir para a nuvem é pouco — e só se você configurar.</p>
+                </header>
+
+                <div class="priv" data-priv data-cloud="on" data-play data-reveal>
+                    <div class="priv__top">
+                        <p class="priv__col priv__col--local"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>No seu computador</p>
+                        <button class="priv-toggle" type="button" aria-pressed="true" data-priv-toggle>
+                            <span class="priv-toggle__track" aria-hidden="true"><span class="priv-toggle__thumb"></span></span>
+                            <span>Nuvem opcional: <b data-priv-state>ligada</b></span>
+                        </button>
+                        <p class="priv__col priv__col--cloud"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 18h10a4 4 0 0 0 .6-7.96A6 6 0 0 0 6.1 9.2 4.5 4.5 0 0 0 7 18z"/></svg>Na nuvem, se você quiser</p>
+                    </div>
+                    <ul class="priv__rows" role="list">
+                        <li class="priv-row priv-row--keep">
+                            <span class="priv-row__local"><span class="priv-row__icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></span><span><strong>Vídeos originais</strong><small>nunca copiados, enviados ou modificados</small></span></span>
+                            <span class="priv-row__lane priv-row__lane--stop" aria-hidden="true"><i></i></span>
+                            <span class="priv-row__cloud priv-row__cloud--never"><strong>Não sai</strong><small>nem com a nuvem ligada</small></span>
+                        </li>
+                        <li class="priv-row">
+                            <span class="priv-row__local"><span class="priv-row__icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M3 12h2M7 8v8M11 5v14M15 9v6M19 7v10M21 12h0"/></svg></span><span><strong>Áudio das entrevistas</strong><small>convertido em MP3 mono de 16 kHz</small></span></span>
+                            <span class="priv-row__lane" aria-hidden="true"><span class="priv-row__run"><i class="priv-row__packet">MP3</i></span></span>
+                            <span class="priv-row__cloud"><strong>Transcrição</strong><small>AssemblyAI ou Deepgram</small></span>
+                        </li>
+                        <li class="priv-row">
+                            <span class="priv-row__local"><span class="priv-row__icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 16 5-5 4 4 3-3 6 6"/></svg></span><span><strong>Quadros-chave</strong><small>poucos: um por trecho</small></span></span>
+                            <span class="priv-row__lane" aria-hidden="true"><span class="priv-row__run" style="--delay: -0.9s"><i class="priv-row__packet">quadros</i></span></span>
+                            <span class="priv-row__cloud"><strong>Descrição visual</strong><small>OpenRouter</small></span>
+                        </li>
+                        <li class="priv-row">
+                            <span class="priv-row__local"><span class="priv-row__icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M4 10h16M4 14h10M4 18h7"/></svg></span><span><strong>Textos</strong><small>transcrições e descrições</small></span></span>
+                            <span class="priv-row__lane" aria-hidden="true"><span class="priv-row__run" style="--delay: -1.8s"><i class="priv-row__packet">texto</i></span></span>
+                            <span class="priv-row__cloud"><strong>Títulos, temas, resumos e agente</strong><small>OpenRouter</small></span>
+                        </li>
+                        <li class="priv-row">
+                            <span class="priv-row__local"><span class="priv-row__icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 12h3l2-5 3 10 2-5h6"/></svg></span><span><strong>Trecho de áudio escolhido</strong><small>só o trecho, não a entrevista</small></span></span>
+                            <span class="priv-row__lane" aria-hidden="true"><span class="priv-row__run" style="--delay: -2.6s"><i class="priv-row__packet">trecho</i></span></span>
+                            <span class="priv-row__cloud"><strong>Tratamento no Auphonic</strong><small>se você quiser a nuvem de áudio</small></span>
+                        </li>
+                        <li class="priv-row priv-row--keep">
+                            <span class="priv-row__local"><span class="priv-row__icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v12c0 1.7 3.1 3 7 3s7-1.3 7-3V6M5 12c0 1.7 3.1 3 7 3s7-1.3 7-3"/></svg></span><span><strong>Proxies, banco e vetores</strong><small>SQLite, Qdrant, MiniLM e CLIP</small></span></span>
+                            <span class="priv-row__lane priv-row__lane--stay" aria-hidden="true"><i></i></span>
+                            <span class="priv-row__cloud priv-row__cloud--never"><strong>Fica aqui</strong><small>com os rostos do módulo local</small></span>
+                        </li>
+                    </ul>
+                    <p class="priv__note priv__note--on">Com a nuvem ligada, sai só isto — e só para o provedor que você configurou, com a sua chave. Os fluxos de rostos em nuvem são outra opção, separada, que só roda se você configurar.</p>
+                    <p class="priv__note priv__note--off">Nuvem desligada: busca, rostos, áudio, timeline e exportação seguem funcionando. A transcrição pode ser local (Whisper). Descrição visual, títulos, temas e o agente ficam de fora.</p>
+                    <p class="sr-only" aria-live="polite" data-priv-live></p>
+                </div>
+
+                <div class="priv__after">
+                    <a class="link-arrow" href="como-funciona.html#privacidade" data-reveal>O que fica e o que sai, item por item<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+                    <p class="callout callout--amber priv__warn" data-reveal><strong>Uso local.</strong> A interface abre em <code class="inline">localhost:8000</code> e a API não tem autenticação: rode o Talho só no seu computador. <a class="inline-link" href="comecar.html#seguranca">Veja como</a>.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- ═══════════════ 06 — EXPORTAR ═══════════════ -->
+        <section class="section exp" id="exportar" aria-labelledby="exportar-titulo">
+            <div class="container">
+                <header class="section-head">
+                    <p class="eyebrow eyebrow--amber" data-reveal>06 — Exportação</p>
+                    <h2 class="section-title" id="exportar-titulo" data-reveal>Sem prisão.</h2>
+                    <p class="lead" data-reveal>O Talho faz a triagem e o primeiro corte; o acabamento fica no editor que você já usa. A timeline sai com precisão de frame e apontando para os seus arquivos originais.</p>
+                </header>
+
+                <div class="exp__map" data-play>
+                    <div class="exp-seq" data-reveal="left" aria-hidden="true">
+                        <p class="exp-seq__name">Sequência 01 · primeiro corte</p>
+                        <div class="exp-seq__tracks">
+                            <span class="exp-seq__track"><b>V2</b><i class="exp-seq__clip exp-seq__clip--c" style="--s: 0.14; --w: 0.16"></i><i class="exp-seq__clip exp-seq__clip--c" style="--s: 0.62; --w: 0.14"></i></span>
+                            <span class="exp-seq__track"><b>V1</b><i class="exp-seq__clip exp-seq__clip--v" style="--s: 0; --w: 0.3"></i><i class="exp-seq__clip exp-seq__clip--v" style="--s: 0.31; --w: 0.24"></i><i class="exp-seq__clip exp-seq__clip--v" style="--s: 0.56; --w: 0.4"></i></span>
+                            <span class="exp-seq__track"><b>A1</b><i class="exp-seq__clip exp-seq__clip--e" style="--s: 0; --w: 0.3"></i><i class="exp-seq__clip exp-seq__clip--e" style="--s: 0.31; --w: 0.24"></i><i class="exp-seq__clip exp-seq__clip--e" style="--s: 0.56; --w: 0.4"></i></span>
+                            <span class="exp-seq__track"><b>A2</b><i class="exp-seq__clip exp-seq__clip--a" style="--s: 0; --w: 0.96"></i></span>
+                            <span class="exp-seq__head"></span>
+                        </div>
+                        <p class="exp-seq__meta"><span>24 fps</span><span>V1–V2 · A1–A2</span><span>aponta para os originais</span></p>
+                    </div>
+
+                    <svg class="exp__wires" viewBox="0 0 160 500" preserveAspectRatio="none" aria-hidden="true">
+                        <path class="exp__wire" d="M0 250 C 80 250, 80 50, 160 50" pathLength="100"/>
+                        <path class="exp__wire" d="M0 250 C 80 250, 80 150, 160 150" pathLength="100"/>
+                        <path class="exp__wire" d="M0 250 C 80 250, 80 250, 160 250" pathLength="100"/>
+                        <path class="exp__wire" d="M0 250 C 80 250, 80 350, 160 350" pathLength="100"/>
+                        <path class="exp__wire" d="M0 250 C 80 250, 80 450, 160 450" pathLength="100"/>
+                        <path class="exp__pulse" d="M0 250 C 80 250, 80 50, 160 50" pathLength="100"/>
+                        <path class="exp__pulse" d="M0 250 C 80 250, 80 150, 160 150" pathLength="100" style="--d: -0.5s"/>
+                        <path class="exp__pulse" d="M0 250 C 80 250, 80 250, 160 250" pathLength="100" style="--d: -1s"/>
+                        <path class="exp__pulse" d="M0 250 C 80 250, 80 350, 160 350" pathLength="100" style="--d: -1.5s"/>
+                        <path class="exp__pulse" d="M0 250 C 80 250, 80 450, 160 450" pathLength="100" style="--d: -2s"/>
+                    </svg>
+
+                    <ul class="exp__dests" role="list" data-reveal-stagger="90">
+                        <li class="exp-dest" data-reveal="right">
+                            <span class="exp-dest__fmt">.otio</span>
+                            <span class="exp-dest__body"><strong>Kdenlive 25.04+</strong><span>abre o OpenTimelineIO direto, com pistas e cortes</span></span>
+                        </li>
+                        <li class="exp-dest" data-reveal="right">
+                            <span class="exp-dest__fmt">.xml</span>
+                            <span class="exp-dest__body"><strong>Premiere Pro, DaVinci Resolve e Final Cut Pro</strong><span>importam o XML (padrão Final Cut Pro 7)</span></span>
+                        </li>
+                        <li class="exp-dest" data-reveal="right">
+                            <span class="exp-dest__fmt">.edl</span>
+                            <span class="exp-dest__body"><strong>Suítes de pós e de cor</strong><span>conformação por timecode</span></span>
+                        </li>
+                        <li class="exp-dest" data-reveal="right">
+                            <span class="exp-dest__fmt">.mp4</span>
+                            <span class="exp-dest__body"><strong>Qualquer tela</strong><span>render pelo FFmpeg: rascunho com proxies ou master com os originais</span></span>
+                        </li>
+                        <li class="exp-dest" data-reveal="right">
+                            <span class="exp-dest__fmt">.srt · .vtt</span>
+                            <span class="exp-dest__body"><strong>Legendas</strong><span>do Titler, prontas para o player ou para o editor</span></span>
+                        </li>
+                    </ul>
+                </div>
+
+                <p class="exp__keys" data-reveal>E se as suas mãos já sabem outro editor: são <strong>6 perfis de atalhos</strong> — CapIAu, Kdenlive, Premiere Pro, DaVinci Resolve, Final Cut Pro e um personalizado. <a class="inline-link" href="recursos.html#exportacao">Mais sobre exportação</a>.</p>
+            </div>
+        </section>
+
+        <!-- ═══════════════ NÚMEROS ═══════════════ -->
+        <section class="section section--tight nums" id="numeros" aria-labelledby="numeros-titulo">
+            <div class="container">
+                <header class="section-head center">
+                    <p class="eyebrow" data-reveal>Em números</p>
+                    <h2 class="section-title" id="numeros-titulo" data-reveal>Números que dá para conferir.</h2>
+                    <p class="lead" data-reveal>Medidos no projeto e documentados no repositório — nada de estimativa de marketing.</p>
+                </header>
+                <ul class="nums__grid" role="list" data-reveal-stagger="80">
+                    <li class="num" data-reveal>
+                        <p class="num__value"><span>0</span></p>
+                        <p class="num__label"><strong>GPU necessária.</strong> Roda em CPU; se houver placa de vídeo, o encode aproveita.</p>
+                    </li>
+                    <li class="num" data-reveal>
+                        <p class="num__value"><span data-count-to="5" data-count-prefix="&lt; " data-count-suffix=" ms" data-count-from="40">&lt; 5 ms</span></p>
+                        <p class="num__label"><strong>para a busca</strong> localizar o trecho exato no acervo indexado.</p>
+                    </li>
+                    <li class="num" data-reveal>
+                        <p class="num__value"><span data-count-to="44" data-count-from="31" data-count-prefix="31×–" data-count-suffix="×">31×–44×</span></p>
+                        <p class="num__label"><strong>o tempo real</strong> na cadeia clássica de áudio: 22 min de entrevista em ~43 s, medido na máquina do projeto.</p>
+                    </li>
+                    <li class="num" data-reveal>
+                        <p class="num__value"><span data-count-to="80" data-count-suffix=" px">80 px</span></p>
+                        <p class="num__label"><strong>por frame</strong> no zoom máximo da timeline, para cortar no quadro exato.</p>
+                    </li>
+                    <li class="num" data-reveal>
+                        <p class="num__value"><span data-count-to="6">6</span></p>
+                        <p class="num__label"><strong>perfis de atalhos</strong>, com teclado visual para conferir cada tecla.</p>
+                    </li>
+                    <li class="num" data-reveal>
+                        <p class="num__value"><span data-count-to="3">3</span></p>
+                        <p class="num__label"><strong>formatos de timeline</strong> — <code class="inline">.otio</code>, <code class="inline">.xml</code> e <code class="inline">.edl</code> — para levar o corte embora.</p>
+                    </li>
+                </ul>
+            </div>
+        </section>
+
+        <!-- ═══════════════ 07 — COMUNIDADE ═══════════════ -->
+        <section class="section section--alt com" id="comunidade" aria-labelledby="comunidade-titulo">
+            <div class="container">
+                <header class="section-head">
+                    <p class="eyebrow eyebrow--violet" data-reveal>07 — Comunidade</p>
+                    <h2 class="section-title" id="comunidade-titulo" data-reveal>Feito em <span class="text-gradient">aberto.</span></h2>
+                    <p class="lead" data-reveal>O Talho é um MVP em desenvolvimento ativo: muita coisa já funciona, muita coisa está sendo construída agora. Se você monta, cataloga, programa, escreve ou desenha, tem lugar para você.</p>
+                </header>
+
+                <div class="grid grid--4 com__ways" data-reveal-stagger="80">
+                    <article class="card com-way" data-reveal data-glow>
+                        <div class="card__icon card__icon--violet" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m8 7-5 5 5 5M16 7l5 5-5 5"/></svg></div>
+                        <h3 class="card__title">Código</h3>
+                        <p class="card__text">Python com FastAPI no backend; JavaScript moderno, sem frameworks, no navegador — com a timeline em Canvas 2D.</p>
+                    </article>
+                    <article class="card com-way" data-reveal data-glow>
+                        <div class="card__icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3h6M10 3v6L4.5 18.5A1.7 1.7 0 0 0 6 21h12a1.7 1.7 0 0 0 1.5-2.5L14 9V3"/><path d="M7.5 15h9"/></svg></div>
+                        <h3 class="card__title">Testes com material real</h3>
+                        <p class="card__text">Rode com o seu acervo e conte o que quebrou. Um relato com passo a passo vale ouro.</p>
+                    </article>
+                    <article class="card com-way" data-reveal data-glow>
+                        <div class="card__icon card__icon--emerald" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2zm0 0a2 2 0 0 0 2 2h13"/></svg></div>
+                        <h3 class="card__title">Documentação</h3>
+                        <p class="card__text">Wiki, manual e guias. Aprendeu algo no caminho? Alguém precisa saber também.</p>
+                    </article>
+                    <article class="card com-way" data-reveal data-glow>
+                        <div class="card__icon card__icon--amber" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.6 10.8c.6.5 1 1.2 1 2V17h5.2v-1.2c0-.8.4-1.5 1-2A6 6 0 0 0 12 3z"/></svg></div>
+                        <h3 class="card__title">Ideias e design</h3>
+                        <p class="card__text">Proponha recursos, desenhe telas, discuta o roadmap nas issues do GitHub.</p>
+                    </article>
+                </div>
+
+                <div class="road" data-reveal>
+                    <div class="road__head">
+                        <h3 class="road__title">Onde estamos</h3>
+                        <p class="road__note">Sem datas prometidas: o ritmo é o de um projeto aberto.</p>
+                    </div>
+                    <ol class="road__track" role="list">
+                        <li class="road-step road-step--done"><span class="road-step__status">Concluída</span><strong>Etapa 1 · Sanear a base</strong><span>limpeza do pipeline de análise</span></li>
+                        <li class="road-step road-step--done"><span class="road-step__status">Concluída</span><strong>Etapa 2 · Segmentação e CLIP local</strong><span>shots, beats e busca visual</span></li>
+                        <li class="road-step road-step--done"><span class="road-step__status">Concluída</span><strong>Suíte NLE Clássico</strong><span>tasks 0 a 15: lâmina, slip, slide, 3 pontos…</span></li>
+                        <li class="road-step road-step--now"><span class="road-step__status">Em andamento</span><strong>Etapa 3 · Sala de Projeto &amp; IA de Montagem</strong><span>contexto, transições sugeridas, escaleta</span></li>
+                        <li class="road-step road-step--now"><span class="road-step__status">Em andamento</span><strong>Etapa 4 · Vídeo, Cor &amp; Efeitos</strong><span>tasks 16 a 18 prontas; 19 a 25 na fila</span></li>
+                        <li class="road-step road-step--next"><span class="road-step__status">Planejada</span><strong>Etapa 5 · Busca multi-vetor e agentes</strong><span>busca em 3 passos, chat com ferramentas, servidor MCP</span></li>
+                    </ol>
+                    <div class="road__ideas">
+                        <p class="road__ideas-label">Ideias na fila, sem data</p>
+                        <div class="marquee road__marquee" data-play>
+                            <div class="marquee__track">
+                                <ul class="road__chips" role="list">
+                                    <li>VU meter estéreo</li><li>Keyframes de áudio</li><li>Auto-ducking</li><li>Várias timelines em abas</li><li>Sincronia multicâmera pelo áudio</li><li>Construtor de storyline</li><li>Auto B-roll</li><li>Scopes de vídeo</li><li>Revisão colaborativa por WebRTC</li>
+                                </ul>
+                                <ul class="road__chips" role="list" aria-hidden="true">
+                                    <li>VU meter estéreo</li><li>Keyframes de áudio</li><li>Auto-ducking</li><li>Várias timelines em abas</li><li>Sincronia multicâmera pelo áudio</li><li>Construtor de storyline</li><li>Auto B-roll</li><li>Scopes de vídeo</li><li>Revisão colaborativa por WebRTC</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="com__foot">
+                    <p class="com__facts" data-reveal><span class="mono">~49 mil</span> linhas de Python · <span class="mono">~89 mil</span> de JavaScript · <span class="mono">78</span> arquivos de teste pytest · <span class="mono">83</span> autotestes Node <span class="com__date">— em 29/10/2026</span></p>
+                    <div class="cluster com__actions" data-reveal>
+                        <a class="btn btn--primary" href="contribuir.html">Como contribuir
+                            <svg class="btn__arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                        </a>
+                        <a class="btn btn--ghost" href="https://github.com/fernangcortes/capiau-talho-v03">
+                            <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
+                            Ver o código
+                        </a>
+                        <a class="btn btn--ghost" href="https://github.com/fernangcortes/capiau-talho-v03/issues/new">Relatar um problema</a>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <div class="container"><div class="talho-cut" data-inview></div></div>
+
+        <!-- ═══════════════ CHAMADA FINAL ═══════════════ -->
+        <section class="section section--tight" id="chamada" aria-labelledby="cta-titulo">
+            <div class="container">
+                <div class="cta-band" data-reveal="scale">
+                    <p class="eyebrow eyebrow--rec">Grátis · sem assinatura · código aberto</p>
+                    <h2 class="cta-band__title" id="cta-titulo">Seu acervo merece um <span class="text-gradient">primeiro corte.</span></h2>
+                    <p class="lead cta-band__lead">Baixe o código, rode com Docker ou Python e abra no navegador. Sem conta, sem cartão, sem plano pago.</p>
+                    <div class="cluster cta-band__actions">
+                        <a class="btn btn--primary btn--lg" href="comecar.html">Baixar grátis
+                            <svg class="btn__arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                        </a>
+                        <a class="btn btn--ghost btn--lg" href="contribuir.html">Quero contribuir</a>
+                    </div>
+                    <p class="cta-band__note">Projeto em desenvolvimento ativo (MVP) · software livre sob a GPL-3.0</p>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- ═══════════════ RODAPÉ (idêntico em todas as páginas) ═══════════════ -->
+    <footer class="site-footer">
+        <div class="container">
+            <div class="site-footer__grid">
+                <div class="site-footer__brand">
+                    <a class="brand" href="index.html" aria-label="CapIAu-Talho — página inicial">
+                        <img src="assets/img/logo.svg" width="34" height="34" alt="">
+                        <span class="brand__name">CapIAu-<span class="brand__talho">Talho</span></span>
+                    </a>
+                    <p class="site-footer__about">Ilha de pré-edição, decupagem e assistência por IA para documentários e grandes acervos audiovisuais. Grátis, sem assinatura e de código aberto.</p>
+                    <div class="cluster site-footer__badges">
+                        <span class="chip chip--emerald"><span class="chip__dot"></span>Grátis</span>
+                        <span class="chip chip--violet">GPL-3.0</span>
+                        <span class="chip chip--cyan">Roda em CPU</span>
+                    </div>
+                </div>
+                <nav aria-labelledby="rodape-site">
+                    <h2 class="site-footer__title" id="rodape-site">Site</h2>
+                    <ul class="site-footer__links">
+                        <li><a href="index.html">Início</a></li>
+                        <li><a href="recursos.html">Recursos</a></li>
+                        <li><a href="como-funciona.html">Como funciona</a></li>
+                        <li><a href="comecar.html">Começar</a></li>
+                        <li><a href="contribuir.html">Contribuir</a></li>
+                    </ul>
+                </nav>
+                <nav aria-labelledby="rodape-docs">
+                    <h2 class="site-footer__title" id="rodape-docs">Documentação</h2>
+                    <ul class="site-footer__links">
+                        <li><a href="https://github.com/fernangcortes/capiau-talho-v03/wiki">Wiki oficial</a></li>
+                        <li><a href="https://github.com/fernangcortes/capiau-talho-v03/blob/main/USER_MANUAL.md">Manual do usuário</a></li>
+                        <li><a href="https://github.com/fernangcortes/capiau-talho-v03/blob/main/docs/usuario/shortcuts.md">Atalhos de teclado</a></li>
+                        <li><a href="https://github.com/fernangcortes/capiau-talho-v03/blob/main/docs/usuario/costs_and_security.md">Custos e segurança</a></li>
+                    </ul>
+                </nav>
+                <nav aria-labelledby="rodape-comunidade">
+                    <h2 class="site-footer__title" id="rodape-comunidade">Comunidade</h2>
+                    <ul class="site-footer__links">
+                        <li><a href="https://github.com/fernangcortes/capiau-talho-v03">Código no GitHub</a></li>
+                        <li><a href="https://github.com/fernangcortes/capiau-talho-v03/issues">Relatar um problema</a></li>
+                        <li><a href="https://github.com/fernangcortes/capiau-talho-v03/blob/main/docs/planos/PLANO_IMPLEMENTACAO.md">Plano e roadmap</a></li>
+                        <li><a href="https://github.com/fernangcortes/capiau-talho-v03/blob/main/LICENSE">Licença GPL-3.0</a></li>
+                    </ul>
+                </nav>
+            </div>
+            <div class="site-footer__bottom">
+                <p>© <span data-year>2026</span> CapIAu-Talho e colaboradores · Software livre sob a <a href="https://github.com/fernangcortes/capiau-talho-v03/blob/main/LICENSE">GPL-3.0</a>.</p>
+                <div class="cluster">
+                    <button class="text-btn" type="button" data-motion-toggle>
+                        <svg class="motion-icon-pause" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 6v12M15 6v12"/></svg>
+                        <svg class="motion-icon-play" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M8 5.5v13l11-6.5z"/></svg>
+                        <span data-motion-label>Pausar animações</span>
+                    </button>
+                    <a class="text-btn" href="#conteudo">Voltar ao topo ↑</a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+</body>
+</html>
