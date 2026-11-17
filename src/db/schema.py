@@ -122,6 +122,7 @@ CREATE TABLE IF NOT EXISTS face (
     
     -- Crop do rosto (path para arquivo recortado)
     crop_path TEXT,
+    embedding BLOB,
     
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -714,6 +715,9 @@ def init_db(db_path: Path = None):
             # mas a nova arquitetura usa face_recognition
             print("[MIGRATION] Detectada coluna 'embedding' legacy na tabela face.")
             print("[MIGRATION] Os embeddings existentes serao mantidos. A nova arquitetura versionada usa face_recognition.")
+        else:
+            cursor.execute("ALTER TABLE face ADD COLUMN embedding BLOB")
+            print("[MIGRATION] Coluna 'embedding' adicionada a tabela face.")
         
         if "cluster_id" not in face_cols:
             cursor.execute("ALTER TABLE face ADD COLUMN cluster_id INTEGER")
