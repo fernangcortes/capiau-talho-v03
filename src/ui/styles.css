@@ -15351,7 +15351,7 @@ body.dock-dragging * {
 .dock-frame {
     display: grid;
     grid-template-columns: auto minmax(0, 1fr) auto;
-    grid-template-rows: auto minmax(0, 1fr) auto;
+    grid-template-rows: auto minmax(180px, 1fr) auto;
     flex: 1;
     min-height: 0;
     height: calc(100vh - var(--header-h));
@@ -15366,7 +15366,7 @@ body.dock-dragging * {
     grid-row: 2;
     grid-column: 2;
     height: auto;
-    min-height: 0;
+    min-height: 180px;
     min-width: 0;
 }
 .header-collapsed .dock-frame > .workspace {
@@ -15378,8 +15378,12 @@ body.dock-dragging * {
     display: flex;
     flex-direction: column;
     height: var(--dock-band-h, 260px);
+    max-height: 45vh;
     min-height: 0;
     min-width: 0;
+}
+.dock-frame:has(> .dock-band[data-edge="top"]:not([hidden])):has(> .dock-band[data-edge="bottom"]:not([hidden])) > .dock-band {
+    max-height: calc((100% - 180px) / 2);
 }
 .dock-band[hidden] {
     display: none !important;

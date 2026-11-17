@@ -378,6 +378,9 @@ function applyTabVisibility(btn, isVisible, container, tabVal, visibilityKey, ac
             firstVisible.click();
         }
     }
+    if (container && container.id === "right-tabs") {
+        window.tabPanels?.syncSidebarVisibility?.();
+    }
 }
 
 export function setTabVisibility(tabVal, isVisible) {

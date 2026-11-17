@@ -1,7 +1,23 @@
 // Controlador de Interatividade, Cliques e Atalhos da Timeline (CapIAu-Talho)
 import { STATE } from "./state.js";
-import { TIMELINE_STATE, TIMELINE_HISTORY, secondsToFrames, framesToSeconds, framesToTimecode, formatRulerTimecode, evaluateFadeCurve, FADE_CURVE_PRESETS, getClipSyncStatus } from "./timelineState.js";
+import { TIMELINE_STATE, TIMELINE_HISTORY, secondsToFrames, framesToSeconds, framesToTimecode, formatRulerTimecode, evaluateFadeCurve, FADE_CURVE_PRESETS, getClipSyncStatus, CLIP_COLOR_LABELS, resolveClipColorLabel } from "./timelineState.js";
 import { setTabVisibility } from "./tabsCustomization.js";
+
+const _CROP_OPPOSITE = { left: "right", right: "left", top: "bottom", bottom: "top" };
+
+/**
+ * Garante trava par-a-par no Crop: cada lado fica em [0, 90] e left+right <= 90 / top+bottom <= 90.
+ */
+export function clampCropPair(crop, key, rawVal) {
+    const num = Number(rawVal);
+    const val = Number.isFinite(num) ? Math.max(0, Math.min(90, num)) : 0;
+    const oppKey = _CROP_OPPOSITE[key];
+    if (!oppKey) return val;
+    const oppRaw = Number(crop?.[oppKey]);
+    const oppVal = Number.isFinite(oppRaw) ? Math.max(0, Math.min(90, oppRaw)) : 0;
+    const maxAllowed = Math.max(0, 90 - oppVal);
+    return Math.min(val, maxAllowed);
+}
 import { getActiveElement, getActiveQuerySelector } from "./workspaceManager.js";
 import {
     hasKeyframes,
@@ -4334,6 +4350,98 @@ export class CapiauTimelineInteraction {
             }
         }
 
+        // 6.5 Rotular Cor (Task 22 — Color Labels)
+        const sepColorLabel = document.createElement("div");
+        sepColorLabel.className = "menu-separator";
+        sepColorLabel.style.height = "1px";
+        sepColorLabel.style.background = "var(--border-glass)";
+        sepColorLabel.style.margin = "4px 0";
+        menu.appendChild(sepColorLabel);
+
+        const isClickedInSelection = TIMELINE_STATE.selectedClipIds && TIMELINE_STATE.selectedClipIds.has(clip.id);
+        const labelTargetIds = (isClickedInSelection && TIMELINE_STATE.selectedClipIds.size > 1)
+            ? Array.from(TIMELINE_STATE.selectedClipIds)
+            : [clip.id];
+        const currentColorObj = resolveClipColorLabel(clip.colorLabel);
+        const currentColorLabel = currentColorObj ? currentColorObj.id : null;
+
+        const itemColorLabel = document.createElement("div");
+        itemColorLabel.className = "menu-item menu-item-has-submenu";
+        itemColorLabel.style.display = "flex";
+        itemColorLabel.style.alignItems = "center";
+        itemColorLabel.style.justifyContent = "space-between";
+        itemColorLabel.style.padding = "7px 12px";
+        itemColorLabel.style.cursor = "pointer";
+        const activeColorDot = currentColorObj
+            ? `<span style="display:inline-block; width:9px; height:9px; border-radius:50%; background:${currentColorObj.hex}; flex-shrink:0;"></span>`
+            : `<i class="fa-solid fa-palette" style="color:var(--accent);"></i>`;
+        itemColorLabel.innerHTML = `
+            <span style="display:flex; align-items:center; gap:var(--sp-8);">
+                ${activeColorDot}
+                <span>Rotular Cor ➔${labelTargetIds.length > 1 ? ` (${labelTargetIds.length})` : ""}</span>
+            </span>
+            <i class="fa-solid fa-chevron-right menu-item-chevron"></i>
+            <div class="menu-submenu" style="min-width: 170px;"></div>
+        `;
+        const colorLabelSubmenu = itemColorLabel.querySelector(".menu-submenu");
+
+        CLIP_COLOR_LABELS.forEach(c => {
+            const sub = document.createElement("div");
+            sub.className = `menu-item${currentColorLabel === c.id ? " active" : ""}`;
+            sub.dataset.colorLabel = c.id;
+            sub.style.display = "flex";
+            sub.style.alignItems = "center";
+            sub.style.justifyContent = "space-between";
+            sub.style.padding = "6px 12px";
+            sub.style.cursor = "pointer";
+            sub.innerHTML = `
+                <span style="display:flex; align-items:center; gap:var(--sp-8);">
+                    <span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:${c.hex}; box-shadow:0 0 0 1px rgba(255,255,255,0.2); flex-shrink:0;"></span>
+                    <span>${c.name}</span>
+                </span>
+                ${currentColorLabel === c.id ? '<i class="fa-solid fa-check" style="font-size:var(--fs-9); color:var(--accent);"></i>' : ""}
+            `;
+            sub.onclick = (ev) => {
+                ev.stopPropagation();
+                TIMELINE_STATE.setClipColorLabel(labelTargetIds, c.id);
+                if (typeof window.showToast === "function") {
+                    window.showToast(`Cor "${c.name}" aplicada${labelTargetIds.length > 1 ? ` em ${labelTargetIds.length} clipes` : ""}`, "info");
+                }
+                if (this.renderer) this.renderer.requestRedraw();
+                menu.remove();
+            };
+            colorLabelSubmenu.appendChild(sub);
+        });
+
+        const subSep = document.createElement("div");
+        subSep.className = "menu-separator";
+        subSep.style.height = "1px";
+        subSep.style.background = "var(--border-glass)";
+        subSep.style.margin = "4px 0";
+        colorLabelSubmenu.appendChild(subSep);
+
+        const subClear = document.createElement("div");
+        subClear.className = "menu-item";
+        subClear.dataset.colorLabel = "none";
+        subClear.style.display = "flex";
+        subClear.style.alignItems = "center";
+        subClear.style.gap = "var(--sp-8)";
+        subClear.style.padding = "6px 12px";
+        subClear.style.cursor = "pointer";
+        subClear.innerHTML = `<i class="fa-solid fa-ban" style="color:var(--text-muted); font-size:var(--fs-10);"></i><span>Padrão da Pista</span>`;
+        subClear.onclick = (ev) => {
+            ev.stopPropagation();
+            TIMELINE_STATE.setClipColorLabel(labelTargetIds, null);
+            if (typeof window.showToast === "function") {
+                window.showToast("Rótulo de cor removido", "info");
+            }
+            if (this.renderer) this.renderer.requestRedraw();
+            menu.remove();
+        };
+        colorLabelSubmenu.appendChild(subClear);
+
+        menu.appendChild(itemColorLabel);
+
         // 7. Ações em Lote para Cortes da Mesma Mídia
         const sameMediaVideoCuts = this._getSameMediaVideoCuts(clip, cutsOnTimeline);
         const sameMediaAudioCuts = this._getSameMediaAudioCuts(clip, cutsOnTimeline);
@@ -4405,6 +4513,9 @@ export class CapiauTimelineInteraction {
         if (top + h > win.innerHeight - 8) top = Math.max(8, win.innerHeight - h - 8);
         menu.style.left = `${left}px`;
         menu.style.top = `${top}px`;
+        if (left + w + 175 > win.innerWidth - 8) {
+            colorLabelSubmenu.classList.add("submenu-left");
+        }
 
         const closeHandler = (ev) => {
             if (!menu.contains(ev.target)) {
@@ -6474,6 +6585,37 @@ export class CapiauTimelineInteraction {
         }, "video");
     }
 
+    /**
+     * Atualiza apenas os inputs/sliders de Transformação já renderizados no Inspetor
+     * sem reconstruir innerHTML nem emitir timelineSelectionChanged (usado durante mousemove no overlay).
+     */
+    syncTransformInputsInPlace(tf) {
+        if (!tf) return;
+        const container = getActiveElement("adjustments-panel-content");
+        if (!container) return;
+        const roundVal = (v) => Math.round(Number(v) * 10) / 10;
+        const propLabels = { x: "Posição X", y: "Posição Y", scale: "Escala", rotation: "Rotação", opacity: "Opacidade" };
+        const values = {
+            x: roundVal(tf.x !== undefined ? tf.x : 0),
+            y: roundVal(tf.y !== undefined ? tf.y : 0),
+            scale: roundVal((tf.scale !== undefined ? tf.scale : 1.0) * 100),
+            rotation: roundVal(tf.rotation !== undefined ? tf.rotation : 0),
+            opacity: roundVal((tf.opacity !== undefined ? tf.opacity : 1.0) * 100)
+        };
+        Object.entries(values).forEach(([prop, displayVal]) => {
+            const slider = container.querySelector(`input[data-prop="${prop}"]`);
+            if (!slider) return;
+            slider.value = String(displayVal);
+            const suffix = prop === "rotation" ? "°" : "%";
+            const dispText = `${displayVal}${suffix}`;
+            const disp = slider.nextElementSibling;
+            if (disp && disp.classList.contains("value-disp")) {
+                disp.textContent = dispText;
+            }
+            slider.setAttribute("data-tooltip", `${propLabels[prop] || prop}: ${dispText}`);
+        });
+    }
+
     setClipBlendMode(clipId, mode) {
         const blendMode = (mode || "normal").trim().toLowerCase();
         this._mutateClipEffects(clipId, (clip) => {
@@ -6507,7 +6649,7 @@ export class CapiauTimelineInteraction {
                 crop = { type: "crop", top: 0, right: 0, bottom: 0, left: 0 };
                 clip.effects.push(crop);
             }
-            crop[key] = value;
+            crop[key] = clampCropPair(crop, key, value);
         }, "video");
     }
 
@@ -8637,28 +8779,28 @@ export class CapiauTimelineInteraction {
                     <div class="adjustments-row" data-control-id="left">
                         <label>Esquerda</label>
                         <div class="control-wrap">
-                            <input type="range" data-crop="left" min="0" max="100" value="${roundVal(cropLeft)}" data-tooltip="Recorte Esquerda: ${roundVal(cropLeft)}%">
+                            <input type="range" data-crop="left" min="0" max="90" value="${roundVal(cropLeft)}" data-tooltip="Recorte Esquerda: ${roundVal(cropLeft)}%">
                             <span class="value-disp">${roundVal(cropLeft)}%</span>
                         </div>
                     </div>
                     <div class="adjustments-row" data-control-id="right">
                         <label>Direita</label>
                         <div class="control-wrap">
-                            <input type="range" data-crop="right" min="0" max="100" value="${roundVal(cropRight)}" data-tooltip="Recorte Direita: ${roundVal(cropRight)}%">
+                            <input type="range" data-crop="right" min="0" max="90" value="${roundVal(cropRight)}" data-tooltip="Recorte Direita: ${roundVal(cropRight)}%">
                             <span class="value-disp">${roundVal(cropRight)}%</span>
                         </div>
                     </div>
                     <div class="adjustments-row" data-control-id="top">
                         <label>Topo</label>
                         <div class="control-wrap">
-                            <input type="range" data-crop="top" min="0" max="100" value="${roundVal(cropTop)}" data-tooltip="Recorte Topo: ${roundVal(cropTop)}%">
+                            <input type="range" data-crop="top" min="0" max="90" value="${roundVal(cropTop)}" data-tooltip="Recorte Topo: ${roundVal(cropTop)}%">
                             <span class="value-disp">${roundVal(cropTop)}%</span>
                         </div>
                     </div>
                     <div class="adjustments-row" data-control-id="bottom">
                         <label>Base</label>
                         <div class="control-wrap">
-                            <input type="range" data-crop="bottom" min="0" max="100" value="${roundVal(cropBottom)}" data-tooltip="Recorte Base: ${roundVal(cropBottom)}%">
+                            <input type="range" data-crop="bottom" min="0" max="90" value="${roundVal(cropBottom)}" data-tooltip="Recorte Base: ${roundVal(cropBottom)}%">
                             <span class="value-disp">${roundVal(cropBottom)}%</span>
                         </div>
                     </div>
@@ -11243,11 +11385,27 @@ export class CapiauTimelineInteraction {
             const prop = slider.dataset.crop;
             const disp = slider.nextElementSibling;
 
+            const applyPairClampFromDom = (rawValue) => {
+                const oppKey = _CROP_OPPOSITE[prop];
+                const oppSlider = oppKey ? container.querySelector(`input[data-crop="${oppKey}"]`) : null;
+                const oppDomVal = oppSlider ? parseFloat(oppSlider.value) : 0;
+                const targetCutNow = (STATE.activeTimelineCuts || []).find(c => c.id === clipId);
+                const cropNow = (targetCutNow?.effects || []).find(e => e.type === "crop") || {};
+                const pairState = {
+                    ...cropNow,
+                    ...(oppKey ? { [oppKey]: Number.isFinite(oppDomVal) ? oppDomVal : (cropNow[oppKey] || 0) } : {})
+                };
+                return clampCropPair(pairState, prop, rawValue);
+            };
+
             slider.oninput = () => {
                 TIMELINE_HISTORY.begin();
-                const val = parseFloat(slider.value);
+                const val = applyPairClampFromDom(parseFloat(slider.value));
+                if (parseFloat(slider.value) !== val) {
+                    slider.value = String(val);
+                }
 
-                const dispText = slider.value + "%";
+                const dispText = val + "%";
                 if (disp) {
                     disp.textContent = dispText;
                 }
@@ -11268,7 +11426,7 @@ export class CapiauTimelineInteraction {
                         crop = { type: "crop", top: 0, right: 0, bottom: 0, left: 0 };
                         tc.effects.push(crop);
                     }
-                    crop[prop] = val;
+                    crop[prop] = clampCropPair(crop, prop, val);
                 });
                 STATE.activeTimelineCuts = cuts;
                 if (window.player?.programPlayer?.syncVideoToPlayhead) {
@@ -11282,7 +11440,12 @@ export class CapiauTimelineInteraction {
             };
 
             slider.onchange = () => {
-                const val = parseFloat(slider.value);
+                const val = applyPairClampFromDom(parseFloat(slider.value));
+                if (parseFloat(slider.value) !== val) {
+                    slider.value = String(val);
+                    if (disp) disp.textContent = val + "%";
+                    slider.setAttribute("data-tooltip", `${cropLabels[prop] || prop}: ${val}%`);
+                }
                 this.setClipCrop(clipId, prop, val);
                 TIMELINE_HISTORY.commit();
             };

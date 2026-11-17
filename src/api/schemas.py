@@ -109,6 +109,7 @@ class CutItem(BaseModel):
     effects: Optional[List[Dict[str, Any]]] = None       # efeitos MLT aplicados (fade, volume, speed...)
     alternatives: Optional[List[Dict[str, Any]]] = None  # candidatos do carrossel de alternativas da IA
     origin: Optional[str] = None                          # "user" | "ai"
+    colorLabel: Optional[str] = None                      # rótulo de cor NLE do clipe (Task 22)
 
 class TrackItem(BaseModel):
     # Mesmo motivo do CutItem: a UI manda hidden, thumbnailsEnabled etc.

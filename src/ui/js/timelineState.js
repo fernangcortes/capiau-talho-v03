@@ -123,6 +123,46 @@ export const FADE_CURVE_PRESETS = {
     equal_power: { id: "equal_power", name: "Potência Constante", label: "Potência Constante" }
 };
 
+// --- RÓTULOS DE COR DE CLIPE (TASK 22 — COLOR LABELS) ---
+
+export const CLIP_COLOR_LABELS = [
+    { id: "violet", name: "Violeta", hex: "#8b5cf6", rgb: "139, 92, 246" },
+    { id: "cyan", name: "Ciano", hex: "#06b6d4", rgb: "6, 182, 212" },
+    { id: "rose", name: "Rosa", hex: "#f43f5e", rgb: "244, 63, 94" },
+    { id: "amber", name: "Âmbar", hex: "#f59e0b", rgb: "245, 158, 11" },
+    { id: "emerald", name: "Esmeralda", hex: "#10b981", rgb: "16, 185, 129" },
+    { id: "royal_blue", name: "Azul Real", hex: "#3b82f6", rgb: "59, 130, 246" },
+    { id: "sun_yellow", name: "Amarelo Sol", hex: "#eab308", rgb: "234, 179, 8" },
+    { id: "neutral_gray", name: "Cinza Neutro", hex: "#94a3b8", rgb: "148, 163, 184" }
+];
+
+const _CLIP_COLOR_ALIASES = {
+    blue: "royal_blue",
+    yellow: "sun_yellow",
+    gray: "neutral_gray",
+    grey: "neutral_gray",
+    slate: "neutral_gray"
+};
+
+/**
+ * Resolve um código, ID, apelido, nome PT-BR ou hexadecimal para o objeto oficial de CLIP_COLOR_LABELS.
+ * Retorna null quando vazio ou "none"/"default"/"clear".
+ */
+export function resolveClipColorLabel(colorCode) {
+    if (colorCode === null || colorCode === undefined) return null;
+    const raw = String(colorCode).trim();
+    if (!raw) return null;
+    const lower = raw.toLowerCase();
+    if (lower === "none" || lower === "default" || lower === "clear" || lower === "null") return null;
+    const norm = lower.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    const aliased = _CLIP_COLOR_ALIASES[norm] || norm;
+    return CLIP_COLOR_LABELS.find(c =>
+        c.id === aliased ||
+        c.hex.toLowerCase() === lower ||
+        c.name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") === norm
+    ) || null;
+}
+
 /**
  * Avalia o valor de atenuação do fade [0.0 a 1.0] dado um progresso p [0.0 a 1.0].
  * 0.0 = silêncio / preto total; 1.0 = ganho / opacidade plena.
@@ -1998,6 +2038,63 @@ export class CapiauTimelineState {
         STATE.emit("timelineTracksChanged", this.tracks);
         STATE.emit("timelineCutsUpdated", STATE.activeTimelineCuts);
         return { locked: shouldLockAll, count: nonAiTracks.length };
+    }
+
+    /**
+     * Define ou limpa o rótulo de cor (Color Label — Task 22) de um ou mais clipes.
+     * Respeita travas físicas de pista (Track Lock) e grava atomicamente no TIMELINE_HISTORY.
+     *
+     * @param {string|string[]|Set<string>|null} clipIds ID ou lista de IDs (se omitido, usa seleção atual)
+     * @param {string|null} colorCode Código/ID/hex/nome da cor ou null/"none" para remover
+     * @returns {{ updated: number, colorLabel: string|null }}
+     */
+    setClipColorLabel(clipIds, colorCode) {
+        let targetIds = [];
+        if (clipIds instanceof Set) {
+            targetIds = Array.from(clipIds).map(String);
+        } else if (Array.isArray(clipIds)) {
+            targetIds = clipIds.map(String);
+        } else if (clipIds !== null && clipIds !== undefined && String(clipIds).trim() !== "") {
+            targetIds = [String(clipIds)];
+        } else if (this.selectedClipIds && this.selectedClipIds.size > 0) {
+            targetIds = Array.from(this.selectedClipIds).map(String);
+        } else if (this.selectedClipId) {
+            targetIds = [String(this.selectedClipId)];
+        }
+
+        if (targetIds.length === 0) return { updated: 0, colorLabel: null };
+
+        const resolved = resolveClipColorLabel(colorCode);
+        if (colorCode !== null && colorCode !== undefined && String(colorCode).trim() !== "" && !resolved) {
+            const lower = String(colorCode).trim().toLowerCase();
+            if (lower !== "none" && lower !== "default" && lower !== "clear" && lower !== "null") {
+                return { updated: 0, colorLabel: null };
+            }
+        }
+        const nextLabel = resolved ? resolved.id : null;
+        const idSet = new Set(targetIds);
+        let updatedCount = 0;
+
+        TIMELINE_HISTORY.record(() => {
+            const cuts = [...(STATE.activeTimelineCuts || [])];
+            let changed = false;
+            cuts.forEach(cut => {
+                if (!cut || !idSet.has(String(cut.id))) return;
+                if (this.isTrackLocked(cut.track)) return;
+                const current = cut.colorLabel ?? null;
+                if (current !== nextLabel) {
+                    cut.colorLabel = nextLabel;
+                    changed = true;
+                }
+                updatedCount++;
+            });
+            if (changed) {
+                STATE.activeTimelineCuts = cuts;
+                STATE.emit("timelineCutsUpdated", STATE.activeTimelineCuts);
+            }
+        });
+
+        return { updated: updatedCount, colorLabel: nextLabel };
     }
 
     toggleTrackVisibility(trackId) {
@@ -4491,10 +4588,34 @@ export class CapiauTimelineState {
                 track: cut.track || defaultTrack,
                 timelineStartFrame: cut.timelineStartFrame,
                 link_id: cut.link_id || null,
+                colorLabel: cut.colorLabel ?? cut.color_label ?? null,
                 // Garante objeto de keyframes inicializado se aplicável
                 keyframes: cut.keyframes || {}
             };
         });
+    }
+
+    /**
+     * Auto-configura resolução e fps da sequência a partir do primeiro clipe de vídeo inserido
+     * numa timeline vazia (Fase 2.3).
+     */
+    _autoConfigureFromFirstVideo(video) {
+        if ((STATE.activeTimelineCuts || []).length !== 0 || !video) return false;
+        let w = 1920, h = 1080;
+        if (video.resolution && typeof video.resolution === "string" && video.resolution.includes("x")) {
+            const parts = video.resolution.split("x").map(Number);
+            if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1]) && parts[0] > 0 && parts[1] > 0) {
+                w = parts[0];
+                h = parts[1];
+            }
+        }
+        const fps = parseFloat(video.fps) || 24;
+        this.width = w;
+        this.height = h;
+        this.fps = fps;
+        STATE.emit("timelineFpsChanged", this.fps);
+        STATE.emit("timelinePropertiesChanged", { width: w, height: h, fps });
+        return true;
     }
 
     /**
@@ -4557,22 +4678,7 @@ export class CapiauTimelineState {
         const wasEmptyTimeline = (STATE.activeTimelineCuts || []).length === 0;
 
         // Auto-configuração no primeiro clipe de vídeo da timeline (Fase 2.3)
-        if ((STATE.activeTimelineCuts || []).length === 0 && video) {
-            let w = 1920, h = 1080;
-            if (video.resolution && video.resolution.includes("x")) {
-                const parts = video.resolution.split("x").map(Number);
-                if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
-                    w = parts[0];
-                    h = parts[1];
-                }
-            }
-            const fps = parseFloat(video.fps) || 24;
-            this.width = w;
-            this.height = h;
-            this.fps = fps;
-            STATE.emit("timelineFpsChanged", this.fps);
-            STATE.emit("timelinePropertiesChanged", { width: w, height: h, fps });
-        }
+        this._autoConfigureFromFirstVideo(video);
 
         const fps = this.fps || 24;
 
@@ -4986,22 +5092,7 @@ export class CapiauTimelineState {
         const wasEmptyTimeline = (STATE.activeTimelineCuts || []).length === 0;
 
         // Auto-configuração no primeiro clipe da timeline se vazia
-        if ((STATE.activeTimelineCuts || []).length === 0 && videoObj) {
-            let w = 1920, h = 1080;
-            if (videoObj.resolution && videoObj.resolution.includes("x")) {
-                const parts = videoObj.resolution.split("x").map(Number);
-                if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
-                    w = parts[0];
-                    h = parts[1];
-                }
-            }
-            const fps = parseFloat(videoObj.fps) || 24;
-            this.width = w;
-            this.height = h;
-            this.fps = fps;
-            STATE.emit("timelineFpsChanged", this.fps);
-            STATE.emit("timelinePropertiesChanged", { width: w, height: h, fps });
-        }
+        this._autoConfigureFromFirstVideo(videoObj);
 
         const fps = this.fps || 24;
 
@@ -5327,24 +5418,7 @@ export class CapiauTimelineState {
             options = { ...options, audioTrackId: this.pairedAudioTrackId(track) };
         }
         // Auto-configuração no primeiro clipe de vídeo (Fase 2.3)
-        if (STATE.activeTimelineCuts.length === 0 && video) {
-            let w = 1920, h = 1080;
-            if (video.resolution && video.resolution.includes("x")) {
-                const parts = video.resolution.split("x").map(Number);
-                if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
-                    w = parts[0];
-                    h = parts[1];
-                }
-            }
-            const fps = parseFloat(video.fps) || 24;
-
-            this.width = w;
-            this.height = h;
-            this.fps = fps;
-
-            STATE.emit("timelineFpsChanged", this.fps);
-            STATE.emit("timelinePropertiesChanged", { width: w, height: h, fps });
-        }
+        this._autoConfigureFromFirstVideo(video);
 
         const inFrame = secondsToFrames(inSec, this.fps);
         const outFrame = secondsToFrames(outSec, this.fps);
@@ -9134,6 +9208,9 @@ class TimelineHistory {
             cuts: STATE.activeTimelineCuts,
             tracks: TIMELINE_STATE.tracks,
             ghosts: TIMELINE_STATE.ghostTrack,
+            fps: TIMELINE_STATE.fps || 24,
+            width: TIMELINE_STATE.width || 1920,
+            height: TIMELINE_STATE.height || 1080,
             selectedClipId: TIMELINE_STATE.selectedClipId,
             selectedClipIds: Array.from(TIMELINE_STATE.selectedClipIds || []),
             activeTool: TIMELINE_STATE.activeTool || "select",
@@ -9204,6 +9281,14 @@ class TimelineHistory {
                 STATE.emit("timelineToolChanged", TIMELINE_STATE.activeTool);
             }
             TIMELINE_STATE.selectedGhostClipId = snap.selectedGhostClipId !== undefined ? snap.selectedGhostClipId : null;
+            const prevFps = TIMELINE_STATE.fps;
+            const prevWidth = TIMELINE_STATE.width;
+            const prevHeight = TIMELINE_STATE.height;
+            if (snap.fps !== undefined && snap.fps !== null) TIMELINE_STATE.fps = snap.fps;
+            if (snap.width !== undefined && snap.width !== null) TIMELINE_STATE.width = snap.width;
+            if (snap.height !== undefined && snap.height !== null) TIMELINE_STATE.height = snap.height;
+            const fpsChanged = TIMELINE_STATE.fps !== prevFps;
+            const propsChanged = fpsChanged || TIMELINE_STATE.width !== prevWidth || TIMELINE_STATE.height !== prevHeight;
             TIMELINE_STATE.setTracks(snap.tracks);
             STATE.activeTimelineCuts = snap.cuts || [];
             TIMELINE_STATE.ghostTrack = snap.ghosts || [];
@@ -9233,6 +9318,14 @@ class TimelineHistory {
                 rc.restoreSnapshot(snap.renderCacheToken || null);
             }
 
+            if (fpsChanged) STATE.emit("timelineFpsChanged", TIMELINE_STATE.fps);
+            if (propsChanged) {
+                STATE.emit("timelinePropertiesChanged", {
+                    width: TIMELINE_STATE.width,
+                    height: TIMELINE_STATE.height,
+                    fps: TIMELINE_STATE.fps,
+                });
+            }
             STATE.emit("timelineInOutChanged", { inFrame: TIMELINE_STATE.inFrame, outFrame: TIMELINE_STATE.outFrame });
             STATE.emit("timelineGhostUpdated", TIMELINE_STATE.ghostTrack);
             STATE.emit("timelineRestored");

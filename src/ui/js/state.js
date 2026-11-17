@@ -212,7 +212,8 @@ class AppState extends EventEmitter {
                 // Mantém a chave em segundos sincronizada (evita valor obsoleto após drags)
                 timeline_start: Math.max(0, Math.round(timelineStartFrame)) / timelineFps,
                 link_id: cut.link_id || null,
-                syncOffset: typeof cut.syncOffset === "number" ? cut.syncOffset : null
+                syncOffset: typeof cut.syncOffset === "number" ? cut.syncOffset : null,
+                colorLabel: cut.colorLabel ?? cut.color_label ?? null
             };
         });
 

@@ -220,7 +220,8 @@ function hideSearchResultPreview() {
 }
 
 function updatePlaylistUI() {
-    const controlsDiv = document.querySelector(".search-playlist-controls");
+    const searchRoot = getActiveElement("search-container") || document;
+    const controlsDiv = searchRoot.querySelector(".search-playlist-controls");
     if (!controlsDiv) return;
     
     const statusDiv = controlsDiv.querySelector("#search-playlist-status");
@@ -347,7 +348,8 @@ function extractContextFilters() {
 }
 
 function updateContextPills() {
-    const container = document.querySelector(".context-filters-container");
+    const searchRoot = getActiveElement("search-container") || document;
+    const container = searchRoot.querySelector(".context-filters-container");
     if (!container) return;
     
     container.innerHTML = "";
@@ -491,7 +493,8 @@ function updateContextPills() {
 }
 
 async function runAiCategorization() {
-    const btn = document.querySelector(".btn-ai-categorize");
+    const searchRoot = getActiveElement("search-container") || document;
+    const btn = searchRoot.querySelector(".btn-ai-categorize");
     if (!btn || SEARCH_STATE.isLoading || SEARCH_STATE.loadedResults.length === 0) return;
     
     btn.classList.add("loading");
@@ -944,7 +947,8 @@ function applyFiltersAndRenderCards() {
 
 async function loadMoreResults() {
     SEARCH_STATE.isLoading = true;
-    const loader = document.querySelector(".search-loading-more");
+    const searchRoot = getActiveElement("search-container") || document;
+    const loader = searchRoot.querySelector(".search-loading-more");
     if (loader) loader.style.display = "block";
     
     SEARCH_STATE.offset += SEARCH_STATE.limit;
@@ -972,6 +976,19 @@ async function loadMoreResults() {
     } finally {
         SEARCH_STATE.isLoading = false;
         if (loader) loader.style.display = "none";
+    }
+}
+
+function handleSearchInfiniteScroll(scrollEl) {
+    if (!scrollEl) return;
+    const searchContainer = getActiveElement("search-container");
+    const isOut = !!searchContainer?.dataset?.dockOut;
+    if (!isOut && STATE.currentRightTab !== "search") return;
+    const threshold = 100; // pixels antes do final da rolagem
+    if (scrollEl.scrollHeight - scrollEl.scrollTop - scrollEl.clientHeight < threshold) {
+        if (SEARCH_STATE.hasMore && !SEARCH_STATE.isLoading) {
+            loadMoreResults();
+        }
     }
 }
 
@@ -1113,6 +1130,11 @@ function renderSearchResults(query) {
 
     updateContextPills();
     applyFiltersAndRenderCards();
+
+    const resultsListEl = searchContainer.querySelector(".search-results-list");
+    if (resultsListEl) {
+        resultsListEl.addEventListener("scroll", () => handleSearchInfiniteScroll(resultsListEl));
+    }
 }
 
 async function runSemanticSearch() {
@@ -3157,18 +3179,14 @@ window.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    // Ouvinte de rolagem infinita no container pai da barra lateral direita (garante escopo correto à direita)
+    // Ouvinte de rolagem infinita na barra lateral direita e em qualquer container hospedando a busca (bandas, colunas, popout)
     const sidebarContent = document.querySelector("#sidebar-right .sidebar-content.scrollable");
     if (sidebarContent) {
-        sidebarContent.addEventListener("scroll", async () => {
-            if (STATE.currentRightTab !== "search") return;
-            const threshold = 100; // pixels antes do final da rolagem
-            if (sidebarContent.scrollHeight - sidebarContent.scrollTop - sidebarContent.clientHeight < threshold) {
-                if (SEARCH_STATE.hasMore && !SEARCH_STATE.isLoading) {
-                    await loadMoreResults();
-                }
-            }
-        });
+        sidebarContent.addEventListener("scroll", () => handleSearchInfiniteScroll(sidebarContent));
+    }
+    const searchEl = document.getElementById("search-container");
+    if (searchEl) {
+        searchEl.addEventListener("scroll", (e) => handleSearchInfiniteScroll(e.target), true);
     }
 
     // Carregar projetos iniciais e exibir Welcome Hub se nenhum projeto estiver ativo ou sob requisição
@@ -3304,8 +3322,12 @@ window.addEventListener("DOMContentLoaded", () => {
             interaction.refreshClipInspector();
         }
 
-        // Garante que o painel Inspetor de Ajustes & Efeitos seja aberto/expandido se estiver recolhido
-        expandSidebar("inspector");
+        // Garante que o painel Inspetor de Ajustes & Efeitos seja aberto/expandido se estiver recolhido (linha ou barra)
+        if (typeof window.expandInspectorPanel === "function") {
+            window.expandInspectorPanel();
+        } else {
+            expandSidebar("inspector");
+        }
     };
 
     const btnSeqSettingsProgram = document.getElementById("btn-seq-settings-program");

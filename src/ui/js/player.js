@@ -4035,6 +4035,7 @@ export class ProgramPlayer {
 
     syncVideoToPlayhead() {
         try {
+            syncProgramViewport();
             const currentFrame = TIMELINE_STATE.playheadFrame;
         const durationFrames = this.getDurationFrames();
 
@@ -6818,8 +6819,8 @@ export class ProgramPlayer {
                 this.syncVideoToPlayhead();
 
                 const interaction = window.timelineInteraction || window.panelsManager?.timelineInteraction;
-                if (interaction) {
-                    interaction.refreshClipInspector();
+                if (interaction && typeof interaction.syncTransformInputsInPlace === "function") {
+                    interaction.syncTransformInputsInPlace(localTf);
                 }
             };
 
@@ -6828,6 +6829,14 @@ export class ProgramPlayer {
                 doc.removeEventListener("mouseup", onMouseUp);
                 this.hideSnapGuides();
                 TIMELINE_HISTORY.commit();
+
+                if (moved) {
+                    const interaction = window.timelineInteraction || window.panelsManager?.timelineInteraction;
+                    const updatedClip = (STATE.activeTimelineCuts || []).find(c => c.id === clipId);
+                    if (interaction && updatedClip && typeof interaction.showClipInspector === "function") {
+                        interaction.showClipInspector(updatedClip);
+                    }
+                }
 
                 const isMinimap = upEv && upEv.target && upEv.target.closest && upEv.target.closest("#program-player-minimap");
                 // Se clicou rápido no corpo sem arrastar (e não foi no minimapa), alterna play/pause

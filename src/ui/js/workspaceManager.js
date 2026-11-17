@@ -180,7 +180,17 @@ export class WorkspaceManager {
             "timeline-panel": { title: "Timeline", icon: "fa-film", desc: "Linha do tempo como coluna do editor" },
             "source-player-panel": { title: "Source", icon: "fa-tv", desc: "Monitor Source fora do bloco, como coluna" },
             "program-player-panel": { title: "Program", icon: "fa-tv", desc: "Monitor Program fora do bloco, como coluna" },
-            "sidebar-right": { title: "Ferramentas / Painel Direito", icon: "fa-toolbox", desc: "Ferramentas secundárias, exportação e IA" }
+            "sidebar-right": { title: "Ferramentas / Painel Direito", icon: "fa-toolbox", desc: "Ferramentas secundárias, exportação e IA" },
+            "tabpanel-transcript": { title: "Falas", icon: "fa-microphone", desc: "Transcrição e inspetor de falas como coluna" },
+            "tabpanel-vision": { title: "Visão IA", icon: "fa-eye", desc: "Análise visual dos planos como coluna" },
+            "tabpanel-chat": { title: "Chat IA", icon: "fa-comments", desc: "Assistente de montagem CapIAu como coluna" },
+            "tabpanel-search": { title: "Busca", icon: "fa-magnifying-glass", desc: "Resultados da busca semântica como coluna" },
+            "tabpanel-tasks": { title: "Tarefas", icon: "fa-list-check", desc: "Fila de processamento em segundo plano como coluna" },
+            "tabpanel-logs": { title: "Logs", icon: "fa-terminal", desc: "Registro de eventos e terminal como coluna" },
+            "tabpanel-themes": { title: "Temas", icon: "fa-tags", desc: "Organização por temas e tags como coluna" },
+            "tabpanel-faces": { title: "Rostos", icon: "fa-user-friends", desc: "Galeria e clusters faciais como coluna" },
+            "tabpanel-titles": { title: "Títulos", icon: "fa-font", desc: "Modelos e edição de títulos como coluna" },
+            "tabpanel-docs": { title: "Docs", icon: "fa-file-text", desc: "Documentos de contexto e roteiro como coluna" }
         };
 
         this.workspacePresets = {
@@ -621,7 +631,11 @@ export class WorkspaceManager {
             });
         };
         this.bindResizeDrag(resizer, () => { h0 = band.getBoundingClientRect().height; }, (dx, dy) => {
-            const max = (band.parentElement?.getBoundingClientRect().height || 800) - 180;
+            const parent = band.parentElement;
+            const otherEdge = edge === "top" ? "bottom" : "top";
+            const otherBand = parent?.querySelector(`:scope > .dock-band[data-edge="${otherEdge}"]:not([hidden])`);
+            const otherH = otherBand ? otherBand.getBoundingClientRect().height : 0;
+            const max = Math.max(120, (parent?.getBoundingClientRect().height || 800) - otherH - 180);
             const h = Math.max(120, Math.min(max, h0 + (edge === "top" ? dy : -dy)));
             band.style.setProperty("--dock-band-h", `${Math.round(h)}px`);
             redraw();
@@ -1423,13 +1437,6 @@ export class WorkspaceManager {
             });
         }
 
-        const selectTimelinePosition = document.getElementById("select-timeline-position");
-        if (selectTimelinePosition) {
-            selectTimelinePosition.addEventListener("change", (e) => {
-                this.setTimelinePosition(e.target.value);
-            });
-        }
-
         const btnToggleMonitorsSrc = document.getElementById("btn-toggle-monitors-layout-source");
         const btnToggleMonitorsPrg = document.getElementById("btn-toggle-monitors-layout-program");
         const handleToggleMonitors = (e) => {
@@ -1662,10 +1669,6 @@ export class WorkspaceManager {
             }
         }
 
-        const selectTimelinePosition = document.getElementById("select-timeline-position");
-        if (selectTimelinePosition) {
-            selectTimelinePosition.value = shape === "band" || shape === "column" ? "" : shape;
-        }
         let timelineLabel = "Entre menus";
         if (isBottomFull) {
             timelineLabel = "Faixa de baixo (Total)";
@@ -2144,8 +2147,8 @@ export class WorkspaceManager {
         const modal = document.getElementById("workspace-config-modal");
         if (!modal) return;
 
-        // Clona o estado atual para modificações pendentes
-        this.pendingColumnOrder = [...this.columnOrder];
+        // Clona o estado atual para modificações pendentes (exclui painéis que estão em faixa)
+        this.pendingColumnOrder = this.columnOrder.filter(id => !bandOf(this.bands, id));
         this.pendingTimelinePosition = this.timelineShape();
         this.pendingMonitorsLayout = this.monitorsLayout;
 
@@ -2691,9 +2694,13 @@ export class WorkspaceManager {
      * @param {boolean} [showToast=true] 
      */
     applyActiveConfigFromModal(showToast = true) {
-        this.setTimelinePosition(this.pendingTimelinePosition, true);
+        if (this.pendingTimelinePosition !== this.timelineShape()) {
+            this.setTimelinePosition(this.pendingTimelinePosition, true);
+        }
         this.setMonitorsLayout(this.pendingMonitorsLayout, true);
-        this.applyColumnsOrder(this.pendingColumnOrder, true);
+        const bandTrailing = this.columnOrder.filter(id => bandOf(this.bands, id) && !this.pendingColumnOrder.includes(id));
+        const finalOrder = [...this.pendingColumnOrder, ...bandTrailing];
+        this.applyColumnsOrder(finalOrder, true);
         this.closeConfigWorkspaceModal();
         if (showToast && window.showToast) {
             window.showToast("Layout do Workspace atualizado com sucesso!", "success");
@@ -3121,7 +3128,7 @@ export class WorkspaceManager {
                     ? workspace.querySelector(".center-stage")
                     : workspace.querySelector(`#${colId}`);
                 const isPopped = !!(window.popoutWindows?.[colId] && !window.popoutWindows[colId].closed);
-                return el && !isPopped && el.parentNode === workspace;
+                return el && !isPopped && el.parentNode === workspace && el.style.display !== "none" && !el.hidden;
             });
             const centerEmpty = !!centerStage?.classList.contains("center-empty");
             const activeCols = centerEmpty ? present.filter(id => id !== CENTER_STAGE) : present;
@@ -4130,9 +4137,15 @@ export class WorkspaceManager {
 
             if (ws === "montagem") {
                 const left = document.getElementById("sidebar-left");
-                if (left && left.classList.contains("collapsed")) document.getElementById("toggle-left")?.click();
+                if (this.isPanelCollapsed("sidebar-left") || (left && left.classList.contains("collapsed"))) {
+                    if (typeof window.expandLeftPanel === "function") window.expandLeftPanel();
+                    else this.setPanelCollapsed("sidebar-left", false);
+                }
                 const right = document.getElementById("sidebar-right");
-                if (right && right.classList.contains("collapsed")) document.getElementById("toggle-right")?.click();
+                if (this.isPanelCollapsed("sidebar-right") || (right && right.classList.contains("collapsed"))) {
+                    if (typeof window.expandRightPanel === "function") window.expandRightPanel();
+                    else this.setPanelCollapsed("sidebar-right", false);
+                }
                 const timeline = document.getElementById("timeline-panel");
                 if (timeline && timeline.classList.contains("collapsed")) {
                     const reopen = document.getElementById("reopen-timeline");
@@ -4143,8 +4156,14 @@ export class WorkspaceManager {
             else if (ws === "default") {
                 const left = document.getElementById("sidebar-left");
                 const right = document.getElementById("sidebar-right");
-                if (left && left.classList.contains("collapsed")) document.getElementById("toggle-left")?.click();
-                if (right && right.classList.contains("collapsed")) document.getElementById("toggle-right")?.click();
+                if (this.isPanelCollapsed("sidebar-left") || (left && left.classList.contains("collapsed"))) {
+                    if (typeof window.expandLeftPanel === "function") window.expandLeftPanel();
+                    else this.setPanelCollapsed("sidebar-left", false);
+                }
+                if (this.isPanelCollapsed("sidebar-right") || (right && right.classList.contains("collapsed"))) {
+                    if (typeof window.expandRightPanel === "function") window.expandRightPanel();
+                    else this.setPanelCollapsed("sidebar-right", false);
+                }
                 
                 const sourcePanel = document.getElementById("source-player-panel");
                 if (sourcePanel && sourcePanel.classList.contains("maximized")) {
@@ -4159,8 +4178,14 @@ export class WorkspaceManager {
             else if (ws === "inspector-right") {
                 const left = document.getElementById("sidebar-left");
                 const right = document.getElementById("sidebar-right");
-                if (left && left.classList.contains("collapsed")) document.getElementById("toggle-left")?.click();
-                if (right && right.classList.contains("collapsed")) document.getElementById("toggle-right")?.click();
+                if (this.isPanelCollapsed("sidebar-left") || (left && left.classList.contains("collapsed"))) {
+                    if (typeof window.expandLeftPanel === "function") window.expandLeftPanel();
+                    else this.setPanelCollapsed("sidebar-left", false);
+                }
+                if (this.isPanelCollapsed("sidebar-right") || (right && right.classList.contains("collapsed"))) {
+                    if (typeof window.expandRightPanel === "function") window.expandRightPanel();
+                    else this.setPanelCollapsed("sidebar-right", false);
+                }
                 this.reinitSplitters();
             }
             else if (ws === "decupagem") {
@@ -4169,9 +4194,15 @@ export class WorkspaceManager {
                     document.getElementById("btn-expand-source")?.click();
                 }
                 const left = document.getElementById("sidebar-left");
-                if (left && left.classList.contains("collapsed")) document.getElementById("toggle-left")?.click();
+                if (this.isPanelCollapsed("sidebar-left") || (left && left.classList.contains("collapsed"))) {
+                    if (typeof window.expandLeftPanel === "function") window.expandLeftPanel();
+                    else this.setPanelCollapsed("sidebar-left", false);
+                }
                 const right = document.getElementById("sidebar-right");
-                if (right && right.classList.contains("collapsed")) document.getElementById("toggle-right")?.click();
+                if (this.isPanelCollapsed("sidebar-right") || (right && right.classList.contains("collapsed"))) {
+                    if (typeof window.expandRightPanel === "function") window.expandRightPanel();
+                    else this.setPanelCollapsed("sidebar-right", false);
+                }
                 this.reinitSplitters();
             }
             else if (ws === "multitela") {

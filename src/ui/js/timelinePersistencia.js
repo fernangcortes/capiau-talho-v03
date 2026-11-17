@@ -64,7 +64,8 @@ export function corteParaSalvar(c, fps) {
         link_id: c.link_id || null,
         effects: c.effects || [],
         alternatives: c.alternatives || [],
-        origin: c.origin || "user"
+        origin: c.origin || "user",
+        colorLabel: c.colorLabel ?? c.color_label ?? null
     };
 }
 
@@ -91,6 +92,7 @@ export function corteDoBanco(c, idx, fps) {
     corte.effects = c.effects || [];
     corte.alternatives = c.alternatives || [];
     corte.origin = c.origin || "user";
+    corte.colorLabel = c.colorLabel ?? c.color_label ?? null;
     delete corte.timeline_start;
     if (c.timeline_start !== undefined && c.timeline_start !== null) {
         corte.timelineStartFrame = Math.round(Number(c.timeline_start) * fpsVal);

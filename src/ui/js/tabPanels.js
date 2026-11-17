@@ -298,6 +298,7 @@ export class TabPanels {
             const strip = stripEl(side);
             if (strip && !strip.querySelector(".tab-btn.active, .tab-btn.dock-guest-active")) this.activateFirst(strip);
         });
+        this.syncRightSidebarTitle();
     }
 
     /**
@@ -642,12 +643,34 @@ export class TabPanels {
         if (TABS[tab].side === "right") this.syncSidebarVisibility();
     }
 
+    syncRightSidebarTitle() {
+        const sidebar = document.getElementById("sidebar-right") || this.wm?.findPanelElement?.("sidebar-right");
+        if (!sidebar) return;
+        const transcriptBtn = tabButton("transcript") || sidebar.querySelector('#right-tabs .tab-btn[data-right-tab="transcript"]');
+        const hasTranscript = !!transcriptBtn && !transcriptBtn.dataset.dockOut && transcriptBtn.style.display !== "none";
+        const titleSpan = sidebar.querySelector(".sidebar-header h2 .header-title-text");
+        if (titleSpan) {
+            const fullText = hasTranscript ? "Transcrição & Falas" : "Painel Lateral";
+            const shortText = hasTranscript ? "Transcrição" : "Painel";
+            const fullEl = titleSpan.querySelector(".text-full");
+            const shortEl = titleSpan.querySelector(".text-short");
+            if (fullEl) fullEl.textContent = fullText;
+            if (shortEl) shortEl.textContent = shortText;
+            if (!fullEl && !shortEl) titleSpan.textContent = fullText;
+        }
+        const reopen = document.getElementById("reopen-right");
+        if (reopen) {
+            reopen.setAttribute("data-tooltip", hasTranscript ? "Expandir Transcrição & Falas" : "Expandir Painel Lateral");
+        }
+    }
+
     /**
      * Decisão do plano: o Painel Lateral some quando todas as abas saem para janelas e volta
      * quando uma aba volta. Usa o recolher que já existe (divisores e linhas restauradoras cuidam do resto).
      * (A Biblioteca nunca fica vazia: a Mídias não sai.)
      */
     syncSidebarVisibility() {
+        this.syncRightSidebarTitle();
         const sidebar = document.getElementById("sidebar-right");
         if (!sidebar || sidebar.ownerDocument !== document) return;
         const anyLeft = [...document.querySelectorAll("#right-tabs .tab-btn")].some(b => !b.dataset.dockOut && b.style.display !== "none");

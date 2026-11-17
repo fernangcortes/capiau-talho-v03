@@ -181,4 +181,86 @@ assert.ok(
 
 console.log("   ✔ WorkspaceManager configurado para persistência e não interferência.");
 
+// ─────────────────────────────────────────────────────────────────────
+// 7. HOTFIX MANUAL TRANSFORM OVERLAY & TIMELINE HISTORY / AUTO-CONFIG
+// ─────────────────────────────────────────────────────────────────────
+console.log("7. Verificando proteção anti-rebote no drag do overlay, viewport sync, auto-config e crop clamp...");
+
+const playerNorm = playerJs.replace(/\r\n/g, "\n");
+const timelineStateNorm = timelineStateJs.replace(/\r\n/g, "\n");
+const mainNorm = mainJs.replace(/\r\n/g, "\n");
+const interactionPath = new URL("../src/ui/js/timelineInteraction.js", import.meta.url);
+const interactionNorm = fs.readFileSync(interactionPath, "utf8").replace(/\r\n/g, "\n");
+
+const dragIdx = playerNorm.indexOf("attachOverlayDragListeners(overlay, clipId)");
+assert.ok(dragIdx !== -1, "player.js deve definir attachOverlayDragListeners(overlay, clipId)");
+const dragSlice = playerNorm.slice(dragIdx, dragIdx + 12000);
+
+const moveStart = dragSlice.indexOf("const onMouseMove");
+const upStart = dragSlice.indexOf("const onMouseUp");
+const addMouseMoveIdx = dragSlice.indexOf('doc.addEventListener("mousemove", onMouseMove)', upStart);
+assert.ok(moveStart !== -1 && upStart !== -1 && upStart > moveStart && addMouseMoveIdx > upStart, "onMouseMove e onMouseUp devem existir em attachOverlayDragListeners");
+const moveBody = dragSlice.slice(moveStart, upStart);
+const upBody = dragSlice.slice(upStart, addMouseMoveIdx);
+
+assert.ok(
+    !moveBody.includes("refreshClipInspector("),
+    "onMouseMove do overlay manual NÃO deve chamar refreshClipInspector() (evita destruir foco e causar rebote/snapback)"
+);
+assert.ok(
+    moveBody.includes("syncTransformInputsInPlace"),
+    "onMouseMove deve usar syncTransformInputsInPlace para atualizar os inputs do Inspector sem recriar o DOM"
+);
+assert.ok(
+    upBody.includes("if (moved)") && upBody.includes("showClipInspector"),
+    "onMouseUp do overlay manual deve sincronizar Inspector ao finalizar arraste (if (moved) -> showClipInspector)"
+);
+
+const syncIdx = playerNorm.indexOf("syncVideoToPlayhead() {");
+assert.ok(syncIdx !== -1, "player.js deve definir syncVideoToPlayhead()");
+const syncHead = playerNorm.slice(syncIdx, syncIdx + 600);
+assert.ok(
+    syncHead.includes("syncProgramViewport()"),
+    "syncVideoToPlayhead deve chamar syncProgramViewport() no início"
+);
+
+const openSeqIdx = mainNorm.indexOf("const openSequenceSettings = () =>");
+assert.ok(openSeqIdx !== -1, "main.js deve definir openSequenceSettings");
+const openSeqSlice = mainNorm.slice(openSeqIdx, openSeqIdx + 700);
+assert.ok(
+    openSeqSlice.includes("expandInspectorPanel"),
+    "openSequenceSettings deve chamar window.expandInspectorPanel() para abrir corretamente quando o Inspector estiver na barra (rail)"
+);
+
+const autoCfgCalls = (timelineStateNorm.match(/_autoConfigureFromFirstVideo\(/g) || []).length;
+assert.ok(
+    autoCfgCalls >= 4,
+    `timelineState.js deve definir _autoConfigureFromFirstVideo() e utilizá-lo nos 3 pontos (encontrados: ${autoCfgCalls})`
+);
+
+const capIdx = timelineStateNorm.indexOf("_capture(");
+const resIdx = timelineStateNorm.indexOf("_restore(snap)");
+assert.ok(capIdx !== -1 && resIdx !== -1, "TIMELINE_HISTORY deve possuir _capture e _restore");
+const capBody = timelineStateNorm.slice(capIdx, resIdx);
+const resBody = timelineStateNorm.slice(resIdx, resIdx + 2500);
+assert.ok(
+    capBody.includes("fps:") && capBody.includes("width:") && capBody.includes("height:"),
+    "TIMELINE_HISTORY._capture() deve capturar fps, width e height"
+);
+const restoreFpsPos = resBody.indexOf("snap.fps");
+const restoreCutsPos = resBody.indexOf("STATE.activeTimelineCuts = snap.cuts");
+assert.ok(
+    restoreFpsPos !== -1 && restoreCutsPos !== -1 && restoreFpsPos < restoreCutsPos,
+    "TIMELINE_HISTORY._restore() deve restaurar fps/width/height ANTES de STATE.activeTimelineCuts"
+);
+
+assert.ok(
+    interactionNorm.includes("export function clampCropPair(") &&
+    interactionNorm.includes("Math.max(0, 90 - oppVal)") &&
+    !interactionNorm.includes('data-crop="left" min="0" max="100"'),
+    "timelineInteraction.js deve aplicar clamp cruzado left+right<=90 / top+bottom<=90 com max=90 nos inputs de crop"
+);
+
+console.log("   ✔ Drag sem rebote, syncProgramViewport, expandInspectorPanel, histórico fps/resolução e crop clamp validados.");
+
 console.log("\n=== AUTOTESTE CONCLUÍDO COM SUCESSO: 100% DE APROVAÇÃO ===");

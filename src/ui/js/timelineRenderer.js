@@ -1,7 +1,7 @@
 // Renderizador de Alta Performance via Canvas (CapIAu-Talho)
 // v2: Multipista dinâmica com pista de IA, scroll vertical e cores por pista.
 import { STATE } from "./state.js";
-import { TIMELINE_STATE, framesToTimecode, framesToSeconds, formatRulerTimecode, evaluateFadeCurve, getClipSyncStatus } from "./timelineState.js";
+import { TIMELINE_STATE, framesToTimecode, framesToSeconds, formatRulerTimecode, evaluateFadeCurve, getClipSyncStatus, CLIP_COLOR_LABELS, resolveClipColorLabel } from "./timelineState.js";
 import { WaveformManager } from "./waveformManager.js";
 import { getAllKeyframeTimelineFrames } from "./keyframeEngine.js";
 import { themeColor, THEME_CHANGED_EVENT } from "./themeTokens.js";
@@ -38,6 +38,24 @@ const AUDIO_TRACK_STYLE = {
     border: "rgba(16, 185, 129, 0.6)",
     wave: "rgba(110, 231, 183, 0.55)"
 };
+
+// Cache estático para estilos de Color Labels (Task 22) mantendo identidade de referência em applyTrackMode
+const COLOR_LABEL_STYLE_CACHE = new Map();
+function getColorLabelStyle(colorObj, baseStyle, kind) {
+    if (!colorObj) return baseStyle;
+    const key = `${colorObj.id}|${kind}`;
+    let base = COLOR_LABEL_STYLE_CACHE.get(key);
+    if (!base) {
+        base = {
+            bg: baseStyle.bg,
+            clipBg: `rgba(${colorObj.rgb}, 0.28)`,
+            border: `rgba(${colorObj.rgb}, 0.85)`,
+            wave: kind === "audio" ? `rgba(${colorObj.rgb}, 0.65)` : baseStyle.wave
+        };
+        COLOR_LABEL_STYLE_CACHE.set(key, base);
+    }
+    return applyTrackMode(base, themeColor("track-mode", "coloridas"), kind);
+}
 
 // ── Diagnóstico de áudio (faixa fina na base do clipe) ──────────────────────
 // Rampa de cor do envelope: abaixo deste piso em dBFS o balde fica transparente
@@ -1686,8 +1704,10 @@ export class CapiauTimelineRenderer {
             // Ignora se estiver fora do viewport visível
             if (startX + width < 0 || startX > this.width) return;
 
-            const style = this.getTrackStyle(lane.track);
+            const baseStyle = this.getTrackStyle(lane.track);
             const laneKind = lane.track.kind || "video";
+            const colorLabelObj = resolveClipColorLabel(cut.colorLabel);
+            const style = colorLabelObj ? getColorLabelStyle(colorLabelObj, baseStyle, laneKind) : baseStyle;
             const isText = cut.type === "text" || laneKind === "text";
             const isPhoto = cut.type === "photo";
             const isAdjustment = cut.kind === "adjustment";
@@ -1858,6 +1878,14 @@ export class CapiauTimelineRenderer {
                 }
             }
 
+            // Faixa superior de Color Label (Task 22) — visível mesmo com miniaturas contínuas
+            if (colorLabelObj) {
+                ctx.save();
+                ctx.fillStyle = colorLabelObj.hex;
+                ctx.fillRect(startX, clipY, width, 3);
+                ctx.restore();
+            }
+
             const isSelected = (TIMELINE_STATE.selectedClipIds && TIMELINE_STATE.selectedClipIds.has(cut.id)) || TIMELINE_STATE.selectedClipId === cut.id;
             const isPartner = !isSelected && selectedLink && cut.link_id === selectedLink;
             const isMatchHighlight = this.highlightedMatchClipIds && this.highlightedMatchClipIds.has(String(cut.id));
@@ -1978,6 +2006,17 @@ export class CapiauTimelineRenderer {
 
             ctx.font = "bold 10px Inter, sans-serif";
             let currentTextX = startX + 8;
+
+            if (colorLabelObj && width >= 18) {
+                const chipSize = 8;
+                const chipY = clipY + 6;
+                ctx.fillStyle = colorLabelObj.hex;
+                ctx.fillRect(currentTextX, chipY, chipSize, chipSize);
+                ctx.strokeStyle = "rgba(255, 255, 255, 0.45)";
+                ctx.lineWidth = 0.8;
+                ctx.strokeRect(currentTextX, chipY, chipSize, chipSize);
+                currentTextX += chipSize + 5;
+            }
 
             if (speedBadgeText) {
                 // Desenha a porcentagem / badge de velocidade em VERMELHO vibrante
