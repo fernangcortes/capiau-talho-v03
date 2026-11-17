@@ -423,7 +423,7 @@ Gerado por `python scripts/gerar_docs_api.py`. Não edite o bloco abaixo à mão
 
 <!-- GERADO:API:INICIO -->
 
-Total: 190 rotas em 9 grupos. A documentação interativa completa (parâmetros e esquemas) fica em `/docs` com o servidor em execução.
+Total: 191 rotas em 9 grupos. A documentação interativa completa (parâmetros e esquemas) fica em `/docs` com o servidor em execução.
 
 ### AI Settings
 
@@ -628,7 +628,7 @@ Total: 190 rotas em 9 grupos. A documentação interativa completa (parâmetros 
 | POST | `/api/onboarding/api-key` | Salva a chave de API fornecida no onboarding nas configurações globais. |
 | POST | `/api/onboarding/chat` | Chat inteligente de onboarding com IA em nuvem ou inteligência especializada nativa. |
 | POST | `/api/onboarding/chat/stream` | Mesmo chat de /api/onboarding/chat, com o texto chegando aos poucos (Server-Sent Events). |
-| POST | `/api/project/backup-db` | Faz backup manual do arquivo de banco de dados SQLite para o S3. |
+| POST | `/api/project/backup-db` | Faz backup consistente e versionado do arquivo de banco de dados SQLite para o S3. |
 | POST | `/api/project/import` | Recebe um ZIP exportado e reconstrói o projeto, mídias e índices vetoriais. |
 | GET | `/api/project/{project_id}/docs` | Retorna a lista de documentos de contexto cadastrados do projeto. |
 | POST | `/api/project/{project_id}/docs` | Faz upload de um documento de roteiro/pauta e indexa no Qdrant. |
@@ -658,6 +658,7 @@ Total: 190 rotas em 9 grupos. A documentação interativa completa (parâmetros 
 
 | Método | Rota | Descrição |
 | :--- | :--- | :--- |
+| GET | `/api/auth/local-token` | Emite o token local da sessão apenas para clientes loopback na mesma origem. |
 | GET | `/api/health` | Retorna o status de saúde do backend: SQLite, Qdrant, Hardware/GPU e porta em execução. |
 
 <!-- GERADO:API:FIM -->
