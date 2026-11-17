@@ -242,6 +242,43 @@ class TestF0OTIOTimelineExport(unittest.TestCase):
         self.assertTrue(out_proxy_file.exists())
         self.assertTrue(out_proxy_file.name.endswith("_proxy.otio"))
 
+    def test_otio_constant_speed_linear_time_warp(self):
+        proj_id = add_project("Teste OTIO Speed", "Velocidade constante LinearTimeWarp", "")
+        v_path = str((self.test_dir / "originals" / "acao.mp4").resolve())
+        v_id = add_video(
+            project_id=proj_id, filename="acao.mp4", filepath=v_path,
+            file_hash="hash_speed_1", video_type="broll", duration=20.0, fps=24.0
+        )
+
+        tracks = [{"id": "V1", "name": "Falas", "kind": "video"}]
+        # Clipe 1: 10s da fonte a 2x -> 5s na timeline (0s..5s)
+        # Clipe 2: começa em 5.0s imediatamente após Clipe 1 (sem gap espúrio)
+        cuts = [
+            {"id": "cut_fast", "video_id": v_id, "in": 0.0, "out": 10.0, "speed": 2.0, "track": "V1", "timeline_start": 0.0},
+            {"id": "cut_next", "video_id": v_id, "in": 10.0, "out": 14.0, "speed": 1.0, "track": "V1", "timeline_start": 5.0},
+        ]
+        with get_db() as conn:
+            timeline_id = ProjectRepository.save_timeline(
+                conn=conn, project_id=proj_id, name="TL Speed", description="speed",
+                cuts=cuts, tracks=tracks, fps=24.0
+            )
+
+        otio_tl = generate_otio_timeline(timeline_id)
+        v1 = next(t for t in otio_tl.tracks if t.name.startswith("V1"))
+        gaps = [item for item in v1 if isinstance(item, otio.schema.Gap)]
+        self.assertEqual(len(gaps), 0)
+
+        clips = [item for item in v1 if isinstance(item, otio.schema.Clip)]
+        self.assertEqual(len(clips), 2)
+        fast_clip, next_clip = clips
+        self.assertAlmostEqual(fast_clip.source_range.duration.to_seconds(), 5.0, places=4)
+        self.assertAlmostEqual(next_clip.source_range.duration.to_seconds(), 4.0, places=4)
+
+        warps = [e for e in fast_clip.effects if isinstance(e, otio.schema.LinearTimeWarp)]
+        self.assertEqual(len(warps), 1)
+        self.assertAlmostEqual(warps[0].time_scalar, 2.0, places=4)
+        self.assertEqual(len(next_clip.effects), 0)
+
 
 if __name__ == "__main__":
     unittest.main()

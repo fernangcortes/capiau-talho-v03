@@ -241,6 +241,18 @@ def generate_otio_timeline(timeline_id: int, as_uri: bool = True, use_proxies: b
                     track.append(clip)
                     playhead_s += (out_s - in_s)
                 else:
+                    try:
+                        raw_speed = float(cut.get("speed") or 1.0)
+                        if raw_speed <= 0 or raw_speed != raw_speed:
+                            raw_speed = 1.0
+                    except (TypeError, ValueError):
+                        raw_speed = 1.0
+                    is_freeze = bool(cut.get("is_freeze"))
+                    speed = 1.0 if is_freeze else min(100.0, max(0.01, raw_speed))
+                    reverse = False if is_freeze else bool(cut.get("reverse"))
+                    dur_tl_s = max(0.0, out_s - in_s) / speed
+                    dur_tl_frames = max(1, int(round(dur_tl_s * fps)))
+
                     # Contrato H1 (secao 10 do plano): com audio_render ready e o
                     # arquivo no disco, a referencia passa ao WAV TRATADO. O WAV
                     # so conte o trecho [in_s, out_s] da fonte e comeca em ZERO,
@@ -249,17 +261,17 @@ def generate_otio_timeline(timeline_id: int, as_uri: bool = True, use_proxies: b
                     # ao arquivo curto joga o audio fora de sincronia no Resolve.
                     wav_tratado, motivo_ref = _bloco_audio_tratado(cut)
                     if wav_tratado is not None:
-                        dur_frames = int((out_s - in_s) * fps)
+                        dur_avail_frames = max(1, int(round((out_s - in_s) * fps)))
                         media_ref = otio.schema.ExternalReference(
                             target_url=_media_target_url(str(wav_tratado), as_uri),
                             available_range=otio.opentime.TimeRange(
                                 start_time=otio.opentime.RationalTime(0, fps),
-                                duration=otio.opentime.RationalTime(dur_frames, fps)
+                                duration=otio.opentime.RationalTime(dur_avail_frames, fps)
                             )
                         )
                         clip_range = otio.opentime.TimeRange(
                             start_time=otio.opentime.RationalTime(0, fps),
-                            duration=otio.opentime.RationalTime(dur_frames, fps)
+                            duration=otio.opentime.RationalTime(dur_tl_frames, fps)
                         )
                     else:
                         # Sem tratamento (ou ref quebrada): original intacto, como sempre.
@@ -267,13 +279,13 @@ def generate_otio_timeline(timeline_id: int, as_uri: bool = True, use_proxies: b
                             target_url=_media_target_url(filepath, as_uri),
                             available_range=otio.opentime.TimeRange(
                                 start_time=otio.opentime.RationalTime(0, fps),
-                                duration=otio.opentime.RationalTime(int(out_s * fps), fps)
+                                duration=otio.opentime.RationalTime(int(round(out_s * fps)), fps)
                             )
                         )
 
                         clip_range = otio.opentime.TimeRange(
-                            start_time=otio.opentime.RationalTime(int(in_s * fps), fps),
-                            duration=otio.opentime.RationalTime(int((out_s - in_s) * fps), fps)
+                            start_time=otio.opentime.RationalTime(int(round(in_s * fps)), fps),
+                            duration=otio.opentime.RationalTime(dur_tl_frames, fps)
                         )
 
                     clip = otio.schema.Clip(
@@ -281,6 +293,10 @@ def generate_otio_timeline(timeline_id: int, as_uri: bool = True, use_proxies: b
                         media_reference=media_ref,
                         source_range=clip_range
                     )
+                    if abs(speed - 1.0) > 1e-9 or reverse:
+                        time_scalar = -speed if reverse else speed
+                        clip.effects.append(otio.schema.LinearTimeWarp(time_scalar=time_scalar))
+
                     # Contrato H2: efeitos de Tipo A (audio_eq/audio_dynamics) NAO
                     # atravessam FCPXML/EDL; declara-los no metadado e melhor que
                     # fingir que atravessam. Ref quebrada registra o motivo aqui.
@@ -295,7 +311,7 @@ def generate_otio_timeline(timeline_id: int, as_uri: bool = True, use_proxies: b
                     clip.metadata["capiau"] = capiau_meta
 
                     track.append(clip)
-                    playhead_s += (out_s - in_s)
+                    playhead_s += dur_tl_s
 
         return otio_timeline
 
