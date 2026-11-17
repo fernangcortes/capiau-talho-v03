@@ -4526,6 +4526,44 @@ export class CapiauTimelineInteraction {
             colorLabelSubmenu.classList.add("submenu-left");
         }
 
+        itemColorLabel.addEventListener("mouseenter", () => {
+            colorLabelSubmenu.style.top = "";
+            colorLabelSubmenu.style.bottom = "";
+            colorLabelSubmenu.style.maxHeight = "";
+            colorLabelSubmenu.style.overflowY = "";
+
+            const prevDisplay = colorLabelSubmenu.style.display;
+            const prevVisibility = colorLabelSubmenu.style.visibility;
+            if (colorLabelSubmenu.offsetHeight === 0) {
+                colorLabelSubmenu.style.visibility = "hidden";
+                colorLabelSubmenu.style.display = "block";
+            }
+            const subH = colorLabelSubmenu.offsetHeight;
+            const subW = colorLabelSubmenu.offsetWidth || 170;
+            colorLabelSubmenu.style.display = prevDisplay;
+            colorLabelSubmenu.style.visibility = prevVisibility;
+
+            const itemRect = itemColorLabel.getBoundingClientRect();
+            const margin = 8;
+            if (itemRect.right + subW > win.innerWidth - margin) {
+                colorLabelSubmenu.classList.add("submenu-left");
+            } else {
+                colorLabelSubmenu.classList.remove("submenu-left");
+            }
+
+            if (itemRect.top - 4 + subH > win.innerHeight - margin) {
+                const maxAvailableH = win.innerHeight - margin * 2;
+                if (subH > maxAvailableH) {
+                    colorLabelSubmenu.style.maxHeight = `${maxAvailableH}px`;
+                    colorLabelSubmenu.style.overflowY = "auto";
+                    colorLabelSubmenu.style.top = `${margin - itemRect.top}px`;
+                } else {
+                    const desiredViewportTop = Math.max(margin, win.innerHeight - margin - subH);
+                    colorLabelSubmenu.style.top = `${desiredViewportTop - itemRect.top}px`;
+                }
+            }
+        });
+
         const closeHandler = (ev) => {
             if (!menu.contains(ev.target)) {
                 menu.remove();
