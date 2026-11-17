@@ -56,6 +56,10 @@ _SEPIA_BASE = (
 # UI; 1e-9 so filtra lixo de ponto flutuante, nao mudanca real de valor.
 _EPS = 1e-9
 
+# blur(Npx) do Chromium ~= gblur(sigma = FATOR * N, steps = PASSOS) (ver titulos.py).
+FATOR_SIGMA_DESFOQUE = 1.05
+PASSOS_GBLUR = 4
+
 
 def _n(valor: float) -> str:
     """Numero para dentro de opcao/expressao ffmpeg.
@@ -225,7 +229,7 @@ def cadeia_cor(efeito_color: Optional[dict]) -> List[str]:
         filtros.append(_mixer_de_matriz(matriz_saturate(1.0 - a)))
 
     if not _neutro(blur):
-        sigma = max(blur, 0.0)
-        filtros.append(f"gblur=sigma={_n(sigma)}")
+        sigma = max(blur, 0.0) * FATOR_SIGMA_DESFOQUE
+        filtros.append(f"gblur=sigma={_n(sigma)}:steps={PASSOS_GBLUR}")
 
     return filtros

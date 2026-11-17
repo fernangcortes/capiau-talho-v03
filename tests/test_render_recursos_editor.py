@@ -628,6 +628,15 @@ def test_modelo_normalizar_aceita_in_time_out_time():
     assert seq.clipes[0].out_s == 4.0
 
 
+def test_cor_gblur_alinhado_a_titulos():
+    """Desfoque gblur de clipe usa o mesmo fator sigma e steps dos titulos."""
+    from src.export.video_render import cor
+
+    assert cor.FATOR_SIGMA_DESFOQUE == pytest.approx(1.05)
+    assert cor.PASSOS_GBLUR == 4
+    assert cor.cadeia_cor({"type": "color", "blur": 10}) == ["gblur=sigma=10.5:steps=4"]
+
+
 
 
 
