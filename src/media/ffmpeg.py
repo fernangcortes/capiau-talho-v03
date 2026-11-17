@@ -2,7 +2,9 @@
 import os
 import sys
 import json
+import math
 import subprocess
+from fractions import Fraction
 from pathlib import Path
 from typing import Dict, Any, Optional, Callable
 
@@ -34,6 +36,43 @@ def _extract_color_metadata(video_stream: Dict[str, Any]) -> Dict[str, Any]:
     return out
 
 
+def _parse_frame_rate(raw: Any) -> float:
+    """Converte r_frame_rate (ex.: '24000/1001', '30/1', '29.97') sem usar eval()."""
+    if raw is None or isinstance(raw, bool):
+        return 0.0
+    if isinstance(raw, (int, float)):
+        fps = float(raw)
+        return fps if math.isfinite(fps) and fps > 0.0 else 0.0
+    if not isinstance(raw, str):
+        return 0.0
+
+    text = raw.strip()
+    if not text or len(text) > 64:
+        return 0.0
+
+    try:
+        if "e" in text.lower():
+            if "/" in text:
+                return 0.0
+            fps = float(text)
+        elif "/" in text:
+            parts = text.split("/")
+            if len(parts) != 2:
+                return 0.0
+            num_s, den_s = parts[0].strip(), parts[1].strip()
+            if not num_s or not den_s:
+                return 0.0
+            fps = float(Fraction(num_s) / Fraction(den_s))
+        else:
+            fps = float(Fraction(text))
+    except (ValueError, ZeroDivisionError, OverflowError):
+        return 0.0
+
+    if not math.isfinite(fps) or fps <= 0.0:
+        return 0.0
+    return fps
+
+
 def get_media_metadata(filepath: Path) -> Dict[str, Any]:
     """Extrai metadados técnicos (duração, fps, resolução, codec, bitrate e cor) via FFprobe."""
     cmd = [
@@ -56,12 +95,7 @@ def get_media_metadata(filepath: Path) -> Dict[str, Any]:
         duration = float(fmt.get('duration', 0.0))
         bitrate = int(fmt.get('bit_rate', 0)) if fmt.get('bit_rate') else 0
         
-        fps = 0.0
-        if video_stream.get('r_frame_rate'):
-            try:
-                fps = eval(video_stream.get('r_frame_rate'))
-            except Exception:
-                fps = 0.0
+        fps = _parse_frame_rate(video_stream.get('r_frame_rate'))
                 
         resolution = ""
         if video_stream.get('width') and video_stream.get('height'):

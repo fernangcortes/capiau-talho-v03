@@ -34,6 +34,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from src.config import CONFIG
+from src.core.storage_guards import ensure_writable_destination
 
 # Status possiveis de uma fonte resolvida
 ST_OK = "ok"
@@ -105,17 +106,8 @@ def caminho_proxy_foto(photo_id: int) -> Path:
 
 
 def assegurar_destino_seguro(destino) -> Path:
-    """Valida e cria a pasta de destino. Recusa o drive F: (acervo, so leitura).
-
-    Copia da guarda de src/export/audio_stems.py:129 -- mesma regra, mesmo
-    motivo: o drive F: e o acervo bruto; escrever la nunca.
-    """
-    pasta = Path(destino).resolve()
-    if pasta.drive.upper().startswith("F"):
-        raise ValueError(
-            f"Destino dentro do drive F:/ (acervo bruto, somente leitura) e proibido: {pasta}")
-    pasta.mkdir(parents=True, exist_ok=True)
-    return pasta
+    """Valida e cria a pasta de destino, recusando locais somente leitura."""
+    return ensure_writable_destination(destino)
 
 
 # ---------------------------------------------------------------------------

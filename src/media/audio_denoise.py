@@ -35,6 +35,7 @@ import time
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterator, List, Optional, Tuple
 
+from src.core.storage_guards import check_readonly_destination
 # Limiares compartilhados com a Etapa 1 (mesmas chaves/valores de
 # LIMIARES_PADRAO; quem chama pode sobrescrever em atenuacao_recomendada).
 from src.media.audio_analysis import LIMIARES_PADRAO
@@ -384,12 +385,6 @@ def _validar_atenuacao(valor: Any, sem_limite: bool
     return usada, avisos, None
 
 
-def _e_acervo_f(caminho: Path) -> bool:
-    """F:/ e o acervo bruto: somente leitura, nunca escrita."""
-    letra = caminho.drive.upper().rstrip(":")
-    return letra == "F"
-
-
 def denoisar(src, dest, atenuacao_db: float, motor: str = "dpdfnet",
              por_canal: bool = False, progresso: Optional[Callable[..., None]] = None,
              *, sem_limite: bool = False) -> Dict[str, Any]:
@@ -398,7 +393,7 @@ def denoisar(src, dest, atenuacao_db: float, motor: str = "dpdfnet",
     Contratos:
     - Dependencia/modelo ausente -> {"ok": False, "erro": motivo}, SEM excecao.
     - O original nunca e sobrescrito (dest == src e recusado).
-    - Nada e escrito dentro de F:/.
+    - Nada e escrito em destinos somente leitura (drives/caminhos/marcadores).
     - Nunca escreve arquivo pela metade: grava em temporario no diretorio de
       destino e so renomeia (os.replace) quando tudo terminou.
     - Atenuacao sem limite apenas com sem_limite=True explicito, sempre
@@ -421,9 +416,9 @@ def denoisar(src, dest, atenuacao_db: float, motor: str = "dpdfnet",
     except OSError as e:
         resultado["erro"] = f"Falha ao resolver caminhos: {e}"
         return resultado
-    if _e_acervo_f(destino_real):
-        resultado["erro"] = ("Recusado: destino fica dentro de F:/ (acervo bruto "
-                             "e somente leitura; o derivado precisa ir para data/).")
+    motivo_ro = check_readonly_destination(destino_real)
+    if motivo_ro:
+        resultado["erro"] = f"Recusado: {motivo_ro}"
         return resultado
     if origem_real == destino_real:
         resultado["erro"] = "Recusado: o original jamais e sobrescrito pelo denoise."

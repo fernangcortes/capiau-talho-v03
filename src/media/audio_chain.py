@@ -39,6 +39,8 @@ import time
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
+from src.core.storage_guards import check_readonly_destination
+
 # ---------------------------------------------------------------------------
 # Ordem canonica (secao 6 do plano): reparo de clipping SEMPRE primeiro;
 # nivelamento/loudness perto do fim; limitador por ultimo. "denoise_ia" e o
@@ -499,14 +501,13 @@ def renderizar(src, dest, in_s, out_s, cadeia: List[str],
 def _validar_destino(dest, origem: Path) -> Optional[str]:
     """Guarda de seguranca: None se o destino pode ser escrito; senao o motivo.
 
-    Regras do plano/briefing: NUNCA escrever dentro de F:/ (HD do acervo bruto,
-    somente leitura) e NUNCA sobrescrever o arquivo de origem.
+    Regras do plano/briefing: NUNCA escrever em destino somente leitura
+    (ex.: F:/) e NUNCA sobrescrever o arquivo de origem.
     """
     d = Path(dest).resolve()
-    letra = d.drive.rstrip(":").upper()
-    if letra == "F":
-        return (f"Destino proibido: {d} esta dentro de F:/ "
-                "(acervo bruto e somente leitura).")
+    motivo_ro = check_readonly_destination(d)
+    if motivo_ro:
+        return motivo_ro
     s = Path(origem).resolve()
     if d == s:
         return (f"Destino igual a origem ({d}): o original nunca e "

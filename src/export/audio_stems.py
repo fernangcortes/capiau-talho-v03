@@ -54,6 +54,8 @@ import subprocess
 import datetime
 from pathlib import Path
 
+from src.core.storage_guards import ensure_writable_destination
+
 TAXA_AMOSTRAGEM = 48000
 CODEC_PCM = "pcm_s24le"
 BITS = 24
@@ -127,14 +129,8 @@ def parse_nome_stem(nome: str):
 # ---------------------------------------------------------------------------
 
 def _assegurar_destino_seguro(destino) -> Path:
-    """Valida e cria a pasta de destino. Recusa o drive F: (acervo, so leitura)."""
-    pasta = Path(destino).resolve()
-    if pasta.drive.upper() == "F:" or str(pasta).upper().startswith("F:\\"):
-        raise ValueError(
-            f"Destino dentro do drive F:/ (acervo bruto, somente leitura) e proibido: {pasta}"
-        )
-    pasta.mkdir(parents=True, exist_ok=True)
-    return pasta
+    """Valida e cria a pasta de destino, recusando locais somente leitura."""
+    return ensure_writable_destination(destino)
 
 
 def _garantir_arquivo_livre(caminho: Path, sobrescrever: bool) -> None:
