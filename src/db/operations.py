@@ -14,8 +14,12 @@ def get_connection(db_path: Optional[Path] = None) -> sqlite3.Connection:
     """Retorna uma conexão ativa com o SQLite configurada (compatibilidade legado)."""
     if db_path is None:
         db_path = CONFIG.DB_PATH
-    conn = sqlite3.connect(db_path, check_same_thread=False)
+    is_memory = str(db_path) == ":memory:"
+    conn = sqlite3.connect(db_path, check_same_thread=False, timeout=30.0)
     conn.execute("PRAGMA foreign_keys = ON")
+    conn.execute("PRAGMA busy_timeout = 30000")
+    if not is_memory:
+        conn.execute("PRAGMA journal_mode = WAL")
     conn.row_factory = sqlite3.Row
     return conn
 

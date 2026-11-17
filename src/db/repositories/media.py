@@ -20,9 +20,12 @@ class MediaRepository:
         virtual_folder: str = "root",
         recorded_at: Optional[str] = None
     ) -> int:
-        """Adiciona um vídeo ou retorna o ID se já existir com o mesmo hash."""
+        """Adiciona um vídeo ou retorna o ID se já existir com o mesmo hash no projeto."""
         cursor = conn.cursor()
-        cursor.execute("SELECT id FROM video WHERE hash = ?", (file_hash,))
+        cursor.execute(
+            "SELECT id FROM video WHERE project_id = ? AND hash = ?",
+            (project_id, file_hash),
+        )
         row = cursor.fetchone()
         if row:
             return row['id']
@@ -373,9 +376,12 @@ class MediaRepository:
         virtual_folder: str = "root",
         recorded_at: Optional[str] = None
     ) -> int:
-        """Adiciona uma foto ou retorna o ID se já existir."""
+        """Adiciona uma foto ou retorna o ID se já existir no projeto."""
         cursor = conn.cursor()
-        cursor.execute("SELECT id FROM photo WHERE hash = ?", (file_hash,))
+        cursor.execute(
+            "SELECT id FROM photo WHERE project_id = ? AND hash = ?",
+            (project_id, file_hash),
+        )
         row = cursor.fetchone()
         if row:
             return row['id']

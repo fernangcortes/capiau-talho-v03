@@ -1,7 +1,23 @@
 """Schema de Banco de Dados SQLite para o CapIAu-Talho Making Of MVP."""
+import re
 import sqlite3
+from datetime import datetime
 from pathlib import Path
 from src.config import CONFIG
+from src.db.backup import create_consistent_sqlite_backup
+
+SCHEMA_VERSION = 1
+
+
+def get_schema_version(conn: sqlite3.Connection) -> int:
+    """Retorna a versão atual do schema SQLite via PRAGMA user_version."""
+    row = conn.execute("PRAGMA user_version").fetchone()
+    return int(row[0]) if row else 0
+
+
+def set_schema_version(conn: sqlite3.Connection, version: int) -> None:
+    """Define a versão do schema SQLite via PRAGMA user_version."""
+    conn.execute(f"PRAGMA user_version = {int(version)}")
 
 SCHEMA_SQL = """
 -- Projetos (Making Of de Documentario)
@@ -32,7 +48,7 @@ CREATE TABLE IF NOT EXISTS video (
     project_id INTEGER NOT NULL REFERENCES project(id) ON DELETE CASCADE,
     filename TEXT NOT NULL,
     filepath TEXT NOT NULL,
-    hash TEXT UNIQUE NOT NULL,
+    hash TEXT NOT NULL,
     video_type TEXT CHECK(video_type IN ('interview', 'broll', 'unknown')) DEFAULT 'unknown',
     virtual_folder TEXT DEFAULT 'root',
     recorded_at TIMESTAMP,
@@ -69,7 +85,8 @@ CREATE TABLE IF NOT EXISTS video (
     rotation INTEGER DEFAULT 0,    -- Rotacao em graus (0, 90, 180, 270)
     thumbnail_time REAL DEFAULT NULL, -- Timestamp da miniatura principal escolhida
     
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(project_id, hash)
 );
 
 -- Fotos de Set (Bastidores)
@@ -78,7 +95,7 @@ CREATE TABLE IF NOT EXISTS photo (
     project_id INTEGER NOT NULL REFERENCES project(id) ON DELETE CASCADE,
     filename TEXT NOT NULL,
     filepath TEXT NOT NULL,
-    hash TEXT UNIQUE NOT NULL,
+    hash TEXT NOT NULL,
     virtual_folder TEXT DEFAULT 'root',
     recorded_at TIMESTAMP,
     title TEXT,       -- titulo curto (3-6 palavras) gerado pela IA
@@ -89,7 +106,8 @@ CREATE TABLE IF NOT EXISTS photo (
     burst_group_id INTEGER, -- id da foto lider da rajada (a unica analisada por API); NULL = foto isolada
     status TEXT CHECK(status IN ('pending', 'ingested', 'analyzed', 'error')) DEFAULT 'pending',
     rotation INTEGER DEFAULT 0,    -- Rotacao em graus (0, 90, 180, 270)
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(project_id, hash)
 );
 
 -- Documentos de Contexto de Producao (Roteiros, Pautas, Fountain, FDX, etc.)
@@ -186,9 +204,10 @@ CREATE TABLE IF NOT EXISTS transcript (
 CREATE TABLE IF NOT EXISTS theme (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     project_id INTEGER NOT NULL REFERENCES project(id) ON DELETE CASCADE,
-    title TEXT NOT NULL UNIQUE,
+    title TEXT NOT NULL,
     description TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(project_id, title)
 );
 
 -- Tabela de ligacao Muitos-para-Muitos: Segmento de transcricao <-> Tema
@@ -539,6 +558,21 @@ CREATE TABLE IF NOT EXISTS dialogue_word (
 );
 CREATE INDEX IF NOT EXISTS idx_dialogue_word_time ON dialogue_word(video_id, start_s, end_s);
 CREATE INDEX IF NOT EXISTS idx_dialogue_word_utt ON dialogue_word(utterance_id);
+
+-- Fila operacional (outbox) para reconciliação de indexação no Qdrant
+CREATE TABLE IF NOT EXISTS qdrant_outbox (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER NOT NULL REFERENCES project(id) ON DELETE CASCADE,
+    media_kind TEXT NOT NULL,
+    media_id INTEGER,
+    operation TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending',
+    attempts INTEGER DEFAULT 0,
+    last_error TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_qdrant_outbox_status_project ON qdrant_outbox(status, project_id);
 """
 
 
@@ -679,14 +713,237 @@ def migrar_natureza(conn: sqlite3.Connection) -> None:
     print(f"[MIGRATION] Coluna 'natureza' adicionada a tabela video ({cur.rowcount} arquivos de áudio pela extensão).")
 
 
+_VIDEO_CANONICAL_COLUMNS = [
+    ("id", "INTEGER PRIMARY KEY AUTOINCREMENT"),
+    ("project_id", "INTEGER NOT NULL REFERENCES project(id) ON DELETE CASCADE"),
+    ("filename", "TEXT NOT NULL"),
+    ("filepath", "TEXT NOT NULL"),
+    ("hash", "TEXT NOT NULL"),
+    ("video_type", "TEXT CHECK(video_type IN ('interview', 'broll', 'unknown')) DEFAULT 'unknown'"),
+    ("virtual_folder", "TEXT DEFAULT 'root'"),
+    ("recorded_at", "TIMESTAMP"),
+    ("duration", "REAL"),
+    ("fps", "REAL"),
+    ("resolution", "TEXT"),
+    ("codec", "TEXT"),
+    ("bitrate", "INTEGER"),
+    ("title", "TEXT"),
+    ("category", "TEXT"),
+    ("category_confidence", "REAL"),
+    ("description", "TEXT"),
+    ("summary", "TEXT"),
+    ("tags", "TEXT"),
+    ("esforco_analisado", "TEXT"),
+    ("categorias_secundarias", "TEXT"),
+    ("fora_do_projeto", "INTEGER DEFAULT 0"),
+    ("categoria_resumo", "TEXT"),
+    ("analise_desatualizada", "TEXT"),
+    ("natureza", "TEXT DEFAULT 'video'"),
+    ("triagem_detalhe", "TEXT"),
+    ("metadata_origem", "TEXT DEFAULT 'ia'"),
+    ("color_range", "TEXT"),
+    ("color_space", "TEXT"),
+    ("color_transfer", "TEXT"),
+    ("color_primaries", "TEXT"),
+    ("pix_fmt", "TEXT"),
+    ("field_order", "TEXT"),
+    ("color_profile", "TEXT"),
+    ("color_profile_origem", "TEXT"),
+    ("proxy_color_range", "TEXT"),
+    ("proxy_pix_fmt", "TEXT"),
+    ("color_auditado_em", "TIMESTAMP"),
+    ("palette_temp", "TEXT"),
+    ("palette_hex", "TEXT"),
+    ("status", "TEXT CHECK(status IN ('pending', 'ingested', 'transcribing', 'transcribed', 'analyzing', 'analyzed', 'error')) DEFAULT 'pending'"),
+    ("error_message", "TEXT"),
+    ("crucial_moments", "TEXT"),
+    ("hover_loop_duration", "REAL"),
+    ("rotation", "INTEGER DEFAULT 0"),
+    ("thumbnail_time", "REAL DEFAULT NULL"),
+    ("created_at", "TIMESTAMP DEFAULT CURRENT_TIMESTAMP"),
+]
+
+_PHOTO_CANONICAL_COLUMNS = [
+    ("id", "INTEGER PRIMARY KEY AUTOINCREMENT"),
+    ("project_id", "INTEGER NOT NULL REFERENCES project(id) ON DELETE CASCADE"),
+    ("filename", "TEXT NOT NULL"),
+    ("filepath", "TEXT NOT NULL"),
+    ("hash", "TEXT NOT NULL"),
+    ("virtual_folder", "TEXT DEFAULT 'root'"),
+    ("recorded_at", "TIMESTAMP"),
+    ("title", "TEXT"),
+    ("category", "TEXT"),
+    ("category_confidence", "REAL"),
+    ("description", "TEXT"),
+    ("raw_description", "TEXT"),
+    ("tags", "TEXT"),
+    ("burst_group_id", "INTEGER"),
+    ("status", "TEXT CHECK(status IN ('pending', 'ingested', 'analyzed', 'error')) DEFAULT 'pending'"),
+    ("palette_temp", "TEXT"),
+    ("palette_hex", "TEXT"),
+    ("color_profile", "TEXT"),
+    ("color_profile_origem", "TEXT"),
+    ("raw_params_json", "TEXT"),
+    ("color_auditado_em", "TIMESTAMP"),
+    ("rotation", "INTEGER DEFAULT 0"),
+    ("created_at", "TIMESTAMP DEFAULT CURRENT_TIMESTAMP"),
+]
+
+_THEME_CANONICAL_COLUMNS = [
+    ("id", "INTEGER PRIMARY KEY AUTOINCREMENT"),
+    ("project_id", "INTEGER NOT NULL REFERENCES project(id) ON DELETE CASCADE"),
+    ("title", "TEXT NOT NULL"),
+    ("description", "TEXT"),
+    ("embedding", "TEXT"),
+    ("pinned", "INTEGER DEFAULT 0"),
+    ("created_at", "TIMESTAMP DEFAULT CURRENT_TIMESTAMP"),
+]
+
+
+def _table_has_global_unique(conn: sqlite3.Connection, table_name: str, column_name: str) -> bool:
+    """Detecta via sqlite_master (e PRAGMA index_list) se a tabela ainda possui UNIQUE global."""
+    row = conn.execute(
+        "SELECT sql FROM sqlite_master WHERE type='table' AND name=?",
+        (table_name,),
+    ).fetchone()
+    if not row or not row[0]:
+        return False
+    ddl = row[0]
+    inline_pattern = rf"(?i)(?:^|[(,])\s*{re.escape(column_name)}\b[^,)]*\bUNIQUE\b"
+    table_unique_pattern = rf"(?i)\bUNIQUE\s*\(\s*{re.escape(column_name)}\s*\)"
+    if re.search(inline_pattern, ddl) or re.search(table_unique_pattern, ddl):
+        return True
+
+    for idx_row in conn.execute(f"PRAGMA index_list({table_name})").fetchall():
+        idx_name = idx_row[1]
+        is_unique = bool(idx_row[2])
+        if not is_unique:
+            continue
+        cols = [c[2] for c in conn.execute(f"PRAGMA index_info('{idx_name}')").fetchall()]
+        if cols == [column_name]:
+            return True
+    return False
+
+
+def _rebuild_table_scoped_unique(
+    conn: sqlite3.Connection,
+    table_name: str,
+    canonical_cols: list[tuple[str, str]],
+    unique_expr: str,
+) -> None:
+    """Reconstrói `table_name` com `UNIQUE(project_id, ...)` preservando todas as colunas existentes."""
+    existing_info = conn.execute(f"PRAGMA table_info({table_name})").fetchall()
+    existing_cols = [r[1] for r in existing_info]
+    canonical_map = dict(canonical_cols)
+
+    col_defs = [f"{name} {defn}" for name, defn in canonical_cols]
+    target_col_names = list(canonical_map.keys())
+    for info in existing_info:
+        col_name = info[1]
+        col_type = info[2] or "TEXT"
+        if col_name not in canonical_map:
+            col_defs.append(f'"{col_name}" {col_type}')
+            target_col_names.append(col_name)
+
+    tmp_table = f"__{table_name}_v1_rebuild"
+    conn.execute(f'DROP TABLE IF EXISTS "{tmp_table}"')
+    create_sql = f'CREATE TABLE "{tmp_table}" (\n    ' + ",\n    ".join(col_defs + [unique_expr]) + "\n)"
+
+    copy_cols = [c for c in existing_cols if c in target_col_names]
+    cols_csv = ", ".join(f'"{c}"' for c in copy_cols)
+
+    conn.execute("BEGIN")
+    try:
+        conn.execute(create_sql)
+        if copy_cols:
+            conn.execute(
+                f'INSERT INTO "{tmp_table}" ({cols_csv}) SELECT {cols_csv} FROM "{table_name}"'
+            )
+        conn.execute(f'DROP TABLE "{table_name}"')
+        conn.execute(f'ALTER TABLE "{tmp_table}" RENAME TO "{table_name}"')
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+
+
+def _ensure_v1_indexes(conn: sqlite3.Connection) -> None:
+    """Garante os índices de video e photo após reconstrução de tabelas."""
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_video_project ON video(project_id)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_video_hash ON video(hash)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_video_virtual_folder ON video(project_id, virtual_folder)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_video_color_profile ON video(project_id, color_profile)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_photo_project ON photo(project_id)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_photo_virtual_folder ON photo(project_id, virtual_folder)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_photo_burst_group ON photo(project_id, burst_group_id)")
+
+
+def _migrate_v0_to_v1(conn: sqlite3.Connection) -> None:
+    """Migração versionada 0 -> 1: remove UNIQUE global de video/photo/theme em favor de escopo por projeto."""
+    affected: list[tuple[str, list[tuple[str, str]], str]] = []
+    if _table_has_global_unique(conn, "video", "hash"):
+        affected.append(("video", _VIDEO_CANONICAL_COLUMNS, "UNIQUE(project_id, hash)"))
+    if _table_has_global_unique(conn, "photo", "hash"):
+        affected.append(("photo", _PHOTO_CANONICAL_COLUMNS, "UNIQUE(project_id, hash)"))
+    if _table_has_global_unique(conn, "theme", "title"):
+        affected.append(("theme", _THEME_CANONICAL_COLUMNS, "UNIQUE(project_id, title)"))
+
+    if affected:
+        if conn.in_transaction:
+            conn.commit()
+        prev_fk = conn.execute("PRAGMA foreign_keys").fetchone()[0]
+        conn.execute("PRAGMA foreign_keys = OFF")
+        try:
+            for tbl, cols_spec, uniq_expr in affected:
+                _rebuild_table_scoped_unique(conn, tbl, cols_spec, uniq_expr)
+                print(f"[MIGRATION] Tabela '{tbl}' reconstruída com unicidade por projeto.")
+            _ensure_v1_indexes(conn)
+            conn.commit()
+        finally:
+            conn.execute("PRAGMA foreign_keys = ON")
+        fk_errors = conn.execute("PRAGMA foreign_key_check").fetchall()
+        if fk_errors:
+            raise RuntimeError(
+                f"Falha na verificação de chaves estrangeiras após migração 0->1: {[tuple(r) for r in fk_errors]}"
+            )
+        if not prev_fk:
+            conn.execute("PRAGMA foreign_keys = OFF")
+    else:
+        _ensure_v1_indexes(conn)
+
+    set_schema_version(conn, SCHEMA_VERSION)
+    conn.commit()
+
+
 def init_db(db_path: Path = None):
     """Inicializa o banco de dados SQLite com as tabelas do schema e realiza migracoes dinamicas."""
     if db_path is None:
         db_path = CONFIG.DB_PATH
-        
-    db_path.parent.mkdir(parents=True, exist_ok=True)
-    
-    conn = sqlite3.connect(db_path)
+
+    is_memory = str(db_path) == ":memory:"
+    if not is_memory:
+        db_path = Path(db_path)
+        db_path.parent.mkdir(parents=True, exist_ok=True)
+        if db_path.exists() and db_path.stat().st_size > 0:
+            probe = sqlite3.connect(db_path, timeout=30.0)
+            try:
+                probe.execute("PRAGMA busy_timeout = 30000")
+                has_tables = probe.execute(
+                    "SELECT 1 FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' LIMIT 1"
+                ).fetchone() is not None
+                probe_version = get_schema_version(probe)
+            finally:
+                probe.close()
+            if has_tables and probe_version < SCHEMA_VERSION:
+                ts = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+                backup_path = db_path.parent / f"{db_path.name}.pre_v{SCHEMA_VERSION}_{ts}.bak"
+                create_consistent_sqlite_backup(db_path, backup_path)
+                print(f"[MIGRATION] Backup pré-migração criado em: {backup_path}")
+
+    conn = sqlite3.connect(db_path, timeout=30.0)
+    conn.execute("PRAGMA busy_timeout = 30000")
+    if not is_memory:
+        conn.execute("PRAGMA journal_mode = WAL")
     try:
         conn.executescript(SCHEMA_SQL)
         conn.commit()
@@ -790,7 +1047,6 @@ def init_db(db_path: Path = None):
         if "categoria_resumo" not in video_cols:
             cursor.execute("ALTER TABLE video ADD COLUMN categoria_resumo TEXT")
             print("[MIGRATION] Coluna 'categoria_resumo' adicionada a tabela video.")
-        migrar_taxonomia_categorias(conn)
         migrar_natureza(conn)
         # Origem da decupagem CORRENTE ('ia' | 'humano' | 'importado'). Serve para
         # que video_metadata_history registre corretamente quem escreveu a versao
@@ -842,11 +1098,12 @@ def init_db(db_path: Path = None):
             print("[MIGRATION] Coluna 'thumbnail_time' adicionada a tabela video.")
 
         # Backfill seguro: sincroniza thumbnail_time com a miniatura inicial padrão do ingest (10% ou 1s) para registros nulos
-        cursor.execute("""
-            UPDATE video
-            SET thumbnail_time = ROUND(MAX(1.0, duration * 0.1), 2)
-            WHERE thumbnail_time IS NULL AND duration IS NOT NULL AND duration > 0
-        """)
+        if "duration" in video_cols:
+            cursor.execute("""
+                UPDATE video
+                SET thumbnail_time = ROUND(MAX(1.0, duration * 0.1), 2)
+                WHERE thumbnail_time IS NULL AND duration IS NOT NULL AND duration > 0
+            """)
 
         # Migracoes para tabela photo (descricao original preservada antes do enriquecimento)
         cursor.execute("PRAGMA table_info(photo)")
@@ -900,6 +1157,8 @@ def init_db(db_path: Path = None):
         if "rotation" not in photo_cols:
             cursor.execute("ALTER TABLE photo ADD COLUMN rotation INTEGER DEFAULT 0")
             print("[MIGRATION] Coluna 'rotation' adicionada a tabela photo.")
+
+        migrar_taxonomia_categorias(conn)
 
         # Migracoes para tabela theme (centroide de embedding e temas fixados pelo usuario)
         cursor.execute("PRAGMA table_info(theme)")
@@ -985,6 +1244,10 @@ def init_db(db_path: Path = None):
             print("[MIGRATION] Coluna 'linked_entity_id' adicionada a tabela entity.")
 
         conn.commit()
+
+        # Migração versionada de schema (0 -> 1)
+        if get_schema_version(conn) < SCHEMA_VERSION:
+            _migrate_v0_to_v1(conn)
         
         # Limpeza automática de menções órfãs/stale de rostos que foram renomeados/mesclados no passado
         try:
