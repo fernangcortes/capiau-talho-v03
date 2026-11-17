@@ -1,6 +1,6 @@
 """Grafo de AUDIO do render: cadeia por clipe + mixagem por pista (pacote B).
 
-CONTRATO E2 (player.js:2623, `_topologiaAudioAoVivo`) - ordem FECHADA:
+CONTRATO E2 (player.js:5254-5398, `_topologiaAudioAoVivo`) - ordem FECHADA:
 
     fonte -> volume -> hpf -> low -> mid -> high -> gate -> comp -> makeup -> destino
 
@@ -69,7 +69,7 @@ from . import fade
 from . import modelo
 
 # ---------------------------------------------------------------------------
-# Limites copiados DE _efeitosAudioAoVivo (player.js:2537-2555). Mudar qualquer
+# Limites copiados DE _efeitosAudioAoVivo (player.js:5254-5275). Mudar qualquer
 # um deles cria divergencia silenciosa com a tela.
 # ---------------------------------------------------------------------------
 HPF_MAX_HZ = 20000.0
@@ -395,22 +395,23 @@ def _filtros_eq(params: Dict[str, Any]) -> List[str]:
 
     Ganho 0 sai da cadeia: shelf/pico com ganho 0 tem resposta plana
     (identidade matematica) e sair encurta o grafo sem mudar audio. O hpf 0 ja
-    e "desligado" por regra da propria topologia (player.js:2625).
+    e "desligado" por regra da propria topologia (player.js:5342-5350).
 
-    Width dos shelves: WebAudio lowshelf/highshelf ignora Q e usa S=1, que
-    corresponde a Q = 1/sqrt(2) ~ 0.7071 (tabela 3.6). Mid peaking Q=1.0.
+    Width do highpass: WebAudio interpreta Q em dB (padrao 1 dB = 10**(1/20)
+    ~ 1.122018 linear). Width dos shelves: no FFmpeg (af_biquads), S=1 do
+    WebAudio equivale a width_type=q:width=0.5. Mid peaking Q=1.0.
     """
     if not params["eq_on"]:
         return []
     filtros: List[str] = []
     if params["hpf_hz"] > 0:
-        filtros.append(f"highpass=f={_num(params['hpf_hz'])}:width_type=q:width=1")
+        filtros.append(f"highpass=f={_num(params['hpf_hz'])}:width_type=q:width=1.122018")
     if params["low_db"] != 0.0:
-        filtros.append(f"bass=g={_num(params['low_db'])}:f=250:width_type=q:width=0.7071")
+        filtros.append(f"bass=g={_num(params['low_db'])}:f=250:width_type=q:width=0.5")
     if params["mid_db"] != 0.0:
         filtros.append(f"equalizer=f=1000:width_type=q:width=1:g={_num(params['mid_db'])}")
     if params["high_db"] != 0.0:
-        filtros.append(f"treble=g={_num(params['high_db'])}:f=3000:width_type=q:width=0.7071")
+        filtros.append(f"treble=g={_num(params['high_db'])}:f=3000:width_type=q:width=0.5")
     return filtros
 
 
@@ -819,10 +820,16 @@ def camada_pista_audio(pista: modelo.Pista, seq: modelo.Sequencia,
 
     rotulo_pista = f"[apista_{marca}]"
     if len(ramos) == 1:
-        # anull existe so para renomear o rotulo sem tocar nas amostras.
-        filtros.append(f"{ramos[0]}anull{rotulo_pista}")
+        # pan converte mono (FC) em estereo (c0=FC, c1=FC) sem perda de -3 dB
+        # e preserva estereo (FL, FR) intacto antes de eventual amix entre pistas.
+        filtros.append(f"{ramos[0]}pan=stereo|c0=FL+FC|c1=FR+FC{rotulo_pista}")
     else:
-        filtros.append(f"{''.join(ramos)}amix=inputs={len(ramos)}"
+        ramos_st: List[str] = []
+        for idx_r, r_lbl in enumerate(ramos):
+            st_lbl = f"[a{marca}_{idx_r}_st]"
+            filtros.append(f"{r_lbl}pan=stereo|c0=FL+FC|c1=FR+FC{st_lbl}")
+            ramos_st.append(st_lbl)
+        filtros.append(f"{''.join(ramos_st)}amix=inputs={len(ramos_st)}"
                        f":normalize=0:duration=longest{rotulo_pista}")
     return entradas, filtros, rotulo_pista
 
@@ -881,6 +888,7 @@ def grafo_audio_completo(seq: modelo.Sequencia, escopo: modelo.Escopo,
 
     filtros.append(
         f"{entrada_final}aresample={SAMPLE_RATE_SAIDA},"
+        f"pan=stereo|c0=FL+FC|c1=FR+FC,"
         f"aformat=sample_fmts=fltp:channel_layouts=stereo,"
         f"alimiter=limit={LIMITE_MIX_LINEAR}:level=disabled:latency=1{rotulo_saida}")
 
