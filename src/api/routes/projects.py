@@ -5,15 +5,26 @@ import zipfile
 import shutil
 import tempfile
 import json
+from datetime import datetime
 from difflib import SequenceMatcher
 from pathlib import Path
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
 from fastapi.responses import FileResponse
+from starlette.background import BackgroundTask
 import sqlite3
 
 from src.config import CONFIG
 from src.api.dependencies import get_db_conn
+from src.api.security import (
+    get_max_doc_upload_bytes,
+    get_max_import_zip_bytes,
+    read_upload_bounded,
+    require_local_auth,
+    safe_extract_zip,
+    stream_upload_to_file,
+    validate_upload_filename,
+)
 from src.api.schemas import (
     ProjectCreate,
     ProjectDriveLinkUpdate,
@@ -75,26 +86,29 @@ def update_drive_link(project_id: int, payload: ProjectDriveLinkUpdate, conn: sq
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+def _sanitize_export_project_name(name: Optional[str], project_id: int) -> str:
+    cleaned = re.sub(r"[^a-zA-Z0-9_-]+", "_", (name or "").strip().lower()).strip("_-")
+    return cleaned[:80] or f"projeto_{project_id}"
+
+
 @router.post("/api/project/{project_id}/export")
 def export_project(project_id: int, options: ProjectExportOptions):
     """Agrupa metadados e arquivos de mídia do projeto em um arquivo ZIP para download."""
     data = SyncService.get_project_all_data(project_id)
-    if not data or not data["project"]:
+    if not data or not data.get("project"):
         raise HTTPException(status_code=404, detail="Projeto não encontrado.")
-        
-    project_name = data["project"]["name"].replace(" ", "_").lower()
-    exports_dir = CONFIG.EXPORTS_DIR
-    exports_dir.mkdir(parents=True, exist_ok=True)
-    
-    zip_filename = f"caiau_export_{project_name}_{project_id}.zip"
-    zip_path = exports_dir / zip_filename
-    
+
+    safe_name = _sanitize_export_project_name(data["project"].get("name"), project_id)
+    temp_dir = tempfile.mkdtemp(prefix="capiau_proj_export_")
+    zip_filename = f"capiau_export_{safe_name}_{project_id}.zip"
+    zip_path = Path(temp_dir) / zip_filename
+
     try:
-        with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+        with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zip_file:
             # 1. Metadados do banco SQLite e Qdrant
-            metadata_json = json.dumps(data, indent=2, ensure_ascii=False)
+            metadata_json = json.dumps(data, indent=2, ensure_ascii=False, default=str)
             zip_file.writestr("metadata.json", metadata_json)
-            
+
             # 2. Proxies de vídeo
             if options.include_proxies:
                 for v in data.get("videos", []):
@@ -102,15 +116,15 @@ def export_project(project_id: int, options: ProjectExportOptions):
                     path = CONFIG.PROXIES_DIR / proxy_name
                     if path.exists():
                         zip_file.write(path, f"proxies/{proxy_name}")
-                        
+
             # 3. Proxies de foto
             if options.include_photos:
                 for p in data.get("photos", []):
-                    proxy_photo_name = f"photo_{p['id']}.webp"
+                    proxy_photo_name = f"proxy_photo_{p['id']}.webp"
                     path = CONFIG.PROXIES_DIR / "photos" / proxy_photo_name
                     if path.exists():
                         zip_file.write(path, f"proxies/photos/{proxy_photo_name}")
-                        
+
             # 4. Documentos de contexto originais
             if options.include_docs:
                 for doc in data.get("production_docs", []):
@@ -118,53 +132,73 @@ def export_project(project_id: int, options: ProjectExportOptions):
                         doc_path = Path(doc["filepath"])
                         if doc_path.exists():
                             zip_file.write(doc_path, f"docs/{doc_path.name}")
-                            
-        return FileResponse(path=str(zip_path), filename=zip_filename, media_type="application/zip")
+
+        return FileResponse(
+            path=str(zip_path),
+            filename=zip_filename,
+            media_type="application/zip",
+            background=BackgroundTask(shutil.rmtree, temp_dir, ignore_errors=True),
+        )
+    except HTTPException:
+        shutil.rmtree(temp_dir, ignore_errors=True)
+        raise
     except Exception as e:
+        shutil.rmtree(temp_dir, ignore_errors=True)
         raise HTTPException(status_code=500, detail=f"Erro ao exportar projeto: {str(e)}")
+
 
 @router.post("/api/project/import")
 async def import_project(file: UploadFile = File(...)):
     """Recebe um ZIP exportado e reconstrói o projeto, mídias e índices vetoriais."""
-    temp_dir = tempfile.mkdtemp()
-    zip_path = os.path.join(temp_dir, "imported.zip")
-    
+    validate_upload_filename(file.filename, allowed_exts={".zip"})
+
+    temp_dir = Path(tempfile.mkdtemp(prefix="capiau_proj_import_"))
+    zip_path = temp_dir / "imported.zip"
+    staging_dir = temp_dir / "extracted"
+
     try:
-        with open(zip_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-            
-        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-            zip_ref.extractall(temp_dir)
-            
-        metadata_path = os.path.join(temp_dir, "metadata.json")
-        if not os.path.exists(metadata_path):
+        max_zip_bytes = get_max_import_zip_bytes()
+        await stream_upload_to_file(
+            file,
+            zip_path,
+            max_bytes=max_zip_bytes,
+            label="pacote ZIP de projeto",
+        )
+
+        safe_extract_zip(zip_path, staging_dir)
+
+        metadata_path = staging_dir / "metadata.json"
+        if not metadata_path.is_file():
             raise HTTPException(status_code=400, detail="ZIP inválido: metadata.json ausente.")
-            
-        with open(metadata_path, "r", encoding="utf-8") as f:
-            project_data = json.load(f)
-            
-        new_project_id = SyncService.import_project_all_data(project_data)
-        
-        # Copia proxies físicos de volta para a pasta de mídias se existirem no ZIP
-        proxies_src_dir = os.path.join(temp_dir, "proxies")
-        if os.path.exists(proxies_src_dir):
-            CONFIG.PROXIES_DIR.mkdir(parents=True, exist_ok=True)
-            for proxy_file in os.listdir(proxies_src_dir):
-                src_file_path = os.path.join(proxies_src_dir, proxy_file)
-                if os.path.isfile(src_file_path):
-                    shutil.copy2(src_file_path, CONFIG.PROXIES_DIR / proxy_file)
-                    
-            # Proxies de fotos
-            photos_src_dir = os.path.join(proxies_src_dir, "photos")
-            if os.path.exists(photos_src_dir):
-                photos_dest_dir = CONFIG.PROXIES_DIR / "photos"
-                photos_dest_dir.mkdir(parents=True, exist_ok=True)
-                for photo_file in os.listdir(photos_src_dir):
-                    src_photo_path = os.path.join(photos_src_dir, photo_file)
-                    if os.path.isfile(src_photo_path):
-                        shutil.copy2(src_photo_path, photos_dest_dir / photo_file)
-                        
-        return {"status": "success", "project_id": new_project_id, "message": "Projeto importado com sucesso."}
+
+        try:
+            with open(metadata_path, "r", encoding="utf-8") as f:
+                project_data = json.load(f)
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            raise HTTPException(status_code=400, detail="ZIP inválido: metadata.json não é um JSON válido.")
+
+        if not isinstance(project_data, dict) or not isinstance(project_data.get("project"), dict):
+            raise HTTPException(
+                status_code=400,
+                detail="ZIP inválido: metadata.json deve ser um objeto JSON contendo a chave 'project'.",
+            )
+
+        report = SyncService.import_project_package(
+            project_data,
+            staging_proxies_dir=staging_dir / "proxies",
+        )
+
+        return {
+            "status": "success",
+            "project_id": report["project_id"],
+            "qdrant_status": report.get("qdrant_status", "ok"),
+            "qdrant_errors": report.get("qdrant_errors", []),
+            "warnings": report.get("warnings", []),
+            "copied_files": report.get("copied_files", []),
+            "message": "Projeto importado com sucesso.",
+        }
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Falha ao importar: {str(e)}")
     finally:
@@ -182,8 +216,12 @@ async def upload_document(
     cliente reenvia com replace_doc_id para apagar a versão antiga (vetores + linha)
     antes de indexar a nova.
     """
-    filename = file.filename
-    file_bytes = await file.read()
+    filename = validate_upload_filename(
+        file.filename,
+        allowed_exts={".txt", ".fountain", ".fdx", ".pdf"},
+    )
+    max_doc_bytes = get_max_doc_upload_bytes()
+    file_bytes = await read_upload_bounded(file, max_bytes=max_doc_bytes, label="documento")
     content = ""
     ext = Path(filename).suffix.lower()
     
@@ -355,25 +393,46 @@ def remove_document(doc_id: int, project_id: int = Query(1), conn: sqlite3.Conne
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.post("/api/project/backup-db")
+@router.post("/api/project/backup-db", dependencies=[Depends(require_local_auth)])
 def backup_database():
-    """Faz backup manual do arquivo de banco de dados SQLite para o S3."""
+    """Faz backup consistente e versionado do arquivo de banco de dados SQLite para o S3."""
+    from src.db.backup import create_consistent_sqlite_backup
     from src.services.s3_service import S3Service
+
     s3_service = S3Service.get_instance()
     if not s3_service.enabled:
         raise HTTPException(status_code=400, detail="Serviço S3 não está ativo ou configurado no .env.")
-    
+
     db_path = CONFIG.DB_PATH
     if not db_path.exists():
         raise HTTPException(status_code=404, detail="Banco de dados local não encontrado.")
-    
-    # Executar upload
-    s3_key = "backups/capiau_backup.db"
-    success = s3_service.upload_file(db_path, s3_key)
-    if success:
-        return {"status": "success", "message": "Backup do banco de dados concluído com sucesso para o S3.", "key": s3_key}
-    else:
-        raise HTTPException(status_code=500, detail="Falha ao fazer upload do backup para o S3. Verifique as travas de limite.")
+
+    stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    s3_key = f"backups/capiau_backup_{stamp}.db"
+    temp_dir = Path(tempfile.mkdtemp(prefix="capiau_db_backup_"))
+    tmp_backup_path = temp_dir / f"capiau_backup_{stamp}.db"
+
+    try:
+        backup_info = create_consistent_sqlite_backup(db_path, tmp_backup_path)
+        success = s3_service.upload_file(tmp_backup_path, s3_key)
+        if not success:
+            raise HTTPException(
+                status_code=500,
+                detail="Falha ao fazer upload do backup para o S3. Verifique as travas de limite.",
+            )
+        return {
+            "status": "success",
+            "message": "Backup do banco de dados concluído com sucesso para o S3.",
+            "key": s3_key,
+            "sha256": backup_info.get("sha256"),
+            "size_bytes": backup_info.get("size_bytes"),
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Falha ao gerar backup consistente: {str(e)}")
+    finally:
+        shutil.rmtree(temp_dir, ignore_errors=True)
 
 @router.get("/api/project/{project_id}/speakers")
 def get_project_speakers(project_id: int, conn: sqlite3.Connection = Depends(get_db_conn)):
@@ -385,7 +444,7 @@ def get_project_speakers(project_id: int, conn: sqlite3.Connection = Depends(get
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/api/onboarding/chat")
+@router.post("/api/onboarding/chat", dependencies=[Depends(require_local_auth)])
 def onboarding_chat(payload: OnboardingChatPayload):
     """Chat inteligente de onboarding com IA em nuvem ou inteligência especializada nativa."""
     from src.services.onboarding_agent import OnboardingAgentService
@@ -401,7 +460,7 @@ def onboarding_chat(payload: OnboardingChatPayload):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/api/onboarding/chat/stream")
+@router.post("/api/onboarding/chat/stream", dependencies=[Depends(require_local_auth)])
 def onboarding_chat_stream(payload: OnboardingChatPayload):
     """Mesmo chat de /api/onboarding/chat, com o texto chegando aos poucos (Server-Sent Events).
 
@@ -428,7 +487,7 @@ def onboarding_chat_stream(payload: OnboardingChatPayload):
                              headers={"X-Accel-Buffering": "no"})
 
 
-@router.post("/api/onboarding/api-key")
+@router.post("/api/onboarding/api-key", dependencies=[Depends(require_local_auth)])
 def save_onboarding_api_key(payload: OnboardingApiKeyPayload, conn: sqlite3.Connection = Depends(get_db_conn)):
     """Salva a chave de API fornecida no onboarding nas configurações globais."""
     from src.db.repositories.settings import SettingsRepository

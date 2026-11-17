@@ -3,6 +3,7 @@ import unittest
 from fastapi.testclient import TestClient
 from src.nlp.prompt_registry import PROMPT_REGISTRY, get_prompt, validate_template, render_prompt
 from src.api.server import app
+from tests.auth_helpers import auth_headers
 
 class TestPrompts(unittest.TestCase):
     @classmethod
@@ -37,7 +38,7 @@ class TestPrompts(unittest.TestCase):
 
     def test_api_endpoints_flow(self):
         # 1. GET lista de prompts
-        response = self.client.get("/api/settings/prompts")
+        response = self.client.get("/api/settings/prompts", headers=auth_headers())
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertEqual(data["status"], "success")
@@ -52,7 +53,7 @@ class TestPrompts(unittest.TestCase):
         response = self.client.put("/api/settings/prompts/vision", json={
             "template": "Template inválido sem placeholders obrigatórios",
             "scope": "global"
-        })
+        }, headers=auth_headers())
         self.assertEqual(response.status_code, 422)
 
         # 3. PUT para atualizar com template válido
@@ -60,11 +61,11 @@ class TestPrompts(unittest.TestCase):
         response = self.client.put("/api/settings/prompts/vision", json={
             "template": valid_template,
             "scope": "global"
-        })
+        }, headers=auth_headers())
         self.assertEqual(response.status_code, 200)
 
         # 4. GET para verificar se alterou para 'global'
-        response = self.client.get("/api/settings/prompts")
+        response = self.client.get("/api/settings/prompts", headers=auth_headers())
         self.assertEqual(response.status_code, 200)
         data = response.json()
         vision_item = next((p for p in data["prompts"] if p["id"] == "vision"), None)
@@ -72,11 +73,11 @@ class TestPrompts(unittest.TestCase):
         self.assertTrue(vision_item["is_modified"])
 
         # 5. DELETE para restaurar
-        response = self.client.delete("/api/settings/prompts/vision?scope=global")
+        response = self.client.delete("/api/settings/prompts/vision?scope=global", headers=auth_headers())
         self.assertEqual(response.status_code, 200)
 
         # 6. GET para garantir que voltou a ser 'default'
-        response = self.client.get("/api/settings/prompts")
+        response = self.client.get("/api/settings/prompts", headers=auth_headers())
         self.assertEqual(response.status_code, 200)
         data = response.json()
         vision_item = next((p for p in data["prompts"] if p["id"] == "vision"), None)

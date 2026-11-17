@@ -12,6 +12,7 @@ from fastapi.testclient import TestClient
 
 from src.services.onboarding_agent import OnboardingAgentService
 from src.api.server import app
+from tests.auth_helpers import auth_headers
 
 
 @pytest.fixture(autouse=True)
@@ -124,7 +125,7 @@ def test_onboarding_http_endpoints():
     resp_chat = client.post("/api/onboarding/chat", json={
         "message": "me explique melhor isso aqui",
         "history": []
-    })
+    }, headers=auth_headers())
     assert resp_chat.status_code == 200
     data = resp_chat.json()
     assert data["step"] == "discussing"
@@ -135,7 +136,7 @@ def test_onboarding_http_endpoints():
     resp_key = client.post("/api/onboarding/api-key", json={
         "provider": "openrouter",
         "api_key": "sk-or-v1-test-http-key-0123456789"
-    })
+    }, headers=auth_headers())
     assert resp_key.status_code == 200
     data_key = resp_key.json()
     assert data_key["ok"] is True

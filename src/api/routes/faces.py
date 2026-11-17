@@ -14,6 +14,7 @@ from fastapi import APIRouter, HTTPException, Query, Depends
 from fastapi.responses import FileResponse, RedirectResponse
 
 from src.config import CONFIG
+from src.api.security import require_local_auth
 from src.db.connection import get_db
 from src.db.repositories.entities import EntityRepository
 from src.nlp.enrichment_engine import enrich_after_face_labeling, enrich_photo, enrich_video_frames, enrich_in_background
@@ -319,7 +320,7 @@ def get_pipeline_status():
     )
 
 
-@router.get("/pipeline/s3/status", response_model=S3StatusResponse)
+@router.get("/pipeline/s3/status", response_model=S3StatusResponse, dependencies=[Depends(require_local_auth)])
 def get_s3_status():
     """Retorna o status da integracao S3, tamanho do bucket e travas de seguranca."""
     from src.services.s3_service import S3Service
@@ -344,7 +345,7 @@ def get_s3_status():
     )
 
 
-@router.post("/pipeline/install-insightface")
+@router.post("/pipeline/install-insightface", dependencies=[Depends(require_local_auth)])
 def install_insightface(gpu: bool = Query(False, description="Instalar versão com suporte a GPU (onnxruntime-gpu)")):
     """Instala o InsightFace e dependências de runtime (onnxruntime) no Python local."""
     import subprocess

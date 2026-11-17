@@ -16,6 +16,12 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from src.api.dependencies import get_db_conn
+from src.api.security import (
+    get_max_timeline_upload_bytes,
+    require_local_auth,
+    stream_upload_to_file,
+    validate_upload_filename,
+)
 from src.config import CONFIG
 from src.api.schemas import (
     TimelineCreate,
@@ -469,7 +475,7 @@ def get_timeline_detail(timeline_id: int, conn: sqlite3.Connection = Depends(get
         raise HTTPException(status_code=404, detail="Timeline não encontrada.")
     return result
 
-@router.post("/api/timeline/ai-suggest")
+@router.post("/api/timeline/ai-suggest", dependencies=[Depends(require_local_auth)])
 def timeline_ai_suggest(payload: TimelineAISuggestPayload):
     """Analisa o corte ATUAL da timeline (transcrições dos trechos, descrições visuais,
     lacunas de cobertura) e retorna sugestões estruturadas de edição para a pista de IA."""
@@ -574,13 +580,11 @@ async def import_timeline(
     (por caminho; fallback por nome único de arquivo). Clipes cuja mídia não
     existe no acervo voltam como `missing_media` — não quebram a importação.
     """
-    original_name = Path(file.filename or "").name
+    original_name = validate_upload_filename(
+        file.filename,
+        allowed_exts=set(SUPPORTED_EXTENSIONS),
+    )
     ext = Path(original_name).suffix.lower()
-    if ext not in SUPPORTED_EXTENSIONS:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Formato '{ext or '?'}' não suportado. Use um dos: {', '.join(SUPPORTED_EXTENSIONS)}."
-        )
 
     proj = conn.execute("SELECT id FROM project WHERE id = ?", (project_id,)).fetchone()
     if not proj:
@@ -588,9 +592,16 @@ async def import_timeline(
 
     tmp_path: Optional[Path] = None
     try:
-        with tempfile.NamedTemporaryFile(prefix="capiau_import_", suffix=ext, delete=False) as buf:
-            shutil.copyfileobj(file.file, buf)
-            tmp_path = Path(buf.name)
+        fd, raw_tmp_path = tempfile.mkstemp(prefix="capiau_import_", suffix=ext)
+        os.close(fd)
+        tmp_path = Path(raw_tmp_path)
+
+        await stream_upload_to_file(
+            file,
+            tmp_path,
+            max_bytes=get_max_timeline_upload_bytes(),
+            label="arquivo de timeline",
+        )
 
         summary = import_timeline_file(
             conn, project_id, tmp_path,
@@ -599,6 +610,9 @@ async def import_timeline(
         )
         conn.commit()
         return summary
+    except HTTPException:
+        conn.rollback()
+        raise
     except (ValueError, RuntimeError) as e:
         # Conteúdo inválido ou dependência de conversão ausente: erro do cliente.
         conn.rollback()
@@ -802,7 +816,7 @@ def get_diarization_clues(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/api/project/{project_id}/chat")
+@router.post("/api/project/{project_id}/chat", dependencies=[Depends(require_local_auth)])
 def chatbot_rag(project_id: int, payload: ChatPayload):
     """Interface chatbot RAG (legado) ou Agente de Edição ativo (se timeline for enviada)."""
     if payload.clips is not None:
@@ -1425,7 +1439,7 @@ class RevelarRenderPayload(BaseModel):
     caminho: str
 
 
-@router.post("/api/render/revelar")
+@router.post("/api/render/revelar", dependencies=[Depends(require_local_auth)])
 def revelar_render(payload: RevelarRenderPayload):
     """Abre o gerenciador de arquivos com o arquivo renderizado SELECIONADO.
 

@@ -42,6 +42,7 @@
 //   GET  /api/timeline/{id}/render/ultimo     → último render, se houver
 //   POST /api/task/{task_key}/cancel          → cancelamento cooperativo
 
+import { CapIAuAPI } from "./api.js";
 import { STATE } from "./state.js";
 import { TIMELINE_STATE, framesToTimecode } from "./timelineState.js";
 import { cortesParaSalvar } from "./timelinePersistencia.js";
@@ -151,7 +152,15 @@ function _fmtEta(ms) {
  */
 async function _pedir(url, opcoes = {}) {
     try {
-        const resp = await fetch(url, opcoes);
+        const enviar = async (forceRefresh = false) => {
+            const headers = await CapIAuAPI.getAuthHeaders(opcoes.headers, forceRefresh);
+            return fetch(url, { ...opcoes, headers });
+        };
+        let resp = await enviar(false);
+        if (resp.status === 401) {
+            CapIAuAPI.clearLocalToken();
+            resp = await enviar(true);
+        }
         let data = null;
         try { data = await resp.json(); } catch (_) { data = null; }
         return { ok: resp.ok, status: resp.status, data };

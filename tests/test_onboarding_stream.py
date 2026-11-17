@@ -11,6 +11,7 @@ from fastapi.testclient import TestClient
 from src.api.server import app
 from src.services import onboarding_agent
 from src.services.onboarding_agent import OnboardingAgentService
+from tests.auth_helpers import auth_headers
 
 KEY = "sk-or-v1-teste-streaming-000000000000"
 
@@ -111,7 +112,8 @@ def test_rota_http_envia_eventos_sse(monkeypatch):
     monkeypatch.setattr(onboarding_agent.requests, "post", lambda *a, **k: fake)
     client = TestClient(app)
     with client.stream("POST", "/api/onboarding/chat/stream",
-                       json={"message": "oi", "history": [], "custom_api_key": KEY}) as resp:
+                       json={"message": "oi", "history": [], "custom_api_key": KEY},
+                       headers=auth_headers()) as resp:
         assert resp.status_code == 200
         assert resp.headers["content-type"].startswith("text/event-stream")
         events = [json.loads(line[5:]) for line in resp.iter_lines() if line.startswith("data:")]

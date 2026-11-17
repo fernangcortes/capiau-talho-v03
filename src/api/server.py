@@ -2,17 +2,25 @@
 import logging
 import mimetypes
 import os
+import posixpath
+from urllib.parse import unquote
 
 # Corrigir mapeamento do registro do Windows que polui tipos MIME de imagem
 mimetypes.add_type('image/jpeg', '.jpg')
 mimetypes.add_type('image/jpeg', '.jpeg')
 
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from src.config import CONFIG
+from src.api.security import (
+    get_local_token,
+    is_loopback_client,
+    validate_local_host_and_origin,
+)
 from src.core.logging import setup_logging
 from src.core.tasks import TASK_MANAGER
 from src.db.schema import init_db
@@ -77,8 +85,40 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+_STATIC_MOUNT_PREFIXES = ("/cache", "/proxies", "/originals", "/exports")
+
+
+def _is_blocked_static_dotfile_request(request: Request) -> bool:
+    raw_path = request.scope.get("raw_path")
+    candidates = [request.url.path]
+    if isinstance(raw_path, (bytes, bytearray)) and raw_path:
+        candidates.append(raw_path.decode("utf-8", errors="ignore"))
+    for candidate in candidates:
+        decoded = unquote(candidate).replace("\\", "/")
+        normalized = posixpath.normpath(decoded)
+        for prefix in _STATIC_MOUNT_PREFIXES:
+            is_under_prefix = (
+                decoded == prefix
+                or decoded.startswith(prefix + "/")
+                or normalized == prefix
+                or normalized.startswith(prefix + "/")
+            )
+            if not is_under_prefix:
+                continue
+            rel = normalized[len(prefix):] if normalized.startswith(prefix) else decoded[len(prefix):]
+            parts = [p for p in rel.split("/") if p and p != "."]
+            if any(p == ".." or p.startswith(".") for p in parts):
+                return True
+            raw_parts = [p for p in decoded.split("/") if p]
+            if any(p.startswith(".") for p in raw_parts):
+                return True
+    return False
+
+
 @app.middleware("http")
 async def add_cache_headers(request, call_next):
+    if _is_blocked_static_dotfile_request(request):
+        return JSONResponse({"detail": "Not found"}, status_code=404)
     response = await call_next(request)
     path = request.url.path
     # Mídia pesada (thumbnails de rostos, proxies, originais) PODE e DEVE ser cacheada pelo
@@ -94,9 +134,10 @@ async def add_cache_headers(request, call_next):
         response.headers.setdefault("Cache-Control", "public, max-age=604800")
     else:
         # HTML/JS/JSON continuam sem cache para refletir mudanças imediatamente.
-        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
-        response.headers["Pragma"] = "no-cache"
-        response.headers["Expires"] = "0"
+        if response.headers.get("Cache-Control") != "no-store":
+            response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+            response.headers["Pragma"] = "no-cache"
+            response.headers["Expires"] = "0"
     return response
 
 # Acoplamento de rotas modulares
@@ -109,16 +150,37 @@ app.include_router(settings.router)
 app.include_router(scenes.router)
 app.include_router(modelos.router)
 
-from fastapi import Request
+@app.get("/api/auth/local-token")
+def get_auth_local_token(request: Request):
+    """Emite o token local da sessão apenas para clientes loopback na mesma origem."""
+    validate_local_host_and_origin(request)
+    if not is_loopback_client(request):
+        raise HTTPException(status_code=403, detail="Acesso restrito a clientes locais.")
+    sec_fetch_site = (request.headers.get("sec-fetch-site") or "").strip().lower()
+    if sec_fetch_site == "cross-site":
+        raise HTTPException(status_code=403, detail="Requisição cross-site não permitida.")
+    return JSONResponse(
+        content={"token": get_local_token()},
+        headers={"Cache-Control": "no-store"},
+    )
+
 
 @app.get("/api/health")
 def get_health(request: Request):
     """Retorna o status de saúde do backend: SQLite, Qdrant, Hardware/GPU e porta em execução."""
     db_ok = False
+    qdrant_outbox_pending = 0
     try:
         with get_db() as conn:
             conn.execute("SELECT 1")
             db_ok = True
+            try:
+                row = conn.execute(
+                    "SELECT COUNT(*) FROM qdrant_outbox WHERE status = 'pending'"
+                ).fetchone()
+                qdrant_outbox_pending = int(row[0]) if row else 0
+            except Exception:
+                qdrant_outbox_pending = 0
     except Exception:
         db_ok = False
 
@@ -158,6 +220,7 @@ def get_health(request: Request):
         "db": "ok" if db_ok else "error",
         "qdrant": "ok" if qdrant_ok else "unavailable",
         "qdrant_error": qdrant_err,
+        "qdrant_outbox_pending": qdrant_outbox_pending,
         "hardware": hw_info,
         "port": port
     }
@@ -170,9 +233,21 @@ exports_dir = CONFIG.EXPORTS_DIR
 exports_dir.mkdir(parents=True, exist_ok=True)
 app.mount("/exports", StaticFiles(directory=str(exports_dir)), name="exports")
 
-cache_dir = CONFIG.BASE_DIR / "data/cache"
+class _CacheStaticFiles(StaticFiles):
+    """Serve arquivos públicos de cache bloqueando dotfiles e .local_token."""
+
+    async def get_response(self, path: str, scope):
+        decoded = unquote(path or "").replace("\\", "/")
+        normalized = posixpath.normpath(decoded)
+        parts = [part for part in normalized.split("/") if part and part != "."]
+        if any(part == ".." or part.startswith(".") for part in parts):
+            return JSONResponse({"detail": "Not found"}, status_code=404)
+        return await super().get_response(path, scope)
+
+
+cache_dir = CONFIG.CACHE_DIR
 cache_dir.mkdir(parents=True, exist_ok=True)
-app.mount("/cache", StaticFiles(directory=str(cache_dir)), name="cache")
+app.mount("/cache", _CacheStaticFiles(directory=str(cache_dir)), name="cache")
 
 
 # Interface Web na raiz do servidor
@@ -180,3 +255,11 @@ frontend_dir = CONFIG.BASE_DIR / "src/ui"
 frontend_dir.mkdir(parents=True, exist_ok=True)
 app.mount("/", StaticFiles(directory=str(frontend_dir), html=True), name="ui")
 # Auto-reload trigger comment v3 (adaptadores OTIO fcp_xml + cmx_3600 instalados)
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    host = (os.getenv("CAPIAU_HOST") or "127.0.0.1").strip() or "127.0.0.1"
+    port = int((os.getenv("PORT") or "8000").strip() or "8000")
+    uvicorn.run("src.api.server:app", host=host, port=port)

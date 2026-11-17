@@ -15,6 +15,7 @@ from src.services.rag import RAGService
 from src.services.chat_agent import ChatAgentService
 from src.services.settings_service import ResolvedSettings
 from src.search.semantic import QdrantUnavailableError
+from tests.auth_helpers import auth_headers
 
 client = TestClient(app)
 
@@ -62,7 +63,11 @@ class TestChatQdrantWarning(unittest.TestCase):
                    side_effect=QdrantUnavailableError("Qdrant em uso por outro processo")), \
              patch("src.search.image_semantic.ImageSearch.search_text", return_value=[]), \
              patch("src.services.rag.requests.post", return_value=_fake_openrouter_response()):
-            response = client.post("/api/project/1/chat", json={"message": "teste", "history": []})
+            response = client.post(
+                "/api/project/1/chat",
+                json={"message": "teste", "history": []},
+                headers=auth_headers(),
+            )
             self.assertEqual(response.status_code, 200)
             data = response.json()
             self.assertEqual(data["index_status"], "unavailable")

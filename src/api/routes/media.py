@@ -22,6 +22,15 @@ from fastapi.responses import JSONResponse, FileResponse
 from src.config import CONFIG
 from src.db.connection import get_db
 from src.api.dependencies import get_db_conn
+from src.api.security import (
+    get_max_media_upload_bytes,
+    get_max_total_upload_bytes,
+    get_max_upload_files,
+    require_local_auth,
+    resolve_confined_path,
+    stream_upload_to_file,
+    validate_upload_filename,
+)
 from src.api.schemas import (
     CategoryUpdate, TitleUpdate, ExternalPathIngest, ExternalFilesIngest, OpenFolderPayload,
     LabelFacePayload, MergeClustersPayload, ReassignFacesPayload,
@@ -31,7 +40,7 @@ from src.api.schemas import (
 from src.db.repositories.media import MediaRepository
 from src.core.tasks import (TASK_MANAGER, read_worker_progress, WORKER_LOGS_DIR,
                             worker_is_running, write_worker_pid)
-from src.services.ingest import IngestService
+from src.services.ingest import IngestService, SUPPORTED_VIDEO, SUPPORTED_AUDIO, SUPPORTED_PHOTO
 from src.services.pipeline import PipelineService
 from src.services.burst_service import group_photo_bursts, replicate_to_members
 from src.services.settings_service import SettingsService
@@ -677,7 +686,7 @@ def _get_powershell_path() -> Optional[str]:
             return str(candidate)
     return None
 
-@router.post("/api/ingest/select-folder")
+@router.post("/api/ingest/select-folder", dependencies=[Depends(require_local_auth)])
 def select_folder_dialog():
     """Abre uma caixa de diálogo nativa do Windows para seleção de diretório se suportado."""
     ps_exe = _get_powershell_path()
@@ -706,7 +715,7 @@ def select_folder_dialog():
         print(f"[select_folder_dialog] Erro: {e}")
         return {"status": "error", "message": f"Erro ao abrir seletor de pasta: {str(e)}"}
 
-@router.post("/api/ingest/select-files")
+@router.post("/api/ingest/select-files", dependencies=[Depends(require_local_auth)])
 def select_files_dialog():
     """Abre uma caixa de diálogo nativa do Windows para seleção múltipla de arquivos de mídia se suportado."""
     ps_exe = _get_powershell_path()
@@ -736,7 +745,7 @@ def select_files_dialog():
         print(f"[select_files_dialog] Erro: {e}")
         return {"status": "error", "message": f"Erro ao abrir seletor de arquivos: {str(e)}"}
 
-@router.post("/api/ingest/external")
+@router.post("/api/ingest/external", dependencies=[Depends(require_local_auth)])
 def trigger_external_ingest(payload: ExternalPathIngest, background_tasks: BackgroundTasks):
     """Varre uma pasta ou arquivo externo inserindo os caminhos em formato Link (in-place) para uma pasta virtual."""
     path_obj = Path(payload.path)
@@ -750,7 +759,7 @@ def trigger_external_ingest(payload: ExternalPathIngest, background_tasks: Backg
     background_tasks.add_task(bg_task)
     return {"status": "success", "message": f"Ingestão externa iniciada para projeto {payload.project_id}."}
 
-@router.post("/api/ingest/external-files")
+@router.post("/api/ingest/external-files", dependencies=[Depends(require_local_auth)])
 def trigger_external_files_ingest(payload: ExternalFilesIngest, background_tasks: BackgroundTasks):
     """Ingere múltiplos arquivos externos in-place em background para uma pasta virtual."""
     def bg_task():
@@ -773,33 +782,69 @@ async def upload_files_for_ingest(
     files: List[UploadFile] = File(...)
 ):
     """Recebe arquivos enviados via drag & drop e salva na pasta originals/ para ingestão."""
-    saved_paths = []
+    max_files = get_max_upload_files()
+    if len(files) > max_files:
+        raise HTTPException(
+            status_code=413,
+            detail=f"Quantidade de arquivos ({len(files)}) excede o limite de {max_files} por requisição.",
+        )
+
+    allowed_exts = SUPPORTED_VIDEO | SUPPORTED_AUDIO | SUPPORTED_PHOTO
+    validated_names = [
+        validate_upload_filename(upload.filename, allowed_exts=allowed_exts)
+        for upload in files
+    ]
+
+    max_file_bytes = get_max_media_upload_bytes()
+    max_total_bytes = get_max_total_upload_bytes()
+
     upload_dir = CONFIG.ORIGINALS_DIR
     upload_dir.mkdir(parents=True, exist_ok=True)
-    
-    for upload in files:
-        if not upload.filename:
-            continue
-        dest_path = upload_dir / upload.filename
-        counter = 1
-        stem = Path(upload.filename).stem
-        ext = Path(upload.filename).suffix
-        while dest_path.exists():
-            dest_path = upload_dir / f"{stem}_{counter}{ext}"
-            counter += 1
-            
-        with open(dest_path, "wb") as buffer:
-            content = await upload.read()
-            buffer.write(content)
-        saved_paths.append(dest_path)
-        
+
+    saved_paths: List[Path] = []
+    total_written = 0
+
+    try:
+        for upload, safe_name in zip(files, validated_names):
+            dest_path = resolve_confined_path(upload_dir, safe_name)
+            counter = 1
+            stem = Path(safe_name).stem
+            ext = Path(safe_name).suffix
+            while dest_path.exists():
+                dest_path = resolve_confined_path(upload_dir, f"{stem}_{counter}{ext}")
+                counter += 1
+
+            remaining_total = max(0, max_total_bytes - total_written)
+            if remaining_total == 0:
+                raise HTTPException(
+                    status_code=413,
+                    detail=f"Tamanho total do lote excede o limite máximo ({max_total_bytes} bytes).",
+                )
+
+            per_file_cap = min(max_file_bytes, remaining_total)
+            written = await stream_upload_to_file(
+                upload,
+                dest_path,
+                max_bytes=per_file_cap,
+                label=safe_name,
+            )
+            total_written += written
+            saved_paths.append(dest_path)
+    except Exception:
+        for p in saved_paths:
+            try:
+                p.unlink(missing_ok=True)
+            except OSError:
+                pass
+        raise
+
     def bg_task():
         for p in saved_paths:
             try:
                 IngestService.ingest_file(p, project_id, copy_original=False, virtual_folder=virtual_folder or "root")
             except Exception as ex:
                 print(f"[UploadIngest] Erro ao ingerir {p.name}: {ex}")
-                
+
     background_tasks.add_task(bg_task)
     return {"status": "success", "count": len(saved_paths)}
 
@@ -860,7 +905,7 @@ def update_media_metadata(media_type: str, media_id: int, payload: MediaMetadata
     updated = MediaRepository.update_media_metadata_fields(conn, media_type, media_id, data)
     return {"status": "success", "media": updated}
 
-@router.post("/api/project/{project_id}/relink")
+@router.post("/api/project/{project_id}/relink", dependencies=[Depends(require_local_auth)])
 def relink_project_media(project_id: int, payload: RelinkPayload, conn: sqlite3.Connection = Depends(get_db_conn)):
     """Varre uma pasta raiz com subpastas para relincar automaticamente mídias desconectadas."""
     res = MediaRepository.relink_media_files_recursive(conn, project_id, payload.search_folder)
@@ -1076,19 +1121,19 @@ def trigger_vision_photo(photo_id: int, conn: sqlite3.Connection = Depends(get_d
             
     return {"status": "success", "photo": updated}
 
-@router.post("/api/video/{video_id}/analyze-all")
+@router.post("/api/video/{video_id}/analyze-all", dependencies=[Depends(require_local_auth)])
 def trigger_analyze_all_video(video_id: int, background_tasks: BackgroundTasks):
     """Executa o pipeline completo de IA (ASR + Visão + Rostos + Indexação Vetorial) para um único vídeo."""
     background_tasks.add_task(PipelineService.analyze_video_all, video_id)
     return {"status": "success", "message": f"Análise completa de IA iniciada para o vídeo #{video_id}."}
 
-@router.post("/api/photo/{photo_id}/analyze-all")
+@router.post("/api/photo/{photo_id}/analyze-all", dependencies=[Depends(require_local_auth)])
 def trigger_analyze_all_photo(photo_id: int, background_tasks: BackgroundTasks):
     """Executa o pipeline completo de IA (Visão + Rostos + Indexação Vetorial) para uma única foto."""
     background_tasks.add_task(PipelineService.analyze_photo_all, photo_id)
     return {"status": "success", "message": f"Análise completa de IA iniciada para a foto #{photo_id}."}
 
-@router.post("/api/project/open-folder-in-explorer")
+@router.post("/api/project/open-folder-in-explorer", dependencies=[Depends(require_local_auth)])
 def open_folder_in_explorer(payload: OpenFolderPayload):
     """Abre um diretório ou a pasta do arquivo no Windows Explorer nativo."""
     if sys.platform != "win32" and shutil.which("explorer") is None:
@@ -1113,7 +1158,7 @@ def open_folder_in_explorer(payload: OpenFolderPayload):
         return {"status": "error", "message": f"Erro ao abrir Explorer: {str(e)}"}
 
 
-@router.post("/api/project/{project_id}/analyze-all-vision")
+@router.post("/api/project/{project_id}/analyze-all-vision", dependencies=[Depends(require_local_auth)])
 def trigger_all_vision(
     project_id: int,
     force: bool = Query(False, description="Forçar reanálise de mídias já analisadas"),
@@ -1240,7 +1285,7 @@ def retry_failed_conversions(project_id: int, conn: sqlite3.Connection = Depends
             
     return {"status": "success", "message": f"Reiniciadas {count} conversões falhas.", "count": count}
 
-@router.post("/api/project/open-proxies-folder")
+@router.post("/api/project/open-proxies-folder", dependencies=[Depends(require_local_auth)])
 def open_proxies_folder():
     """Abre a pasta local de proxies no Windows Explorer."""
     try:
@@ -3286,7 +3331,7 @@ class RelinkProjectPayload(BaseModel):
     search_dir: str
 
 
-@router.post("/api/video/{video_id}/relink")
+@router.post("/api/video/{video_id}/relink", dependencies=[Depends(require_local_auth)])
 def relink_video_file(
     video_id: int,
     payload: RelinkVideoPayload,
@@ -3322,7 +3367,7 @@ def relink_video_file(
     return {"ok": True, "video_id": video_id, "filepath": str(new_path), "message": "Vídeo relincado com sucesso."}
 
 
-@router.post("/api/projects/{project_id}/relink")
+@router.post("/api/projects/{project_id}/relink", dependencies=[Depends(require_local_auth)])
 def relink_project_media(
     project_id: int,
     payload: RelinkProjectPayload,

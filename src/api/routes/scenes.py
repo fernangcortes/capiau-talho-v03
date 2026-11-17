@@ -5,6 +5,7 @@ from pydantic import BaseModel
 from fastapi import APIRouter, HTTPException, Query, BackgroundTasks, Depends
 
 from src.api.dependencies import get_db_conn
+from src.api.security import require_local_auth
 from src.core.tasks import TASK_MANAGER
 from src.db.repositories.projects import ProjectRepository
 from src.db.repositories.scenes import SceneRepository
@@ -55,7 +56,7 @@ def structure_preview(
     return report.to_dict()
 
 
-@router.post("/api/docs/{doc_id}/extract-structure")
+@router.post("/api/docs/{doc_id}/extract-structure", dependencies=[Depends(require_local_auth)])
 def extract_structure(
     doc_id: int, background_tasks: BackgroundTasks,
     project_id: int = Query(...),

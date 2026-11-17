@@ -1,8 +1,9 @@
 """Rotas FastAPI para a Camada de Entidades (Pessoas, Objetos, Locações) e Enriquecimento de Descrições."""
 from typing import List, Optional
 from pydantic import BaseModel
-from fastapi import APIRouter, HTTPException, Query, BackgroundTasks
+from fastapi import APIRouter, HTTPException, Query, BackgroundTasks, Depends
 
+from src.api.security import require_local_auth
 from src.db.connection import get_db
 from src.db.repositories.entities import EntityRepository, is_identifying_name
 from src.nlp.enrichment_engine import (
@@ -168,7 +169,7 @@ def merge_entities_endpoint(payload: MergeEntitiesPayload):
     return {"status": "success", **result}
 
 
-@router.post("/project/{project_id}/enrich")
+@router.post("/project/{project_id}/enrich", dependencies=[Depends(require_local_auth)])
 def trigger_project_enrichment(
     project_id: int,
     video_id: Optional[int] = Query(None, description="Restringe o enriquecimento a um único vídeo"),

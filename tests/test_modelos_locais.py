@@ -73,12 +73,13 @@ def test_laya_nao_baixada_vira_indisponivel(monkeypatch, cache_vazio):
 def test_rota_lista_e_recusa_modelo_desconhecido(cache_vazio):
     from fastapi.testclient import TestClient
     from src.api.server import app
+    from tests.auth_helpers import auth_headers
     c = TestClient(app)
     r = c.get("/api/modelos")
     assert r.status_code == 200
     ids = {m["id"] for m in r.json()["modelos"]}
     assert {"whisper_large-v3-turbo", "whisper_tiny", "laya_multilingual", "yolo_world"} <= ids
-    assert c.post("/api/modelos/nao_existe/baixar").status_code == 404
+    assert c.post("/api/modelos/nao_existe/baixar", headers=auth_headers()).status_code == 404
 
 
 def test_download_roda_em_segundo_plano_e_registra_falha(monkeypatch, cache_vazio):

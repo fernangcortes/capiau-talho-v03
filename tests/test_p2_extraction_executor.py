@@ -25,6 +25,7 @@ from src.services.settings_service import SettingsService
 from src.core.tasks import TASK_MANAGER
 from src.services.script_extract import extraction_task_key, run_script_extraction
 from src.api.server import app
+from tests.auth_helpers import auth_headers
 
 client = TestClient(app)
 
@@ -119,7 +120,7 @@ class TestP2ExtractionExecutor(unittest.TestCase):
     def test_extract_structure_happy_path_persists_scenes_and_entities(self):
         doc_id = self._insert_doc(SMALL_SCRIPT)
 
-        resp = client.post(f"/api/docs/{doc_id}/extract-structure?project_id={self.project_id}")
+        resp = client.post(f"/api/docs/{doc_id}/extract-structure?project_id={self.project_id}", headers=auth_headers())
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(self.mock_llm.call_count, 1, "roteiro pequeno deveria caber em 1 chunk")
 
@@ -150,7 +151,7 @@ class TestP2ExtractionExecutor(unittest.TestCase):
         """Elo com a regra do Commit 1: o que o roteiro sugere nao pode influenciar
         analises de visao/triagem antes de confirmado pelo usuario."""
         doc_id = self._insert_doc(SMALL_SCRIPT, filename="roteiro2.txt")
-        client.post(f"/api/docs/{doc_id}/extract-structure?project_id={self.project_id}")
+        client.post(f"/api/docs/{doc_id}/extract-structure?project_id={self.project_id}", headers=auth_headers())
 
         with get_db() as conn:
             known = [e["name"] for e in EntityRepository.get_known_names(conn, self.project_id)]
@@ -161,19 +162,19 @@ class TestP2ExtractionExecutor(unittest.TestCase):
 
     def test_cache_skips_second_call_without_force(self):
         doc_id = self._insert_doc(SMALL_SCRIPT, filename="cache.txt")
-        client.post(f"/api/docs/{doc_id}/extract-structure?project_id={self.project_id}")
+        client.post(f"/api/docs/{doc_id}/extract-structure?project_id={self.project_id}", headers=auth_headers())
         self.assertEqual(self.mock_llm.call_count, 1)
 
-        resp2 = client.post(f"/api/docs/{doc_id}/extract-structure?project_id={self.project_id}")
+        resp2 = client.post(f"/api/docs/{doc_id}/extract-structure?project_id={self.project_id}", headers=auth_headers())
         self.assertEqual(resp2.status_code, 200)
         self.assertEqual(self.mock_llm.call_count, 1, "segunda rodada sem force nao pode chamar o LLM de novo")
 
     def test_force_reextracts_even_with_cache(self):
         doc_id = self._insert_doc(SMALL_SCRIPT, filename="force.txt")
-        client.post(f"/api/docs/{doc_id}/extract-structure?project_id={self.project_id}")
+        client.post(f"/api/docs/{doc_id}/extract-structure?project_id={self.project_id}", headers=auth_headers())
         self.assertEqual(self.mock_llm.call_count, 1)
 
-        resp2 = client.post(f"/api/docs/{doc_id}/extract-structure?project_id={self.project_id}&force=true")
+        resp2 = client.post(f"/api/docs/{doc_id}/extract-structure?project_id={self.project_id}&force=true", headers=auth_headers())
         self.assertEqual(resp2.status_code, 200)
         self.assertEqual(self.mock_llm.call_count, 2, "force=true precisa ignorar o cache")
 
@@ -183,14 +184,14 @@ class TestP2ExtractionExecutor(unittest.TestCase):
         doc_id = self._insert_doc(SMALL_SCRIPT, filename="duplo.txt")
         TASK_MANAGER.update_progress(extraction_task_key(doc_id), 40.0, "running", task_type="script_extract")
 
-        resp = client.post(f"/api/docs/{doc_id}/extract-structure?project_id={self.project_id}")
+        resp = client.post(f"/api/docs/{doc_id}/extract-structure?project_id={self.project_id}", headers=auth_headers())
         self.assertEqual(resp.status_code, 409)
         self.assertEqual(self.mock_llm.call_count, 0, "rodada duplicada nao pode nem comecar a chamar o LLM")
 
     def test_404_for_doc_not_in_project(self):
         doc_id = self._insert_doc(SMALL_SCRIPT, filename="outro_projeto.txt")
         outro_projeto = add_project("Outro Projeto", "", "")
-        resp = client.post(f"/api/docs/{doc_id}/extract-structure?project_id={outro_projeto}")
+        resp = client.post(f"/api/docs/{doc_id}/extract-structure?project_id={outro_projeto}", headers=auth_headers())
         self.assertEqual(resp.status_code, 404)
 
     # ── Falha persistente: nada parcial ─────────────────────────────────────
@@ -198,7 +199,7 @@ class TestP2ExtractionExecutor(unittest.TestCase):
     def test_chunk_failure_persists_nothing_and_marks_failed(self):
         doc_id = self._insert_doc(SMALL_SCRIPT, filename="falha.txt")
         with patch("src.nlp.llm_text.call_text_llm", return_value=(None, {})):
-            resp = client.post(f"/api/docs/{doc_id}/extract-structure?project_id={self.project_id}")
+            resp = client.post(f"/api/docs/{doc_id}/extract-structure?project_id={self.project_id}", headers=auth_headers())
         self.assertEqual(resp.status_code, 200, "o endpoint aceita a rodada; a falha e interna/assincrona")
 
         scenes = client.get(f"/api/project/{self.project_id}/scenes?doc_id={doc_id}").json()["scenes"]
@@ -224,7 +225,7 @@ class TestP2ExtractionExecutor(unittest.TestCase):
             return _fake_llm_response(prompt, **kwargs)
 
         with patch("src.nlp.llm_text.call_text_llm", side_effect=side_effect):
-            resp = client.post(f"/api/docs/{doc_id}/extract-structure?project_id={self.project_id}")
+            resp = client.post(f"/api/docs/{doc_id}/extract-structure?project_id={self.project_id}", headers=auth_headers())
         self.assertEqual(resp.status_code, 200)
 
         scenes = client.get(f"/api/project/{self.project_id}/scenes?doc_id={doc_id}").json()["scenes"]
@@ -243,7 +244,7 @@ class TestP2ExtractionExecutor(unittest.TestCase):
             conn.commit()
         SettingsService.invalidate(self.project_id)
 
-        resp = client.post(f"/api/docs/{doc_id}/extract-structure?project_id={self.project_id}")
+        resp = client.post(f"/api/docs/{doc_id}/extract-structure?project_id={self.project_id}", headers=auth_headers())
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(self.mock_llm.call_count, 3, "6 cenas / chunk_chars=8000 deveria virar 3 chunks")
 
@@ -272,7 +273,7 @@ class TestP2ExtractionExecutor(unittest.TestCase):
         SettingsService.invalidate(self.project_id)
 
         doc_id = self._insert_doc(PROSE_DOC, filename="tratamento.txt", doc_type="notes")
-        resp = client.post(f"/api/docs/{doc_id}/extract-structure?project_id={self.project_id}")
+        resp = client.post(f"/api/docs/{doc_id}/extract-structure?project_id={self.project_id}", headers=auth_headers())
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(self.mock_llm.call_count, 0)
 
@@ -291,7 +292,7 @@ class TestP2ExtractionExecutor(unittest.TestCase):
         antes de desistir e virar 'prose' -- essa chamada e da deteccao, nao da
         extracao de cenas/entidades (que continua em 0)."""
         doc_id = self._insert_doc(PROSE_DOC, filename="tratamento2.txt", doc_type="notes")
-        resp = client.post(f"/api/docs/{doc_id}/extract-structure?project_id={self.project_id}")
+        resp = client.post(f"/api/docs/{doc_id}/extract-structure?project_id={self.project_id}", headers=auth_headers())
         self.assertEqual(resp.status_code, 200)
         self.assertLessEqual(self.mock_llm.call_count, 1)
 
@@ -319,7 +320,7 @@ class TestP2ExtractionExecutor(unittest.TestCase):
 
     def test_bulk_scene_status(self):
         doc_id = self._insert_doc(SMALL_SCRIPT, filename="bulk_cenas.txt")
-        client.post(f"/api/docs/{doc_id}/extract-structure?project_id={self.project_id}")
+        client.post(f"/api/docs/{doc_id}/extract-structure?project_id={self.project_id}", headers=auth_headers())
         scenes = client.get(f"/api/project/{self.project_id}/scenes?doc_id={doc_id}").json()["scenes"]
         ids = [s["id"] for s in scenes[:2]]
 

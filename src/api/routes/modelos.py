@@ -3,8 +3,9 @@
 Nada aqui roda sozinho: a interface lista (GET) e o usuário escolhe baixar (POST).
 Ver src/services/modelos_locais.py.
 """
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
+from src.api.security import require_local_auth
 from src.services import modelos_locais
 
 router = APIRouter(tags=["Modelos locais"])
@@ -15,7 +16,7 @@ def listar_modelos():
     return {"modelos": modelos_locais.listar()}
 
 
-@router.post("/api/modelos/{modelo_id}/baixar")
+@router.post("/api/modelos/{modelo_id}/baixar", dependencies=[Depends(require_local_auth)])
 def baixar_modelo(modelo_id: str):
     if modelo_id not in modelos_locais.CATALOGO:
         raise HTTPException(404, f"Modelo desconhecido: '{modelo_id}'")

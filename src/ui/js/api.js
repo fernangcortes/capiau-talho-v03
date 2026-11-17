@@ -1,9 +1,75 @@
 // Cliente unificado de comunicação com a API REST backend.
 
 export class CapIAuAPI {
+    static _localToken = null;
+    static _tokenPromise = null;
+
+    static clearLocalToken() {
+        this._localToken = null;
+    }
+
+    static async getLocalToken(forceRefresh = false) {
+        if (forceRefresh) {
+            this._localToken = null;
+        }
+        if (this._localToken) {
+            return this._localToken;
+        }
+        if (!forceRefresh && this._tokenPromise) {
+            return this._tokenPromise;
+        }
+        this._tokenPromise = (async () => {
+            try {
+                const resp = await fetch("/api/auth/local-token", { cache: "no-store" });
+                if (!resp || !resp.ok) return null;
+                const data = await resp.json().catch(() => ({}));
+                const token = typeof data?.token === "string" ? data.token.trim() : "";
+                if (token) {
+                    this._localToken = token;
+                    return token;
+                }
+                return null;
+            } catch {
+                return null;
+            } finally {
+                this._tokenPromise = null;
+            }
+        })();
+        return this._tokenPromise;
+    }
+
+    static async getAuthHeaders(extra = {}, forceRefresh = false) {
+        const merged = {};
+        if (typeof Headers !== "undefined" && extra instanceof Headers) {
+            for (const [k, v] of extra.entries()) merged[k] = v;
+        } else if (Array.isArray(extra)) {
+            for (const [k, v] of extra) merged[k] = v;
+        } else if (extra && typeof extra === "object") {
+            Object.assign(merged, extra);
+        }
+        const token = await this.getLocalToken(forceRefresh);
+        if (token) {
+            const existingAuthKey = Object.keys(merged).find(k => k.toLowerCase() === "authorization");
+            if (existingAuthKey && existingAuthKey !== "Authorization") {
+                delete merged[existingAuthKey];
+            }
+            merged.Authorization = `Bearer ${token}`;
+        }
+        return merged;
+    }
+
     static async request(endpoint, options = {}) {
         try {
-            const response = await fetch(endpoint, options);
+            const buildOptions = async (forceRefresh = false) => {
+                const headers = await this.getAuthHeaders(options.headers, forceRefresh);
+                return { ...options, headers };
+            };
+
+            let response = await fetch(endpoint, await buildOptions(false));
+            if (response.status === 401) {
+                this.clearLocalToken();
+                response = await fetch(endpoint, await buildOptions(true));
+            }
             if (!response.ok) {
                 const text = await response.text();
                 throw new Error(text || `HTTP error! Status: ${response.status}`);
@@ -75,9 +141,18 @@ export class CapIAuAPI {
     // (rodada já em andamento) sem que um 409 vire uma Error genérica — mesmo
     // idioma de fetch cru já usado no upload de documento (dedupe, P1.3).
     static async extractDocStructure(docId, projectId, force = false) {
-        const response = await fetch(`/api/docs/${docId}/extract-structure?project_id=${projectId}&force=${force}`, {
-            method: "POST"
+        const url = `/api/docs/${docId}/extract-structure?project_id=${projectId}&force=${force}`;
+        let response = await fetch(url, {
+            method: "POST",
+            headers: await this.getAuthHeaders()
         });
+        if (response.status === 401) {
+            this.clearLocalToken();
+            response = await fetch(url, {
+                method: "POST",
+                headers: await this.getAuthHeaders({}, true)
+            });
+        }
         const body = await response.json().catch(() => ({}));
         return { ok: response.ok, status: response.status, body };
     }
@@ -683,17 +758,23 @@ export class CapIAuAPI {
      * (mesmo formato de onboardingChat). `signal` (AbortController) interrompe a leitura.
      */
     static async onboardingChatStream(message, history = [], currentProjectName = null, currentProfile = null, { onEvent, signal } = {}) {
-        const response = await fetch("/api/onboarding/chat/stream", {
+        const payload = JSON.stringify({
+            message,
+            history,
+            current_project_name: currentProjectName,
+            current_profile: currentProfile
+        });
+        const send = async (forceRefresh = false) => fetch("/api/onboarding/chat/stream", {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                message,
-                history,
-                current_project_name: currentProjectName,
-                current_profile: currentProfile
-            }),
+            headers: await this.getAuthHeaders({ "Content-Type": "application/json" }, forceRefresh),
+            body: payload,
             signal
         });
+        let response = await send(false);
+        if (response.status === 401) {
+            this.clearLocalToken();
+            response = await send(true);
+        }
         if (!response.ok || !response.body) {
             throw new Error((await response.text().catch(() => "")) || `HTTP ${response.status}`);
         }

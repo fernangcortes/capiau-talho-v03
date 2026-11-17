@@ -4,6 +4,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from src.api.dependencies import get_db_conn
+from src.api.security import require_local_auth
 from src.api.schemas import SettingsUpdatePayload, SettingsResetPayload, PresetApplyPayload, PromptUpdatePayload
 from src.db.repositories.settings import SettingsRepository
 from src.services.settings_service import SettingsService
@@ -66,7 +67,7 @@ def get_settings_registry():
     return {"status": "success", "settings": entries, "categories": CATEGORIES, "presets": presets}
 
 
-@router.get("/api/settings")
+@router.get("/api/settings", dependencies=[Depends(require_local_auth)])
 def get_settings(project_id: Optional[int] = Query(None)):
     """Valores resolvidos (default -> global -> projeto) com origem de cada um. Secrets mascarados."""
     try:
@@ -84,7 +85,7 @@ def get_settings(project_id: Optional[int] = Query(None)):
 
 # ── Escrita ──────────────────────────────────────────────────────────────────
 
-@router.put("/api/settings/global")
+@router.put("/api/settings/global", dependencies=[Depends(require_local_auth)])
 def update_global_settings(payload: SettingsUpdatePayload, conn: sqlite3.Connection = Depends(get_db_conn)):
     """Grava overrides globais (apenas as chaves enviadas)."""
     coerced = _validate_payload(payload.values, scope="global")
@@ -100,7 +101,7 @@ def update_global_settings(payload: SettingsUpdatePayload, conn: sqlite3.Connect
         raise HTTPException(500, str(e))
 
 
-@router.put("/api/settings/project/{project_id}")
+@router.put("/api/settings/project/{project_id}", dependencies=[Depends(require_local_auth)])
 def update_project_settings(project_id: int, payload: SettingsUpdatePayload, conn: sqlite3.Connection = Depends(get_db_conn)):
     """Grava overrides do projeto (apenas as chaves enviadas)."""
     coerced = _validate_payload(payload.values, scope="project")
@@ -116,7 +117,7 @@ def update_project_settings(project_id: int, payload: SettingsUpdatePayload, con
         raise HTTPException(500, str(e))
 
 
-@router.post("/api/settings/global/reset")
+@router.post("/api/settings/global/reset", dependencies=[Depends(require_local_auth)])
 def reset_global_settings(payload: SettingsResetPayload, conn: sqlite3.Connection = Depends(get_db_conn)):
     """Remove overrides globais (todos, ou apenas as chaves informadas)."""
     try:
@@ -132,7 +133,7 @@ def reset_global_settings(payload: SettingsResetPayload, conn: sqlite3.Connectio
         raise HTTPException(500, str(e))
 
 
-@router.post("/api/settings/project/{project_id}/reset")
+@router.post("/api/settings/project/{project_id}/reset", dependencies=[Depends(require_local_auth)])
 def reset_project_settings(project_id: int, payload: SettingsResetPayload, conn: sqlite3.Connection = Depends(get_db_conn)):
     """Remove overrides do projeto (todos, ou apenas as chaves informadas)."""
     try:
@@ -150,7 +151,7 @@ def reset_project_settings(project_id: int, payload: SettingsResetPayload, conn:
 
 # ── Presets ──────────────────────────────────────────────────────────────────
 
-@router.post("/api/settings/preset")
+@router.post("/api/settings/preset", dependencies=[Depends(require_local_auth)])
 def apply_preset(payload: PresetApplyPayload, conn: sqlite3.Connection = Depends(get_db_conn)):
     """Aplica um preset no escopo pedido.
 
@@ -192,7 +193,7 @@ def apply_preset(payload: PresetApplyPayload, conn: sqlite3.Connection = Depends
 
 # ── Prompts ──────────────────────────────────────────────────────────────────
 
-@router.get("/api/settings/prompts")
+@router.get("/api/settings/prompts", dependencies=[Depends(require_local_auth)])
 def get_prompts(project_id: Optional[int] = Query(None), conn: sqlite3.Connection = Depends(get_db_conn)):
     """Lista todos os prompts do sistema com os valores resolvidos e suas origens."""
     from src.nlp.prompt_registry import PROMPT_REGISTRY
@@ -235,7 +236,7 @@ def get_prompts(project_id: Optional[int] = Query(None), conn: sqlite3.Connectio
     return {"status": "success", "prompts": prompts_list}
 
 
-@router.put("/api/settings/prompts/{prompt_id}")
+@router.put("/api/settings/prompts/{prompt_id}", dependencies=[Depends(require_local_auth)])
 def update_prompt(
     prompt_id: str,
     payload: PromptUpdatePayload,
@@ -268,7 +269,7 @@ def update_prompt(
         raise HTTPException(500, str(e))
 
 
-@router.delete("/api/settings/prompts/{prompt_id}")
+@router.delete("/api/settings/prompts/{prompt_id}", dependencies=[Depends(require_local_auth)])
 def delete_prompt_override(
     prompt_id: str,
     scope: str = Query("global"),

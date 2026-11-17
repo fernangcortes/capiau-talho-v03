@@ -1,3 +1,4 @@
+import { CapIAuAPI } from "./api.js";
 import { showConfirmModal } from "./dialogs.js";
 // Modelos locais opcionais (Configurações > Modelos locais).
 // Nada baixa sozinho: a lista mostra o que existe, quanto pesa e para que serve;
@@ -102,7 +103,18 @@ export const ModelosLocais = {
             });
             if (!ok) return;
             try {
-                const r = await fetch(`/api/modelos/${encodeURIComponent(m.id)}/baixar`, { method: "POST" });
+                const url = `/api/modelos/${encodeURIComponent(m.id)}/baixar`;
+                let r = await fetch(url, {
+                    method: "POST",
+                    headers: await CapIAuAPI.getAuthHeaders()
+                });
+                if (r.status === 401) {
+                    CapIAuAPI.clearLocalToken();
+                    r = await fetch(url, {
+                        method: "POST",
+                        headers: await CapIAuAPI.getAuthHeaders({}, true)
+                    });
+                }
                 const corpo = await r.json().catch(() => ({}));
                 if (!r.ok) throw new Error(corpo.detail || `HTTP ${r.status}`);
                 await this.carregar();
