@@ -5,6 +5,7 @@ atual (transcrições dos trechos usados, descrições visuais, lacunas de cober
 o catálogo de mídias candidatas, e pede ao LLM sugestões estruturadas de edição
 (INSERT / DELETE / REPLACE) que viram ghost clips na pista de IA.
 """
+import html
 import json
 import requests
 from typing import List, Dict, Any, Optional
@@ -298,7 +299,7 @@ class TimelineAIService:
                     "track": track,
                     "timeline_start_s": round(float(s.get("timeline_start_s", 0.0) or 0.0), 2),
                     "target_clip_id": target_clip_id,
-                    "reason": str(s.get("reason", "Sugestão da IA"))[:300],
+                    "reason": html.escape(str(s.get("reason", "Sugestão da IA"))[:300]),
                     "persona": persona,
                 }
 

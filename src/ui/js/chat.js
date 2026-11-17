@@ -6,6 +6,15 @@ import { TIMELINE_STATE, TIMELINE_HISTORY } from "./timelineState.js";
 import { formatTimecode } from "./player.js";
 import { showConfirmModal } from "./dialogs.js";
 
+export function escapeHtml(str) {
+    return String(str ?? "")
+        .replace(/&(?!(?:amp|lt|gt|quot|#39|#x27);)/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+}
+
 export class ChatManager {
     constructor() {
         this.init();
@@ -396,14 +405,14 @@ export class ChatManager {
                     <div style="font-weight: 700; font-size: var(--fs-11); display: flex; align-items: center; gap: var(--sp-6); margin-bottom: var(--sp-2); color: var(--color-rose);">
                         <i class="fa-solid fa-triangle-exclamation"></i> Índice de Busca Indisponível
                     </div>
-                    <div>${window.escapeHtml ? window.escapeHtml(m.indexWarning) : m.indexWarning}</div>
+                    <div>${escapeHtml(m.indexWarning)}</div>
                 `;
                 bubble.appendChild(warnEl);
             }
 
             const textEl = document.createElement("div");
             textEl.className = "chat-bubble-text";
-            let formatted = this.formatMarkdownLinks(m.content);
+            let formatted = this.formatMarkdownLinks(escapeHtml(m.content));
             formatted = this.renderMarkdown(formatted);
             textEl.innerHTML = formatted;
             bubble.appendChild(textEl);
@@ -520,7 +529,7 @@ export class ChatManager {
                 </div>
                 ${details}
             </div>
-            <div class="card-quote">"${item.text}"</div>
+            <div class="card-quote">"${escapeHtml(item.text)}"</div>
             <div class="card-actions">
                 <button class="btn-play-card" title="Visualizar mídia"><i class="fa-solid fa-play"></i> Assistir</button>
                 ${item.type === 'video' ? `<button class="btn-insert-card" title="Inserir clipe na timeline"><i class="fa-solid fa-plus"></i> Inserir</button>` : ''}
@@ -731,28 +740,36 @@ export class ChatManager {
 
     formatMarkdownLinks(content) {
         // Converte [Texto](video_id: 2, start: 10.5, end: 20.0) para links clicáveis
-        let html = content;
+        let html = escapeHtml(content);
         
         const videoRegex = /\[([^\]]+)\]\(video_id:\s*(\d+),\s*start:\s*([\d.]+),\s*end:\s*([\d.]+)\)/g;
         html = html.replace(videoRegex, (match, text, videoId, start, end) => {
-            return `<a href="#" class="chat-media-link" data-type="video" data-id="${videoId}" data-start="${start}" data-end="${end}"><i class="fa-solid fa-video"></i> ${text}</a>`;
+            return `<a href="#" class="chat-media-link" data-type="video" data-id="${escapeHtml(videoId)}" data-start="${escapeHtml(start)}" data-end="${escapeHtml(end)}"><i class="fa-solid fa-video"></i> ${escapeHtml(text)}</a>`;
         });
         
         const photoRegex = /\[([^\]]+)\]\(photo_id:\s*(\d+)\)/g;
         html = html.replace(photoRegex, (match, text, photoId) => {
-            return `<a href="#" class="chat-media-link" data-type="photo" data-id="${photoId}"><i class="fa-solid fa-camera"></i> ${text}</a>`;
+            return `<a href="#" class="chat-media-link" data-type="photo" data-id="${escapeHtml(photoId)}"><i class="fa-solid fa-camera"></i> ${escapeHtml(text)}</a>`;
         });
 
         const docRegex = /\[([^\]]+)\]\(doc_id:\s*(\d+)\)/g;
         html = html.replace(docRegex, (match, text, docId) => {
-            return `<a href="#" class="chat-media-link" data-type="doc" data-id="${docId}"><i class="fa-solid fa-file-lines"></i> ${text}</a>`;
+            return `<a href="#" class="chat-media-link" data-type="doc" data-id="${escapeHtml(docId)}"><i class="fa-solid fa-file-lines"></i> ${escapeHtml(text)}</a>`;
         });
 
         return html.replace(/\n/g, "<br>");
     }
 
     renderMarkdown(text) {
-        let html = text;
+        const placeholders = [];
+        const safeTagRegex = /<a href="#" class="chat-media-link" data-type="(?:video|photo|doc)" data-id="\d+"(?: data-start="[\d.]+" data-end="[\d.]+")?><i class="fa-solid fa-(?:video|camera|file-lines)"><\/i> [^<]*<\/a>|<br>/g;
+        let html = String(text ?? "").replace(/[\uE000\uE001]/g, "");
+        html = html.replace(safeTagRegex, (tag) => {
+            const token = `\uE000CHAT_TAG_${placeholders.length}\uE001`;
+            placeholders.push(tag);
+            return token;
+        });
+        html = escapeHtml(html);
         
         // Negrito: **texto** -> <strong>texto</strong>
         html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
@@ -770,6 +787,8 @@ export class ChatManager {
 
         // Linha Horizontal: ---
         html = html.replace(/^---$/gm, '<hr style="border:none; border-top: 1px solid var(--border-glass); margin: var(--sp-10) 0;">');
+
+        html = html.replace(/\uE000CHAT_TAG_(\d+)\uE001/g, (_, idx) => placeholders[Number(idx)] ?? "");
 
         return html;
     }

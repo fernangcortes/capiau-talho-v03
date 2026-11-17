@@ -3,6 +3,15 @@ import { STATE } from "./state.js";
 import { TIMELINE_STATE, TIMELINE_HISTORY, secondsToFrames, framesToSeconds, framesToTimecode, formatRulerTimecode, evaluateFadeCurve, FADE_CURVE_PRESETS, getClipSyncStatus, CLIP_COLOR_LABELS, resolveClipColorLabel } from "./timelineState.js";
 import { setTabVisibility } from "./tabsCustomization.js";
 
+function escapeHtml(str) {
+    return String(str ?? "")
+        .replace(/&(?!(?:amp|lt|gt|quot|#39|#x27);)/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+}
+
 const _CROP_OPPOSITE = { left: "right", right: "left", top: "bottom", bottom: "top" };
 
 /**
@@ -13770,7 +13779,7 @@ export class CapiauTimelineInteraction {
 
         popup.innerHTML = `
             <div style="font-size: var(--fs-11); color: var(--accent); font-weight: bold; margin-bottom: var(--sp-2);">SUGESTÃO DE CORTE IA</div>
-            <div style="font-size: var(--fs-12); color: #fff; line-height: 1.4; margin-bottom: var(--sp-6);">"${ghost.reason}"</div>
+            <div style="font-size: var(--fs-12); color: #fff; line-height: 1.4; margin-bottom: var(--sp-6);">"${escapeHtml(ghost.reason || '')}"</div>
             <div style="display: flex; gap: var(--sp-8);">
                 <button id="btn-popup-accept" class="btn-primary" style="flex: 1; height: 26px; font-size: var(--fs-11); font-weight: bold; padding: 0 var(--sp-10); display: flex; align-items: center; justify-content: center; gap: var(--sp-4); border-radius: 4px;">
                      <i class="fa-solid fa-check"></i> Aceitar (Y)
@@ -14062,17 +14071,18 @@ export class CapiauTimelineInteraction {
             if (!video) return;
             const videoSrc = video.proxy_path || video.filepath || `/originals/${video.filename}`;
             const targetSrc = `${videoSrc}#t=${alt.in_s.toFixed(1)},${alt.out_s.toFixed(1)}`;
+            const safeTargetSrc = escapeHtml(targetSrc);
             
             altsHtml += `
                 <div class="alt-card" style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--t-line-weak, rgba(255, 255, 255, 0.08)); border-radius: 8px; padding: var(--sp-12); display: flex; flex-direction: column; gap: var(--sp-8);">
                     <div style="position: relative; border-radius: 6px; overflow: hidden; background: #000; aspect-ratio: 16/9;">
-                        <video src="${targetSrc}" autoplay loop muted playsinline style="width: 100%; height: 100%; object-fit: cover;"></video>
+                        <video src="${safeTargetSrc}" autoplay loop muted playsinline style="width: 100%; height: 100%; object-fit: cover;"></video>
                         <div style="position: absolute; top: 8px; left: 8px; font-size: var(--fs-10); font-weight: bold; background: rgba(0,0,0,0.6); padding: var(--sp-2) var(--sp-6); border-radius: 4px; color: #fff;">
                             Candidato #${idx + 1}
                         </div>
                     </div>
                     <div style="font-size: var(--fs-12); color: #e2e8f0; line-height: 1.4; flex-grow: 1; min-height: 36px;">
-                        "${alt.reason || 'Sem justificativa.'}"
+                        "${escapeHtml(alt.reason || 'Sem justificativa.')}"
                     </div>
                     <div style="font-size: var(--fs-11); color: var(--text-secondary); display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--t-line-weak, rgba(255,255,255,0.05)); padding-top: var(--sp-8);">
                         <span>Duração Ideal: ${alt.ideal_duration_s ? alt.ideal_duration_s.toFixed(1) + 's' : 'N/A'}</span>
