@@ -535,7 +535,7 @@ def _transicoes_da_pista(clipes: List[Any],
 
         tipo_trans = str(ef_a.get("transitionType") or ef_b.get("transitionType") or ef_a.get("type") or "video_cross_dissolve").lower()
 
-        if tipo_trans == "video_dip_black":
+        if tipo_trans in ("video_dip_black", "video_dip_white"):
             base = {
                 "inicio_s": corte - half_a,
                 "span_s": half_a + half_b,
@@ -633,7 +633,7 @@ def _estender(clipe: Any, transicoes: List[Dict[str, Any]]) -> Tuple[Any, float,
         novos_efeitos.append(ef)
 
     for t in transicoes:
-        if t["papel"] == "entra" and t.get("type", "video_cross_dissolve") != "video_dip_black":
+        if t["papel"] == "entra" and t.get("type", "video_cross_dissolve") not in ("video_dip_black", "video_dip_white"):
             # Clipe B dissolve suavemente por cima do Clipe A ao longo de todo o envelope
             novos_efeitos.append({
                 "type": "crossfade",
@@ -749,6 +749,40 @@ def camada_pista(pista, clipes, seq, escopo, inicio_s: float, fim_s: float,
         acumulado = depois
         if fonte["entrada"] is not None:
             entradas.append(fonte["entrada"])
+
+    for i, (_c_orig, transicoes) in enumerate(pares_com_trans):
+        for t_dw in transicoes:
+            if t_dw.get("type") != "video_dip_white" or t_dw.get("papel") != "sai":
+                continue
+            t_ini = float(t_dw["inicio_s"])
+            span_s = float(t_dw["span_s"])
+            t_fim = t_ini + span_s
+            w_ini = max(t_ini, float(inicio_s))
+            w_fim = min(t_fim, float(fim_s))
+            if w_fim - w_ini <= _EPS_TEMPO or span_s <= _EPS_TEMPO:
+                continue
+            usada = True
+            loc_w = w_ini - float(inicio_s)
+            dur_w = w_fim - w_ini
+            delta_w = w_ini - t_ini
+            prog_w = (
+                f"clip((T+{_n(delta_w)})/{_n(span_s)},0,1)"
+                if delta_w > _EPS_TEMPO
+                else f"clip(T/{_n(span_s)},0,1)"
+            )
+            expr_w = f"'255*(1-2*abs({prog_w}-0.5))'"
+            rot_w = f"{prefixo}dw{i}"
+            desloc_w = f",setpts=PTS+round({_n(loc_w)}/TB)" if loc_w > _EPS_TEMPO else ""
+            declaracoes.append(
+                f"color=c=white:s={w}x{h}:r={_n(seq.fps)}:d={_n(dur_w)},"
+                f"format=rgba,geq=r='255':g='255':b='255':a={expr_w}{desloc_w}{_col(rot_w)}"
+            )
+            depois_w = f"{prefixo}dw{i}l"
+            declaracoes.append(
+                f"{_col(acumulado)}{_col(rot_w)}"
+                f"overlay=x=0:y=0:{_enable_janela(loc_w, loc_w + dur_w, seq.fps)}{_col(depois_w)}"
+            )
+            acumulado = depois_w
 
     return declaracoes, acumulado, entradas, usada
 

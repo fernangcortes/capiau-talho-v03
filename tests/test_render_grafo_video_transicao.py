@@ -284,3 +284,66 @@ def test_composicao_color_matte_com_video_e_in_out_range():
     assert "st=-" not in fc
 
 
+def test_video_dip_to_white_gera_flash_branco_sem_estender_clipes():
+    """Dip to white gera overlay branco puro 1 - 2*|t - 0.5| sem estender mídia nem fazer crossfade nos clipes."""
+    seq = _seq([
+        {"id": "a", "track": "V1", "timeline_start": 0.0, "in": 0.0, "out": 10.0,
+         "video_id": 1, "effects": [_cf("out", 1.0, tipo="video_dip_white")]},
+        {"id": "b", "track": "V1", "timeline_start": 10.0, "in": 5.0, "out": 15.0,
+         "video_id": 2, "effects": [_cf("in", 0.5, tipo="video_dip_white")]},
+    ], fps=24)
+    g = grafo_video.grafo_completo(seq, modelo.Escopo(), 0.0, 20.0)
+    fc = g["filter_complex"]
+    ent = {e["clipe_id"]: e for e in g["entradas"]}
+
+    # Duração das entradas não é estendida
+    assert ent["a"]["t"] == pytest.approx(10.0)
+    assert ent["b"]["ss"] == pytest.approx(5.0)
+    assert ent["b"]["t"] == pytest.approx(10.0)
+
+    # Sem tpad e sem fade de alfa nos clipes
+    assert "tpad" not in fc
+    assert "fade=t=" not in fc
+
+    # Flash branco puro na janela [9.0, 10.5] (span = 1.5s)
+    assert "color=c=white:" in fc
+    assert "geq=r='255':g='255':b='255':a='255*(1-2*abs(clip(T/1.5,0,1)-0.5))'" in fc
+    assert _janela(9.0, 10.5, fps=24) in fc
+
+
+def test_video_dip_to_white_execucao_ffmpeg_pico_branco():
+    """No quadro central do corte, dip_white entrega branco puro (255, 255, 255)."""
+    import shutil
+    import subprocess
+    import numpy as np
+
+    if shutil.which("ffmpeg") is None:
+        pytest.skip("FFmpeg indisponivel")
+
+    seq = modelo.normalizar({
+        "version": 2, "fps": 24, "width": 64, "height": 64,
+        "tracks": [{"id": "V1", "kind": "video"}],
+        "clips": [
+            {"id": "a", "track": "V1", "timeline_start": 0.0, "in": 0.0, "out": 1.0,
+             "kind": "color_matte", "color": "#ff0000",
+             "effects": [_cf("out", 0.5, tid="dw1", tipo="video_dip_white")]},
+            {"id": "b", "track": "V1", "timeline_start": 1.0, "in": 0.0, "out": 1.0,
+             "kind": "color_matte", "color": "#0000ff",
+             "effects": [_cf("in", 0.5, tid="dw1", tipo="video_dip_white")]},
+        ],
+    })
+    g = grafo_video.grafo_completo(seq, modelo.Escopo(), 0.0, 2.0)
+    raw = subprocess.check_output([
+        "ffmpeg", "-v", "error", "-filter_complex", g["filter_complex"],
+        "-map", g["rotulo_video"], "-pix_fmt", "rgb24", "-f", "rawvideo", "-",
+    ])
+    arr = np.frombuffer(raw, dtype=np.uint8).reshape(-1, 64, 64, 3)
+    assert len(arr) == 48
+    # Antes da transição (quadro 0): vermelho
+    assert arr[0, 32, 32, 0] >= 250 and arr[0, 32, 32, 1] <= 5 and arr[0, 32, 32, 2] <= 5
+    # Ponto de corte (quadro 24, t=1.0s): branco puro
+    assert tuple(int(v) for v in arr[24, 32, 32]) == (255, 255, 255)
+    # Depois da transição (quadro 47): azul
+    assert arr[47, 32, 32, 0] <= 5 and arr[47, 32, 32, 1] <= 5 and arr[47, 32, 32, 2] >= 250
+
+
