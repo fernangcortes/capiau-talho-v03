@@ -117,12 +117,12 @@ class TestProjectExportImport(unittest.TestCase):
             self.assertEqual(row["name"], "Filme Destino (Importado)")
             self.assertEqual(row["drive_link"], "http://drive.com/folder1")
             
-            # Verificar se mídias foram importadas com mapeamento e sem colisão de hash única
+            # Verificar se mídias foram importadas com mapeamento mantendo hash original intacto (unicidade por projeto)
             cursor.execute("SELECT id, filepath, hash FROM video WHERE project_id = ?", (new_proj_id,))
             video_row = cursor.fetchone()
             self.assertIsNotNone(video_row)
             self.assertNotEqual(video_row["id"], video_id)
-            self.assertIn("hash_video_teste_123_imp_", video_row["hash"])
+            self.assertEqual(video_row["hash"], "hash_video_teste_123")
             
             # Verificar se falas foram importadas vinculadas ao novo vídeo
             cursor.execute("SELECT COUNT(*) FROM transcript WHERE video_id = ?", (video_row["id"],))
@@ -133,7 +133,7 @@ class TestProjectExportImport(unittest.TestCase):
             photo_row = cursor.fetchone()
             self.assertIsNotNone(photo_row)
             self.assertNotEqual(photo_row["id"], photo_id)
-            self.assertIn("hash_foto_teste_456_imp_", photo_row["hash"])
+            self.assertEqual(photo_row["hash"], "hash_foto_teste_456")
             
             print("  [OK] Todos os dados e chaves mapeados com sucesso!")
         finally:
