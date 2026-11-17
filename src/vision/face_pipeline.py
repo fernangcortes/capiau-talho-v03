@@ -4,7 +4,7 @@ Implementa a arquitetura em camadas onde resultados rapidos e 'bons o suficiente
 sao obtidos no inicio, com refinamento progressivo ate precisao maxima.
 
 Pipeline:
-  Tier 0: YuNet + SFace (local, CPU) - rapido, offline, gratuito
+  Tier 0: SCRFD + ArcFace 512-d (Buffalo_sc ONNX local, CPU) - rapido, offline, gratuito
   Tier 1: Azure Face API (cloud, free tier) - refina deteccoes duvidosas
   Tier 2: AWS Rekognition (cloud, pago) - material critico, Face Collections
   Tier 3: InsightFace + GPU (local) - maxima precisao, arquivos especificos

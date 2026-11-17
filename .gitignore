@@ -49,10 +49,7 @@ data_test_export/
 *.backup
 .tmp_test/
 
-# Planos de Implementação, Pesquisas e Handoffs Locais (não versionados)
-docs/PLANO_*.md
-docs/HANDOFF_*.md
-docs/Pesquisas/
+# Arquivos locais de projeto e infraestrutura de teste
 PROJECT.md
 TEST_INFRA.md
 TEST_READY.md
