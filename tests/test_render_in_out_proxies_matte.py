@@ -228,3 +228,64 @@ def test_in_out_execucao_real_ffmpeg_com_matte_e_video(tmp_path):
     assert out_mp4.exists()
     assert out_mp4.stat().st_size > 1000
 
+
+def test_export_contagem_exata_de_frames_ffprobe(tmp_path):
+    """Valida contagem exata de frames com ffprobe -count_frames (sem perda de 1 quadro pelo fps final)."""
+    if not _tem_ffmpeg() or shutil.which("ffprobe") is None:
+        pytest.skip("FFmpeg/ffprobe não disponíveis no sistema")
+
+    dummy_media = tmp_path / "src_24fps.mp4"
+    subprocess.run(
+        [
+            "ffmpeg", "-y", "-v", "error",
+            "-f", "lavfi", "-i", "testsrc=size=320x180:rate=24:duration=6",
+            "-c:v", "libx264", "-pix_fmt", "yuv420p",
+            str(dummy_media),
+        ],
+        check=True,
+    )
+
+    seq = modelo.normalizar({
+        "version": 2, "fps": 24, "width": 320, "height": 180,
+        "tracks": [{"id": "V1", "kind": "video", "order": 0}],
+        "clips": [{"id": "c1", "track": "V1", "timeline_start": 0.0, "in": 0.0, "out": 4.0, "video_id": 1}],
+    })
+    buscar = lambda tipo, mid: {"id": mid, "filepath": str(dummy_media), "duration": 6.0}
+
+    # Caso 1: timeline completa 4.0s @ 24fps = 96 quadros
+    ped_full = modelo.Pedido(
+        timeline_id=1, kind="master",
+        overrides={"resolution": "320x180", "fps": 24, "mute_audio": True},
+    )
+    rel_full = midia.resolver_fontes(seq, ped_full, buscar_midia=buscar, checar_drive=lambda l: True)
+    out_full = tmp_path / "full_4s.mp4"
+    cmd_full = comando.montar_comando(seq, ped_full, out_full, rel_midia=rel_full, destino_validado=True)
+    fc_full = cmd_full["cmd"][cmd_full["cmd"].index("-filter_complex") + 1]
+    assert "fps=24:eof_action=pass" in fc_full
+    subprocess.run(cmd_full["cmd"], check=True, capture_output=True)
+    nb_full = int(subprocess.check_output(
+        ["ffprobe", "-v", "error", "-count_frames", "-select_streams", "v:0",
+         "-show_entries", "stream=nb_read_frames", "-of", "default=noprint_wrappers=1:nokey=1",
+         str(out_full)],
+        text=True,
+    ).strip())
+    assert nb_full == 96
+
+    # Caso 2: faixa In/Out [1.2, 3.0] = 1.8s @ 24fps = 43 quadros
+    ped_io = modelo.Pedido(
+        timeline_id=1, kind="master",
+        faixa=modelo.Faixa(modo=modelo.MODO_FAIXA_IN_OUT, inicio_s=1.2, fim_s=3.0),
+        overrides={"resolution": "320x180", "fps": 24, "mute_audio": True},
+    )
+    rel_io = midia.resolver_fontes(seq, ped_io, buscar_midia=buscar, checar_drive=lambda l: True)
+    out_io = tmp_path / "inout_1_8s.mp4"
+    cmd_io = comando.montar_comando(seq, ped_io, out_io, rel_midia=rel_io, destino_validado=True)
+    subprocess.run(cmd_io["cmd"], check=True, capture_output=True)
+    nb_io = int(subprocess.check_output(
+        ["ffprobe", "-v", "error", "-count_frames", "-select_streams", "v:0",
+         "-show_entries", "stream=nb_read_frames", "-of", "default=noprint_wrappers=1:nokey=1",
+         str(out_io)],
+        text=True,
+    ).strip())
+    assert nb_io == round(1.8 * 24)
+

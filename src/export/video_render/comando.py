@@ -714,7 +714,7 @@ def montar_comando(seq, pedido, destino, *, rel_midia=None,
         # parametro `color`, mas a forma posicional so vale ate `y` em algumas
         # builds -- nomear a opcao remove a ambiguidade.
         f"pad={param['largura']}:{param['altura']}:(ow-iw)/2:(oh-ih)/2:color=black,"
-        f"fps={_fmt(fps_saida)}"
+        f"fps={_fmt(fps_saida)}:eof_action=pass"
         + (",format=yuv420p" if param["yuv420p"] else "")
         + f"[{fim_v}_final]"
     )
