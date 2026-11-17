@@ -1,6 +1,8 @@
 ﻿# CapIAu-Talho — Launcher Inteligente
 # Detecta se a porta 8000 ja esta ativa, se o Docker esta disponivel ou inicia localmente via Python.
 
+param([switch]$Dev)
+
 $ErrorActionPreference = "SilentlyContinue"
 
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -80,7 +82,8 @@ if (Test-Path "$ProjectRoot\.venv\Scripts\python.exe") {
 }
 
 # Inicia o Uvicorn em uma janela de console do PowerShell dedicada
-$psCmd = "cd '$ProjectRoot'; `$host.UI.RawUI.WindowTitle = 'CapIAu Server (Local Python)'; Write-Host '🎬 CapIAu-Talho rodando localmente via Python na porta 8000...' -ForegroundColor Cyan; & '$pythonExe' -m uvicorn src.api.server:app --host 127.0.0.1 --port 8000 --reload"
+$reloadArg = if ($Dev) { " --reload" } else { "" }
+$psCmd = "cd '$ProjectRoot'; `$host.UI.RawUI.WindowTitle = 'CapIAu Server (Local Python)'; Write-Host '🎬 CapIAu-Talho rodando localmente via Python na porta 8000...' -ForegroundColor Cyan; & '$pythonExe' -m uvicorn src.api.server:app --host 127.0.0.1 --port 8000$reloadArg"
 
 Start-Process powershell.exe -ArgumentList "-NoExit", "-Command", $psCmd -WorkingDirectory $ProjectRoot
 

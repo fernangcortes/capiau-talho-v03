@@ -1,6 +1,7 @@
 """Servidor REST FastAPI unificado e simplificado para o ecossistema CapIAu-Talho."""
 import logging
 import mimetypes
+import os
 
 # Corrigir mapeamento do registro do Windows que polui tipos MIME de imagem
 mimetypes.add_type('image/jpeg', '.jpg')
@@ -63,9 +64,14 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+_porta_cors = (os.getenv("PORT") or "8000").strip() or "8000"
+ORIGENS_LOCAIS_CORS = [
+    f"http://127.0.0.1:{_porta_cors}",
+    f"http://localhost:{_porta_cors}",
+]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ORIGENS_LOCAIS_CORS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

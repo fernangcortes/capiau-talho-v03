@@ -1,4 +1,6 @@
-# Script para iniciar o CapIAu-Talho localmente no Windows com ambiente virtual dedicado
+﻿# Script para iniciar o CapIAu-Talho localmente no Windows com ambiente virtual dedicado
+param([switch]$Dev)
+
 $ErrorActionPreference = "Stop"
 
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -32,4 +34,8 @@ if (-not (Test-Path ".env")) {
 }
 
 Write-Host "`nIniciando servidor Uvicorn em http://localhost:8000 ..." -ForegroundColor Green
-& "$VenvPython" -m uvicorn src.api.server:app --host 127.0.0.1 --port 8000 --reload
+$uvicornArgs = @("-m", "uvicorn", "src.api.server:app", "--host", "127.0.0.1", "--port", "8000")
+if ($Dev) {
+    $uvicornArgs += "--reload"
+}
+& "$VenvPython" @uvicornArgs
