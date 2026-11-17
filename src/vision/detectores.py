@@ -181,9 +181,11 @@ def _yolo_world(img_path: Path, classes_en: List[str], volta: Dict[str, str], mi
     def carregar():
         return _carregar_yolo_world()
     modelo = _modelo(MOTOR_YOLO_WORLD, carregar)
+    from src.services.settings_service import resolve_ai_device
+    dev = resolve_ai_device()
     with _trava:  # set_classes muda o estado do modelo compartilhado
         modelo.set_classes(classes_en)
-        res = modelo.predict(str(img_path), conf=min_conf, device="cpu", verbose=False)[0]
+        res = modelo.predict(str(img_path), conf=min_conf, device=dev, verbose=False)[0]
     h, w = res.orig_shape
     nomes = res.names
     saida = []

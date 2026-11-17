@@ -65,16 +65,20 @@ class ImageSearch:
     def img_encoder(self):
         if self._img_encoder is None:
             from sentence_transformers import SentenceTransformer
-            print("[CLIP] Carregando modelo de imagem em CPU...")
-            self._img_encoder = SentenceTransformer(self.IMAGE_MODEL, device="cpu")
+            from src.services.settings_service import resolve_ai_device
+            dev = resolve_ai_device()
+            print(f"[CLIP] Carregando modelo de imagem em {dev}...")
+            self._img_encoder = SentenceTransformer(self.IMAGE_MODEL, device=dev)
         return self._img_encoder
 
     @property
     def txt_encoder(self):
         if self._txt_encoder is None:
             from sentence_transformers import SentenceTransformer
-            print("[CLIP] Carregando modelo de texto multilíngue em CPU...")
-            self._txt_encoder = SentenceTransformer(self.TEXT_MODEL, device="cpu")
+            from src.services.settings_service import resolve_ai_device
+            dev = resolve_ai_device()
+            print(f"[CLIP] Carregando modelo de texto multilíngue em {dev}...")
+            self._txt_encoder = SentenceTransformer(self.TEXT_MODEL, device=dev)
         return self._txt_encoder
 
     def embed_image_file(self, image_path: Path) -> Optional[np.ndarray]:

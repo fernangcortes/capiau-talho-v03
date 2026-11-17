@@ -13,6 +13,32 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from src.config import CONFIG
 
+
+def _ai_device_enum_labels() -> Dict[str, str]:
+    """Rótulos dinâmicos de hardware.ai_device sinalizando aceleradores indisponíveis."""
+    import importlib.util
+
+    cuda_ok = False
+    directml_ok = False
+    try:
+        import torch
+        cuda_ok = bool(torch.cuda.is_available())
+    except Exception:
+        cuda_ok = False
+    try:
+        if importlib.util.find_spec("torch_directml") is not None:
+            import torch_directml
+            directml_ok = bool(getattr(torch_directml, "is_available", lambda: False)())
+    except Exception:
+        directml_ok = False
+
+    return {
+        "auto": "Automático (Seguro para economizar VRAM)",
+        "cpu": "Processador CPU (Padrão 100% estável)",
+        "directml": "DirectML (GPU DirectX 12)" if directml_ok else "DirectML (indisponível nesta máquina)",
+        "cuda": "Nvidia CUDA" if cuda_ok else "Nvidia CUDA (indisponível nesta máquina)",
+    }
+
 # -- Categorias exibidas na navegação do painel -------------------------------
 
 CATEGORIES = [
@@ -75,39 +101,11 @@ SETTINGS_REGISTRY: List[Dict[str, Any]] = [
         "category": "models_keys", "level": "simple", "scope": "global", "requires_reprocess": False,
     },
     {
-        "key": "api.anthropic_key", "type": "secret", "default": "",
-        "label": "Chave Anthropic Claude",
-        "help": "Chave direta para Claude 5.5 Sonnet e raciocínio estendido.",
-        "help_tech": "Usado para inferência direta via API Anthropic.",
-        "category": "models_keys", "level": "simple", "scope": "global", "requires_reprocess": False,
-    },
-    {
-        "key": "api.deepseek_key", "type": "secret", "default": "",
-        "label": "Chave DeepSeek",
-        "help": "Chave direta para DeepSeek 4.1 Flash/Pro com custo ultra-baixo.",
-        "help_tech": "Usado para inferência direta via API DeepSeek.",
-        "category": "models_keys", "level": "simple", "scope": "global", "requires_reprocess": False,
-    },
-    {
         "key": "api.typesafe_key", "type": "secret", "default": "",
         "label": "Chave TypeSafe AI",
         "help": "Chave para o Jev (Sistema 1 comercial de baixa latência e safety gatekeeper).",
         "help_tech": "Usado no System1JevClient para auditoria e triagem de baixa latência.",
         "category": "models_keys", "level": "simple", "scope": "global", "requires_reprocess": False,
-    },
-    {
-        "key": "api.nvidia_nim_key", "type": "secret", "default": "",
-        "label": "Chave NVIDIA NIM",
-        "help": "Chave para acessar microsserviços NVIDIA NIM (Nemotron 3, Canary, Cosmos 3) na nuvem corporativa.",
-        "help_tech": "Usado para acesso a microsserviços NIM na nuvem NVIDIA.",
-        "category": "models_keys", "level": "simple", "scope": "global", "requires_reprocess": False,
-    },
-    {
-        "key": "api.local_vlm_endpoint", "type": "string", "default": "http://localhost:11434/v1",
-        "label": "Endpoint de VLM Local (Ollama/vLLM)",
-        "help": "URL base para inferência local de visão sem custos de nuvem.",
-        "help_tech": "Base URL para endpoints locais compatíveis com a API OpenAI.",
-        "category": "models_keys", "level": "pro", "scope": "global", "requires_reprocess": False,
     },
     {
         "key": "llm.text_model", "type": "enum", "default": CONFIG.TEXT_MODEL,
@@ -167,7 +165,7 @@ SETTINGS_REGISTRY: List[Dict[str, Any]] = [
             "deepgram_nova_3": "Deepgram Nova-3 (nuvem)",
         },
         "label": "Motor de Transcrição Primária",
-        "help": "Motor de reconhecimento de fala. Os locais precisam do modelo baixado em Modelos locais; sem ele, a transcrição sai pela AssemblyAI e a tela de Tarefas avisa.",
+        "help": "Motor de reconhecimento de fala. Os locais precisam do modelo baixado em Modelos locais; sem ele, a transcrição para com erro e instrução de download (apenas idioma sem suporte cai na AssemblyAI).",
         "help_tech": "Resolvido em src/transcription/motores.py (resolver_motores).",
         "category": "transcription", "level": "simple", "scope": "both", "requires_reprocess": True,
     },
@@ -277,28 +275,6 @@ SETTINGS_REGISTRY: List[Dict[str, Any]] = [
         "help": "Lista separada por vírgula de classes prioritárias para catalogação.",
         "help_tech": "Filtro de prompts zero-shot.",
         "category": "objects_props", "level": "pro", "scope": "both", "requires_reprocess": False,
-    },
-    {
-        "key": "object.execution_mode", "type": "enum", "default": "cloud_api",
-        "enum": ["cloud_api", "local_cpu", "local_gpu"],
-        "label": "Modo de Execução",
-        "help": "Onde executar o motor de detecção de adereços.",
-        "help_tech": "cloud_api | local_cpu | local_gpu",
-        "category": "objects_props", "level": "pro", "scope": "global", "requires_reprocess": False,
-    },
-    {
-        "key": "object.auto_crop", "type": "bool", "default": True,
-        "label": "Gerar Recortes de Imagem (Thumbnails)",
-        "help": "Se verdadeiro, extrai crops automáticos dos objetos detectados para cache visual.",
-        "help_tech": "Salva crops em data/cache/crops/objects.",
-        "category": "objects_props", "level": "pro", "scope": "both", "requires_reprocess": False,
-    },
-    {
-        "key": "object.link_script_props", "type": "bool", "default": True,
-        "label": "Vincular com Props do Roteiro",
-        "help": "Vincula automaticamente objetos detectados com adereços extraídos das cenas do roteiro.",
-        "help_tech": "Faz matching semântico com scene.props_json.",
-        "category": "objects_props", "level": "simple", "scope": "both", "requires_reprocess": False,
     },
 
     # -- Visão & Resumos ------------------------------------------------------
@@ -998,13 +974,6 @@ SETTINGS_REGISTRY: List[Dict[str, Any]] = [
         "help_tech": "min_samples do cluster_faces_dbscan.",
         "category": "faces", "level": "pro", "scope": "both", "requires_reprocess": False,
     },
-    {
-        "key": "faces.recognition_confidence", "type": "float", "default": 0.7, "min": 0.3, "max": 0.99, "step": 0.01,
-        "label": "Confiança mínima de reconhecimento",
-        "help": "Quão parecido um rosto precisa ser de uma pessoa conhecida para ser reconhecido automaticamente.",
-        "help_tech": "confidence_threshold do FacePipeline em cascata.",
-        "category": "faces", "level": "pro", "scope": "both", "requires_reprocess": False,
-    },
 
     # -- Hardware & GPU -------------------------------------------------------
     {
@@ -1033,6 +1002,7 @@ SETTINGS_REGISTRY: List[Dict[str, Any]] = [
     {
         "key": "hardware.ai_device", "type": "enum", "default": "auto",
         "enum": ["auto", "cpu", "directml", "cuda"],
+        "enum_labels": _ai_device_enum_labels(),
         "label": "Dispositivo para Modelos de IA (CLIP / Embeddings)",
         "help": "Controla onde os modelos de busca semântica e visão local (CLIP para busca por texto de fotos e MiniLM para falas) serão carregados. No modo 'Automático', os modelos rodam na CPU para economizar os 2.0 GB de VRAM da GPU para a renderização de vídeo, garantindo estabilidade máxima sem riscos de estouro de memória.",
         "help_tech": "Define a string de dispositivo enviada ao PyTorch / SentenceTransformer ('cpu', 'directml', 'cuda'). Com 2.0 GB de VRAM, a CPU preserva memória dedicada livre para o decodificador/codificador de hardware do FFmpeg.",

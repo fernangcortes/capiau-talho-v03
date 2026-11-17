@@ -86,8 +86,10 @@ class SemanticSearch:
 
                 if self.encoder is None:
                     # Modelo leve de embeddings (MiniLM), roda rápido na CPU — só carrega 1x
-                    print("[QDRANT] Carregando modelo sentence-transformers local em CPU...")
-                    self.encoder = SentenceTransformer(CONFIG.embedding_model, device="cpu")
+                    from src.services.settings_service import resolve_ai_device
+                    dev = resolve_ai_device()
+                    print(f"[QDRANT] Carregando modelo sentence-transformers local em {dev}...")
+                    self.encoder = SentenceTransformer(CONFIG.embedding_model, device=dev)
 
                 print(f"[QDRANT] Conectando ao banco local em: {db_file_path}")
                 self.client = QdrantClient(path=str(db_file_path))

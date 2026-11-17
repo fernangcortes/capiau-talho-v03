@@ -397,15 +397,15 @@ class TestTier1FeatureCoverage:
         with get_db() as conn:
             SettingsRepository.upsert_global(conn, "api.gemini_key", "AIzaSyTestKey2026Direct")
             SettingsRepository.upsert_global(conn, "api.typesafe_key", "typesafe_secret_123")
-            SettingsRepository.upsert_global(conn, "api.nvidia_nim_key", "nv_nim_secret_456")
-            SettingsRepository.upsert_global(conn, "api.local_vlm_endpoint", "http://127.0.0.1:8000/v1")
+            SettingsRepository.upsert_global(conn, "api.deepgram_key", "dg_secret_456")
+            SettingsRepository.upsert_global(conn, "hardware.ai_device", "cpu")
         SettingsService.invalidate()
 
         S = SettingsService.get_settings()
         assert S.api_key("gemini") == "AIzaSyTestKey2026Direct"
         assert S.api_key("typesafe") == "typesafe_secret_123"
-        assert S.api_key("nvidia_nim") == "nv_nim_secret_456"
-        assert S.get("api.local_vlm_endpoint") == "http://127.0.0.1:8000/v1"
+        assert S.api_key("deepgram") == "dg_secret_456"
+        assert S.get("hardware.ai_device") == "cpu"
 
     # ── Feature 13: Text-Based Editing c/ Fala Sobreposta ────────────────────
     def test_f13_text_based_editing_dual_audio_routing(self, db_conn):

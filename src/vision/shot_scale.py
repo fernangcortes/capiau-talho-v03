@@ -85,8 +85,10 @@ class ShotScaleClassifier:
     def _ensure_labels(self) -> np.ndarray:
         if self._label_matrix is None:
             from sentence_transformers import SentenceTransformer
-            print("[ShotScale] Carregando encoder de texto CLIP multilingue (uma vez)...")
-            encoder = SentenceTransformer(TEXT_MODEL, device="cpu")
+            from src.services.settings_service import resolve_ai_device
+            dev = resolve_ai_device()
+            print(f"[ShotScale] Carregando encoder de texto CLIP multilingue em {dev} (uma vez)...")
+            encoder = SentenceTransformer(TEXT_MODEL, device=dev)
             rows = []
             for label in SHOT_SCALE_LABELS:
                 vecs = np.asarray(encoder.encode(SHOT_SCALE_PROMPTS[label]), dtype=np.float32)

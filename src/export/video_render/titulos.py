@@ -51,6 +51,9 @@ from __future__ import annotations
 import hashlib
 import json
 import mimetypes
+import os
+import shutil
+import sys
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
@@ -73,9 +76,74 @@ class TitulosIndisponiveis(RuntimeError):
     """Nao ha como fotografar titulos (playwright ou navegador ausentes)."""
 
 
+def _navegador_executavel_disponivel() -> bool:
+    """Confere sem abrir processo se ha Edge, Chrome ou Chromium do Playwright instalado."""
+    for cmd in ("msedge", "chrome", "chromium", "chromium-browser", "google-chrome", "microsoft-edge"):
+        if shutil.which(cmd):
+            return True
+
+    if os.name == "nt":
+        for var in ("ProgramFiles", "ProgramFiles(x86)", "LocalAppData"):
+            base = os.environ.get(var)
+            if not base:
+                continue
+            for rel in (
+                Path("Microsoft") / "Edge" / "Application" / "msedge.exe",
+                Path("Google") / "Chrome" / "Application" / "chrome.exe",
+            ):
+                if (Path(base) / rel).is_file():
+                    return True
+    elif sys.platform == "darwin":
+        for app_bin in (
+            Path("/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge"),
+            Path("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"),
+            Path("/Applications/Chromium.app/Contents/MacOS/Chromium"),
+        ):
+            if app_bin.is_file():
+                return True
+    else:
+        for linux_bin in (
+            Path("/opt/microsoft/msedge/msedge"),
+            Path("/usr/bin/microsoft-edge"),
+            Path("/usr/bin/google-chrome"),
+            Path("/usr/bin/chromium"),
+            Path("/usr/bin/chromium-browser"),
+        ):
+            if linux_bin.is_file():
+                return True
+
+    pw_dirs: List[Path] = []
+    env_pw = os.environ.get("PLAYWRIGHT_BROWSERS_PATH")
+    if env_pw and env_pw != "0":
+        pw_dirs.append(Path(env_pw))
+    else:
+        if os.name == "nt" and os.environ.get("LocalAppData"):
+            pw_dirs.append(Path(os.environ["LocalAppData"]) / "ms-playwright")
+        elif sys.platform == "darwin":
+            pw_dirs.append(Path.home() / "Library" / "Caches" / "ms-playwright")
+        else:
+            pw_dirs.append(Path.home() / ".cache" / "ms-playwright")
+
+    for pw_dir in pw_dirs:
+        if not pw_dir.is_dir():
+            continue
+        for pat in (
+            "chromium-*/chrome-win*/chrome.exe",
+            "chromium-*/chrome-linux*/chrome",
+            "chromium-*/chrome-mac*/Chromium.app/Contents/MacOS/Chromium",
+            "chromium_headless_shell-*/chrome-headless-shell-win*/chrome-headless-shell.exe",
+            "chromium_headless_shell-*/chrome-headless-shell-linux*/chrome-headless-shell",
+            "chromium_headless_shell-*/chrome-headless-shell-mac*/chrome-headless-shell",
+        ):
+            if any(pw_dir.glob(pat)):
+                return True
+
+    return False
+
+
 def playwright_instalado() -> bool:
     import importlib.util
-    return importlib.util.find_spec("playwright") is not None
+    return importlib.util.find_spec("playwright") is not None and _navegador_executavel_disponivel()
 
 
 def _hash(*partes: Any) -> str:

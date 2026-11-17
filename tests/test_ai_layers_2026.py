@@ -464,15 +464,22 @@ class TestSettingsDynamicResolution:
     def test_settings_registry_has_2026_keys(self):
         reg_map = get_registry_map()
         expected_keys = [
-            "api.gemini_key", "api.anthropic_key", "api.deepseek_key",
-            "api.typesafe_key", "api.nvidia_nim_key", "api.local_vlm_endpoint",
+            "api.gemini_key", "api.typesafe_key",
+            "api.assemblyai_key", "api.deepgram_key", "api.auphonic_key",
             "object.detector_engine", "object.min_confidence", "object.classes_filter",
-            "object.execution_mode", "object.auto_crop", "object.link_script_props",
             "triage.system1_enabled", "triage.escalation_threshold",
-            "transcription.engine", "diarization.engine", "diarization.max_speakers"
+            "transcription.engine", "diarization.engine", "diarization.max_speakers",
+            "hardware.ai_device", "hardware.opencv_opencl",
         ]
         for k in expected_keys:
             assert k in reg_map, f"Configuração obrigatória '{k}' não registrada no SETTINGS_REGISTRY"
+        removed_keys = [
+            "api.anthropic_key", "api.deepseek_key", "api.nvidia_nim_key", "api.local_vlm_endpoint",
+            "object.execution_mode", "object.auto_crop", "object.link_script_props",
+            "faces.recognition_confidence",
+        ]
+        for k in removed_keys:
+            assert k not in reg_map, f"Chave morta '{k}' deveria ter sido removida do SETTINGS_REGISTRY"
 
     def test_api_key_resolution_and_env_fallbacks(self, monkeypatch):
         from src.services.settings_service import ResolvedSettings

@@ -238,7 +238,8 @@ class System1LayaEngine:
                 except ImportError as e:
                     raise System1Indisponivel("pacote 'laya' não instalado (uv pip install laya)") from e
                 try:
-                    cls._router_compartilhado = Router(device="cpu", max_loaded=1)
+                    from src.services.settings_service import resolve_ai_device
+                    cls._router_compartilhado = Router(device=resolve_ai_device(), max_loaded=1)
                 except Exception as e:
                     raise System1Indisponivel(f"falha ao carregar a Laya: {e}") from e
             return cls._router_compartilhado

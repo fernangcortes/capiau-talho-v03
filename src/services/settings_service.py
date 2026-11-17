@@ -197,3 +197,42 @@ class SettingsService:
                 SettingsService._project_cache.clear()
             else:
                 SettingsService._project_cache.pop(project_id, None)
+
+
+def resolve_ai_device(raw_device: Optional[str] = None, project_id: Optional[int] = None) -> str:
+    """Resolve `hardware.ai_device` (auto/cpu/directml/cuda) com fallback seguro para 'cpu'."""
+    if raw_device is None:
+        try:
+            raw_device = SettingsService.get_settings(project_id).get("hardware.ai_device")
+        except Exception:
+            raw_device = "auto"
+
+    dev = str(raw_device or "auto").strip().lower()
+    if dev in ("", "auto", "cpu"):
+        return "cpu"
+
+    if dev == "cuda":
+        try:
+            import torch
+            if torch.cuda.is_available():
+                return "cuda"
+        except Exception:
+            pass
+        return "cpu"
+
+    if dev == "directml":
+        try:
+            import importlib.util
+            import sys
+            mod = sys.modules.get("torch_directml")
+            if mod is None:
+                if "torch_directml" in sys.modules or importlib.util.find_spec("torch_directml") is None:
+                    return "cpu"
+                import torch_directml as mod
+            if getattr(mod, "is_available", lambda: False)():
+                return "directml"
+        except Exception:
+            pass
+        return "cpu"
+
+    return "cpu"

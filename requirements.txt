@@ -19,6 +19,11 @@ python-multipart>=0.0.9
 numpy>=1.26.0
 rawpy>=0.21.0
 boto3>=1.34.0
+pypdf>=4.0.0
+sherpa-onnx>=1.13.6,<2.0.0
+soundfile>=0.12.1
+pytest>=8.0.0
+syrupy>=4.6.0
 # Titulos no render (src/export/video_render/titulos.py): o mesmo CSS do preview
 # fotografado num navegador headless. Usa o Edge/Chrome ja instalado (nao precisa de
 # `playwright install`). Sem ele o render sai sem titulos, com aviso no preflight.

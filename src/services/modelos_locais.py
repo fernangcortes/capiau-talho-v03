@@ -221,7 +221,7 @@ def exigir(modelo_id: str) -> ModeloLocal:
     pacotes_ok, faltam = _pacotes_ok(m)
     if not pacotes_ok:
         onde = "no ambiente .venv-nemo (ver requirements-nemo.txt)" if m.ambiente == "nemo" \
-            else "(ver requirements-opcional.txt)"
+            else "(ver requirements.txt)"
         raise ModeloNaoBaixado(f"{m.nome}: falta instalar {', '.join(faltam)} {onde}")
     if not baixado(m):
         raise ModeloNaoBaixado(f"{m.nome} não está baixado ({_tamanho(m)}); "

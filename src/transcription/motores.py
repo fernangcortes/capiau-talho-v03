@@ -281,8 +281,10 @@ def _carregar_whisper(nome: str = WHISPER_PADRAO):
             except ImportError as e:
                 raise ErroASR("pacote 'faster-whisper' não instalado (uv pip install faster-whisper)") from e
             _exigir_modelo(f"whisper_{nome}")
+            from src.services.settings_service import resolve_ai_device
+            dev = "cuda" if resolve_ai_device() == "cuda" else "cpu"
             threads = max(1, (os.cpu_count() or 2) // 2)
-            _whisper_modelos[nome] = WhisperModel(nome, device="cpu", compute_type="int8", cpu_threads=threads,
+            _whisper_modelos[nome] = WhisperModel(nome, device=dev, compute_type="int8", cpu_threads=threads,
                                                   local_files_only=True)
         return _whisper_modelos[nome]
 
@@ -381,7 +383,8 @@ def _rodar_worker_nemo(tarefa: str, audio: Path, *extra: str) -> Dict[str, Any]:
             raise ErroASR(f"ffmpeg não converteu o áudio para o {tarefa}: {conv.stderr.decode(errors='replace')[:200]}")
         try:
             # HF_HUB_OFFLINE: o worker nunca baixa nada; o download é pelo botão em Modelos locais
-            ambiente = {**os.environ, "HF_HUB_OFFLINE": "1"}
+            from src.services.settings_service import resolve_ai_device
+            ambiente = {**os.environ, "HF_HUB_OFFLINE": "1", "CAPIAU_AI_DEVICE": resolve_ai_device()}
             r = subprocess.run([str(py), str(WORKER_NEMO), tarefa, str(wav), str(saida), *extra],
                                capture_output=True, timeout=NEMO_TIMEOUT_S, env=ambiente, **kw)
         except subprocess.TimeoutExpired as e:
