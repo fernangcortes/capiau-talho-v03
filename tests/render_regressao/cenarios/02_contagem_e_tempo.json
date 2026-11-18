@@ -1,0 +1,20 @@
+{
+  "schema": 1,
+  "id": "02_contagem_e_tempo",
+  "descricao": "Contagem exata de quadros, duração de contêiner e amostras em múltiplos fps e IN/OUT",
+  "marcadores": ["render_golden"],
+  "fps": 24,
+  "resolucao": [320, 180],
+  "fontes": {"1": "barras_a.mp4"},
+  "sequencia": {
+    "version": 2,
+    "fps": 24,
+    "width": 320,
+    "height": 180,
+    "tracks": [{"id": "V1", "kind": "video", "order": 0}],
+    "clips": [
+      {"id": "c1", "type": "video", "track": "V1", "timeline_start": 0.0, "in": 0.0, "out": 4.0, "video_id": 1}
+    ]
+  },
+  "pedido": {"kind": "master", "faixa": null, "overrides": {"fps": 24}}
+}

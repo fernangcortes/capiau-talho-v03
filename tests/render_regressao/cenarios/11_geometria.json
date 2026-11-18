@@ -1,0 +1,32 @@
+{
+  "schema": 1,
+  "id": "11_geometria",
+  "descricao": "Enquadramento fit/fill, scale, x/y, rotação 0/90/180/270/15° e crop",
+  "marcadores": ["render_golden", "paridade"],
+  "fps": 24,
+  "resolucao": [320, 180],
+  "fontes": {"1": "foto.png"},
+  "sequencia": {
+    "version": 2,
+    "fps": 24,
+    "width": 320,
+    "height": 180,
+    "tracks": [{"id": "V1", "kind": "video", "order": 0}],
+    "clips": [
+      {
+        "id": "foto_geo",
+        "type": "photo",
+        "track": "V1",
+        "timeline_start": 0.0,
+        "in": 0.0,
+        "out": 1.0,
+        "photo_id": 1,
+        "effects": [
+          {"type": "fit", "mode": "fill"},
+          {"type": "transform", "scale": 0.5, "x": 15.0, "y": -10.0, "rotation": 0.0}
+        ]
+      }
+    ]
+  },
+  "pedido": {"kind": "master", "faixa": null, "overrides": {"mute_audio": true}}
+}

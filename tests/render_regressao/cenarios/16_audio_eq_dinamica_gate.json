@@ -1,0 +1,32 @@
+{
+  "schema": 1,
+  "id": "16_audio_eq_dinamica_gate",
+  "descricao": "EQ (HPF + low/mid/high), compressor em degraus e noise gate sobre rajadas",
+  "marcadores": ["render_golden", "paridade"],
+  "fps": 24,
+  "resolucao": [320, 180],
+  "fontes": {},
+  "sequencia": {
+    "version": 2,
+    "fps": 24,
+    "width": 320,
+    "height": 180,
+    "tracks": [{"id": "A1", "kind": "audio", "order": 0, "volume": 1.0}],
+    "clips": [
+      {
+        "id": "a_eq",
+        "type": "audio",
+        "track": "A1",
+        "timeline_start": 0.0,
+        "in": 0.0,
+        "out": 3.0,
+        "video_id": 1,
+        "effects": [
+          {"type": "audio_eq", "hpf": 250.0, "low": -9.0, "mid": 0.0, "high": 6.0},
+          {"type": "audio_dynamics", "gate_db": -90.0, "comp_ratio": 4.0, "comp_thresh_db": -18.0, "makeup_db": 0.0}
+        ]
+      }
+    ]
+  },
+  "pedido": {"kind": "master", "faixa": null, "overrides": {}}
+}

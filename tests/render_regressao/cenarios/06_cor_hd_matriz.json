@@ -1,0 +1,23 @@
+{
+  "schema": 1,
+  "id": "06_cor_hd_matriz",
+  "descricao": "Barras SMPTE 1280x720 com e sem tag BT.709: verificação de matriz e metadados no MP4 real",
+  "marcadores": ["render_golden", "paridade"],
+  "fps": 24,
+  "resolucao": [1280, 720],
+  "fontes": {"1": "smpte_hd_709.mp4", "2": "smpte_hd_semtag.mp4"},
+  "sequencia": {
+    "version": 2,
+    "fps": 24,
+    "width": 1280,
+    "height": 720,
+    "tracks": [{"id": "V1", "kind": "video", "order": 0}],
+    "clips": [
+      {"id": "hd1", "type": "video", "track": "V1", "timeline_start": 0.0, "in": 0.0, "out": 0.25, "video_id": 1}
+    ]
+  },
+  "pedido": {"kind": "master", "faixa": null, "overrides": {"mute_audio": true}},
+  "conhecidas": [
+    {"codigo": "HD_SEM_ETIQUETA_BT709", "motivo": "comando.py ainda não emite -colorspace bt709 / out_color_matrix=bt709 (entra no Estágio 4A Frente G1a)", "xfail": ["color_space_bt709"]}
+  ]
+}

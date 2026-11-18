@@ -7,13 +7,13 @@ trocam as midias por cores solidas lavfi e comparam o quadro exportado com a
 formula da W3C -- a asercao de texto do grafo deixou passar o blend errado
 (verde multiply sobre vermelho saia (0,123,0) em vez de (0,38,0)).
 """
-import math
 import shutil
 import subprocess
 
 import pytest
 
 from src.export.video_render import grafo_video, modelo
+from tests.render_regressao.oraculos import _esperado, _modo_w3c
 
 W, H, FPS = 160, 90, 30
 VERMELHO = (200, 40, 40)
@@ -22,37 +22,6 @@ CORES_VIDEO = {1: VERMELHO, 2: AZUL}
 TOLERANCIA = 6  # ida e volta por yuv420p
 
 pytestmark = pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="ffmpeg ausente")
-
-
-def _modo_w3c(modo, cb, cs):
-    b, s = cb / 255, cs / 255
-    if modo == "normal":
-        r = s
-    elif modo == "multiply":
-        r = b * s
-    elif modo == "screen":
-        r = b + s - b * s
-    elif modo == "overlay":
-        r = 2 * b * s if b <= 0.5 else 1 - 2 * (1 - b) * (1 - s)
-    elif modo == "darken":
-        r = min(b, s)
-    elif modo == "lighten":
-        r = max(b, s)
-    elif modo == "difference":
-        r = abs(b - s)
-    elif modo == "soft-light":
-        if s <= 0.5:
-            r = b - (1 - 2 * s) * b * (1 - b)
-        else:
-            d = ((16 * b - 12) * b + 4) * b if b <= 0.25 else math.sqrt(b)
-            r = b + (2 * s - 1) * (d - b)
-    else:
-        raise ValueError(modo)
-    return r * 255
-
-
-def _esperado(modo, fundo, cor, a):
-    return tuple((1 - a) * fundo[i] + a * _modo_w3c(modo, fundo[i], cor[i]) for i in range(3))
 
 
 def _matte(modo="normal", cor="#00ff00", ini=2.0, dur=4.0, fade_in=None, fade_out=None, **tf):

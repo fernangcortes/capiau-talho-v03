@@ -68,5 +68,5 @@ Este documento estabelece as regras permanentes e inegociáveis para a arquitetu
      - **Pista Inferior (V1):** Dois clipes contíguos de vídeo com transição de junção Cross Dissolve ativa no ponto de corte e ajustes individuais de cor.
    - **Critérios de Validação:**
      - **Frontend:** Execução sem falhas de `node tests/autoteste_composicao_multipista_cascata.mjs`.
-     - **Backend:** Execução sem falhas de `pytest tests/test_render_composicao_multipista_cascata.py`.
+     - **Backend:** Execução sem falhas de `pytest tests/test_render_composicao_multipista_cascata.py` e `pytest tests/render_regressao -k canonico`.
      - **Comportamento de Bypass:** Desativar a camada de ajuste superior restaura imediatamente a renderização intacta do crossfade inferior sem efeitos colaterais.

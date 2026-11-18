@@ -1,0 +1,24 @@
+{
+  "schema": 1,
+  "id": "08_blend_modes",
+  "descricao": "Modos de mesclagem W3C (multiply, screen, overlay, darken, lighten, difference, soft-light)",
+  "marcadores": ["render_golden", "paridade"],
+  "fps": 24,
+  "resolucao": [320, 180],
+  "fontes": {"1": "barras_a.mp4", "2": "barras_b.mp4"},
+  "sequencia": {
+    "version": 2,
+    "fps": 24,
+    "width": 320,
+    "height": 180,
+    "tracks": [
+      {"id": "V2", "kind": "video", "order": 0},
+      {"id": "V1", "kind": "video", "order": 1}
+    ],
+    "clips": [
+      {"id": "base", "type": "video", "track": "V1", "timeline_start": 0.0, "in": 0.0, "out": 2.0, "video_id": 1},
+      {"id": "topo", "type": "video", "kind": "color_matte", "color": "#3366cc", "blend_mode": "multiply", "track": "V2", "timeline_start": 0.0, "in": 0.0, "out": 2.0, "effects": [{"type": "fit", "mode": "fill"}]}
+    ]
+  },
+  "pedido": {"kind": "master", "faixa": null, "overrides": {"mute_audio": true}}
+}

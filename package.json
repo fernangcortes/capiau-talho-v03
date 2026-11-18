@@ -10,6 +10,7 @@
     "test:dock": "node tests/autoteste_dock_model.mjs && node tests/autoteste_dock_ops.mjs && node tests/autoteste_dock_drag.mjs && node tests/autoteste_dock_tearoff.mjs && node tests/autoteste_dock_join.mjs && node tests/autoteste_dock_group.mjs && node tests/autoteste_dock_tabs.mjs && node tests/autoteste_panel_collapse.mjs && node tests/autoteste_panel_rail.mjs",
     "test:nle:core": "node tests/autoteste_track_lock.mjs && node tests/autoteste_safe_margins.mjs && node tests/autoteste_match_frame.mjs && node tests/autoteste_aparencia.mjs && node tests/autoteste_welcome_hub.mjs",
     "test:shortcuts:check": "node scripts/gerar_atalhos.mjs --check",
+    "test:render:regressao": ".venv\\Scripts\\python.exe -m pytest tests/render_regressao -q",
     "test:ui:smoke": "npm run test:xss && npm run test:nle:0a && npm run test:nle:1a && npm run test:dock && npm run test:shortcuts:check"
   }
 }

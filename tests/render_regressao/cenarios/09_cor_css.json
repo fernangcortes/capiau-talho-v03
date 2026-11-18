@@ -1,0 +1,32 @@
+{
+  "schema": 1,
+  "id": "09_cor_css",
+  "descricao": "Filter Effects CSS (brilho, contraste, saturação, matiz, sépia, cinza, grampeamento e desfoque)",
+  "marcadores": ["render_golden", "paridade"],
+  "fps": 24,
+  "resolucao": [320, 180],
+  "fontes": {"1": "foto.png"},
+  "sequencia": {
+    "version": 2,
+    "fps": 24,
+    "width": 320,
+    "height": 180,
+    "tracks": [{"id": "V1", "kind": "video", "order": 0}],
+    "clips": [
+      {
+        "id": "c_cor",
+        "type": "photo",
+        "track": "V1",
+        "timeline_start": 0.0,
+        "in": 0.0,
+        "out": 1.0,
+        "photo_id": 1,
+        "effects": [
+          {"type": "fit", "mode": "fill"},
+          {"type": "color", "brightness": 50.0, "contrast": -40.0, "saturation": 130.0, "hue": 35.0, "sepia": 20.0, "grayscale": 10.0}
+        ]
+      }
+    ]
+  },
+  "pedido": {"kind": "master", "faixa": null, "overrides": {"mute_audio": true}}
+}

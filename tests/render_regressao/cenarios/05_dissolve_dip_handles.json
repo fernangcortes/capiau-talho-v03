@@ -1,0 +1,39 @@
+{
+  "schema": 1,
+  "id": "05_dissolve_dip_handles",
+  "descricao": "Dissolve com handles, hard_boundaries (tpad), clamping curto, dip preto e dip branco",
+  "marcadores": ["render_golden", "paridade"],
+  "fps": 24,
+  "resolucao": [320, 180],
+  "fontes": {"1": "barras_a.mp4", "2": "barras_b.mp4"},
+  "sequencia": {
+    "version": 2,
+    "fps": 24,
+    "width": 320,
+    "height": 180,
+    "tracks": [{"id": "V1", "kind": "video", "order": 0}],
+    "clips": [
+      {
+        "id": "c1",
+        "type": "video",
+        "track": "V1",
+        "timeline_start": 0.0,
+        "in": 0.0,
+        "out": 2.0,
+        "video_id": 1,
+        "effects": [{"type": "crossfade", "side": "out", "duration_s": 0.5, "transitionId": "tr_h", "transitionType": "video_cross_dissolve"}]
+      },
+      {
+        "id": "c2",
+        "type": "video",
+        "track": "V1",
+        "timeline_start": 2.0,
+        "in": 1.0,
+        "out": 3.0,
+        "video_id": 2,
+        "effects": [{"type": "crossfade", "side": "in", "duration_s": 0.5, "transitionId": "tr_h", "transitionType": "video_cross_dissolve"}]
+      }
+    ]
+  },
+  "pedido": {"kind": "master", "faixa": null, "overrides": {"mute_audio": true}}
+}

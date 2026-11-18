@@ -1,0 +1,39 @@
+{
+  "schema": 1,
+  "id": "14_audio_crossfade",
+  "descricao": "Ruído descorrelacionado A/B equal_power com e sem handles e seno correlacionado",
+  "marcadores": ["render_golden"],
+  "fps": 24,
+  "resolucao": [320, 180],
+  "fontes": {},
+  "sequencia": {
+    "version": 2,
+    "fps": 24,
+    "width": 320,
+    "height": 180,
+    "tracks": [{"id": "A1", "kind": "audio", "order": 0, "volume": 1.0}],
+    "clips": [
+      {
+        "id": "ca",
+        "type": "audio",
+        "track": "A1",
+        "timeline_start": 0.0,
+        "in": 0.0,
+        "out": 2.0,
+        "video_id": 1,
+        "effects": [{"type": "crossfade", "side": "out", "duration_s": 0.5, "transitionId": "tr_a", "curve": "equal_power"}]
+      },
+      {
+        "id": "cb",
+        "type": "audio",
+        "track": "A1",
+        "timeline_start": 2.0,
+        "in": 1.0,
+        "out": 3.0,
+        "video_id": 2,
+        "effects": [{"type": "crossfade", "side": "in", "duration_s": 0.5, "transitionId": "tr_a", "curve": "equal_power"}]
+      }
+    ]
+  },
+  "pedido": {"kind": "master", "faixa": null, "overrides": {}}
+}

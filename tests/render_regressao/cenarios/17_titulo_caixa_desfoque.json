@@ -1,0 +1,44 @@
+{
+  "schema": 1,
+  "id": "17_titulo_caixa_desfoque",
+  "descricao": "Título com caixa translúcida e backdrop-filter sobre barras (640x360, requires browser)",
+  "marcadores": ["render_golden", "needs_browser", "paridade"],
+  "fps": 24,
+  "resolucao": [640, 360],
+  "fontes": {"1": "barras_a.mp4"},
+  "sequencia": {
+    "version": 2,
+    "fps": 24,
+    "width": 640,
+    "height": 360,
+    "tracks": [
+      {"id": "T1", "kind": "text", "order": 0},
+      {"id": "V1", "kind": "video", "order": 1}
+    ],
+    "clips": [
+      {"id": "v1", "type": "video", "track": "V1", "timeline_start": 0.0, "in": 0.0, "out": 1.0, "video_id": 1},
+      {
+        "id": "gc1",
+        "type": "text",
+        "track": "T1",
+        "timeline_start": 0.0,
+        "in": 0.0,
+        "out": 1.0,
+        "text": "Fulana de Tal",
+        "fontFamily": "Inter",
+        "fontSize": 40,
+        "backgroundColor": "rgba(0,0,0,0.45)",
+        "boxPadding": 14,
+        "boxBorderRadius": 10,
+        "scale": 1.2,
+        "rotation": 5
+      }
+    ]
+  },
+  "pedido": {"kind": "master", "faixa": null, "overrides": {"mute_audio": true}},
+  "quadros_chave": [0, 12, 23],
+  "limiares": {
+    "estrito": {"psnr_min": 50.0, "max_abs": 2, "ssim_min": 0.995},
+    "deriva": {"psnr_min": 42.0, "max_abs": 6, "ssim_min": 0.985}
+  }
+}

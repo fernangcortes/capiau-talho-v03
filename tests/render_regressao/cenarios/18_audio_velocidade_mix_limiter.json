@@ -1,0 +1,24 @@
+{
+  "schema": 1,
+  "id": "18_audio_velocidade_mix_limiter",
+  "descricao": "Áudio 2x com e sem pitch_correction e soma multipista sob alimiter (-0.2 dBTP) e regras P3/P7",
+  "marcadores": ["render_golden"],
+  "fps": 24,
+  "resolucao": [320, 180],
+  "fontes": {},
+  "sequencia": {
+    "version": 2,
+    "fps": 24,
+    "width": 320,
+    "height": 180,
+    "tracks": [
+      {"id": "A1", "kind": "audio", "order": 0, "volume": 1.0},
+      {"id": "A2", "kind": "audio", "order": 1, "volume": 1.0}
+    ],
+    "clips": [
+      {"id": "a1", "type": "audio", "track": "A1", "timeline_start": 0.0, "in": 0.0, "out": 2.0, "speed": 2.0, "pitch_correction": true, "video_id": 1},
+      {"id": "a2", "type": "audio", "track": "A2", "timeline_start": 0.0, "in": 0.0, "out": 1.0, "video_id": 1}
+    ]
+  },
+  "pedido": {"kind": "master", "faixa": null, "overrides": {}}
+}

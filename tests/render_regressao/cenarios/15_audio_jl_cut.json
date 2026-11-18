@@ -1,0 +1,25 @@
+{
+  "schema": 1,
+  "id": "15_audio_jl_cut",
+  "descricao": "Par A/V com áudio adiantado (J-cut) e atrasado (L-cut) relativo ao corte visual",
+  "marcadores": ["render_golden"],
+  "fps": 24,
+  "resolucao": [320, 180],
+  "fontes": {"1": "barras_a.mp4"},
+  "sequencia": {
+    "version": 2,
+    "fps": 24,
+    "width": 320,
+    "height": 180,
+    "tracks": [
+      {"id": "V1", "kind": "video", "order": 0},
+      {"id": "A1", "kind": "audio", "order": 1, "volume": 1.0}
+    ],
+    "clips": [
+      {"id": "v1", "type": "video", "track": "V1", "timeline_start": 1.0, "in": 0.0, "out": 2.0, "video_id": 1},
+      {"id": "a_j", "type": "audio", "track": "A1", "timeline_start": 0.5, "in": 0.0, "out": 1.5, "video_id": 2},
+      {"id": "a_l", "type": "audio", "track": "A1", "timeline_start": 2.5, "in": 0.0, "out": 1.5, "video_id": 3}
+    ]
+  },
+  "pedido": {"kind": "master", "faixa": null, "overrides": {}}
+}

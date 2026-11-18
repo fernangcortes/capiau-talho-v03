@@ -1,0 +1,22 @@
+{
+  "schema": 1,
+  "id": "04_corte_trim_razor",
+  "descricao": "Cortes contíguos, trim com in/out > 0, gap preto inicial e faixa IN/OUT",
+  "marcadores": ["render_golden", "paridade"],
+  "fps": 24,
+  "resolucao": [320, 180],
+  "fontes": {"1": "barras_a.mp4", "2": "barras_b.mp4"},
+  "sequencia": {
+    "version": 2,
+    "fps": 24,
+    "width": 320,
+    "height": 180,
+    "tracks": [{"id": "V1", "kind": "video", "order": 0}],
+    "clips": [
+      {"id": "c1", "type": "video", "track": "V1", "timeline_start": 0.5, "in": 1.0, "out": 2.0, "video_id": 1},
+      {"id": "c2", "type": "video", "track": "V1", "timeline_start": 1.5, "in": 2.0, "out": 3.0, "video_id": 1},
+      {"id": "c3", "type": "video", "track": "V1", "timeline_start": 2.5, "in": 0.5, "out": 2.0, "video_id": 2}
+    ]
+  },
+  "pedido": {"kind": "master", "faixa": null, "overrides": {"mute_audio": true}}
+}

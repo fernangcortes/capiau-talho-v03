@@ -1,0 +1,26 @@
+{
+  "schema": 1,
+  "id": "03_velocidade_reverso_freeze",
+  "descricao": "Mapeamento de quadro de origem em 0.5x, 2x, reverso, freeze e rotação 90°",
+  "marcadores": ["render_golden", "paridade"],
+  "fps": 24,
+  "resolucao": [320, 180],
+  "fontes": {"1": "barras_a.mp4"},
+  "sequencia": {
+    "version": 2,
+    "fps": 24,
+    "width": 320,
+    "height": 180,
+    "tracks": [{"id": "V1", "kind": "video", "order": 0}],
+    "clips": [
+      {"id": "c_half", "type": "video", "track": "V1", "timeline_start": 0.0, "in": 0.0, "out": 0.5, "speed": 0.5, "video_id": 1},
+      {"id": "c_fast", "type": "video", "track": "V1", "timeline_start": 1.0, "in": 0.0, "out": 2.0, "speed": 2.0, "video_id": 1},
+      {"id": "c_rev", "type": "video", "track": "V1", "timeline_start": 2.0, "in": 0.0, "out": 2.0, "reverse": true, "video_id": 1},
+      {"id": "c_freeze", "type": "video", "track": "V1", "timeline_start": 4.0, "in": 0.0, "out": 1.0, "is_freeze": true, "freeze_time": 1.25, "video_id": 1}
+    ]
+  },
+  "pedido": {"kind": "master", "faixa": null, "overrides": {"mute_audio": true}},
+  "conhecidas": [
+    {"codigo": "REVERSO_UM_QUADRO", "motivo": "Fórmula do player (player.js:4540) usa out - offset enquanto export começa em out - 1 (decisão no Estágio 2C)", "xfail": ["reverse_formula_player"]}
+  ]
+}

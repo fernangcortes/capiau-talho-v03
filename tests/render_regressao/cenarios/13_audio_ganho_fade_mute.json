@@ -1,0 +1,33 @@
+{
+  "schema": 1,
+  "id": "13_audio_ganho_fade_mute",
+  "descricao": "Seno 1 kHz -20 dBFS: ganho de clipe, volume de pista, mute e fades por curva",
+  "marcadores": ["render_golden"],
+  "fps": 24,
+  "resolucao": [320, 180],
+  "fontes": {},
+  "sequencia": {
+    "version": 2,
+    "fps": 24,
+    "width": 320,
+    "height": 180,
+    "tracks": [{"id": "A1", "kind": "audio", "order": 0, "volume": 0.5, "muted": false}],
+    "clips": [
+      {
+        "id": "a1",
+        "type": "audio",
+        "track": "A1",
+        "timeline_start": 0.0,
+        "in": 0.0,
+        "out": 3.0,
+        "video_id": 1,
+        "effects": [
+          {"type": "volume", "level": 0.8},
+          {"type": "crossfade", "side": "in", "duration_s": 0.5, "curve": "linear"},
+          {"type": "crossfade", "side": "out", "duration_s": 0.5, "curve": "s_curve"}
+        ]
+      }
+    ]
+  },
+  "pedido": {"kind": "master", "faixa": null, "overrides": {}}
+}

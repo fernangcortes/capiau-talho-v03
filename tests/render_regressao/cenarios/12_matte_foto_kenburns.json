@@ -1,0 +1,49 @@
+{
+  "schema": 1,
+  "id": "12_matte_foto_kenburns",
+  "descricao": "Color matte com fade e foto PNG com Ken Burns easeInOut",
+  "marcadores": ["render_golden", "paridade"],
+  "fps": 24,
+  "resolucao": [320, 180],
+  "fontes": {"1": "foto.png"},
+  "sequencia": {
+    "version": 2,
+    "fps": 24,
+    "width": 320,
+    "height": 180,
+    "tracks": [
+      {"id": "V2", "kind": "video", "order": 0},
+      {"id": "V1", "kind": "video", "order": 1}
+    ],
+    "clips": [
+      {
+        "id": "foto_kb",
+        "type": "photo",
+        "track": "V1",
+        "timeline_start": 0.0,
+        "in": 0.0,
+        "out": 2.0,
+        "photo_id": 1,
+        "effects": [
+          {"type": "fit", "mode": "fill"},
+          {"type": "ken_burns", "easing": "easeInOut", "from": {"scale": 1.0, "x": 0.0, "y": 0.0}, "to": {"scale": 1.6, "x": 10.0, "y": -5.0}}
+        ]
+      },
+      {
+        "id": "matte_kb",
+        "type": "video",
+        "kind": "color_matte",
+        "color": "#ff3300",
+        "track": "V2",
+        "timeline_start": 0.5,
+        "in": 0.0,
+        "out": 1.0,
+        "effects": [
+          {"type": "fit", "mode": "fill"},
+          {"type": "transform", "opacity": 0.5, "scale": 0.4, "x": -30.0, "y": 25.0}
+        ]
+      }
+    ]
+  },
+  "pedido": {"kind": "master", "faixa": null, "overrides": {"mute_audio": true}}
+}

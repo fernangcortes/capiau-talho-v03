@@ -1,0 +1,100 @@
+{
+  "schema": 1,
+  "id": "01_canonico_cascata",
+  "descricao": "Camada de ajuste soft-light com fade sobre dissolve em V1 (cenário canônico multipista em cascata)",
+  "marcadores": ["render_golden", "paridade"],
+  "fps": 24,
+  "resolucao": [320, 180],
+  "fontes": {"1": "barras_a.mp4", "2": "barras_b.mp4"},
+  "sequencia": {
+    "version": 2,
+    "fps": 24,
+    "width": 320,
+    "height": 180,
+    "tracks": [
+      {"id": "V2", "kind": "video", "order": 0},
+      {"id": "V1", "kind": "video", "order": 1}
+    ],
+    "clips": [
+      {
+        "id": "clip_a",
+        "type": "video",
+        "track": "V1",
+        "timeline_start": 0.0,
+        "in": 0.0,
+        "out": 3.0,
+        "video_id": 1,
+        "effects": [
+          {"type": "color", "brightness": 10.0, "disabled": false},
+          {
+            "type": "crossfade",
+            "side": "out",
+            "duration_s": 0.5,
+            "transitionId": "tr_1",
+            "transitionType": "video_cross_dissolve",
+            "curve": "linear",
+            "tension": 0.0
+          }
+        ]
+      },
+      {
+        "id": "clip_b",
+        "type": "video",
+        "track": "V1",
+        "timeline_start": 3.0,
+        "in": 1.0,
+        "out": 4.0,
+        "video_id": 2,
+        "effects": [
+          {"type": "color", "contrast": 15.0, "disabled": false},
+          {
+            "type": "crossfade",
+            "side": "in",
+            "duration_s": 0.5,
+            "transitionId": "tr_1",
+            "transitionType": "video_cross_dissolve",
+            "curve": "linear",
+            "tension": 0.0
+          }
+        ]
+      },
+      {
+        "id": "adj_v2",
+        "type": "adjustment",
+        "kind": "adjustment",
+        "track": "V2",
+        "timeline_start": 2.0,
+        "in": 0.0,
+        "out": 2.5,
+        "blend_mode": "soft-light",
+        "effects": [
+          {"type": "color", "saturation": 150.0, "disabled": false},
+          {
+            "type": "crossfade",
+            "side": "in",
+            "duration_s": 0.5,
+            "transitionId": "",
+            "transitionType": "crossfade",
+            "curve": "s_curve",
+            "tension": 0.0
+          },
+          {
+            "type": "crossfade",
+            "side": "out",
+            "duration_s": 0.5,
+            "transitionId": "",
+            "transitionType": "crossfade",
+            "curve": "s_curve",
+            "tension": 0.0
+          }
+        ]
+      }
+    ]
+  },
+  "pedido": {"kind": "master", "faixa": null, "overrides": {"mute_audio": true}, "escopo": {}},
+  "quadros_chave": [12, 54, 60, 72, 83, 90, 102, 130, 143],
+  "limiares": {
+    "estrito": {"psnr_min": 50.0, "max_abs": 2, "ssim_min": 0.995},
+    "deriva": {"psnr_min": 42.0, "max_abs": 6, "ssim_min": 0.985}
+  }
+}

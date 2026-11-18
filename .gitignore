@@ -48,6 +48,7 @@ scratch/
 data_test_export/
 *.backup
 .tmp_test/
+tests/render_regressao/_saida/
 
 # Arquivos locais de projeto e infraestrutura de teste
 PROJECT.md

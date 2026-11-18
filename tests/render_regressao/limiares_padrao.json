@@ -1,0 +1,14 @@
+{
+  "estrito": {
+    "psnr_min": 50.0,
+    "max_abs": 2,
+    "ssim_min": 0.995,
+    "tira_falha_max": 0.01
+  },
+  "deriva": {
+    "psnr_min": 42.0,
+    "max_abs": 6,
+    "ssim_min": 0.985,
+    "tira_falha_max": 0.02
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "schema": 1,
+  "id": "07_ajuste_e_pistas",
+  "descricao": "Camada de ajuste multiply com fade/crop/empilhamento, bypass e três pistas simultâneas",
+  "marcadores": ["render_golden", "paridade"],
+  "fps": 24,
+  "resolucao": [320, 180],
+  "fontes": {"1": "barras_a.mp4", "2": "barras_b.mp4"},
+  "sequencia": {
+    "version": 2,
+    "fps": 24,
+    "width": 320,
+    "height": 180,
+    "tracks": [
+      {"id": "V3", "kind": "video", "order": 0},
+      {"id": "V2", "kind": "video", "order": 1},
+      {"id": "V1", "kind": "video", "order": 2}
+    ],
+    "clips": [
+      {"id": "v1_base", "type": "video", "track": "V1", "timeline_start": 0.0, "in": 0.0, "out": 3.0, "video_id": 1},
+      {"id": "v2_meio", "type": "video", "track": "V2", "timeline_start": 0.5, "in": 0.0, "out": 2.0, "video_id": 2, "effects": [{"type": "transform", "scale": 0.5, "x": -20.0, "y": 0.0}]},
+      {"id": "v3_topo", "type": "video", "kind": "color_matte", "color": "#00ff88", "track": "V3", "timeline_start": 1.0, "in": 0.0, "out": 1.0, "effects": [{"type": "fit", "mode": "fill"}, {"type": "transform", "scale": 0.35, "x": 25.0, "y": 0.0}]}
+    ]
+  },
+  "pedido": {"kind": "master", "faixa": null, "overrides": {"mute_audio": true}}
+}
