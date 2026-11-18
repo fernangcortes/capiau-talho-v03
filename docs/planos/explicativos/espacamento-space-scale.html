@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Controle de Espaçamento --space-scale — CapIAu-Talho</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    color-scheme: dark;
+    --space-scale: 1;
+    --sp-4: calc(4px * var(--space-scale));
+    --sp-6: calc(6px * var(--space-scale));
+    --sp-8: calc(8px * var(--space-scale));
+    --sp-12: calc(12px * var(--space-scale));
+    --sp-16: calc(16px * var(--space-scale));
+    --s0: #080808; --s1: #0e0e10; --s2: #141417; --s3: #1c1c21;
+    --line: rgba(255,255,255,.08); --line2: rgba(255,255,255,.16);
+    --fg: #f1f1f4; --fg2: #b8b8c4; --muted: #828290;
+    --accent: hsl(190, 90%, 55%); --accent-soft: hsla(190, 90%, 55%, .14);
+    --warn: hsl(38, 92%, 58%);
+    --f-head: 'Barlow Semi Condensed', sans-serif;
+    --f-body: 'Inter', system-ui, sans-serif;
+    --f-mono: 'IBM Plex Mono', monospace;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--s0); color: var(--fg); font: 400 13.5px/1.55 var(--f-body); }
+  .wrap { max-width: 1140px; margin: 0 auto; padding: 24px 20px 60px; }
+  .topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 8px; }
+  .back { color: var(--accent); text-decoration: none; font: 500 12px var(--f-mono); }
+  .tag { font: 500 11px var(--f-mono); padding: 3px 8px; border-radius: 4px; background: hsla(38,92%,58%,.14); color: var(--warn); }
+  h1 { font: 600 28px/1.15 var(--f-head); margin: 0 0 8px; }
+  .sub { color: var(--fg2); margin: 0 0 22px; max-width: 82ch; }
+  code { font-family: var(--f-mono); font-size: 12px; background: var(--s3); padding: 1px 5px; border-radius: 3px; }
+
+  .controls {
+    background: var(--s2); border: 1px solid var(--line); border-radius: 8px; padding: 16px;
+    display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 18px;
+  }
+  .controls input[type=range] { width: 220px; accent-color: var(--accent); }
+  .pbtn {
+    padding: 6px 10px; border-radius: 4px; border: 1px solid var(--line2); background: var(--s3);
+    color: var(--fg2); font: 500 12px var(--f-mono); cursor: pointer;
+  }
+  .pbtn.active { background: var(--accent-soft); color: var(--accent); border-color: hsla(190,90%,55%,.4); }
+
+  /* Preview NLE usando --sp-* reais */
+  .preview-shell {
+    background: var(--s1); border: 1px solid var(--line2); border-radius: 8px; overflow: hidden; margin-bottom: 22px;
+  }
+  .pv-hdr {
+    display: flex; align-items: center; gap: var(--sp-8); padding: var(--sp-8) var(--sp-12);
+    background: var(--s2); border-bottom: 1px solid var(--line);
+  }
+  .pv-btn {
+    padding: var(--sp-4) var(--sp-8); border-radius: 4px; border: 1px solid var(--line2);
+    background: var(--s3); color: var(--fg2); font: 500 12px var(--f-body);
+  }
+  .pv-grid { display: grid; grid-template-columns: 1fr 290px; }
+  @media (max-width: 800px) { .pv-grid { grid-template-columns: 1fr; } }
+  .pv-tl { padding: var(--sp-12); display: flex; flex-direction: column; gap: var(--sp-6); border-right: 1px solid var(--line); }
+  .pv-trk {
+    display: flex; gap: var(--sp-4); padding: var(--sp-4); background: var(--s2);
+    border: 1px solid var(--line); border-radius: 4px;
+  }
+  .pv-clip {
+    padding: var(--sp-6) var(--sp-8); border-radius: 3px; background: #1e3a5f; color: #dbeafe;
+    font: 500 11.5px var(--f-body);
+  }
+  .pv-insp { padding: var(--sp-12); display: flex; flex-direction: column; gap: var(--sp-8); background: var(--s2); }
+  .pv-field {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: var(--sp-6) var(--sp-8); background: var(--s3); border: 1px solid var(--line); border-radius: 4px;
+    font-size: 12px;
+  }
+  .pv-val { font: 500 12px var(--f-mono); color: var(--accent); }
+
+  .box { background: var(--s2); border: 1px solid var(--line); border-radius: 8px; padding: 18px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font: 600 11px var(--f-mono); color: var(--muted); text-transform: uppercase; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <a class="back" href="./index.html">← Voltar à Central</a>
+    <span class="tag">Decisão Adiada #2 · Antes de retomar Tema Neutro</span>
+  </div>
+
+  <h1>Controle de Espaçamento <code>--space-scale</code></h1>
+  <p class="sub">
+    <code>src/ui/theme.css:92-113</code> já define 19 degraus (<code>--sp-1</code> a <code>--sp-64</code>) multiplicados por <code>var(--space-scale, 1)</code>. Porém, a <code>AppearanceWindow</code> (<code>src/ui/js/appearanceWindow.js</code>) expõe escala de fonte (<code>--font-scale</code>), mas mantém <code>--space-scale</code> oculto em <code>1.0</code>. Teste abaixo o efeito real na densidade do NLE.
+  </p>
+
+  <div class="controls">
+    <label style="font:500 12px var(--f-mono);">--space-scale: <strong id="val-lbl" style="color:var(--accent)">1.00</strong></label>
+    <input type="range" id="rng" min="0.75" max="1.35" step="0.05" value="1">
+    <button class="pbtn" data-v="0.8">0.80 Compacto</button>
+    <button class="pbtn active" data-v="1">1.00 Padrão (3b)</button>
+    <button class="pbtn" data-v="1.2">1.20 Confortável</button>
+  </div>
+
+  <div class="preview-shell" id="shell">
+    <div class="pv-hdr">
+      <span style="font:600 13px var(--f-head)">PROGRAM · 1920×1080</span>
+      <button class="pv-btn">Cortar (C)</button>
+      <button class="pv-btn">Marcador (M)</button>
+      <button class="pv-btn" style="margin-left:auto;">Exportar</button>
+    </div>
+    <div class="pv-grid">
+      <div class="pv-tl">
+        <div class="pv-trk">
+          <div class="pv-clip" style="width:45%">V1 · Entrevista_01.mp4</div>
+          <div class="pv-clip" style="width:35%">V1 · B-Roll_Oficina.mp4</div>
+        </div>
+        <div class="pv-trk">
+          <div class="pv-clip" style="width:80%;background:#144536;color:#d1fae5">A1 · Lapela_Tratado.wav (-14 LUFS)</div>
+        </div>
+        <div style="font:400 11.5px var(--f-mono);color:var(--muted);margin-top:var(--sp-4);">
+          Degraus ativos: --sp-4=<span id="s4">4px</span> · --sp-8=<span id="s8">8px</span> · --sp-12=<span id="s12">12px</span>
+        </div>
+      </div>
+      <aside class="pv-insp">
+        <div style="font:600 13px var(--f-head)">INSPETOR · CLIPE</div>
+        <div class="pv-field"><span>Posição X / Y</span><span class="pv-val">0, 0 px</span></div>
+        <div class="pv-field"><span>Escala</span><span class="pv-val">100.0 %</span></div>
+        <div class="pv-field"><span>Volume</span><span class="pv-val">-2.4 dB</span></div>
+      </aside>
+    </div>
+  </div>
+
+  <div class="box">
+    <table>
+      <thead><tr><th>Decisão</th><th>Impacto Técnico</th><th>Recomendação</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><strong>Opção A: Expor 3 presets (0.85 / 1.00 / 1.15) na <code>AppearanceWindow</code></strong></td>
+          <td>Adiciona chave <code>ui.space_scale</code> em <code>settings_registry.py</code> + <code>themeManager.js</code>.</td>
+          <td>Útil para notebooks 1366×768 (0.85) ou telas 4K/touch (1.15), mas exige auditar <code>panelRail.js</code> e cabeçalhos fixos (<code>36px</code>) para não cortar texto.</td>
+        </tr>
+        <tr>
+          <td><strong>Opção B: Manter fixo em <code>1.0</code> (padrão Rodada 3b)</strong></td>
+          <td>Zero código novo; mantém a simetria do layout testado nos 79 autotestes.</td>
+          <td><strong>Recomendada agora:</strong> <code>--font-scale</code> já resolve legibilidade sem quebrar alinhamento milimétrico do dock.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+const root = document.documentElement;
+const rng = document.getElementById("rng");
+function apply(v) {
+  const n = parseFloat(v);
+  root.style.setProperty("--space-scale", n);
+  document.getElementById("val-lbl").textContent = n.toFixed(2);
+  document.getElementById("s4").textContent = `${(4*n).toFixed(1)}px`;
+  document.getElementById("s8").textContent = `${(8*n).toFixed(1)}px`;
+  document.getElementById("s12").textContent = `${(12*n).toFixed(1)}px`;
+  document.querySelectorAll(".pbtn").forEach(b => b.classList.toggle("active", Math.abs(parseFloat(b.dataset.v) - n) < 0.01));
+}
+rng.oninput = () => apply(rng.value);
+document.querySelectorAll(".pbtn").forEach(b => b.onclick = () => { rng.value = b.dataset.v; apply(b.dataset.v); });
+</script>
+</body>
+</html>

@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Política do Reverso (Quadro a Quadro) — CapIAu-Talho</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    color-scheme: dark;
+    --s0: #080808; --s1: #0e0e10; --s2: #141417; --s3: #1c1c21;
+    --line: rgba(255,255,255,.08); --line2: rgba(255,255,255,.16);
+    --fg: #f1f1f4; --fg2: #b8b8c4; --muted: #828290;
+    --accent: hsl(190, 90%, 55%); --ok: hsl(152, 58%, 50%); --warn: hsl(38, 92%, 58%); --err: hsl(340, 80%, 62%);
+    --f-head: 'Barlow Semi Condensed', sans-serif;
+    --f-body: 'Inter', system-ui, sans-serif;
+    --f-mono: 'IBM Plex Mono', monospace;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--s0); color: var(--fg); font: 400 13.5px/1.55 var(--f-body); }
+  .wrap { max-width: 1140px; margin: 0 auto; padding: 24px 20px 60px; }
+  .topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 8px; }
+  .back { color: var(--accent); text-decoration: none; font: 500 12px var(--f-mono); }
+  .tag { font: 500 11px var(--f-mono); padding: 3px 8px; border-radius: 4px; background: hsla(38,92%,58%,.14); color: var(--warn); }
+  h1 { font: 600 28px/1.15 var(--f-head); margin: 0 0 8px; }
+  .sub { color: var(--fg2); margin: 0 0 22px; max-width: 82ch; }
+  code { font-family: var(--f-mono); font-size: 12px; background: var(--s3); padding: 1px 5px; border-radius: 3px; }
+
+  .panel { background: var(--s2); border: 1px solid var(--line); border-radius: 8px; padding: 18px; margin-bottom: 18px; }
+  .scrub { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 16px; }
+  .scrub input[type=range] { flex: 1; min-width: 220px; accent-color: var(--accent); }
+  .frames-strip { display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px; margin-bottom: 18px; }
+  .fbox {
+    background: var(--s1); border: 1px solid var(--line); border-radius: 5px; padding: 10px 6px;
+    text-align: center; font: 500 12px var(--f-mono);
+  }
+  .fbox.player-hit { border-color: var(--err); background: hsla(340,80%,62%,.12); }
+  .fbox.export-hit { border-color: var(--ok); background: hsla(152,58%,50%,.12); }
+  .fbox.both-hit { border-color: var(--accent); background: hsla(190,90%,55%,.15); }
+  .fbox small { display: block; font-size: 10px; color: var(--muted); margin-top: 3px; }
+
+  .compare { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 750px) { .compare { grid-template-columns: 1fr; } }
+  .card { background: var(--s1); border: 1px solid var(--line2); border-radius: 6px; padding: 14px; }
+  .card h3 { margin: 0 0 8px; font: 600 16px var(--f-head); }
+  .big-num { font: 600 26px var(--f-mono); margin: 6px 0; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font: 600 11px var(--f-mono); color: var(--muted); text-transform: uppercase; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <a class="back" href="./index.html">← Voltar à Central</a>
+    <span class="tag">Decisão Adiada #3 · Estágio 2C (Defeito #6)</span>
+  </div>
+
+  <h1>Política do Reverso (Quadro a Quadro: Player × Export)</h1>
+  <p class="sub">
+    Para um clipe reverso de 8 quadros (<code>inFrame=10</code> até <code>outFrame=18</code> a 24 fps, intervalo semi-aberto <code>[10, 18)</code>): o Export (<code>modelo.py:172-174</code>) começa no quadro <strong>17</strong> (<code>out - 1</code>) e termina no <strong>10</strong>; já o Player (<code>player.js:4540</code>) calcula <code>outSec - offsetSec</code>, começando no quadro <strong>18</strong> (que pertence ao quadro seguinte fora do corte).
+  </p>
+
+  <div class="panel">
+    <div class="scrub">
+      <label style="font:500 12px var(--f-mono);">Posição na Timeline (<code>k</code>): <strong id="k-lbl" style="color:var(--accent)">0</strong> / 7</label>
+      <input type="range" id="rng-k" min="0" max="7" step="1" value="0">
+    </div>
+
+    <div style="font:500 11px var(--f-mono);color:var(--muted);margin-bottom:6px;">QUADROS REAIS DA FONTE NO INTERVALO [10..17] + QUADRO EXTRA 18:</div>
+    <div class="frames-strip" id="strip"></div>
+
+    <div class="compare">
+      <div class="card">
+        <h3 style="color:var(--err)">Player Atual (<code>player.js:4540</code>)</h3>
+        <div style="font:400 12px var(--f-mono);color:var(--muted);">rawSec = outSec - (k / fps)</div>
+        <div class="big-num" id="p-frame" style="color:var(--err)">Quadro #18</div>
+        <div id="p-note" style="font-size:12.5px;color:var(--fg2)"></div>
+      </div>
+      <div class="card">
+        <h3 style="color:var(--ok)">Export Atual (<code>modelo.py:172-174</code>)</h3>
+        <div style="font:400 12px var(--f-mono);color:var(--muted);">trecho = out_s - (k + 1) / fps</div>
+        <div class="big-num" id="e-frame" style="color:var(--ok)">Quadro #17</div>
+        <div id="e-note" style="font-size:12.5px;color:var(--fg2)"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <table>
+      <thead><tr><th>Decisão</th><th>Fórmula Resultante</th><th>Consequência</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><strong>Opção A (Recomendada): Alinhar Player ao Export (<code>out - 1</code>)</strong></td>
+          <td><code>outSec - offsetSec - (clipSpeed / fps)</code> (com clamp em <code>inSec</code>).</td>
+          <td><strong>Matematicamente exato:</strong> um corte <code>[10, 18)</code> tem exatamente os quadros 10..17 tanto no forward quanto no reverso. Zero vazamento do quadro 18.</td>
+        </tr>
+        <tr>
+          <td><strong>Opção B: Alinhar Export ao Player</strong></td>
+          <td>Deslocar <code>trecho_fonte</code> em <code>+1/fps</code> no reverso.</td>
+          <td>Vazaria o quadro <code>18</code> (que o editor não selecionou ao marcar Out) e deixaria o quadro <code>10</code> de fora.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+const IN_F = 10, OUT_F = 18;
+function update() {
+  const k = parseInt(document.getElementById("rng-k").value, 10);
+  document.getElementById("k-lbl").textContent = k;
+  const pf = OUT_F - k;
+  const ef = OUT_F - 1 - k;
+
+  document.getElementById("p-frame").textContent = `Quadro #${pf}`;
+  document.getElementById("e-frame").textContent = `Quadro #${ef}`;
+
+  document.getElementById("p-note").textContent = pf === 18
+    ? "⚠ Vazamento: quadro #18 está FORA do corte [10..17] (pertence ao próximo clipe/fim do arquivo)."
+    : `1 quadro adiantado em relação ao Export (mostra #${pf} enquanto Export renderiza #${ef}).`;
+  document.getElementById("e-note").textContent =
+    `Dentro do intervalo [10..17]. Sequência exata invertida: 17, 16, 15, 14, 13, 12, 11, 10.`;
+
+  const frames = [10,11,12,13,14,15,16,17,18];
+  const strip = document.getElementById("strip");
+  strip.style.gridTemplateColumns = "repeat(9, 1fr)";
+  strip.innerHTML = frames.map(f => {
+    const isP = f === pf, isE = f === ef;
+    const cls = isP && isE ? "both-hit" : isP ? "player-hit" : isE ? "export-hit" : "";
+    const tag = isP && isE ? "Ambos" : isP ? "Player" : isE ? "Export" : (f === 18 ? "Fora!" : "Fonte");
+    return `<div class="fbox ${cls}">#${f}<small>${tag}</small></div>`;
+  }).join("");
+}
+document.getElementById("rng-k").oninput = update;
+update();
+</script>
+</body>
+</html>

@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Timeline Clone &amp; Múltiplas Sequências Fantasmas — CapIAu-Talho</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    color-scheme: dark;
+    --s0: #080808; --s1: #0e0e10; --s2: #141417; --s3: #1c1c21; --s4: #26262d;
+    --line: rgba(255,255,255,.08); --line2: rgba(255,255,255,.16);
+    --fg: #f1f1f4; --fg2: #b8b8c4; --muted: #828290;
+    --accent: hsl(190, 90%, 55%); --accent-soft: hsla(190, 90%, 55%, .14);
+    --ok: hsl(152, 58%, 50%); --ok-soft: hsla(152, 58%, 50%, .14);
+    --warn: hsl(38, 92%, 58%); --warn-soft: hsla(38, 92%, 58%, .14);
+    --err: hsl(340, 80%, 62%); --err-soft: hsla(340, 80%, 62%, .14);
+    --purple: hsl(265, 80%, 68%); --purple-soft: hsla(265, 80%, 68%, .15);
+    --f-head: 'Barlow Semi Condensed', sans-serif;
+    --f-body: 'Inter', system-ui, sans-serif;
+    --f-mono: 'IBM Plex Mono', monospace;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--s0); color: var(--fg); font: 400 13.5px/1.55 var(--f-body); }
+  .wrap { max-width: 1200px; margin: 0 auto; padding: 24px 20px 60px; }
+  .topbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; }
+  .back { color: var(--accent); text-decoration: none; font: 500 12px var(--f-mono); }
+  .tag { font: 500 11px var(--f-mono); padding: 3px 8px; border-radius: 4px; background: var(--accent-soft); color: var(--accent); }
+  h1 { font: 600 28px/1.15 var(--f-head); margin: 0 0 8px; }
+  .sub { color: var(--fg2); margin: 0 0 22px; max-width: 82ch; }
+  code { font-family: var(--f-mono); font-size: 12px; background: var(--s3); padding: 1px 5px; border-radius: 3px; color: var(--fg); }
+
+  /* Simulador NLE */
+  .nle { background: var(--s1); border: 1px solid var(--line2); border-radius: 8px; overflow: hidden; margin-bottom: 24px; }
+  .nle-tabs { display: flex; align-items: center; background: var(--s2); border-bottom: 1px solid var(--line); padding: 6px 10px 0; gap: 4px; flex-wrap: wrap; }
+  .seq-tab {
+    padding: 7px 12px; border: 1px solid transparent; border-bottom: none; border-radius: 6px 6px 0 0;
+    background: transparent; color: var(--muted); font: 500 12px var(--f-body); cursor: pointer; display: flex; align-items: center; gap: 6px;
+  }
+  .seq-tab.active { background: var(--s1); color: var(--fg); border-color: var(--line); }
+  .seq-tab .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); }
+  .seq-tab.clone .dot { background: var(--purple); }
+  .seq-tab.clone2 .dot { background: var(--accent); }
+  .seq-tab.base .dot { background: var(--ok); }
+  .mode-bar { margin-left: auto; display: flex; gap: 4px; padding-bottom: 6px; }
+  .mode-btn {
+    padding: 4px 10px; border-radius: 4px; border: 1px solid var(--line); background: var(--s3); color: var(--fg2);
+    font: 500 11px var(--f-mono); cursor: pointer;
+  }
+  .mode-btn.active { background: var(--accent-soft); color: var(--accent); border-color: hsla(190,90%,55%,.4); }
+
+  .nle-body { display: grid; grid-template-columns: 1fr 330px; min-height: 360px; }
+  @media (max-width: 900px) { .nle-body { grid-template-columns: 1fr; } }
+
+  .left-pane { display: flex; flex-direction: column; border-right: 1px solid var(--line); }
+  .program {
+    background: #050507; padding: 14px; border-bottom: 1px solid var(--line);
+    display: grid; grid-template-columns: 1fr; gap: 10px;
+  }
+  .program.ab { grid-template-columns: 1fr 1fr; }
+  .monitor {
+    background: linear-gradient(135deg, #13161d, #0b0c10); border: 1px solid var(--line);
+    border-radius: 6px; padding: 14px; min-height: 120px; display: flex; flex-direction: column; justify-content: space-between;
+  }
+  .mon-head { display: flex; justify-content: space-between; font: 500 11px var(--f-mono); color: var(--muted); }
+  .mon-frame { text-align: center; padding: 12px 0; }
+  .mon-title { font: 600 16px var(--f-head); color: var(--fg); }
+  .mon-desc { font: 400 12px var(--f-mono); color: var(--accent); margin-top: 4px; }
+
+  .timeline { padding: 12px; display: flex; flex-direction: column; gap: 8px; flex: 1; }
+  .track { display: grid; grid-template-columns: 54px 1fr; gap: 8px; align-items: center; }
+  .trk-lbl { font: 500 11px var(--f-mono); color: var(--muted); text-align: right; padding-right: 4px; }
+  .trk-lane {
+    height: 36px; background: var(--s2); border: 1px solid var(--line); border-radius: 4px;
+    position: relative; display: flex; align-items: center; padding: 3px; gap: 3px; overflow: hidden;
+  }
+  .clip {
+    height: 100%; border-radius: 3px; padding: 0 8px; display: flex; align-items: center;
+    font: 500 11px var(--f-body); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    border: 1px solid rgba(255,255,255,.12);
+  }
+  .clip.v { background: #1e3a5f; color: #dbeafe; }
+  .clip.a { background: #144536; color: #d1fae5; }
+  .clip.add { background: var(--ok-soft); border: 1px dashed var(--ok); color: var(--ok); }
+  .clip.mod { background: var(--warn-soft); border: 1px dashed var(--warn); color: var(--warn); }
+  .clip.del { background: var(--err-soft); border: 1px dashed var(--err); color: var(--err); text-decoration: line-through; }
+  .clip.dim { opacity: .35; }
+
+  /* Changes Drawer */
+  .changes { background: var(--s2); display: flex; flex-direction: column; }
+  .ch-head { padding: 10px 12px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center; }
+  .ch-head h3 { margin: 0; font: 600 14px var(--f-head); letter-spacing: .02em; }
+  .ch-list { padding: 10px; display: flex; flex-direction: column; gap: 8px; overflow-y: auto; flex: 1; }
+  .ch-item { background: var(--s3); border: 1px solid var(--line); border-radius: 6px; padding: 9px 10px; }
+  .ch-item.accepted { border-color: hsla(152,58%,50%,.45); background: hsla(152,58%,50%,.06); }
+  .ch-item.rejected { opacity: .45; }
+  .ch-top { display: flex; justify-content: space-between; align-items: center; font: 500 11px var(--f-mono); margin-bottom: 4px; }
+  .ch-desc { font-size: 12px; color: var(--fg2); margin-bottom: 8px; }
+  .ch-btns { display: flex; gap: 6px; }
+  .sbtn {
+    padding: 4px 8px; border-radius: 4px; border: 1px solid var(--line); background: var(--s4);
+    color: var(--fg2); font: 500 11px var(--f-body); cursor: pointer;
+  }
+  .sbtn.ok:hover, .sbtn.ok.on { background: var(--ok-soft); color: var(--ok); border-color: hsla(152,58%,50%,.4); }
+  .sbtn.no:hover, .sbtn.no.on { background: var(--err-soft); color: var(--err); border-color: hsla(340,80%,62%,.4); }
+  .ch-foot { padding: 10px 12px; border-top: 1px solid var(--line); display: flex; gap: 8px; }
+  .btn-primary {
+    flex: 1; padding: 8px; border-radius: 5px; border: 1px solid hsla(152,58%,50%,.4);
+    background: var(--ok-soft); color: var(--ok); font: 600 12px var(--f-body); cursor: pointer;
+  }
+  .btn-undo {
+    padding: 8px 10px; border-radius: 5px; border: 1px solid var(--line2);
+    background: var(--s3); color: var(--fg2); font: 500 12px var(--f-body); cursor: pointer;
+  }
+
+  /* Seções explicativas */
+  .cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; margin-bottom: 20px; }
+  .box { background: var(--s2); border: 1px solid var(--line); border-radius: 8px; padding: 18px; }
+  .box h2 { font: 600 18px var(--f-head); margin: 0 0 10px; }
+  .box ul { margin: 0; padding-left: 18px; color: var(--fg2); }
+  .box li { margin-bottom: 6px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--line); }
+  th { font: 600 12px var(--f-mono); color: var(--muted); text-transform: uppercase; }
+  .status-log { font: 400 12px var(--f-mono); color: var(--accent); padding: 6px 12px; background: var(--s1); border-top: 1px solid var(--line); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <a class="back" href="./index.html">← Voltar à Central</a>
+    <span class="tag">Diretriz Definida · Estágios 1A, 2D e 3B</span>
+  </div>
+
+  <h1>Edição da IA / MCP em Timeline "Clone" (Múltiplas Sequências Fantasmas)</h1>
+  <p class="sub">
+    Em vez de sugerir itens soltos na pista travada <code>AI</code> (onde cliques falham em <code>D1</code>, posições envelhecem no primeiro ripple e não há playback), a IA e os clientes MCP editam diretamente em <strong>clones isolados</strong> sobre <code>TimelineSequenceState</code>. O editor assiste, compara em A/B, aceita por bloco e desfaz o turno inteiro com 1 Ctrl+Z.
+  </p>
+
+  <!-- Simulador Interativo -->
+  <div class="nle">
+    <div class="nle-tabs">
+      <button class="seq-tab base" data-seq="base"><span class="dot"></span>Corte_v3 (Base)</button>
+      <button class="seq-tab clone active" data-seq="clone1"><span class="dot"></span>Clone · Diretora (Ritmo)</button>
+      <button class="seq-tab clone2" data-seq="clone2"><span class="dot"></span>Clone · Sound Designer (J-Cuts)</button>
+      <div class="mode-bar">
+        <button class="mode-btn active" data-mode="aba">1. Aba (Clone)</button>
+        <button class="mode-btn" data-mode="ab">2. Contracampo A/B</button>
+        <button class="mode-btn" data-mode="diff">3. Sobreposição (Diff)</button>
+      </div>
+    </div>
+
+    <div class="nle-body">
+      <div class="left-pane">
+        <div class="program" id="program-area"></div>
+        <div class="timeline" id="timeline-area"></div>
+        <div class="status-log" id="status-log">Estado: Visualizando Clone · Diretora (Ritmo) no modo Aba. Base intacta em TimelineSequenceState#1.</div>
+      </div>
+
+      <aside class="changes">
+        <div class="ch-head">
+          <h3>Changes (CutVoke / Turno IA)</h3>
+          <span class="tag" id="ch-count">3 blocos</span>
+        </div>
+        <div class="ch-list" id="ch-list"></div>
+        <div class="ch-foot">
+          <button class="btn-primary" id="btn-apply">Aplicar Aceitos na Base</button>
+          <button class="btn-undo" id="btn-undo" title="Undo atômico por turno">↺ Undo Turno</button>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <div class="cols">
+    <div class="box">
+      <h2>Por que o fluxo atual trava (<code>7e82b92</code>)</h2>
+      <ul>
+        <li><strong><code>D1</code>:</strong> <code>timelineRenderer.js</code> desenha ghosts na V2, mas <code>timelineInteraction.js:582-613</code> só faz hit-test na pista <code>"ai"</code>.</li>
+        <li><strong><code>D2</code> + Bypass:</strong> <code>suggestions_output</code> vazio, <code>in</code> vs <code>in_s</code> gera <code>NaN</code>, e <code>chat_agent.py:2275</code> aplica <code>SET_AV_OFFSET</code> e <code>ADD_EFFECT</code> sem <code>is_preview = True</code>.</li>
+        <li><strong>Sem Playback:</strong> não é possível dar Play em uma proposta de J-cut, aparo ou reordenação.</li>
+      </ul>
+    </div>
+    <div class="box">
+      <h2>Arquitetura em 3 Camadas (Sem Retrabalho)</h2>
+      <ul>
+        <li><strong>Estágio 1A (<code>TimelineSequenceState</code>):</strong> extrai estado + <code>history</code> por instância mantendo <code>TIMELINE_STATE</code> como fachada para os 44 autotestes.</li>
+        <li><strong>Estágio 2D (Task 25):</strong> múltiplas abas de sequência no SQLite e <code>renderCache.js</code> escopado por <code>sequence_id</code>.</li>
+        <li><strong>Estágio 3B (MCP + Clone):</strong> <code>get_editor_state</code>, <code>preview_compare</code>, gravação exclusiva no clone e <em>merge</em> atômico em 1 entrada no <code>TIMELINE_HISTORY</code>.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="box">
+    <h2>Pontos de Decisão Fina de UX (para confirmar antes do Estágio 3B)</h2>
+    <table>
+      <thead><tr><th>Questão de UX</th><th>Opção Recomendada</th><th>Alternativa</th></tr></thead>
+      <tbody>
+        <tr><td>Onde o agente escreve por padrão quando chamado via Chat ou MCP?</td><td>Cria/reutiliza clone <code>[IA] Nome da Tarefa</code> automaticamente</td><td>Exigir comando explícito para clonar</td></tr>
+        <tr><td>Se o editor alterar a Base enquanto o Clone está aberto:</td><td>Marcar clone como <em>desatualizado</em> e oferecer rebase/diff por bloco</td><td>Travar edição na Base durante turno IA</td></tr>
+        <tr><td>Persistência dos clones no projeto (SQLite):</td><td>Salvar com flag <code>is_ghost_clone = 1</code> + TTL/arquivamento fácil</td><td>Manter só em memória/localStorage</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+const SEQS = {
+  base: {
+    label: "Corte_v3 (Base)",
+    frameTitle: "00:00:14:08 · Entrevista Ana (Plano Médio)",
+    frameDesc: "V1: Cam_A_004 | A1: Mic_Lapela (-14 LUFS)",
+    tracks: {
+      V2: [],
+      V1: [{cls:"v", w:38, t:"Ana_01 (00:00–00:12)"}, {cls:"v", w:34, t:"Ana_02 (00:12–00:22)"}, {cls:"v", w:28, t:"Oficina_03"}],
+      A1: [{cls:"a", w:38, t:"Fala Ana 01"}, {cls:"a", w:34, t:"Fala Ana 02"}, {cls:"a", w:28, t:"Ambiente"}]
+    },
+    changes: []
+  },
+  clone1: {
+    label: "Clone · Diretora (Ritmo)",
+    frameTitle: "00:00:14:08 · B-Roll Oficina cobrindo respiro",
+    frameDesc: "V2: B-Roll_Maos_07 (ADD) | V1: Ana_02 aparado -18f",
+    tracks: {
+      V2: [{cls:"v dim", w:22, t:""}, {cls:"add", w:28, t:"+ B-Roll Mãos 07 (V2)"}],
+      V1: [{cls:"v", w:38, t:"Ana_01"}, {cls:"mod", w:26, t:"Ana_02 (-18f aparo)"}, {cls:"del", w:12, t:"Silêncio"}, {cls:"v", w:24, t:"Oficina_03"}],
+      A1: [{cls:"a", w:38, t:"Fala Ana 01"}, {cls:"mod", w:26, t:"Fala Ana 02"}, {cls:"a", w:24, t:"Ambiente"}]
+    },
+    changes: [
+      {id:"c1", tag:"INSERT V2", desc:"Cobrir respiro de 2.4s com B-Roll Mãos 07.", state:"pending"},
+      {id:"c2", tag:"TRIM V1+A1", desc:"Aparar 18 quadros de pausa morta no final de Ana_02.", state:"pending"},
+      {id:"c3", tag:"DELETE", desc:"Remover trecho de silêncio (1.1s) entre falas.", state:"pending"}
+    ]
+  },
+  clone2: {
+    label: "Clone · Sound Designer (J-Cuts)",
+    frameTitle: "00:00:11:20 · J-Cut antecipando fala em 12 quadros",
+    frameDesc: "A1: J-Cut (-12f) + Ducking -6 dB na trilha A2",
+    tracks: {
+      V2: [],
+      V1: [{cls:"v", w:38, t:"Ana_01"}, {cls:"v", w:34, t:"Ana_02"}, {cls:"v", w:28, t:"Oficina_03"}],
+      A1: [{cls:"a", w:32, t:"Fala Ana 01"}, {cls:"mod", w:40, t:"← J-Cut Fala Ana 02 (-12f)"}, {cls:"add", w:28, t:"+ Ducking -6dB"}]
+    },
+    changes: [
+      {id:"s1", tag:"J-CUT A1", desc:"Antecipar áudio de Ana_02 em 12 quadros sob o plano anterior.", state:"pending"},
+      {id:"s2", tag:"DUCKING A2", desc:"Aplicar redução determinística de -6 dB durante a fala.", state:"pending"}
+    ]
+  }
+};
+
+let activeSeq = "clone1";
+let activeMode = "aba";
+
+function render() {
+  const seq = SEQS[activeSeq];
+  const prog = document.getElementById("program-area");
+  prog.className = "program" + (activeMode === "ab" ? " ab" : "");
+  if (activeMode === "ab") {
+    prog.innerHTML = `
+      <div class="monitor">
+        <div class="mon-head"><span>A · BASE (Corte_v3)</span><span>24 fps</span></div>
+        <div class="mon-frame"><div class="mon-title">${SEQS.base.frameTitle}</div><div class="mon-desc">${SEQS.base.frameDesc}</div></div>
+      </div>
+      <div class="monitor" style="border-color: hsla(190,90%,55%,.45)">
+        <div class="mon-head"><span>B · ${seq.label.toUpperCase()}</span><span>SYNC</span></div>
+        <div class="mon-frame"><div class="mon-title">${seq.frameTitle}</div><div class="mon-desc">${seq.frameDesc}</div></div>
+      </div>`;
+  } else {
+    prog.innerHTML = `
+      <div class="monitor">
+        <div class="mon-head"><span>PROGRAM · ${seq.label.toUpperCase()}</span><span>Modo: ${activeMode.toUpperCase()}</span></div>
+        <div class="mon-frame"><div class="mon-title">${seq.frameTitle}</div><div class="mon-desc">${seq.frameDesc}</div></div>
+      </div>`;
+  }
+
+  const tl = document.getElementById("timeline-area");
+  tl.innerHTML = ["V2", "V1", "A1"].map(trk => `
+    <div class="track">
+      <div class="trk-lbl">${trk}</div>
+      <div class="trk-lane">
+        ${seq.tracks[trk].map(c => `<div class="clip ${c.cls}" style="width:${c.w}%">${c.t}</div>`).join("")}
+      </div>
+    </div>`).join("");
+
+  const chList = document.getElementById("ch-list");
+  document.getElementById("ch-count").textContent = seq.changes.length ? `${seq.changes.length} blocos` : "Base ativa";
+  chList.innerHTML = seq.changes.length ? seq.changes.map(ch => `
+    <div class="ch-item ${ch.state}">
+      <div class="ch-top"><span>${ch.tag}</span><span>${ch.state.toUpperCase()}</span></div>
+      <div class="ch-desc">${ch.desc}</div>
+      <div class="ch-btns">
+        <button class="sbtn ok ${ch.state==='accepted'?'on':''}" onclick="setChange('${ch.id}','accepted')">✓ Aceitar</button>
+        <button class="sbtn no ${ch.state==='rejected'?'on':''}" onclick="setChange('${ch.id}','rejected')">✕ Recusar</button>
+      </div>
+    </div>`).join("") : `<div style="color:var(--muted);font-size:12px;padding:8px;">Selecione uma aba Clone para revisar propostas da IA.</div>`;
+}
+
+window.setChange = (id, state) => {
+  const item = SEQS[activeSeq].changes.find(c => c.id === id);
+  if (item) item.state = (item.state === state ? "pending" : state);
+  render();
+};
+
+document.querySelectorAll(".seq-tab").forEach(btn => btn.onclick = () => {
+  document.querySelectorAll(".seq-tab").forEach(b => b.classList.remove("active"));
+  btn.classList.add("active");
+  activeSeq = btn.dataset.seq;
+  document.getElementById("status-log").textContent = `Estado: Visualizando ${SEQS[activeSeq].label} no modo ${activeMode}.`;
+  render();
+});
+
+document.querySelectorAll(".mode-btn").forEach(btn => btn.onclick = () => {
+  document.querySelectorAll(".mode-btn").forEach(b => b.classList.remove("active"));
+  btn.classList.add("active");
+  activeMode = btn.dataset.mode;
+  document.getElementById("status-log").textContent = `Modo alterado para ${btn.textContent}.`;
+  render();
+});
+
+document.getElementById("btn-apply").onclick = () => {
+  const acc = SEQS[activeSeq].changes.filter(c => c.state === "accepted").length;
+  document.getElementById("status-log").textContent = acc
+    ? `✓ ${acc} bloco(s) aplicados atomicamente em Corte_v3 (1 entrada criada no TIMELINE_HISTORY).`
+    : "Marque ao menos 1 bloco como Aceito para simular a aplicação.";
+};
+
+document.getElementById("btn-undo").onclick = () => {
+  SEQS[activeSeq].changes.forEach(c => c.state = "pending");
+  document.getElementById("status-log").textContent = "↺ Undo atômico executado: estado restaurado para antes do turno da IA.";
+  render();
+};
+
+render();
+</script>
+</body>
+</html>

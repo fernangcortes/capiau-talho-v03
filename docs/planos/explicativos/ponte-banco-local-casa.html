@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ponte Banco Local × Banco de Casa (E1.T9) — CapIAu-Talho</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    color-scheme: dark;
+    --s0: #080808; --s1: #0e0e10; --s2: #141417; --s3: #1c1c21;
+    --line: rgba(255,255,255,.08); --line2: rgba(255,255,255,.16);
+    --fg: #f1f1f4; --fg2: #b8b8c4; --muted: #828290;
+    --accent: hsl(190, 90%, 55%); --ok: hsl(152, 58%, 50%); --warn: hsl(38, 92%, 58%); --err: hsl(340, 80%, 62%);
+    --f-head: 'Barlow Semi Condensed', sans-serif;
+    --f-body: 'Inter', system-ui, sans-serif;
+    --f-mono: 'IBM Plex Mono', monospace;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--s0); color: var(--fg); font: 400 13.5px/1.55 var(--f-body); }
+  .wrap { max-width: 1140px; margin: 0 auto; padding: 24px 20px 60px; }
+  .topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 8px; }
+  .back { color: var(--accent); text-decoration: none; font: 500 12px var(--f-mono); }
+  .tag { font: 500 11px var(--f-mono); padding: 3px 8px; border-radius: 4px; background: hsla(38,92%,58%,.14); color: var(--warn); }
+  h1 { font: 600 28px/1.15 var(--f-head); margin: 0 0 8px; }
+  .sub { color: var(--fg2); margin: 0 0 22px; max-width: 82ch; }
+  code { font-family: var(--f-mono); font-size: 12px; background: var(--s3); padding: 1px 5px; border-radius: 3px; }
+
+  .tabs { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+  .tbtn {
+    padding: 8px 14px; border-radius: 6px; border: 1px solid var(--line2); background: var(--s2);
+    color: var(--fg2); font: 500 13px var(--f-body); cursor: pointer;
+  }
+  .tbtn.active { background: hsla(190,90%,55%,.14); color: var(--accent); border-color: hsla(190,90%,55%,.45); }
+
+  .flow-box { background: var(--s2); border: 1px solid var(--line); border-radius: 8px; padding: 20px; margin-bottom: 20px; }
+  .steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; margin: 14px 0; }
+  .step { background: var(--s1); border: 1px solid var(--line); border-radius: 6px; padding: 12px; }
+  .step-num { font: 600 11px var(--f-mono); color: var(--accent); margin-bottom: 4px; }
+  .step h4 { margin: 0 0 6px; font: 600 15px var(--f-head); }
+  .step p { margin: 0; font-size: 12.5px; color: var(--fg2); }
+
+  .alert {
+    padding: 12px 14px; border-radius: 6px; border: 1px solid hsla(340,80%,62%,.35);
+    background: hsla(340,80%,62%,.08); color: var(--fg2); font-size: 13px; margin-bottom: 18px;
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font: 600 11px var(--f-mono); color: var(--muted); text-transform: uppercase; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <a class="back" href="./index.html">← Voltar à Central</a>
+    <span class="tag">Decisão Adiada #5 · E1.T9 / Estágio 6D</span>
+  </div>
+
+  <h1>Ponte Banco Local × Banco de Casa (<code>E1.T9</code>)</h1>
+  <p class="sub">
+    Comparativo dos fluxos para conciliar o banco desenvolvido em paralelo com o banco principal de casa (~506 vídeos + análises antigas), evitando perda silenciosa de dados.
+  </p>
+
+  <div class="alert">
+    <strong>Por que o <code>sync.py</code> atual (<code>7e82b92</code>) NÃO pode ser usado antes do Estágio 1B:</strong>
+    exporta apenas <strong>12 de 30 tabelas</strong>, grava o SQLite antes dos arquivos com IDs antigos, escreve <code>photo_{id}.webp</code> em vez de <code>proxy_photo_{id}.webp</code>, muta o hash com <code>_imp_</code> e quebra em <code>sequence_json</code> v2 (<code>sync.py:206-213</code> itera <code>dict</code> esperando <code>list</code> e engole o <code>AttributeError</code>).
+  </div>
+
+  <div class="tabs">
+    <button class="tbtn active" onclick="showFlow('sync', this)">Fluxo A: <code>sync.py</code> Corrigido (Estágio 1B)</button>
+    <button class="tbtn" onclick="showFlow('dump', this)">Fluxo B: Dump / Merge SQLite Direto</button>
+    <button class="tbtn" onclick="showFlow('hybrid', this)">Fluxo C: Híbrido (Recomendado p/ E1.T9)</button>
+  </div>
+
+  <div class="flow-box" id="flow-view"></div>
+
+  <div class="flow-box">
+    <table>
+      <thead><tr><th>Critério</th><th><code>sync.py</code> Corrigido</th><th>Dump / Merge SQLite</th></tr></thead>
+      <tbody>
+        <tr><td>Escopo ideal</td><td>Mover <strong>1 projeto</strong> entre máquinas (portátil com proxies/transcripts).</td><td>Reconciliar <strong>acervo inteiro</strong> (506+ vídeos, rostos, pessoas, cenas) na <code>E1.T9</code>.</td></tr>
+        <tr><td>Tratamento de IDs</td><td>Remapeia PKs/FKs na importação e copia arquivos após mapear IDs.</td><td>Exige script de merge por <code>file_hash</code> + reindexação Qdrant.</td></tr>
+        <tr><td>Vetores Qdrant</td><td>Reinsere payloads por projeto (não engolir exceções).</td><td>Copia coleção local ou roda <code>/api/search/reindex</code> no destino.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+const FLOWS = {
+  sync: {
+    title: "Fluxo A: Pacote Portátil via sync.py Corrigido (Estágio 1B)",
+    desc: "Ideal para levar ou trazer um projeto específico sem tocar no resto do banco.",
+    steps: [
+      {n:"1. EXPORT", t:"30 Tabelas + v2", p:"Exportar todas as 30 tabelas do projeto, lendo sequence_json v2 (dict) sem mutar hashes."},
+      {n:"2. MÍDIA", t:"Proxies Corretos", p:"Empacotar proxy_photo_{id}.webp, proxies de vídeo e thumbnails com limites contra zip-bomb."},
+      {n:"3. IMPORT", t:"Mapear IDs antes do Commit", p:"Inserir registros em transação única mapeando old_id → new_id antes de mover arquivos."},
+      {n:"4. QDRANT", t:"Sync Vetorial Explícito", p:"Atualizar Qdrant com os novos IDs e falhar explicitamente se houver erro de coleção."}
+    ]
+  },
+  dump: {
+    title: "Fluxo B: Dump / Merge Direto de SQLite + Reindexação",
+    desc: "Ideal quando as duas máquinas têm análises pesadas diferentes sobre o mesmo acervo bruto.",
+    steps: [
+      {n:"1. SNAPSHOT", t:"PRAGMA user_version", p:"Garantir que ambos os bancos estão na mesma versão de schema (NUV.43)."},
+      {n:"2. CHAVE NATURAL", t:"Match por file_hash", p:"Casar vídeos/fotos pelo SHA/hash original (sem sufixo _imp_) para evitar duplicatas."},
+      {n:"3. MERGE SELETIVO", t:"Preferência por Timestamp", p:"Mesclar transcript, face, scene e system1_decisao preservando edições mais recentes."},
+      {n:"4. REBUILD", t:"Reindexar Qdrant", p:"Reconstruir coleções locais (capiau_videos, capiau_images) a partir do SQLite consolidado."}
+    ]
+  },
+  hybrid: {
+    title: "Fluxo C: Híbrido (Recomendado para E1.T9 no Estágio 6D)",
+    desc: "Combina a segurança do Merge para o acervo histórico com o sync.py corrigido para projetos novos.",
+    steps: [
+      {n:"1. BASE", t:"Saneamento no Estágio 1B", p:"Corrigir sync.py (30 tabelas + v2 + proxy_photo_) e adicionar PRAGMA user_version."},
+      {n:"2. CHECK", t:"Dry-Run de E1.T9", p:"Rodar script de auditoria comparando file_hash entre banco local e banco de casa."},
+      {n:"3. CONCILIAÇÃO", t:"Merge de Acervo + sync.py", p:"Aplicar merge de metadados no banco principal e importar projetos isolados via sync.py."},
+      {n:"4. VALIDAÇÃO", t:"Contagem + Busca", p:"Validar contagem de 506+ vídeos, rostos e rodar /api/search/reindex."}
+    ]
+  }
+};
+
+window.showFlow = (key, btn) => {
+  document.querySelectorAll(".tbtn").forEach(b => b.classList.remove("active"));
+  if (btn) btn.classList.add("active");
+  const f = FLOWS[key];
+  document.getElementById("flow-view").innerHTML = `
+    <h2 style="font:600 20px var(--f-head);margin:0 0 6px;">${f.title}</h2>
+    <p style="margin:0 0 12px;color:var(--fg2);">${f.desc}</p>
+    <div class="steps">
+      ${f.steps.map(s => `<div class="step"><div class="step-num">${s.n}</div><h4>${s.t}</h4><p>${s.p}</p></div>`).join("")}
+    </div>`;
+};
+showFlow("sync", document.querySelector(".tbtn"));
+</script>
+</body>
+</html>

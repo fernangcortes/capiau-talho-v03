@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Curva "bezier" vs "s_curve" — CapIAu-Talho</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    color-scheme: dark;
+    --s0: #080808; --s1: #0e0e10; --s2: #141417; --s3: #1c1c21;
+    --line: rgba(255,255,255,.08); --line2: rgba(255,255,255,.16);
+    --fg: #f1f1f4; --fg2: #b8b8c4; --muted: #828290;
+    --accent: hsl(190, 90%, 55%); --warn: hsl(38, 92%, 58%); --ok: hsl(152, 58%, 50%); --err: hsl(340, 80%, 62%);
+    --f-head: 'Barlow Semi Condensed', sans-serif;
+    --f-body: 'Inter', system-ui, sans-serif;
+    --f-mono: 'IBM Plex Mono', monospace;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--s0); color: var(--fg); font: 400 13.5px/1.55 var(--f-body); }
+  .wrap { max-width: 1140px; margin: 0 auto; padding: 24px 20px 60px; }
+  .topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 8px; }
+  .back { color: var(--accent); text-decoration: none; font: 500 12px var(--f-mono); }
+  .tag { font: 500 11px var(--f-mono); padding: 3px 8px; border-radius: 4px; background: hsla(38,92%,58%,.14); color: var(--warn); }
+  h1 { font: 600 28px/1.15 var(--f-head); margin: 0 0 8px; }
+  .sub { color: var(--fg2); margin: 0 0 22px; max-width: 82ch; }
+  code { font-family: var(--f-mono); font-size: 12px; background: var(--s3); padding: 1px 5px; border-radius: 3px; }
+
+  .lab { display: grid; grid-template-columns: 1.25fr 1fr; gap: 18px; margin-bottom: 22px; }
+  @media (max-width: 880px) { .lab { grid-template-columns: 1fr; } }
+  .panel { background: var(--s2); border: 1px solid var(--line); border-radius: 8px; padding: 18px; }
+  svg { width: 100%; height: auto; background: #0a0a0c; border: 1px solid var(--line); border-radius: 6px; display: block; }
+  .legend { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 10px; font: 500 12px var(--f-mono); }
+  .leg-item { display: flex; align-items: center; gap: 6px; }
+  .sw { width: 14px; height: 3px; border-radius: 2px; }
+
+  .ctrl { margin-bottom: 16px; }
+  .ctrl label { display: flex; justify-content: space-between; font: 500 12px var(--f-mono); color: var(--fg2); margin-bottom: 6px; }
+  input[type=range] { width: 100%; accent-color: var(--accent); }
+  .presets { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px; }
+  .pbtn {
+    padding: 5px 10px; border-radius: 4px; border: 1px solid var(--line2); background: var(--s3);
+    color: var(--fg2); font: 500 11px var(--f-mono); cursor: pointer;
+  }
+  .pbtn:hover { border-color: var(--accent); color: var(--fg); }
+
+  .metric-box { background: var(--s1); border: 1px solid var(--line); border-radius: 6px; padding: 12px; font: 400 12px var(--f-mono); display: grid; gap: 6px; }
+  .row { display: flex; justify-content: space-between; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font: 600 11px var(--f-mono); color: var(--muted); text-transform: uppercase; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <a class="back" href="./index.html">← Voltar à Central</a>
+    <span class="tag">Decisão Adiada #1 · Antes da Frente F / Regressão Nível 1</span>
+  </div>
+
+  <h1>Curva <code>"bezier"</code> vs <code>"s_curve"</code> (Defeito #7)</h1>
+  <p class="sub">
+    Em <code>src/export/video_render/fade.py:40</code> e <code>src/ui/js/timelineState.js:118-124</code>, as curvas conhecidas são apenas <code>linear</code>, <code>exponential</code>, <code>logarithmic</code>, <code>s_curve</code>, <code>equal_power</code> e <code>custom</code>. Quando um teste ou preset envia <code>"bezier"</code>, tanto o Player quanto o FFmpeg caem silenciosamente em <code>linear</code>.
+  </p>
+
+  <div class="lab">
+    <div class="panel">
+      <svg id="plot" viewBox="0 0 500 340">
+        <!-- Grid -->
+        <g stroke="rgba(255,255,255,0.06)" stroke-width="1">
+          <line x1="50" y1="30" x2="50" y2="290"/><line x1="150" y1="30" x2="150" y2="290"/>
+          <line x1="250" y1="30" x2="250" y2="290"/><line x1="350" y1="30" x2="350" y2="290"/>
+          <line x1="450" y1="30" x2="450" y2="290"/>
+          <line x1="50" y1="290" x2="450" y2="290"/><line x1="50" y1="225" x2="450" y2="225"/>
+          <line x1="50" y1="160" x2="450" y2="160"/><line x1="50" y1="95" x2="450" y2="95"/>
+          <line x1="50" y1="30" x2="450" y2="30"/>
+        </g>
+        <text x="45" y="308" fill="#828290" font-size="11" font-family="IBM Plex Mono">0.0</text>
+        <text x="240" y="308" fill="#828290" font-size="11" font-family="IBM Plex Mono">0.5</text>
+        <text x="440" y="308" fill="#828290" font-size="11" font-family="IBM Plex Mono">1.0</text>
+        <text x="16" y="294" fill="#828290" font-size="11" font-family="IBM Plex Mono">0.0</text>
+        <text x="16" y="34" fill="#828290" font-size="11" font-family="IBM Plex Mono">1.0</text>
+
+        <path id="path-linear" fill="none" stroke="rgba(255,255,255,0.28)" stroke-width="1.5" stroke-dasharray="4 4"/>
+        <path id="path-scurve" fill="none" stroke="hsl(190,90%,55%)" stroke-width="2.5"/>
+        <path id="path-bezier" fill="none" stroke="hsl(38,92%,58%)" stroke-width="2.5"/>
+      </svg>
+      <div class="legend">
+        <div class="leg-item"><span class="sw" style="background:hsl(190,90%,55%)"></span><code>s_curve</code> (Hermite 3p²−2p³ + tensão k)</div>
+        <div class="leg-item"><span class="sw" style="background:hsl(38,92%,58%)"></span><code>bezier</code> (Cubic-Bezier P1/P2)</div>
+        <div class="leg-item"><span class="sw" style="background:rgba(255,255,255,0.3)"></span><code>linear</code> (Fallback atual de "bezier")</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="ctrl">
+        <label><span>Tensão <code>k</code> da <code>s_curve</code></span><span id="lbl-k">0.00</span></label>
+        <input type="range" id="rng-k" min="-1" max="1" step="0.05" value="0">
+      </div>
+      <div class="ctrl">
+        <label><span>Bezier P1.x / P2.x (simétrico)</span><span id="lbl-bx">0.42</span></label>
+        <input type="range" id="rng-bx" min="0.05" max="0.95" step="0.01" value="0.42">
+      </div>
+      <div class="presets">
+        <button class="pbtn" onclick="setPreset(0, 0.42)">ease-in-out (0.42,0,0.58,1)</button>
+        <button class="pbtn" onclick="setPreset(0, 0.25)">suave (0.25,0,0.75,1)</button>
+        <button class="pbtn" onclick="setPreset(0.45, 0.42)">k = +0.45</button>
+      </div>
+      <div class="metric-box">
+        <div class="row"><span>Erro máx. |s_curve − linear|:</span><span id="m-lin" style="color:var(--err)">—</span></div>
+        <div class="row"><span>Erro máx. |s_curve − bezier|:</span><span id="m-bez" style="color:var(--warn)">—</span></div>
+        <div class="row"><span>Expressão FFmpeg (<code>s_curve</code>):</span><span style="color:var(--ok)">Polinômio exato (leve)</span></div>
+        <div class="row"><span>Expressão FFmpeg (<code>bezier</code>):</span><span style="color:var(--warn)">Exige solver cúbico ou LUT</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <table>
+      <thead><tr><th>Decisão</th><th>O que muda no código</th><th>Prós / Contras</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><strong>Opção A (Recomendada): Padronizar em <code>s_curve</code></strong></td>
+          <td>Trocar <code>"bezier"</code> por <code>"s_curve"</code> nos testes canônicos e documentar alias/validação.</td>
+          <td>Zero custo extra de CPU no FFmpeg (<code>p*p*(3-2*p)</code> já portado 1:1 em <code>fade.py:100</code> e <code>timelineState.js:196</code>). Visualmente quase idêntica a <code>cubic-bezier(0.42,0,0.58,1)</code>.</td>
+        </tr>
+        <tr>
+          <td><strong>Opção B: Implementar <code>"bezier"</code> real</strong></td>
+          <td>Adicionar <code>bezier</code> em <code>CURVAS_CONHECIDAS</code>, <code>evaluateFadeCurve</code> e expressão fechada/aproximada em <code>fade.py</code>.</td>
+          <td>Necessária apenas se a UI futura expuser alças livres assimétricas <code>(x1,y1,x2,y2)</code> em vez de tensão única <code>k</code>.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+function evalSCurve(p, k) {
+  const base = p * p * (3 - 2 * p);
+  if (Math.abs(k) < 0.01) return base;
+  return k > 0 ? Math.pow(base, 1 / (1 + k * 1.5)) : Math.pow(base, 1 + Math.abs(k) * 1.5);
+}
+
+// Cubic bezier (x1, 0, 1-x1, 1) via amostragem paramétrica t -> (x, y)
+function evalBezierAtX(targetX, x1) {
+  const x2 = 1 - x1;
+  let lo = 0, hi = 1;
+  for (let i = 0; i < 20; i++) {
+    const t = (lo + hi) / 2;
+    const x = 3*(1-t)*(1-t)*t*x1 + 3*(1-t)*t*t*x2 + t*t*t;
+    if (x < targetX) lo = t; else hi = t;
+  }
+  const t = (lo + hi) / 2;
+  return 3*(1-t)*t*t + t*t*t; // y1=0, y2=1
+}
+
+function update() {
+  const k = parseFloat(document.getElementById("rng-k").value);
+  const bx = parseFloat(document.getElementById("rng-bx").value);
+  document.getElementById("lbl-k").textContent = k.toFixed(2);
+  document.getElementById("lbl-bx").textContent = bx.toFixed(2);
+
+  let dLin = "M 50 290 L 450 30";
+  let dS = "", dB = "";
+  let maxLin = 0, maxBez = 0;
+
+  for (let i = 0; i <= 80; i++) {
+    const p = i / 80;
+    const ys = evalSCurve(p, k);
+    const yb = evalBezierAtX(p, bx);
+    maxLin = Math.max(maxLin, Math.abs(ys - p));
+    maxBez = Math.max(maxBez, Math.abs(ys - yb));
+    const px = (50 + p * 400).toFixed(1);
+    const sy = (290 - ys * 260).toFixed(1);
+    const by = (290 - yb * 260).toFixed(1);
+    dS += (i === 0 ? "M " : "L ") + `${px} ${sy} `;
+    dB += (i === 0 ? "M " : "L ") + `${px} ${by} `;
+  }
+
+  document.getElementById("path-linear").setAttribute("d", dLin);
+  document.getElementById("path-scurve").setAttribute("d", dS);
+  document.getElementById("path-bezier").setAttribute("d", dB);
+  document.getElementById("m-lin").textContent = `${(maxLin * 100).toFixed(1)}%`;
+  document.getElementById("m-bez").textContent = `${(maxBez * 100).toFixed(1)}%`;
+}
+
+window.setPreset = (k, bx) => {
+  document.getElementById("rng-k").value = k;
+  document.getElementById("rng-bx").value = bx;
+  update();
+};
+
+document.getElementById("rng-k").oninput = update;
+document.getElementById("rng-bx").oninput = update;
+update();
+</script>
+</body>
+</html>

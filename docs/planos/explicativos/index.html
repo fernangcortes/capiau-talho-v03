@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CapIAu-Talho — Central de HTMLs Explicativos (Nov/2026)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    color-scheme: dark;
+    --s0: #080808; --s1: #0d0d0d; --s2: #121214; --s3: #18181b; --s4: #222226;
+    --line: rgba(255,255,255,.08); --line2: rgba(255,255,255,.15);
+    --fg: #f0f0f3; --fg2: #b4b4be; --muted: #7e7e8a;
+    --accent: hsl(190, 90%, 55%); --accent-soft: hsla(190, 90%, 55%, .12);
+    --ok: hsl(152, 58%, 50%); --ok-soft: hsla(152, 58%, 50%, .12);
+    --warn: hsl(38, 92%, 58%); --warn-soft: hsla(38, 92%, 58%, .12);
+    --f-head: 'Barlow Semi Condensed', sans-serif;
+    --f-body: 'Inter', system-ui, sans-serif;
+    --f-mono: 'IBM Plex Mono', monospace;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--s0); color: var(--fg); font: 400 14px/1.6 var(--f-body); }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 32px 24px 64px; }
+  header { border-bottom: 1px solid var(--line); padding-bottom: 20px; margin-bottom: 28px; }
+  .eyebrow { font: 500 11px var(--f-mono); text-transform: uppercase; letter-spacing: .08em; color: var(--accent); margin-bottom: 6px; }
+  h1 { font: 600 30px/1.15 var(--f-head); margin: 0 0 10px; letter-spacing: .01em; }
+  .lead { color: var(--fg2); margin: 0; max-width: 78ch; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }
+  .card {
+    background: var(--s2); border: 1px solid var(--line); border-radius: 8px;
+    padding: 20px; display: flex; flex-direction: column; gap: 12px;
+    transition: border-color .15s, transform .15s;
+  }
+  .card:hover { border-color: var(--line2); transform: translateY(-1px); }
+  .card-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .badge {
+    font: 500 11px var(--f-mono); padding: 3px 8px; border-radius: 4px;
+    background: var(--warn-soft); color: var(--warn);
+  }
+  .badge.dir { background: var(--accent-soft); color: var(--accent); }
+  .badge.ext { background: rgba(255,255,255,.06); color: var(--fg2); }
+  .stage { font: 500 11px var(--f-mono); color: var(--muted); }
+  h2 { font: 600 19px/1.25 var(--f-head); margin: 0; }
+  p { margin: 0; color: var(--fg2); font-size: 13px; }
+  .meta { font: 400 12px var(--f-mono); color: var(--muted); background: var(--s1); border: 1px solid var(--line); padding: 8px 10px; border-radius: 5px; }
+  .actions { margin-top: auto; padding-top: 6px; display: flex; gap: 10px; align-items: center; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px;
+    background: var(--accent-soft); color: var(--accent); border: 1px solid hsla(190, 90%, 55%, .3);
+    border-radius: 5px; text-decoration: none; font: 500 13px var(--f-body);
+  }
+  .btn:hover { background: hsla(190, 90%, 55%, .22); }
+  .btn.disabled { opacity: .55; pointer-events: none; background: var(--s3); color: var(--muted); border-color: var(--line); }
+  footer { margin-top: 36px; padding-top: 16px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+  code { font-family: var(--f-mono); font-size: 12px; color: var(--fg); background: var(--s3); padding: 1px 5px; border-radius: 3px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="eyebrow">CapIAu-Talho · Grande Plano Unificado (Nov/2026) · Seção 5</div>
+    <h1>Central de HTMLs Explicativos &amp; Decisões de Arquitetura</h1>
+    <p class="lead">
+      Estes protótipos interativos materializam a diretriz definida e as decisões adiadas da <strong>Seção 5</strong> do
+      <code>GRANDE_PLANO_UNIFICADO_2026-11.md</code> (baseado no commit <code>7e82b92</code>). Nenhuma destas decisões bloqueia o Estágio 0.
+    </p>
+  </header>
+
+  <div class="grid">
+    <article class="card">
+      <div class="card-top">
+        <span class="badge dir">Diretriz Definida</span>
+        <span class="stage">Estágios 1A · 2D · 3B</span>
+      </div>
+      <h2>Edição da IA / MCP em Timeline "Clone" (Múltiplas Sequências Fantasmas)</h2>
+      <p>Simulador interativo dos 3 modos de revisão (Aba/Clone, A/B Contracampo e Sobreposição), seletor de múltiplos clones por persona, aba Changes e Undo atômico por turno.</p>
+      <div class="meta">Base: TimelineSequenceState · chat_agent.py:2275 · D1–D6</div>
+      <div class="actions">
+        <a class="btn" href="./timeline-clone-ia.html">Abrir Simulador →</a>
+      </div>
+    </article>
+
+    <article class="card">
+      <div class="card-top">
+        <span class="badge">Decisão Adiada #1</span>
+        <span class="stage">Antes da Frente F / B Nível 1</span>
+      </div>
+      <h2>Curva <code>"bezier"</code> vs <code>"s_curve"</code></h2>
+      <p>Plotter SVG interativo comparando a <code>s_curve</code> (Hermite Smoothstep + tensão <code>k</code>) com curvas Cubic-Bezier reais, delta de ganho/opacidade e impacto no FFmpeg.</p>
+      <div class="meta">fade.py:40 · timelineState.js:118-208</div>
+      <div class="actions">
+        <a class="btn" href="./curvas-bezier-vs-s-curve.html">Comparar Curvas →</a>
+      </div>
+    </article>
+
+    <article class="card">
+      <div class="card-top">
+        <span class="badge">Decisão Adiada #2</span>
+        <span class="stage">Antes de retomar Tema</span>
+      </div>
+      <h2>Controle de Espaçamento <code>--space-scale</code></h2>
+      <p>Simulador ao vivo de densidade da UI multiplicando os 19 degraus <code>--sp-1..--sp-64</code> sobre um mini-editor NLE (Inspetor, Toolbar, Timeline) para decidir se entra na <code>AppearanceWindow</code>.</p>
+      <div class="meta">theme.css:92-113 · appearanceWindow.js</div>
+      <div class="actions">
+        <a class="btn" href="./espacamento-space-scale.html">Testar Densidade →</a>
+      </div>
+    </article>
+
+    <article class="card">
+      <div class="card-top">
+        <span class="badge">Decisão Adiada #3</span>
+        <span class="stage">Estágio 2C</span>
+      </div>
+      <h2>Política do Reverso (Quadro a Quadro)</h2>
+      <p>Scrubber interativo frame a frame comparando a fórmula do Player (<code>outSec - offsetSec</code>) com a do Export (<code>out_s - b</code>, começando em <code>out - 1</code>) para resolver o desvio de 1 quadro.</p>
+      <div class="meta">player.js:4540 · modelo.py:172-174</div>
+      <div class="actions">
+        <a class="btn" href="./politica-reverso.html">Inspecionar Quadros →</a>
+      </div>
+    </article>
+
+    <article class="card">
+      <div class="card-top">
+        <span class="badge ext">Artefato Externo</span>
+        <span class="stage">Estágio 2E (Opcional)</span>
+      </div>
+      <h2>Onda Lateral da Biblioteca (<code>onda-lateral.html</code>)</h2>
+      <p>Artefato externo já existente (1.279 linhas, 20 perguntas, publicado no Claude/branch <code>ccr-63e58089-4mr3t5</code>). Não versionado na <code>main</code>; revisar após Task 25 respeitando <code>panelRail.js</code>.</p>
+      <div class="meta">Ref: NOVOS_PLANOS_IAS_2026-11.md (§3)</div>
+      <div class="actions">
+        <span class="btn disabled">Artefato externo (fora da main)</span>
+      </div>
+    </article>
+
+    <article class="card">
+      <div class="card-top">
+        <span class="badge">Decisão Adiada #5</span>
+        <span class="stage">Estágio 6D (E1.T9)</span>
+      </div>
+      <h2>Ponte Banco Local × Banco de Casa</h2>
+      <p>Comparativo de fluxos entre corrigir o <code>sync.py</code> (30 tabelas, v2, <code>proxy_photo_</code>, remapeamento de IDs) vs Dump/Merge SQLite direto + estratégia híbrida para a reconciliação <code>E1.T9</code>.</p>
+      <div class="meta">sync.py:206-213 · projects.py · db/operations.py</div>
+      <div class="actions">
+        <a class="btn" href="./ponte-banco-local-casa.html">Comparar Fluxos →</a>
+      </div>
+    </article>
+  </div>
+
+  <footer>
+    <span>Gerado em 17/11/2026 a partir de <code>docs/planos/GRANDE_PLANO_UNIFICADO_2026-11.md</code></span>
+    <span>CapIAu-Talho · NLE + IA Local</span>
+  </footer>
+</div>
+</body>
+</html>
