@@ -1,7 +1,7 @@
 # Grande Plano Unificado CapIAu-Talho (Novembro/2026)
 
 > **Data-base da auditoria:** 16/11/2026 sobre `main` (`7e82b92`) + planos HyperFrames de `origin/ccr-a5fc9a59-3gh91p` (em *stage* no Git) + levantamentos extraídos das 5 IAs do navegador ([`NOVOS_PLANOS_IAS_2026-11.md`](./NOVOS_PLANOS_IAS_2026-11.md)).
-> **Status atualizado em 17/11/2026 (`main` @ `11efef5`):** **Estágio 0 (`0A`, `0B`, `0C`)**, **Estágio 1A** e **Estágio 1B** **100% concluídos**; central e HTMLs explicativos das decisões adiadas entregues em [`docs/planos/explicativos/index.html`](./explicativos/index.html) (`d2a3437`); **Estágio 1C** **em andamento** com **Frente D1 (`E1–E2`) concluída** (`11efef5`), restando `D1 E3` e `Frente B Nível 1 + Video Receipts`.
+> **Status atualizado em 18/11/2026 (`main` @ `da91a0c`):** **Estágio 0 (`0A`, `0B`, `0C`)** e **Estágio 1 (`1A`, `1B`, `1C`)** **100% concluídos**; central e HTMLs explicativos das decisões adiadas entregues em [`docs/planos/explicativos/index.html`](./explicativos/index.html) (`d2a3437`); próximo bloco da fila: **Estágio 2** (Ferramentas NLE e Áudio).
 > **Como usar este documento:** Este é o **ponto de partida vivo** do planejamento. Ele substitui a ordenação anterior de 18/10 ([`ORDEM_DE_IMPLEMENTACAO.md`](./ORDEM_DE_IMPLEMENTACAO.md)) com o estado real verificado no código por 5 frentes de auditoria paralelas, colocando **Quick Wins fáceis primeiro**, fechando **Saneamento mínimo de base** e atacando suas duas prioridades declaradas (**Ferramentas NLE** e **MCP multi-harness**) sem gerar retrabalho com o HyperFrames nem com o acoplamento do estado global da timeline. A cada bloco iniciado, abra o plano detalhado correspondente na **Seção 4 (Lista Resumida Mestre)** para refinar e executar.
 
 ---
@@ -26,13 +26,13 @@
   * `PLANO_IMPLEMENTACAO.md`: Etapa 1 (`E1.T1–T8`), Etapa 2 (`segmentation.py`, `media_segment`, `ImageSearch`/CLIP, burst `0.80/10`, perfis, paletas, backend de facetas em `narrative.py:176-406`), `P0/P0.6`, `P1.1–P1.3`, `P2` (`script_format.py`, `script_extract.py`, `scene`, curadoria).
   * `ORDEM_DAS_ANALISES.md` §6, `REVISAO_CATEGORIAS.md` (Proposta B `8 + fora_do_projeto`, `triagem_rodada.py`, `triagem_relatorio.py`, `jev_verificar.py`), tabelas `detected_object`/`system1_decisao`, `spatial_grounding.py`, `detectores.py`, `system1_service.py` (pilotos Laya/Jev + `audit_timeline_mutation`), `motores.py` (`venv_nemo_worker.py`), `LocalBackend`, scripts offline de `08_plano_sequencia.md`.
 * **Documentação & Build:** `git` no `Dockerfile:20` (`3d21b4a`), reorganização de `docs/`, `scripts/gerar_docs_api.py`, `scripts/gerar_atalhos.mjs`, `scripts/verificar_docs.py`, `tests/test_docs_sincronizadas.py`, `site/` e `.github/workflows/site.yml` (PR #6), `NUV.1` em `src/config.py:109-116`.
-* **Entregas pós-auditoria já incorporadas na `main` (`7e82b92..11efef5`):**
+* **Entregas pós-auditoria já incorporadas na `main` (`7e82b92..da91a0c`):**
   * **Estágio 0A (`ae252e0`, `a59fc02`):** fix do arraste manual das alças (`player.js`), botão Configurações da Sequência (`expandInspectorPanel`), trava par-a-par de Crop `<= 90%`, `syncProgramViewport()`, `fps/width/height` no `TIMELINE_HISTORY`, unificação do auto-config do 1º clipe, micro-ajustes Drag & Dock (`DOCK.3, 4, 5, 9, 15, 31, 33`) e **Task 22 (Color Labels)** + autotestes (`autoteste_color_labels.mjs`, `autoteste_transform_overlay_manual_ctrl.mjs`).
   * **Estágio 0B (`9972298`, `ead9c01`, `4b5c023`, `dbfddf3`, `945b843`):** `Frente A E0` (EQ Q-factor + compensação mono `−3 dB`), fix do último quadro com `eof_action=pass`, ramo dedicado `video_dip_white`, alinhamento do `gblur` de clipe aos títulos e `LinearTimeWarp` no `otio_export.py`.
   * **Estágio 0C (`44077f0`, `1c4848a`, `8cc01fa`, `2e57224`, `a1dc7b2`):** CORS restrito à origem local, `--reload` isolado sob `-Dev`, sanitização XSS (`SEC-03`), coluna `face.embedding` no schema + migração, limpeza de chaves mortas e conexão de `hardware.ai_device`, checagem real de Edge/Chrome no preflight, dependências no `requirements.txt` e sincronia documental pós-PR #6.
   * **Estágio 1A (`5e05296`):** extração de `TimelineSequenceState` por instância, `SequenceManager` e fachada `Proxy` compatível em `timelineState.js` + `tests/autoteste_timeline_sequence_state.mjs`.
   * **Estágio 1B (`98656c7`, `5561def`, `d4957d1`, `4678990`, `6b17c9c`):** remoção de `eval()` no `ffprobe` e guardas somente leitura (`src/core/storage_guards.py`), schema versionado com `PRAGMA user_version` + backup consistente em WAL (`src/db/backup.py`), `sync.py` cobrindo todas as tabelas + timeline v2 + proxies antes do commit + outbox do Qdrant, e segurança local Bearer (`src/api/security.py`) + isolamento de `/cache` e exports + blindagem contra path traversal e zip-bomb.
-  * **Estágio 1C parcial — Frente D1 `E1–E2` (`11efef5`):** pacote `src/navegador/` com servidor HTTP loopback `127.0.0.1` (`servidor.py`, token, Range, PUT atômico, origem segura), lançador Playwright (`lancador.py`), diagnóstico barato e completo (`diagnostico.py`, rotas `/api/navegador/diagnostico` e `/api/navegador/testar`), limpeza/varredura de processos órfãos (`orfaos.py` + `lifespan` em `server.py` e `TASK_MANAGER`) e suíte `tests/test_navegador_servidor.py` + `tests/test_navegador_lancador.py`.
+  * **Estágio 1C — Frente D1 `E0–E3`, Video Receipts e Frente B Nível 1 (`11efef5`, `3fe1d6b`, `916cf27`, `da91a0c`):** pacote `src/navegador/` (`servidor.py` `127.0.0.1` com token/Range/PUT, `lancador.py`, `diagnostico.py` em `16,24 ms`, `orfaos.py` + `Navegador.abortar()` e `--proxy-bypass-list`), migração bit-a-bit de `titulos.py`/`execucao.py`/`fidelidade.py` (`test_render_titulos_regressao.py`), recibos `<destino>.receipt.json` (`src/export/video_render/recibo.py` + `/api/timeline/{id}/render/ultimo`) e suíte determinística `tests/render_regressao/` (`FFV1 + PCM s16le`, mídias sintéticas 11 bits, oráculos NumPy e 18 cenários Nível 1).
 
 ---
 
@@ -52,14 +52,14 @@
 
 ---
 
-### 1.3 Bugs Ativos e Lacunas Críticas Encontradas no Código (`7e82b92` → status em `11efef5`)
+### 1.3 Bugs Ativos e Lacunas Críticas Encontradas no Código (`7e82b92` → status em `da91a0c`)
 
 1. **Sequência Fantasma & Chat Agente (`D1–D6` 100% abertos + bug novo de bypass):**
    * **Bypass novo (`chat_agent.py:2275`):** `SET_AV_OFFSET` e `ADD_EFFECT` não constam na lista que ativa `is_preview = True`; se chamados sozinhos, aplicam edição sem confirmação.
    * **Abertos:** `D1` hit-test só na pista `"ai"` (`timelineInteraction.js:582-613`); `D2` `final_cuts`/`shadow_cuts` quebrados no front por incompatibilidade `in` vs `in_s` (`NaN`) e `suggestions_output = []`; `D3` `populateRoughCutMarkers` nunca chamado por `chat.js`; `D4` fallback `"V1"` vs `"V2"`; `D5` corte offline silencioso; `D6` fotos/textos/mattes perdem campos em `api.js:640`, `TimelineAISuggestClip` e `TimelineShadowCopy`.
 2. **Paridade Player × Export (`17/17` defeitos HyperFrames abertos em `7e82b92` + bug novo):**
    * **Já resolvidos no Estágio 0B/0C:** ramo `video_dip_white` (`4b5c023`), export 1 frame a menos (`ead9c01`), EQ `highpass`/`bass`/`treble` + mono `−3 dB` (`9972298`), desfoque de clipe `gblur` (`dbfddf3`), `otio_export.py` `LinearTimeWarp` (`945b843`), CORS `*` (`44077f0`), textos/refs `requirements-opcional.txt` + `sherpa-onnx` no `requirements.txt` + preflight real Edge/Chrome (`2e57224`).
-   * **Parcial no Estágio 1C (`11efef5`):** base `src/navegador/orfaos.py` + `lifespan` e `TASK_MANAGER` para Chromium órfão já implementados (`D1 E1–E2`), faltando migrar `titulos.py` e encerrar Chromium/thread daemon em `execucao.py:110-145` (`D1 E3`).
+   * **Já resolvidos no Estágio 1C (`11efef5`, `3fe1d6b`, `916cf27`, `da91a0c`):** pacote completo `src/navegador/` (`D1 E0–E3`) com migração bit-a-bit de `titulos.py`/`execucao.py`/`fidelidade.py` e abort imediato no cancelamento, emissão de `Video Receipts` (`recibo.py`) e suíte de regressão `Frente B Nível 1` (`tests/render_regressao/`, 18 cenários `FFV1 + PCM s16le`, com `REVERSO_UM_QUADRO` e `HD_SEM_ETIQUETA_BT709` isolados em `xfail(strict=True)` para os Estágios `2C` e `4A`).
    * **Ainda abertos:** HD sem `bt709` e conversão RGBA sem `in_color_matrix=bt709`/`gbrp` (`4A`); compressor `knee=8` vs `"2,1 dB"` (`2B`); reverso 1 frame adiantado no player (`2C`); curva `"bezier"` não registrada (`decisão adiada`); **3+ pistas de vídeo ocupadas ocultam pista do meio no Program** (`2C`, `player.js:4131-4200`); `SRT/VTT` preso no JS morto (`4B`).
 3. **NLE / UI & Segurança (`SEC`):**
    * **Já resolvidos no Estágio 0A/0C:** arraste das alças em modo manual (`player.js:6820-6823`), `#btn-seq-settings-program` (`main.js:3308`) e trava par-a-par de Crop `<= 90%` (`ae252e0`); sanitização XSS `SEC-03` em `timelineInteraction.js` e `chat.js` (`1c4848a`).
@@ -119,7 +119,7 @@
 
 ---
 
-### Estágio 1 — Fundação Arquitetural Sem Retrabalho (~2–3 semanas) — 🟡 EM ANDAMENTO (1A e 1B concluídos)
+### Estágio 1 — Fundação Arquitetural Sem Retrabalho (~2–3 semanas) — ✅ 100% CONCLUÍDO (1A, 1B e 1C)
 1. **Estágio 1A — Estado da Timeline por Instância com Fachada Compatível (~1,5–2 sem) — ✅ CONCLUÍDO (`5e05296`):**
    * Extrair classe/fábrica `TimelineSequenceState` (`cuts`, `tracks`, `transitions`, `markers`, `ghostTrack`, `fps/width/height`, `in/out`, `playheadFrame`, `history` próprio + invariante A/V).
    * Manter `TIMELINE_STATE`, `TIMELINE_HISTORY` e `STATE.activeTimelineCuts` como **fachada/proxy** para a sequência ativa — preserva os `44` autotestes e as `1.555` referências em `21` arquivos enquanto destrava **Task 25 (Abas)**, **edição da IA/MCP diretamente em timeline "clone" / múltiplas sequências fantasmas**, **Undo por turno de IA** e **motor headless**.
@@ -128,9 +128,9 @@
    * Streaming e limites contra DoS/zip-bomb em uploads (`media.py:768-794`, `projects.py:126-145, 173-188`, `narrative.py:577-594`).
    * Consertar `sync.py`: incluir todas as **30 tabelas**, corrigir leitura v2 de `sequence_json` (`:206-213`), usar `proxy_photo_{id}.webp`, parar de mutar hash (`_imp_`), copiar arquivos antes do commit mapeando novos IDs, e não engolir erros do Qdrant.
    * Adicionar `PRAGMA user_version` (`NUV.43`), `WAL + timeout` também em `db/operations.py:13-20`, remover `eval()` (`ffmpeg.py:62`) e caminhos `F:/` hardcoded (`audio_*.py`).
-3. **Estágio 1C — Rede de Segurança de Render: `Frente B` (Nível 1) + `Frente D1` (E0–E3) (~1,5–2 sem) — 🟡 EM ANDAMENTO:**
-   * ✅ **`Frente D1 E1–E2` concluída (`11efef5`):** pacote `src/navegador/` (`servidor.py` em `127.0.0.1` com token, Range e PUT atômico; `lancador.py` Playwright; `diagnostico.py` + rotas `/api/navegador/diagnostico` e `/api/navegador/testar`; `orfaos.py` + limpeza no `lifespan` e `TASK_MANAGER`; testes em `tests/test_navegador_*.py`).
-   * ⏳ **Pendente para concluir o 1C:** `Frente D1 E3` (migrar `titulos.py` e `execucao.py:110` para `src/navegador/`, fechar navegador no cancelamento e eliminar thread daemon órfã) + `Frente B Nível 1` (`ffv1` + `pcm_s16le`, extração exata por índice, métricas numpy, cenários canônicos) + **Video Receipts** JSON por export (`Kinocut`).
+3. **Estágio 1C — Rede de Segurança de Render: `Frente B` (Nível 1) + `Frente D1` (E0–E3) + `Video Receipts` (~1,5–2 sem) — ✅ CONCLUÍDO (`11efef5`, `3fe1d6b`, `916cf27`, `da91a0c`):**
+   * ✅ **`Frente D1 E0–E3` concluída (`11efef5`, `3fe1d6b`):** pacote `src/navegador/` (`servidor.py` `127.0.0.1`, `lancador.py` com `--proxy-bypass-list`, `diagnostico.py` em `16,24 ms`, `orfaos.py` + `Navegador.abortar()`), migração de `titulos.py`, `execucao.py` e `fidelidade.py` com paridade bit-a-bit (`tests/test_render_titulos_regressao.py`).
+   * ✅ **`Video Receipts` & `Frente B Nível 1` concluídos (`916cf27`, `da91a0c`):** recibo `<destino>.receipt.json` em `src/export/video_render/recibo.py` + `GET /api/timeline/{id}/render/ultimo`; suíte `tests/render_regressao/` (`FFV1 + PCM s16le`, mídias sintéticas 11 bits, oráculos NumPy, referências douradas e 18 cenários, com `REVERSO_UM_QUADRO` e `HD_SEM_ETIQUETA_BT709` isolados em `xfail(strict=True)` para `2C` e `4A`).
 
 ---
 
@@ -230,7 +230,7 @@
 
 ## 4. Lista Resumida Mestre (Mapa de Ligação com Todos os Planos Detalhados)
 
-| Estágio | Bloco / Frente Resumida | Status Atual (`main` @ `11efef5`) | Planos Detalhados de Origem | Nota Obrigatória ao Refazer o Plano do Bloco |
+| Estágio | Bloco / Frente Resumida | Status Atual (`main` @ `da91a0c`) | Planos Detalhados de Origem | Nota Obrigatória ao Refazer o Plano do Bloco |
 |---|---|---|---|---|
 | **0A** | Bug alças manual, botão Seq Settings, Crop ≤90%, Dock micro-fixes, Color Labels (**Task 22**) *(sem `--space-scale`)* | ✅ Concluído (`ae252e0`, `a59fc02`) | [`09_quick_wins_estagio_0.md`](../agentes/proximos_chats/09_quick_wins_estagio_0.md) · [`PLANO_VIEWPORT_TRANSFORM_CROP.md`](./PLANO_VIEWPORT_TRANSFORM_CROP.md) · [`HANDOFF_JANELAS_DRAG_DOCK.md`](../agentes/HANDOFF_JANELAS_DRAG_DOCK.md) · [`PLANO_SUITE_NLE_CLASSICO.md`](./PLANO_SUITE_NLE_CLASSICO.md) | Tasks 0–18, 22, 23 e 24 prontas; `--space-scale` adiado c/ HTML em `explicativos/` |
 | **0B** | EQ/Mono (`Frente A E0`), −1 frame, `video_dip_white`, `gblur` clipe, OTIO `speed` *(sem `"bezier"`)* | ✅ Concluído (`9972298`, `ead9c01`, `4b5c023`, `dbfddf3`, `945b843`) | [`09_quick_wins_estagio_0.md`](../agentes/proximos_chats/09_quick_wins_estagio_0.md) · [`A_audio_paridade.md`](../plano_hyperframes/A_audio_paridade.md) · [`plano_hyperframes/README.md`](../plano_hyperframes/README.md) · [`F_audio_avancado_rampas.md`](../plano_hyperframes/F_audio_avancado_rampas.md) | Decisão `"bezier"` vs `"s_curve"` com HTML em `explicativos/` antes da Frente F / Nível 1 |

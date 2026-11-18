@@ -98,17 +98,17 @@
 
                     <aside class="pl-board" aria-label="Resumo do andamento atual" data-reveal="right" style="--d: 180ms">
                         <div class="pl-board__head">
-                            <span class="pl-board__eyebrow">Status da obra · main @ d6d6f78</span>
-                            <span class="pl-board__ref">Último código: 11efef5</span>
+                            <span class="pl-board__eyebrow">Status da obra · main @ da91a0c</span>
+                            <span class="pl-board__ref">Estágios 0 e 1: 100% ✅</span>
                         </div>
                         <div class="pl-stats">
                             <div class="pl-stat pl-stat--done">
-                                <span class="pl-stat__val" data-count-to="5">5</span>
-                                <span class="pl-stat__lbl">frentes concluídas (0A–1B)</span>
+                                <span class="pl-stat__val" data-count-to="6">6</span>
+                                <span class="pl-stat__lbl">frentes concluídas (0A–1C)</span>
                             </div>
                             <div class="pl-stat pl-stat--wip">
-                                <span class="pl-stat__val" data-count-to="1">1</span>
-                                <span class="pl-stat__lbl">em andamento (1C parcial)</span>
+                                <span class="pl-stat__val" data-count-to="0">0</span>
+                                <span class="pl-stat__lbl">em andamento (pronto p/ E2)</span>
                             </div>
                             <div class="pl-stat pl-stat--plan">
                                 <span class="pl-stat__val" data-count-to="25">25</span>
@@ -123,11 +123,11 @@
                         <div class="pl-stagebar">
                             <div class="pl-stagebar__label">
                                 <span>Progresso por estágio (0 → 7)</span>
-                                <span>Estágio 0 ✅ · Estágio 1 🟡</span>
+                                <span>Estágio 0 ✅ · Estágio 1 ✅</span>
                             </div>
                             <div class="pl-stagebar__segments" aria-label="Linha de progresso dos 8 estágios">
                                 <div class="pl-seg pl-seg--done" title="Estágio 0 (0A, 0B, 0C): 100% concluído"><span class="pl-seg__bar"><span class="pl-seg__fill"></span></span><span class="pl-seg__name">E0</span></div>
-                                <div class="pl-seg pl-seg--wip" title="Estágio 1 (1A e 1B concluídos; 1C com D1 E1-E2 pronto)"><span class="pl-seg__bar"><span class="pl-seg__fill"></span></span><span class="pl-seg__name">E1</span></div>
+                                <div class="pl-seg pl-seg--done" title="Estágio 1 (1A, 1B, 1C): 100% concluído"><span class="pl-seg__bar"><span class="pl-seg__fill"></span></span><span class="pl-seg__name">E1</span></div>
                                 <div class="pl-seg pl-seg--plan" title="Estágio 2: Ferramentas NLE e Áudio"><span class="pl-seg__bar"><span class="pl-seg__fill"></span></span><span class="pl-seg__name">E2</span></div>
                                 <div class="pl-seg pl-seg--plan" title="Estágio 3: MCP Multi-Harness e Clone IA"><span class="pl-seg__bar"><span class="pl-seg__fill"></span></span><span class="pl-seg__name">E3</span></div>
                                 <div class="pl-seg pl-seg--plan" title="Estágio 4: Cor Técnica, Legendas, Parakeet e Proofcut"><span class="pl-seg__bar"><span class="pl-seg__fill"></span></span><span class="pl-seg__name">E4</span></div>
@@ -179,7 +179,7 @@
                         <p class="pl-pillar__tag text-emerald">Estágios 0 &amp; 1 · Fundação</p>
                         <h3 class="card__title">Casa segura e mesa modular</h3>
                         <p class="card__text">Tapa bugs diários (alças, crop, áudio mono, segurança), transforma a timeline única em bandejas independentes (<code class="inline">1A</code>), blinda o banco/sync (<code class="inline">1B</code>) e monta a prova matemática do export (<code class="inline">1C</code>).</p>
-                        <p class="pl-pillar__meta">Status: E0 ✅ · 1A ✅ · 1B ✅ · 1C 🟡</p>
+                        <p class="pl-pillar__meta">Status: E0 ✅ · 1A ✅ · 1B ✅ · 1C ✅ (Fundação 100%)</p>
                     </article>
 
                     <article class="card pl-pillar" data-reveal data-glow>
@@ -294,7 +294,7 @@
                 <header class="section-head">
                     <p class="eyebrow eyebrow--emerald" data-reveal>03 — Diário de obra (0A a 1C)</p>
                     <h2 class="section-title" id="diario-titulo" data-reveal>O que já foi entregue — e <span class="text-gradient">o que mudou no caminho</span></h2>
-                    <p class="lead" data-reveal>Planos mudam quando encontram o código real. Aqui registramos cada bloco já executado até hoje (<code class="inline">0A</code>, <code class="inline">0B</code>, <code class="inline">0C</code>, <code class="inline">1A</code>, <code class="inline">1B</code> e a parcial do <code class="inline">1C</code>), comparando o previsto com o que foi descoberto, corrigido ou adiado de forma consciente.</p>
+                    <p class="lead" data-reveal>Planos mudam quando encontram o código real. Aqui registramos cada bloco já executado até hoje (<code class="inline">0A</code>, <code class="inline">0B</code>, <code class="inline">0C</code>, <code class="inline">1A</code>, <code class="inline">1B</code> e <code class="inline">1C</code>), comparando o previsto com o que foi descoberto, corrigido ou adiado de forma consciente.</p>
                 </header>
 
                 <div class="pl-diary-grid" id="pl-diary-grid">
@@ -331,8 +331,8 @@
                     <div class="pl-controls__row">
                         <div class="pl-filter-pills" role="group" aria-label="Filtrar por status" id="pl-status-filters">
                             <button class="pl-pill is-active" type="button" data-status-filter="all">Qualquer status</button>
-                            <button class="pl-pill" type="button" data-status-filter="done">✅ Concluídos (5)</button>
-                            <button class="pl-pill" type="button" data-status-filter="wip">🟡 Em andamento (1)</button>
+                            <button class="pl-pill" type="button" data-status-filter="done">✅ Concluídos (6)</button>
+                            <button class="pl-pill" type="button" data-status-filter="wip">🟡 Em andamento (0)</button>
                             <button class="pl-pill" type="button" data-status-filter="plan">⏳ Planejados (25)</button>
                         </div>
                         <label class="pl-search">

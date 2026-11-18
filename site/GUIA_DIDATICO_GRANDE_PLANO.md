@@ -8,7 +8,7 @@
 
 **Versão interativa no site:** abra [`site/plano.html`](./plano.html) (ou *Plano Vivo* no site publicado) para explorar mapas clicáveis, diagramas SVG, seletor de lente (*Montador* vs *Programador*) e trechos de código com tooltips.
 
-**Data-base do acompanhamento:** 18/11/2026 (`main` @ `d6d6f78`, com último código em `11efef5`).
+**Data-base do acompanhamento:** 18/11/2026 (`main` @ `da91a0c`, Estágios 0 e 1 concluídos).
 
 ---
 
@@ -28,7 +28,7 @@ Se tentássemos construir tudo ao mesmo tempo ou na ordem errada, um recurso que
 | Bloco da Obra | O que muda para quem edita (Sala de Corte) | Status em 18/11/2026 |
 |---|---|---|
 | **Estágio 0 (`0A`–`0C`)** | Conserta bugs que atrapalham hoje (arraste de alças, Crop seguro, cores nos clipes, áudio mono/EQ no export, segurança XSS e preflight real). | ✅ **100% Concluído** |
-| **Estágio 1 (`1A`–`1C`)** | Prepara o chassi: transforma a timeline única em várias "bandejas" independentes, blinda o banco/sync/segurança local e cria a rede de provas automática do render + navegador invisível único. | 🟡 **1A e 1B concluídos · 1C em andamento** (`D1 E1–E2` pronto) |
+| **Estágio 1 (`1A`–`1C`)** | Prepara o chassi: transforma a timeline única em várias "bandejas" independentes, blinda o banco/sync/segurança local e entrega o navegador único, Video Receipts e a suíte de regressão do render (18 cenários). | ✅ **100% Concluído** (`1A`, `1B` e `1C`) |
 | **Estágio 2 (`2A`–`2E`)** | Fecha a **Suíte NLE Clássica**: Índice de Sequência pesquisável, VU Meter, Borracha de Volume e Auto-Ducking com som idêntico no export, composição de 3+ pistas de vídeo e **Abas de Múltiplas Timelines**. | ⏳ **Planejado (Prioridade 1)** |
 | **Estágio 3 (`3A`–`3C`)** | Abre o Talho para **5 IAs externas via MCP** sem travar o banco, com a IA editando em uma **Timeline "Clone" isolada**, painel de *Changes*, *Undo* em 1 clique e revisão visual de títulos. | ⏳ **Planejado (Prioridade 2)** |
 | **Estágio 4 (`4A`–`4D`)** | Cor técnica fiel (`BT.709` e HDR→SDR no proxy), legendas completas (`.srt`/`.vtt`/`.ass` e karaokê), transcrição local **Parakeet** + alinhamento palavra a palavra e prova final do vídeo (**Proofcut** + *Smart Cut*). | ⏳ **Planejado** |
@@ -69,7 +69,7 @@ Porque existem **4 correntes físicas** dentro do código. Se você puxar um elo
   (0B) EQ/Mono + -1 frame + dip_white + gblur + OTIO  ✅ FEITO
          │
          ▼
-  (1C) Rede de Segurança: src/navegador/ (D1 E1-E2 ✅) + Regressão FFV1 + Video Receipts  🟡
+  (1C) Rede de Segurança: src/navegador/ (D1 E0-E3) + Regressão FFV1 (18 cen.) + Video Receipts  ✅ FEITO (da91a0c)
          │  "Cria um mini-servidor seguro 127.0.0.1 e controla 1 único Chromium limpo."
          ├──────────────────────────┬────────────────────┬───────────────────┐
          ▼                          ▼                    ▼                   ▼
@@ -260,33 +260,36 @@ Porque existem **4 correntes físicas** dentro do código. Se você puxar um elo
 
 ---
 
-### 1C — Rede de Segurança de Render & Navegador Único (`🟡 EM ANDAMENTO — D1 E1–E2 pronto em 11efef5`)
+### 1C — Rede de Segurança de Render & Navegador Único (`✅ Concluído: 11efef5, 3fe1d6b, 916cf27, da91a0c`)
 - 🎬 **Na Sala de Corte (Leigo / Montador):**
-  - **Metáfora:** Contratar um laboratório oficial com **auditor** e **recibo assinado** para cada filme que sai da sala de edição. Antes de mexer em efeitos complexos de áudio, legendas e animações, o programa ganha uma "prova dos nove" matemática e um navegador invisível bem-educado que nunca deixa processos fantasma comendo memória RAM.
-  - **Uso prático no editor:** Hoje o código já tem a fundação (`src/navegador/`): quando o Talho precisa de um navegador invisível para renderizar algo pesado (títulos, áudio offline, legendas), ele sobe um servidor próprio seguro em `127.0.0.1`, testa se Edge/Chrome funciona pela interface/API (`/api/navegador/diagnostico`) e limpa processos antigos ao fechar. Quando fecharmos a parte pendente, todo export ganhará um "recibo técnico" (**Video Receipt**) provando que duração, quadros e áudio batem com a timeline.
-  - **Por que importa para o programa:** Sem essa rede de segurança (`Frente B Nível 1` com vídeo sem perdas `ffv1`), cada melhoria futura no Player ou no FFmpeg poderia quebrar alguma coisa sem ninguém perceber até o dia da exibição. E sem o `src/navegador/` unificado, cada módulo abria um Chrome separado e deixava threads órfãs no Windows quando o usuário cancelava um render.
+  - **Metáfora:** Contratar um laboratório oficial com **auditor sem perdas** e **recibo assinado** para cada filme que sai da sala de edição. Antes de mexer em efeitos complexos de áudio, legendas e animações, o programa ganha uma "prova dos nove" matemática e um navegador invisível bem-educado que nunca deixa processos fantasma comendo memória RAM.
+  - **Uso prático no editor:** Os títulos e créditos já rodam pelo navegador local seguro em `127.0.0.1` com paridade visual bit-a-bit e encerramento imediato quando você cancela uma exportação; todo vídeo exportado agora gera um recibo técnico auditável (`<destino>.receipt.json`, visível também em `/api/timeline/{id}/render/ultimo`); e uma bateria com **18 cenários sintéticos** vigia quadros, cores, cortes, blend modes, áudio e títulos contra regressões.
+  - **Por que importa para o programa:** Sem essa rede de segurança (`Frente B Nível 1` com vídeo sem perdas `ffv1` + `pcm_s16le`), cada melhoria futura no Player ou no FFmpeg poderia quebrar alguma coisa sem ninguém perceber até o dia da exibição. E sem o `src/navegador/` unificado, cada módulo abria um Chrome separado e deixava processos órfãos no Windows ao cancelar.
 - ⚙️ **Debaixo do Capô (Programador):**
   ```text
-  [Já entregue em 11efef5 — Frente D1 E1-E2]
-  src/navegador/
-   ├── servidor.py     -> HTTP 127.0.0.1/<token>/ (libera AudioWorklet via isSecureContext, Range HTTP, PUT atômico)
-   ├── lancador.py     -> sobe Playwright Edge/Chrome controlando ciclo de vida
-   ├── diagnostico.py  -> checagem rápida & teste completo (/api/navegador/diagnostico e /testar)
-   └── orfaos.py       -> registra PIDs em disco e encerra árvore de processos se cair/fechar
+  1) Frente D1 (E0–E3) · src/navegador/ + titulos.py + execucao.py + fidelidade.py
+     ├── servidor.py (127.0.0.1/<token>/, isSecureContext, Range, PUT atômico)
+     ├── lancador.py (--proxy-bypass-list=127.0.0.1;localhost;<-loopback>)
+     ├── diagnostico.py (diagnostico_barato em 16,24 ms) + orfaos.py + Navegador.abortar()
+     └── paridade bit-a-bit de títulos (ImageChops.difference == None)
 
-  [Falta para fechar 1C]
-   ├── D1 E3           -> migrar titulos.py e execucao.py:110 para usar src/navegador/ (fim da thread daemon órfã)
-   └── Frente B Nível 1 + Video Receipts -> suíte ffv1 + pcm_s16le, comparação pixel/sample via numpy + JSON receipt
+  2) Video Receipts · src/export/video_render/recibo.py
+     └── grava <destino>.receipt.json (sequence_sha256, hashes das mídias, comandos FFmpeg e ffprobe)
+
+  3) Frente B Nível 1 · tests/render_regressao/ (18 cenários + referências douradas)
+     ├── ajudantes.comando_intermediario() -> troca saída para FFV1 + PCM s16le sem perdas
+     ├── fontes.py (código de barras 11 bits por frame, SMPTE HD, foto) + metricas.py + oraculos.py
+     └── 2 divergências conhecidas isoladas em strict xfail: REVERSO_UM_QUADRO (2C) e HD_SEM_ETIQUETA_BT709 (4A)
   ```
   ```python
-  # src/navegador/servidor.py:1-6 (código real entregue em 11efef5)
-  """Servidor HTTP local em loopback (`127.0.0.1`) para o navegador headless.
-  Fornece origem segura (`http://127.0.0.1:<porta>/<token>/...`, destravando
-  `AudioWorklet` e APIs que exigem `window.isSecureContext === true`), suporte a
-  `GET`/`HEAD` com `Range` e `PUT`/`POST` atômico em disco sem base64 via CDP."""
+  # Fluxo unificado do Estágio 1C (11efef5..da91a0c)
+  cmd = ajudantes.comando_intermediario(timeline)        # FFV1 -level 3 + pcm_s16le para medir quadros/áudio em NumPy
+  recibo.gravar_recibo_export(destino, timeline, probe)  # Emite <destino>.receipt.json ao fim do render
+  nav.abortar()                                          # Encerra árvore Chromium imediatamente ao cancelar
   ```
 - 📓 **O que mudou pelo caminho:**
-  - O Estágio `1C` foi dividido de forma pragmática: primeiro entregou-se a fundação limpa de `src/navegador/` (`D1 E1–E2` em `11efef5` com suíte `test_navegador_servidor.py` e `test_navegador_lancador.py`), deixando a migração de `titulos.py`/`execucao.py` (`D1 E3`) e a suíte `Frente B Nível 1 + Video Receipts` para a rodada final de fechamento do `1C`.
+  - A entrega foi dividida em 4 marcos limpos (`11efef5` → `3fe1d6b` → `916cf27` → `da91a0c`), medindo `16,24 ms` no `diagnostico_barato()` em Windows e adicionando `--proxy-bypass-list` no Chromium para não passar `127.0.0.1` por proxies locais.
+  - Os cenários `03` (`REVERSO_UM_QUADRO`, que vai para a decisão do **2C**) e `06` (`HD_SEM_ETIQUETA_BT709`, que entra no **4A**) foram isolados como `@pytest.mark.xfail(strict=True)` para a suíte já atuar 100% verde como guarda-costas automática do motor.
 
 ---
 
