@@ -60,9 +60,21 @@ except Exception as e:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    try:
+        from src.navegador import orfaos as _nav_orfaos
+
+        _nav_orfaos.varrer_orfaos()
+    except Exception:
+        pass
     yield
     print("[Shutdown] Limpando processos FFmpeg em execucao...")
     TASK_MANAGER.cleanup()
+    try:
+        from src.navegador import orfaos as _nav_orfaos
+
+        _nav_orfaos.abortar_todos()
+    except Exception:
+        pass
 
 
 app = FastAPI(

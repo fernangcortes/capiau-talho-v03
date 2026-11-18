@@ -343,6 +343,11 @@ class TaskManager:
                     process.kill()
             except Exception:
                 pass
+        try:
+            from src.navegador import orfaos as _nav_orfaos
+            _nav_orfaos.abortar_todos()
+        except Exception:
+            pass
 
 
 def read_worker_progress() -> Dict[str, Dict[str, Any]]:

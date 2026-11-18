@@ -423,7 +423,7 @@ Gerado por `python scripts/gerar_docs_api.py`. Não edite o bloco abaixo à mão
 
 <!-- GERADO:API:INICIO -->
 
-Total: 191 rotas em 9 grupos. A documentação interativa completa (parâmetros e esquemas) fica em `/docs` com o servidor em execução.
+Total: 193 rotas em 9 grupos. A documentação interativa completa (parâmetros e esquemas) fica em `/docs` com o servidor em execução.
 
 ### AI Settings
 
@@ -585,6 +585,8 @@ Total: 191 rotas em 9 grupos. A documentação interativa completa (parâmetros 
 | :--- | :--- | :--- |
 | GET | `/api/modelos` |  |
 | POST | `/api/modelos/{modelo_id}/baixar` |  |
+| GET | `/api/navegador/diagnostico` | Diagnóstico barato (< 100 ms, sem lançar processo) do navegador headless. |
+| POST | `/api/navegador/testar` | Diagnóstico completo do navegador headless (síncrono, sob demanda). |
 
 ### Narratives & Search
 
