@@ -42,9 +42,11 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 from src.core.tasks import TASK_MANAGER
+from src.navegador import CapturaCancelada, Navegador
 
 from . import comando
 from . import midia
+from . import recibo as _recibo
 from . import titulos as _titulos
 from .comando import _clipes_em_cena  # mesmo pacote: os recortes pos-regra-P4
 from .midia import assegurar_destino_seguro
@@ -74,6 +76,7 @@ def _startupinfo():
 # ---------------------------------------------------------------------------
 
 _PROCESSOS: Dict[int, subprocess.Popen] = {}
+_NAVEGADORES: Dict[int, Navegador] = {}
 _PROCESSOS_LOCK = threading.Lock()
 
 
@@ -85,6 +88,16 @@ def _registrar_processo(timeline_id: int, proc: subprocess.Popen) -> None:
 def _desregistrar_processo(timeline_id: int) -> None:
     with _PROCESSOS_LOCK:
         _PROCESSOS.pop(int(timeline_id), None)
+
+
+def _registrar_navegador(timeline_id: int, nav: Navegador) -> None:
+    with _PROCESSOS_LOCK:
+        _NAVEGADORES[int(timeline_id)] = nav
+
+
+def _desregistrar_navegador(timeline_id: int) -> None:
+    with _PROCESSOS_LOCK:
+        _NAVEGADORES.pop(int(timeline_id), None)
 
 
 def _matar_processo(proc: subprocess.Popen) -> None:
@@ -108,17 +121,23 @@ def _matar_processo(proc: subprocess.Popen) -> None:
 
 
 def cancelar_render(timeline_id: int) -> bool:
-    """Cancela o render da timeline: mata o ffmpeg registrado e marca a tarefa.
+    """Cancela o render da timeline: mata o ffmpeg e aborta o navegador registrados.
 
     Marca ANTES de matar: o laco de leitura pode enxergar o flag e encerrar
-    limpo mesmo se o kill chegar tarde. Devolve True se havia processo vivo.
+    limpo mesmo se o kill chegar tarde. Devolve True se havia processo/navegador vivo.
     """
     timeline_id = int(timeline_id)
     TASK_MANAGER.cancel_task(f"render_timeline_{timeline_id}")
     with _PROCESSOS_LOCK:
         proc = _PROCESSOS.get(timeline_id)
+        nav = _NAVEGADORES.get(timeline_id)
+    if nav is not None:
+        try:
+            nav.abortar()
+        except Exception:
+            pass
     if proc is None:
-        return False
+        return nav is not None
     _matar_processo(proc)
     return True
 
@@ -421,6 +440,7 @@ def _render_job(sequencia, pedido) -> Dict[str, Any]:
     destino_final: Optional[Path] = None
     parcial: Optional[Path] = None
     tmpdir: Optional[Path] = None
+    navegador_job: Optional[Navegador] = None
     gerador_titulos = None  # navegador headless dos titulos: aberto so se houver titulo
 
     TASK_MANAGER.update_progress(chave, 0.0, "running", "render", label="Preparando...")
@@ -510,8 +530,20 @@ def _render_job(sequencia, pedido) -> Dict[str, Any]:
         if any(c.tipo == "text" for c in sequencia.clipes):
             from src.config import CONFIG
             pasta_titulos = Path(CONFIG.CACHE_DIR) / "titulos"
+            fontes_proj = _fontes_do_projeto(timeline_id)
+            navegador_job = Navegador(
+                pasta_titulos / "_nav",
+                fontes=fontes_proj,
+                cancelado=lambda: TASK_MANAGER.is_cancelled(chave),
+                rotulo=f"render_{timeline_id}",
+            )
+            _registrar_navegador(timeline_id, navegador_job)
             gerador_titulos = _titulos.GeradorTitulos(
-                pasta_titulos, fontes=_fontes_do_projeto(timeline_id))
+                pasta_titulos,
+                fontes=fontes_proj,
+                navegador=navegador_job,
+                cancelado=lambda: TASK_MANAGER.is_cancelled(chave),
+            )
 
             def fn_titulos(seq, escopo, s, f):
                 TASK_MANAGER.add_log(chave, f"[INFO] Desenhando titulos de {s:.1f}s a {f:.1f}s")
@@ -522,6 +554,9 @@ def _render_job(sequencia, pedido) -> Dict[str, Any]:
                     return {"avisos": [f"Titulos NAO desenhados: {e}"]}
 
         resultado_cmd: Dict[str, Any] = {}
+        comandos_executados: List[List[str]] = []
+        avisos_acumulados: List[str] = []
+        param_exec: Dict[str, Any] = dict(param)
         fracao_feita = 0.0
         for indice, (alvo, s, f) in enumerate(comandos):
             if TASK_MANAGER.is_cancelled(chave):
@@ -529,7 +564,11 @@ def _render_job(sequencia, pedido) -> Dict[str, Any]:
             resultado_cmd = comando.montar_comando(
                 sequencia, pedido, alvo, rel_midia=rel_midia, cfg=cfg,
                 destino_validado=True, inicio_s=s, fim_s=f, titulos=fn_titulos)
+            if resultado_cmd.get("parametros"):
+                param_exec = dict(resultado_cmd["parametros"])
+            comandos_executados.append(list(resultado_cmd["cmd"]))
             for aviso in (resultado_cmd.get("avisos") or [])[:10]:
+                avisos_acumulados.append(str(aviso))
                 nivel = "WARN" if avisos_pendentes else "INFO"
                 TASK_MANAGER.add_log(chave, f"[{nivel}] {aviso}")
             avisos_pendentes = False
@@ -560,6 +599,7 @@ def _render_job(sequencia, pedido) -> Dict[str, Any]:
             if param["faststart"]:
                 cmd_concat += ["-movflags", "+faststart"]
             cmd_concat += ["-progress", "pipe:1", "-nostats", str(parcial)]
+            comandos_executados.append(list(cmd_concat))
 
             TASK_MANAGER.update_progress(chave, round(fracao_feita * 100, 1), "running",
                                          "render", label="Juntando segmentos")
@@ -572,6 +612,22 @@ def _render_job(sequencia, pedido) -> Dict[str, Any]:
             raise RuntimeError("ffmpeg terminou sem gravar arquivo utilizavel.")
         os.replace(parcial, destino_final)
 
+        caminho_recibo: Optional[Path] = None
+        dados_recibo: Optional[Dict[str, Any]] = None
+        try:
+            caminho_recibo, dados_recibo = _recibo.gravar_recibo_export(
+                sequencia,
+                pedido,
+                destino_final,
+                rel_midia=rel_midia,
+                parametros_saida=param_exec,
+                comandos=comandos_executados,
+                avisos=avisos_acumulados,
+                segmentado=segmentar,
+            )
+        except Exception as err_recibo:
+            TASK_MANAGER.add_log(chave, f"[WARN] Video Receipt nao gravado: {err_recibo}", "WARN")
+
         tamanho_mb = destino_final.stat().st_size / (1024 * 1024)
         TASK_MANAGER.add_log(
             chave,
@@ -579,13 +635,15 @@ def _render_job(sequencia, pedido) -> Dict[str, Any]:
         TASK_MANAGER.update_progress(chave, 100.0, "finished", "render",
                                      label=str(destino_final))
         return {"ok": True, "caminho": str(destino_final), "cancelado": False,
-                "tamanho_bytes": destino_final.stat().st_size}
+                "tamanho_bytes": destino_final.stat().st_size,
+                "caminho_recibo": str(caminho_recibo) if caminho_recibo else None,
+                "recibo": dados_recibo}
 
-    except RenderCancelado:
+    except (RenderCancelado, CapturaCancelada):
         _limpar([parcial] if parcial else [], [tmpdir] if tmpdir else [])
         TASK_MANAGER.add_log(
             chave,
-            "[CANCEL] Render cancelado pelo usuario; ffmpeg encerrado e arquivo "
+            "[CANCEL] Render cancelado pelo usuario; ffmpeg/navegador encerrado e arquivo "
             "parcial apagado.")
         TASK_MANAGER.update_progress(chave, 0.0, "cancelled", "render",
                                      label="Cancelado")
@@ -598,6 +656,9 @@ def _render_job(sequencia, pedido) -> Dict[str, Any]:
     finally:
         # Redundancia deliberada com os excepts acima: o tmpdir NUNCA sobra,
         # nem num caminho de retorno esquecido.
+        _desregistrar_navegador(timeline_id)
         _limpar([], [tmpdir] if tmpdir else [])
         if gerador_titulos is not None:
-            gerador_titulos.fechar()  # o navegador headless nao pode sobrar aberto
+            gerador_titulos.fechar()  # fecha pagina associada
+        if navegador_job is not None:
+            navegador_job.fechar()    # o navegador headless nao pode sobrar aberto

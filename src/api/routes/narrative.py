@@ -1421,6 +1421,17 @@ def ultimo_render_timeline(timeline_id: int):
     if arquivo and "tamanho_bytes" in arquivo:
         tamanho_mb = round(arquivo["tamanho_bytes"] / (1024 * 1024), 1)
 
+    receipt_path = None
+    recibo_dados = None
+    if previsto:
+        try:
+            cand_recibo = Path(f"{previsto}.receipt.json")
+            if cand_recibo.is_file():
+                receipt_path = str(cand_recibo)
+                recibo_dados = json.loads(cand_recibo.read_text(encoding="utf-8"))
+        except Exception:
+            recibo_dados = None
+
     return {
         "ok": True,
         "timeline_id": timeline_id,
@@ -1430,6 +1441,8 @@ def ultimo_render_timeline(timeline_id: int):
         "arquivo": arquivo,
         "output_path": previsto,
         "tamanho_mb": tamanho_mb,
+        "receipt_path": receipt_path,
+        "recibo": recibo_dados,
         "fonte": "registro_local(.ultimo_.json) + TASK_MANAGER + stat do arquivo",
     }
 
