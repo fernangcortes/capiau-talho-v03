@@ -16,7 +16,7 @@ from . import diagnostico, orfaos
 from .erros import CapturaCancelada, NavegadorIndisponivel
 from .servidor import ServidorLocal
 
-RAIZ_UI = Path(__file__).resolve().parents[2] / "ui"
+RAIZ_UI = Path(__file__).resolve().parents[1] / "ui"
 VERSAO_MODULO = "1"
 
 _VARREDURA_LOCK = threading.Lock()
@@ -369,11 +369,11 @@ class Navegador:
             )
         if self._pw is None:
             try:
-                asyncio.get_running_loop()
-                tem_loop = True
+                loop = asyncio.get_running_loop()
+                em_tarefa_async = asyncio.current_task(loop) is not None
             except RuntimeError:
-                tem_loop = False
-            if tem_loop:
+                em_tarefa_async = False
+            if em_tarefa_async:
                 raise RuntimeError(
                     "Navegador síncrono não pode iniciar dentro de uma corrotina/event loop "
                     "asyncio ativo; use rota `def` ou `run_in_threadpool`."

@@ -89,15 +89,8 @@ def test_rotas_upload_lista_e_arquivo(raiz):
 # ---------------------------------------------------------------------------
 
 def _navegador_ok():
-    from src.export.video_render import titulos
-    if not titulos.playwright_instalado():
-        return False
-    try:
-        with titulos.GeradorTitulos(Path(".")) as g:
-            g._abrir(64, 64)
-        return True
-    except Exception:
-        return False
+    from src.navegador import navegador_utilizavel
+    return navegador_utilizavel()
 
 
 @pytest.mark.skipif(not _navegador_ok(), reason="playwright/Edge/Chrome indisponivel")

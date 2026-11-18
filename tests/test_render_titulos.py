@@ -122,14 +122,8 @@ def test_modelo_guarda_o_clipe_bruto_ate_no_recorte():
 # ---------------------------------------------------------------------------
 
 def _navegador_ok():
-    if not titulos.playwright_instalado():
-        return False
-    try:
-        with titulos.GeradorTitulos(Path(".")) as g:
-            g._abrir(64, 64)
-        return True
-    except Exception:
-        return False
+    from src.navegador import navegador_utilizavel
+    return navegador_utilizavel()
 
 
 @pytest.mark.skipif(not _navegador_ok(), reason="playwright/Edge/Chrome indisponivel")

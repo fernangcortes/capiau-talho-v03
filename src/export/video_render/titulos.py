@@ -50,12 +50,18 @@ from __future__ import annotations
 
 import hashlib
 import json
-import mimetypes
 import os
 import shutil
-import sys
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
+
+from src.navegador import (
+    CapturaCancelada,
+    Navegador,
+    NavegadorIndisponivel,
+    diagnostico_barato,
+)
+from src.navegador.diagnostico import localizar_executavel_instalado
 
 RAIZ_UI = Path(__file__).resolve().parents[2] / "ui"
 HOST_INTERNO = "http://titulos.capiau"
@@ -77,72 +83,14 @@ class TitulosIndisponiveis(RuntimeError):
 
 
 def _navegador_executavel_disponivel() -> bool:
-    """Confere sem abrir processo se ha Edge, Chrome ou Chromium do Playwright instalado."""
-    for cmd in ("msedge", "chrome", "chromium", "chromium-browser", "google-chrome", "microsoft-edge"):
-        if shutil.which(cmd):
-            return True
-
-    if os.name == "nt":
-        for var in ("ProgramFiles", "ProgramFiles(x86)", "LocalAppData"):
-            base = os.environ.get(var)
-            if not base:
-                continue
-            for rel in (
-                Path("Microsoft") / "Edge" / "Application" / "msedge.exe",
-                Path("Google") / "Chrome" / "Application" / "chrome.exe",
-            ):
-                if (Path(base) / rel).is_file():
-                    return True
-    elif sys.platform == "darwin":
-        for app_bin in (
-            Path("/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge"),
-            Path("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"),
-            Path("/Applications/Chromium.app/Contents/MacOS/Chromium"),
-        ):
-            if app_bin.is_file():
-                return True
-    else:
-        for linux_bin in (
-            Path("/opt/microsoft/msedge/msedge"),
-            Path("/usr/bin/microsoft-edge"),
-            Path("/usr/bin/google-chrome"),
-            Path("/usr/bin/chromium"),
-            Path("/usr/bin/chromium-browser"),
-        ):
-            if linux_bin.is_file():
-                return True
-
-    pw_dirs: List[Path] = []
-    env_pw = os.environ.get("PLAYWRIGHT_BROWSERS_PATH")
-    if env_pw and env_pw != "0":
-        pw_dirs.append(Path(env_pw))
-    else:
-        if os.name == "nt" and os.environ.get("LocalAppData"):
-            pw_dirs.append(Path(os.environ["LocalAppData"]) / "ms-playwright")
-        elif sys.platform == "darwin":
-            pw_dirs.append(Path.home() / "Library" / "Caches" / "ms-playwright")
-        else:
-            pw_dirs.append(Path.home() / ".cache" / "ms-playwright")
-
-    for pw_dir in pw_dirs:
-        if not pw_dir.is_dir():
-            continue
-        for pat in (
-            "chromium-*/chrome-win*/chrome.exe",
-            "chromium-*/chrome-linux*/chrome",
-            "chromium-*/chrome-mac*/Chromium.app/Contents/MacOS/Chromium",
-            "chromium_headless_shell-*/chrome-headless-shell-win*/chrome-headless-shell.exe",
-            "chromium_headless_shell-*/chrome-headless-shell-linux*/chrome-headless-shell",
-            "chromium_headless_shell-*/chrome-headless-shell-mac*/chrome-headless-shell",
-        ):
-            if any(pw_dir.glob(pat)):
-                return True
-
-    return False
+    """Confere sem abrir processo se ha Edge, Chrome ou Chromium instalado."""
+    canal, _ = localizar_executavel_instalado()
+    return canal is not None
 
 
 def playwright_instalado() -> bool:
     import importlib.util
+
     return importlib.util.find_spec("playwright") is not None and _navegador_executavel_disponivel()
 
 
@@ -180,21 +128,26 @@ def escrever_ffconcat(destino: Path, itens: List[Tuple[Path, float]]) -> Path:
 
 
 class GeradorTitulos:
-    """Fotografa titulos. Abre o navegador na primeira necessidade; `fechar()` encerra.
+    """Fotografa titulos sobre o navegador comum (`src/navegador/`).
 
     Um gerador por job de render (a API sincrona do playwright pertence a thread que
     a criou). Uso: `with GeradorTitulos(pasta) as g: g.quadros(...)`.
     """
 
-    def __init__(self, pasta_cache: Path, canais=CANAIS, fontes=None):
+    def __init__(self, pasta_cache: Path, canais=CANAIS, fontes=None, *,
+                 navegador: Navegador | None = None, cancelado=None):
         """`fontes`: fontes enviadas ao projeto, como fontes_projeto.listar()
         ([{"familia", "arquivo", "caminho", "tamanho", "mtime"}])."""
         self.pasta_cache = Path(pasta_cache)
         self.canais = canais
         self.fontes = list(fontes or [])
-        self._pw = None
-        self._navegador = None
+        self._nav_externo = navegador
+        self._nav: Navegador | None = navegador
+        self._cancelado = cancelado
+        self._pg = None
+        self._url_fontes: str | None = None
         self._pagina = None
+        self._abortado = False
         self.avisos: List[str] = []
 
     # -- ciclo de vida ------------------------------------------------------
@@ -204,64 +157,81 @@ class GeradorTitulos:
     def __exit__(self, *exc):
         self.fechar()
 
+    def abortar(self) -> None:
+        self._abortado = True
+        if self._nav is not None:
+            self._nav.abortar()
+
     def fechar(self) -> None:
         try:
-            if self._navegador is not None:
-                self._navegador.close()
+            if self._pg is not None:
+                self._pg.fechar()
         finally:
-            if self._pw is not None:
-                self._pw.stop()
-            self._pw = self._navegador = self._pagina = None
+            self._pg = None
+            self._pagina = None
+            if self._nav_externo is None and self._nav is not None:
+                try:
+                    self._nav.fechar()
+                finally:
+                    self._nav = None
 
-    def _servir(self, route) -> None:
-        """Serve src/ui por rota interna: o render nao depende do servidor estar no ar."""
-        from urllib.parse import unquote, urlparse
-        rel = unquote(urlparse(route.request.url).path).lstrip("/")
-        if rel.startswith(PREFIXO_FONTES):
-            nome = rel[len(PREFIXO_FONTES):]
-            f = next((f for f in self.fontes if f["arquivo"] == nome), None)
-            if f is None or not Path(f["caminho"]).is_file():
-                route.fulfill(status=404, body="")
-                return
-            route.fulfill(status=200, body=Path(f["caminho"]).read_bytes(),
-                          headers={"Content-Type": "application/octet-stream"})
-            return
-        alvo = (RAIZ_UI / rel).resolve()
-        if RAIZ_UI not in alvo.parents or not alvo.is_file():
-            route.fulfill(status=404, body="")
-            return
-        tipo = mimetypes.guess_type(alvo.name)[0] or "application/octet-stream"
-        if alvo.suffix == ".js":
-            tipo = "text/javascript"
-        route.fulfill(status=200, body=alvo.read_bytes(), headers={"Content-Type": tipo})
+    def _checar_cancelamento(self) -> None:
+        if self._abortado:
+            raise CapturaCancelada("Geração de títulos abortada.")
+        if self._cancelado is not None and self._cancelado():
+            raise CapturaCancelada("Geração de títulos cancelada.")
+
+    def _preferencia_canal(self) -> str:
+        if self.canais != CANAIS and self.canais:
+            primeiro = self.canais[0]
+            return str(primeiro) if primeiro else "playwright"
+        return "auto"
 
     def _abrir(self, largura: int, altura: int):
-        if self._pagina is not None:
-            self._pagina.set_viewport_size({"width": largura, "height": altura})
-            return self._pagina
+        self._checar_cancelamento()
+        if self._pg is not None:
+            self._pg.redimensionar(int(largura), int(altura))
+            self._pagina = self._pg.pw
+            return self._pg.pw
+
         if not playwright_instalado():
+            diag = diagnostico_barato()
             raise TitulosIndisponiveis(
-                "Pacote 'playwright' nao instalado no ambiente do Talho: sem ele os "
-                "titulos nao sao desenhados no arquivo.")
-        from playwright.sync_api import sync_playwright
-        self._pw = sync_playwright().start()
-        erro = None
-        for canal in self.canais:
-            try:
-                self._navegador = self._pw.chromium.launch(channel=canal, headless=True) \
-                    if canal else self._pw.chromium.launch(headless=True)
-                break
-            except Exception as e:  # tenta o proximo navegador
-                erro = e
-        if self._navegador is None:
-            self.fechar()
-            raise TitulosIndisponiveis(
-                f"Nenhum navegador disponivel para desenhar titulos (Edge/Chrome): {erro}")
-        self._pagina = self._navegador.new_page(viewport={"width": largura, "height": altura})
-        self._pagina.route(f"{HOST_INTERNO}/**", self._servir)
-        self._pagina.goto(PAGINA)
-        self._pagina.wait_for_function("window.RENDER_TITULOS_PRONTO === true", timeout=15000)
-        return self._pagina
+                diag.get("motivo")
+                or "Pacote 'playwright' ou navegador Edge/Chrome indisponível no ambiente."
+            )
+
+        if self._nav is None:
+            self._nav = Navegador(
+                self.pasta_cache / "_nav",
+                preferir=self._preferencia_canal(),
+                fontes=self.fontes,
+                cancelado=self._cancelado,
+                rotulo="titulos",
+            )
+
+        try:
+            _ = self._nav.info
+        except NavegadorIndisponivel as exc:
+            raise TitulosIndisponiveis(str(exc)) from exc
+
+        mapa_fontes = {
+            f["arquivo"]: Path(f["caminho"])
+            for f in self.fontes
+            if f.get("arquivo") and f.get("caminho") and Path(f["caminho"]).is_file()
+        }
+        self._url_fontes = (
+            self._nav.servidor.publicar_mapa("fontes", mapa_fontes) if mapa_fontes else None
+        )
+
+        self._pg = self._nav.pagina(int(largura), int(altura), rotulo="titulos")
+        self._pg.abrir(
+            "ui/render_titulos.html",
+            pronto="window.RENDER_TITULOS_PRONTO === true",
+            timeout_s=15.0,
+        )
+        self._pagina = self._pg.pw
+        return self._pg.pw
 
     # -- trabalho -----------------------------------------------------------
     def quadros(self, clipe: Dict[str, Any], largura: int, altura: int, fps: float,
@@ -282,24 +252,41 @@ class GeradorTitulos:
         """
         if fim <= inicio:
             return []
-        pagina = self._abrir(int(largura), int(altura))
+        self._checar_cancelamento()
+        self._abrir(int(largura), int(altura))
+        assert self._pg is not None and self._nav is not None
+
         from urllib.parse import quote
-        fontes = [{"familia": f["familia"],
-                   "url": f"{HOST_INTERNO}/{PREFIXO_FONTES}{quote(f['arquivo'])}"}
-                  for f in self.fontes]
-        prep = pagina.evaluate("([c, w, h, f]) => window.RENDER_TITULOS.preparar(c, w, h, f)",
-                               [clipe, int(largura), int(altura), fontes])
+        fontes = [
+            {"familia": f["familia"], "url": f"{self._url_fontes}/{quote(f['arquivo'])}"}
+            for f in self.fontes
+            if self._url_fontes and f.get("arquivo") and f.get("caminho") and Path(f["caminho"]).is_file()
+        ]
+        prep = self._pg.avaliar(
+            "([c, w, h, f]) => window.RENDER_TITULOS.preparar(c, w, h, f)",
+            [clipe, int(largura), int(altura), fontes],
+        )
         if not prep.get("fonteDisponivel", True):
             self.avisos.append(
                 f"Titulo {clipe.get('id')}: fonte \"{prep.get('fonte')}\" indisponivel para o "
                 "render; usado um substituto.")
-        chaves = pagina.evaluate("([c, f, a, b]) => window.RENDER_TITULOS.estados(c, f, a, b)",
-                                 [clipe, float(fps), int(inicio), int(fim)])
-        # Fonte enviada trocada (mesmo nome, outro arquivo) nao pode reaproveitar fotos
+        chaves = self._pg.avaliar(
+            "([c, f, a, b]) => window.RENDER_TITULOS.estados(c, f, a, b)",
+            [clipe, float(fps), int(inicio), int(fim)],
+        )
+        # Fonte enviada trocada (mesmo nome, outro arquivo) nao pode reaproveitar fotos,
+        # e assinatura() garante invalidação quando muda o navegador/versão/modo.
         familia = str(clipe.get("fontFamily") or "").strip().lower()
-        assinatura = [(f["arquivo"], f["tamanho"], f["mtime"]) for f in self.fontes
-                      if f["familia"].lower() == familia]
-        base = _hash(clipe, largura, altura, assinatura) if assinatura else _hash(clipe, largura, altura)
+        assinatura_fontes = [
+            (f["arquivo"], f["tamanho"], f["mtime"]) for f in self.fontes
+            if f["familia"].lower() == familia
+        ]
+        assinatura_nav = self._nav.assinatura()
+        base = (
+            _hash(clipe, largura, altura, assinatura_nav, assinatura_fontes)
+            if assinatura_fontes
+            else _hash(clipe, largura, altura, assinatura_nav)
+        )
         pasta = self.pasta_cache / base
         pasta.mkdir(parents=True, exist_ok=True)
 
@@ -307,17 +294,19 @@ class GeradorTitulos:
         desfoque_px = float(prep.get("desfoquePx") or 0)
         saida: List[Dict[str, Any]] = []
         for ini, n, chave in agrupar_estados(chaves):
+            self._checar_cancelamento()
             rel = (inicio + ini) / float(fps)
             png = pasta / f"{_hash(chave)}.png"
             if not png.is_file():
-                pagina.evaluate("([c, t]) => window.RENDER_TITULOS.desenhar(c, t)", [clipe, rel])
-                pagina.screenshot(path=str(png), omit_background=True)
+                self._pg.avaliar("([c, t]) => window.RENDER_TITULOS.desenhar(c, t)", [clipe, rel])
+                self._pg.capturar(formato="png", alfa=True, destino=png)
             mascara = sigma = None
             if caixa and desfoque_px > 0:
                 mascara = pasta / f"{_hash(chave)}_desfoque.png"
                 if not mascara.is_file():
-                    pagina.evaluate("([c, t]) => window.RENDER_TITULOS.mascara(c, t)", [clipe, rel])
-                    bruta = pagina.screenshot(omit_background=True)
+                    self._checar_cancelamento()
+                    self._pg.avaliar("([c, t]) => window.RENDER_TITULOS.mascara(c, t)", [clipe, rel])
+                    bruta = self._pg.capturar(formato="png", alfa=True).dados or b""
                     _gravar_mascara_desfoque(bruta, png, mascara)
                 escala = abs(float(json.loads(chave).get("scale", 1) or 0))
                 sigma = round(FATOR_SIGMA_DESFOQUE * desfoque_px * escala, 3)

@@ -208,18 +208,23 @@ def relatorio(seq, pedido, relatorio_midia) -> Dict[str, Any]:
             "declarado aqui em vez de ignorado em silencio.",
             sorted(set(clipes_pista_desconhecida))))
 
-    # Titulos (pistas de texto): desenhados por navegador headless (titulos.py).
+    # Titulos (pistas de texto): desenhados por navegador headless (titulos.py + src/navegador/).
     clipes_titulo = [c for c in em_cena if c.tipo == "text"
                      and pedido.escopo.pista_ligada(c.track)]
     if clipes_titulo:
+        from src.navegador import diagnostico_barato
         from . import titulos as _titulos
-        if not _titulos.playwright_instalado():
+        diag_nav = diagnostico_barato()
+        if not diag_nav["ok"] or not _titulos.playwright_instalado():
+            detalhe_nav = diag_nav.get("motivo") or (
+                "O render desenha os titulos num navegador headless (pacote "
+                "'playwright' + Edge/Chrome), indisponivel neste ambiente. "
+                "O resto do video sai normalmente."
+            )
             avisos.append(_aviso(
                 "warn", "TITULOS_SEM_NAVEGADOR",
                 "Titulos nao vao aparecer no arquivo",
-                "O render desenha os titulos num navegador headless (pacote "
-                "'playwright' + Edge/Chrome), e o pacote nao esta instalado neste "
-                "ambiente. O resto do video sai normalmente.",
+                detalhe_nav,
                 sorted({c.id for c in clipes_titulo})))
         # Caixa translucida: o desfoque do video atras (backdrop-filter) e reproduzido
         # no ffmpeg com a mascara da caixa (titulos.py), sem aviso.

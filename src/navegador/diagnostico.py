@@ -259,6 +259,7 @@ def diagnosticar(*, sondar_beginframe: bool = False, timeout_s: float = 30.0) ->
         )
         with Navegador(tmp_path, rotulo="diagnostico") as nav:
             info = nav.info
+            assinatura_nav = nav.assinatura()
             prefixo_url = nav.servidor.publicar_pasta("diag", tmp_path)
             pg = nav.pagina(128, 128, rotulo="diag")
             try:
@@ -294,7 +295,7 @@ def diagnosticar(*, sondar_beginframe: bool = False, timeout_s: float = 30.0) ->
         "versao": info.versao,
         "gpu": info.gpu,
         "sandbox": info.sandbox,
-        "assinatura": None,
+        "assinatura": assinatura_nav,
         "contexto_seguro": bool(probe.get("isSecureContext")),
         "audio_worklet_disponivel": bool(probe.get("audioWorklet")),
         "user_agent": probe.get("userAgent"),
