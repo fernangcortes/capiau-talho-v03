@@ -337,15 +337,16 @@ export const computeClipFadeFactor = computeAdjustmentFadeFactor;
  * @param {Array} [cuts] - Lista de cortes da timeline (padrão STATE.activeTimelineCuts)
  * @returns {Object|null} Status de sincronia ou null
  */
-export function getClipSyncStatus(clip, cuts = null) {
+export function getClipSyncStatus(clip, cuts = null, sequence = null) {
     if (!clip || !clip.link_id) return null;
-    const allCuts = cuts || (STATE && STATE.activeTimelineCuts) || [];
-    
+    const activeSeq = sequence || (typeof SEQUENCE_MANAGER !== "undefined" ? SEQUENCE_MANAGER.getActiveSequence() : null) || (typeof TIMELINE_STATE !== "undefined" ? TIMELINE_STATE : null);
+    const allCuts = cuts || (activeSeq && activeSeq.cuts) || ((typeof STATE !== "undefined" && STATE && STATE.activeTimelineCuts) || []);
+
     // Determina se este clipe é vídeo ou áudio
     const clipTrack = String(clip.track || "");
     let clipKind = "video";
-    if (typeof TIMELINE_STATE !== "undefined" && typeof TIMELINE_STATE.trackKindOf === "function") {
-        clipKind = TIMELINE_STATE.trackKindOf(clipTrack);
+    if (activeSeq && typeof activeSeq.trackKindOf === "function") {
+        clipKind = activeSeq.trackKindOf(clipTrack);
     } else {
         clipKind = clipTrack.startsWith("A") ? "audio" : "video";
     }
@@ -355,8 +356,8 @@ export function getClipSyncStatus(clip, cuts = null) {
     const partner = allCuts.find(c => {
         if (!c || c.id === clip.id || c.link_id !== clip.link_id) return false;
         let k = "video";
-        if (typeof TIMELINE_STATE !== "undefined" && typeof TIMELINE_STATE.trackKindOf === "function") {
-            k = TIMELINE_STATE.trackKindOf(c.track);
+        if (activeSeq && typeof activeSeq.trackKindOf === "function") {
+            k = activeSeq.trackKindOf(c.track);
         } else {
             k = String(c.track || "").startsWith("A") ? "audio" : "video";
         }
@@ -669,54 +670,89 @@ function defaultTracks() {
     ];
 }
 
+let _seqInstanceCounter = 0;
+
+function deepCloneSequenceValue(val, fallback) {
+    try {
+        return JSON.parse(JSON.stringify(val));
+    } catch (_) {
+        return fallback;
+    }
+}
+
+function cloneSequenceTracks(tracks) {
+    if (!Array.isArray(tracks) || tracks.length === 0) return defaultTracks();
+    return tracks.map(t => ({ ...t }));
+}
+
 // --- CLASSE DE ESTADO DA TIMELINE ---
 
 export class CapiauTimelineState {
-    constructor() {
-        this.fps = 24; // FPS padrão da timeline (conforme padrão do player)
-        this.zoom = 0.5; // Pixels por frame (0.5px/frame = 12px/s em 24fps)
+    constructor(options = {}) {
+        const opts = (options && typeof options === "object") ? options : {};
+        _seqInstanceCounter += 1;
+        this.id = opts.id ? String(opts.id) : `seq_${_seqInstanceCounter}`;
+        this.name = opts.name ? String(opts.name) : "Sequência Principal";
+        this.kind = opts.kind ? String(opts.kind) : "edit"; // "edit" | "ghost" | "scene" | "selects" | "escaleta" | "master"
+        this.baseSequenceId = opts.baseSequenceId ?? null;
+        this.baseRevision = opts.baseRevision ?? null;
+        this.revision = Number.isFinite(Number(opts.revision)) ? Number(opts.revision) : 1;
+        this.author = opts.author || "user";
+        this.brief = opts.brief || null;
+        this.createdAt = opts.createdAt || new Date().toISOString();
+        this.updatedAt = opts.updatedAt || this.createdAt;
+
+        this.headless = Boolean(opts.headless);
+        this.isolated = Boolean(opts.isolated);
+        this._mediaCatalog = opts.mediaCatalog || null;
+        this._cuts = [];
+        this._listeners = {};
+        this._suppressGlobalEmit = false;
+
+        this.fps = Number(opts.fps) || 24; // FPS padrão da timeline (conforme padrão do player)
+        this.zoom = Number(opts.zoom) > 0 ? Number(opts.zoom) : 0.5; // Pixels por frame (0.5px/frame = 12px/s em 24fps)
         this.minZoom = 0.01; // Zoom mínimo: ~100 frames por pixel (visão panorâmica de longas sequências)
         this.maxZoom = 80.0; // Zoom máximo: 80 pixels por frame (visão microscópica detalhada de frames)
-        this.scrollLeftFrame = 0; // Posição do scroll horizontal em frames
-        this.scrollTop = 0; // Scroll vertical das pistas em pixels
-        this.playheadFrame = 0; // Posição atual do cursor de reprodução em frames
+        this.scrollLeftFrame = Number(opts.scrollLeftFrame) || 0; // Posição do scroll horizontal em frames
+        this.scrollTop = Number(opts.scrollTop) || 0; // Scroll vertical das pistas em pixels
+        this.playheadFrame = Number(opts.playheadFrame) || 0; // Posição atual do cursor de reprodução em frames
 
-        this.selectedClipId = null; // ID do clipe comum selecionado
-        this.selectedClipIds = new Set(); // IDs de múltiplos clipes selecionados
-        this.activeTool = "select"; // Ferramenta ativa: "select" (V), "track-forward" (T), "track-backward" (Shift+T)
-        this.selectedTrack = "V1"; // Track focada ativa
+        this.selectedClipId = opts.selectedClipId ?? null; // ID do clipe comum selecionado
+        this.selectedClipIds = new Set(Array.isArray(opts.selectedClipIds) ? opts.selectedClipIds : []); // IDs de múltiplos clipes selecionados
+        this.activeTool = opts.activeTool || "select"; // Ferramenta ativa: "select" (V), "track-forward" (T), "track-backward" (Shift+T)
+        this.selectedTrack = opts.selectedTrack !== undefined ? opts.selectedTrack : "V1"; // Track focada ativa
         this.selectedGap = null; // Gap selecionado: { trackId, startFrame, endFrame, durationFrames }
-        this.snappingEnabled = true; // Encaixe magnético global ativo por padrão
+        this.snappingEnabled = opts.snappingEnabled !== undefined ? Boolean(opts.snappingEnabled) : true; // Encaixe magnético global ativo por padrão
         this.selectionFollowsPlayhead = this.loadSelectionFollowsPlayhead(); // Modo 'Seleção Acompanha a Agulha' (Toggle - ativo por padrão)
         this.autoTransformOverlay = this.loadAutoTransformOverlay(); // Modo 'Alças de Transformação Automáticas ao Selecionar' (Toggle - inativo por padrão)
         this.manualTransformClipId = null; // ID do clipe ativo em modo de transformação manual (ativado por Ctrl+clique no preview)
 
-        this.width = 1920; // Largura padrão da sequência (Fase 1)
-        this.height = 1080; // Altura padrão da sequência (Fase 1)
-        this.previewZoom = "fit"; // Zoom de visualização (Fase 1)
-        this.previewPanX = 0; // Posição horizontal de pan do preview
-        this.previewPanY = 0; // Posição vertical de pan do preview
+        this.width = Number(opts.width) || 1920; // Largura padrão da sequência (Fase 1)
+        this.height = Number(opts.height) || 1080; // Altura padrão da sequência (Fase 1)
+        this.previewZoom = opts.previewZoom || "fit"; // Zoom de visualização (Fase 1)
+        this.previewPanX = Number(opts.previewPanX) || 0; // Posição horizontal de pan do preview
+        this.previewPanY = Number(opts.previewPanY) || 0; // Posição vertical de pan do preview
 
-        this.tracks = defaultTracks(); // Lista dinâmica de pistas (ordem visual)
-        this.trackHeightScale = 1.0; // Fator de escala vertical das pistas (compacto ↔ alto)
+        this.tracks = Array.isArray(opts.tracks) ? cloneSequenceTracks(opts.tracks) : defaultTracks(); // Lista dinâmica de pistas (ordem visual)
+        this.trackHeightScale = Number(opts.trackHeightScale) || 1.0; // Fator de escala vertical das pistas (compacto ↔ alto)
 
         this.hoverPreviewEnabled = true;
         this.thumbnailMode = "continuous"; // "continuous" | "head" | "none"
         this.globalThumbnailsInterval = 1.0; // 1.0 para alta densidade, 2.0 para média densidade
         this.muteHiddenTracksPlayback = true;
 
-        this.ghostTrack = []; // Lista de sugestões da IA (Ghost Clips)
+        this.ghostTrack = Array.isArray(opts.ghostTrack) ? deepCloneSequenceValue(opts.ghostTrack, []) : []; // Lista de sugestões da IA (Ghost Clips)
         this.selectedGhostClipId = null; // ID da sugestão de IA ativa
         this.aiAnalysisRunning = false; // Flag de análise de IA em andamento
 
-        this.markers = []; // Lista de marcadores na timeline [{ id, frame, label, color, comment }]
+        this.markers = Array.isArray(opts.markers) ? deepCloneSequenceValue(opts.markers, []) : []; // Lista de marcadores na timeline [{ id, frame, label, color, comment }]
         this.hoveredMarkerId = null; // ID do marcador sobre o qual o mouse está iterando (para mostrar rótulo no hover)
         this.selectedMarkerIds = new Set(); // Conjunto de IDs de marcadores selecionados na timeline
 
         // Pontos de Entrada e Saída (IN / OUT / LOOP)
-        this.inFrame = null; // Ponto IN marcado na timeline (em frames)
-        this.outFrame = null; // Ponto OUT marcado na timeline (em frames)
-        this.isLooping = false; // Modo de reprodução em loop contínuo entre In e Out (ou timeline)
+        this.inFrame = opts.inFrame !== undefined ? opts.inFrame : null; // Ponto IN marcado na timeline (em frames)
+        this.outFrame = opts.outFrame !== undefined ? opts.outFrame : null; // Ponto OUT marcado na timeline (em frames)
+        this.isLooping = Boolean(opts.isLooping); // Modo de reprodução em loop contínuo entre In e Out (ou timeline)
         this.isAdjustingInOut = false; // Flag dinâmica ativa durante arraste/ajuste das alças do IO
         this.showInOutRulerBadge = this.loadShowInOutRulerBadge(); // Opção permanente de visualização (padrão: false)
 
@@ -739,14 +775,298 @@ export class CapiauTimelineState {
 
         // Transições de corte na timeline (Task 15: Áudio / Task 16: Vídeo):
         // [{ id, type, kind, track, cutFrame, clipAId, clipBId, durationFrames, duration_s, alignment, curve, tension }]
-        this.transitions = [];
+        this.transitions = Array.isArray(opts.transitions) ? deepCloneSequenceValue(opts.transitions, []) : [];
         this.selectedTransitionId = null;
         this.hoveredTransition = null;
 
         // Margens de Segurança & Overlays de Aspecto no Player (Task 24):
         const savedSafeMargins = this.loadSafeMarginsState();
-        this.safeMarginsEnabled = savedSafeMargins.enabled;
-        this.safeMarginsConfig = savedSafeMargins.config;
+        this.safeMarginsEnabled = opts.safeMarginsEnabled !== undefined ? Boolean(opts.safeMarginsEnabled) : savedSafeMargins.enabled;
+        this.safeMarginsConfig = opts.safeMarginsConfig ? { ...DEFAULT_SAFE_MARGINS_CONFIG, ...opts.safeMarginsConfig } : savedSafeMargins.config;
+
+        // Histórico próprio desta instância de sequência
+        this.history = new TimelineHistory(this);
+
+        if (this.isolated && Array.isArray(opts.cuts) && opts.cuts.length > 0) {
+            this._setCuts(opts.cuts, { silent: true, preserveRevision: true });
+        }
+    }
+
+    on(event, callback) {
+        if (!event || typeof callback !== "function") return;
+        if (!this._listeners[event]) this._listeners[event] = [];
+        this._listeners[event].push(callback);
+    }
+
+    off(event, callback) {
+        if (!event || !this._listeners[event]) return;
+        this._listeners[event] = this._listeners[event].filter(cb => cb !== callback);
+    }
+
+    _isActiveSequence() {
+        if (!this.isolated) return true;
+        return typeof SEQUENCE_MANAGER !== "undefined" && SEQUENCE_MANAGER && SEQUENCE_MANAGER.getActiveSequence() === this;
+    }
+
+    _shouldEmitGlobal() {
+        if (this.headless || this._suppressGlobalEmit) return false;
+        if (!this.isolated) return true;
+        return this._isActiveSequence();
+    }
+
+    _emit(event, data) {
+        if (this._listeners && this._listeners[event]) {
+            this._listeners[event].forEach(cb => {
+                try {
+                    cb(data);
+                } catch (err) {
+                    console.error(`[TimelineSequence:${this.id}] Erro no ouvinte "${event}":`, err);
+                }
+            });
+        }
+        if (this._shouldEmitGlobal() && typeof STATE !== "undefined" && STATE && typeof STATE.emit === "function") {
+            STATE.emit(event, data);
+        }
+    }
+
+    _getMediaCatalog() {
+        if (this._mediaCatalog) return this._mediaCatalog;
+        if (typeof STATE !== "undefined" && STATE) return STATE;
+        return { allVideos: [], allPhotos: [], activeVideo: null, activePhoto: null };
+    }
+
+    _getCuts() {
+        if (this.isolated) return this._cuts;
+        return (typeof STATE !== "undefined" && STATE && STATE.activeTimelineCuts) || [];
+    }
+
+    _setCuts(val, options = {}) {
+        const raw = Array.isArray(val) ? val : [];
+        if (!this.isolated) {
+            if (typeof STATE !== "undefined" && STATE) {
+                STATE.activeTimelineCuts = raw;
+            }
+            return this._getCuts();
+        }
+        const normalized = (typeof STATE !== "undefined" && STATE && typeof STATE.normalizeCuts === "function")
+            ? STATE.normalizeCuts(raw, this, this.fps || 24)
+            : deepCloneSequenceValue(raw, []);
+        this._cuts = normalized;
+        if (!options.preserveRevision) {
+            this.bumpRevision();
+        }
+        if (this._isActiveSequence() && typeof STATE !== "undefined" && STATE) {
+            STATE._activeTimelineCuts = this._cuts;
+        }
+        if (!options.skipValidateTransitions && this.transitions && this.transitions.length > 0) {
+            this.validateTransitions();
+        }
+        if (!options.silent) {
+            this._emit("timelineCutsUpdated", this._cuts);
+        }
+        return this._cuts;
+    }
+
+    setCuts(val, options = {}) {
+        return this._setCuts(val, options);
+    }
+
+    bumpRevision() {
+        this.revision = (Number(this.revision) || 1) + 1;
+        this.updatedAt = new Date().toISOString();
+        return this.revision;
+    }
+
+    toSnapshot({ includeHistory = true } = {}) {
+        const snap = {
+            id: this.id,
+            name: this.name,
+            kind: this.kind,
+            baseSequenceId: this.baseSequenceId,
+            baseRevision: this.baseRevision,
+            revision: this.revision,
+            author: this.author,
+            brief: this.brief,
+            createdAt: this.createdAt,
+            updatedAt: this.updatedAt,
+            fps: this.fps,
+            width: this.width,
+            height: this.height,
+            tracks: deepCloneSequenceValue(this.tracks, defaultTracks()),
+            cuts: deepCloneSequenceValue(this._getCuts(), []),
+            transitions: deepCloneSequenceValue(this.transitions, []),
+            markers: deepCloneSequenceValue(this.markers, []),
+            ghostTrack: deepCloneSequenceValue(this.ghostTrack, []),
+            inFrame: this.inFrame,
+            outFrame: this.outFrame,
+            playheadFrame: this.playheadFrame,
+            zoom: this.zoom,
+            scrollLeftFrame: this.scrollLeftFrame,
+            scrollTop: this.scrollTop,
+            trackHeightScale: this.trackHeightScale,
+            previewZoom: this.previewZoom,
+            previewPanX: this.previewPanX,
+            previewPanY: this.previewPanY,
+            safeMarginsEnabled: this.safeMarginsEnabled,
+            safeMarginsConfig: deepCloneSequenceValue(this.safeMarginsConfig, { ...DEFAULT_SAFE_MARGINS_CONFIG }),
+            selectedClipId: this.selectedClipId,
+            selectedClipIds: Array.from(this.selectedClipIds || []),
+            activeTool: this.activeTool,
+            selectedTrack: this.selectedTrack
+        };
+        if (includeHistory && this.history) {
+            snap.history = {
+                undoStack: deepCloneSequenceValue(this.history.undoStack, []),
+                redoStack: deepCloneSequenceValue(this.history.redoStack, [])
+            };
+        }
+        return snap;
+    }
+
+    loadSnapshot(snap, { silent = false } = {}) {
+        if (!snap || typeof snap !== "object") return this;
+        const prevSuppress = this._suppressGlobalEmit;
+        if (silent) this._suppressGlobalEmit = true;
+        try {
+            if (snap.name !== undefined) this.name = String(snap.name);
+            if (snap.kind !== undefined) this.kind = String(snap.kind);
+            if (snap.baseSequenceId !== undefined) this.baseSequenceId = snap.baseSequenceId;
+            if (snap.baseRevision !== undefined) this.baseRevision = snap.baseRevision;
+            if (snap.revision !== undefined) this.revision = Number(snap.revision) || 1;
+            if (snap.author !== undefined) this.author = snap.author;
+            if (snap.brief !== undefined) this.brief = snap.brief;
+            if (snap.fps !== undefined && snap.fps !== null) this.fps = Number(snap.fps) || 24;
+            if (snap.width !== undefined && snap.width !== null) this.width = Number(snap.width) || 1920;
+            if (snap.height !== undefined && snap.height !== null) this.height = Number(snap.height) || 1080;
+            if (Array.isArray(snap.tracks)) this.tracks = cloneSequenceTracks(snap.tracks);
+            this.transitions = Array.isArray(snap.transitions) ? deepCloneSequenceValue(snap.transitions, []) : [];
+            this.markers = Array.isArray(snap.markers) ? deepCloneSequenceValue(snap.markers, []) : [];
+            this.ghostTrack = Array.isArray(snap.ghostTrack) ? deepCloneSequenceValue(snap.ghostTrack, []) : [];
+            if (snap.inFrame !== undefined) this.inFrame = snap.inFrame;
+            if (snap.outFrame !== undefined) this.outFrame = snap.outFrame;
+            if (snap.playheadFrame !== undefined && snap.playheadFrame !== null) this.playheadFrame = Number(snap.playheadFrame) || 0;
+            if (snap.zoom !== undefined) this.zoom = Number(snap.zoom) || 0.5;
+            if (snap.scrollLeftFrame !== undefined) this.scrollLeftFrame = Number(snap.scrollLeftFrame) || 0;
+            if (snap.scrollTop !== undefined) this.scrollTop = Number(snap.scrollTop) || 0;
+            if (snap.trackHeightScale !== undefined) this.trackHeightScale = Number(snap.trackHeightScale) || 1.0;
+            if (snap.previewZoom !== undefined) this.previewZoom = snap.previewZoom;
+            if (snap.previewPanX !== undefined) this.previewPanX = Number(snap.previewPanX) || 0;
+            if (snap.previewPanY !== undefined) this.previewPanY = Number(snap.previewPanY) || 0;
+            if (snap.safeMarginsEnabled !== undefined) this.safeMarginsEnabled = Boolean(snap.safeMarginsEnabled);
+            if (snap.safeMarginsConfig) this.safeMarginsConfig = { ...DEFAULT_SAFE_MARGINS_CONFIG, ...snap.safeMarginsConfig };
+            if (snap.selectedClipId !== undefined) this.selectedClipId = snap.selectedClipId;
+            if (Array.isArray(snap.selectedClipIds)) this.selectedClipIds = new Set(snap.selectedClipIds);
+            if (snap.activeTool) this.activeTool = snap.activeTool;
+            if (snap.selectedTrack !== undefined) this.selectedTrack = snap.selectedTrack;
+
+            this._setCuts(Array.isArray(snap.cuts) ? snap.cuts : [], { silent, skipValidateTransitions: true, preserveRevision: true });
+            if (snap.history && this.history) {
+                this.history.undoStack = deepCloneSequenceValue(snap.history.undoStack || [], []);
+                this.history.redoStack = deepCloneSequenceValue(snap.history.redoStack || [], []);
+                this.history.pending = null;
+                if (!silent) this.history._notify();
+            }
+        } finally {
+            this._suppressGlobalEmit = prevSuppress;
+        }
+        return this;
+    }
+
+    clone(options = {}) {
+        const opts = (options && typeof options === "object") ? options : {};
+        const snap = this.toSnapshot({ includeHistory: Boolean(opts.cloneHistory) });
+        const cloned = new TimelineSequenceState({
+            ...snap,
+            id: opts.id || `${this.id}_clone_${++_seqInstanceCounter}`,
+            name: opts.name || `${this.name} (Clone)`,
+            kind: opts.kind || "ghost",
+            baseSequenceId: this.id,
+            baseRevision: this.revision,
+            revision: 1,
+            author: opts.author || "ai",
+            brief: opts.brief ?? null,
+            headless: opts.headless !== undefined ? Boolean(opts.headless) : this.headless,
+            isolated: true,
+            mediaCatalog: opts.mediaCatalog || this._mediaCatalog
+        });
+        if (opts.cloneHistory && snap.history) {
+            cloned.history.undoStack = deepCloneSequenceValue(snap.history.undoStack, []);
+            cloned.history.redoStack = deepCloneSequenceValue(snap.history.redoStack, []);
+        }
+        return cloned;
+    }
+
+    diffAgainst(baseSequenceOrSnapshot) {
+        const base = (baseSequenceOrSnapshot && typeof baseSequenceOrSnapshot.toSnapshot === "function")
+            ? baseSequenceOrSnapshot.toSnapshot({ includeHistory: false })
+            : (baseSequenceOrSnapshot || {});
+        const baseCuts = Array.isArray(base.cuts) ? base.cuts : [];
+        const curCuts = this._getCuts() || [];
+        const baseById = new Map(baseCuts.map(c => [String(c.id), c]));
+        const curById = new Map(curCuts.map(c => [String(c.id), c]));
+
+        const added = [];
+        const removed = [];
+        const modified = [];
+        const compareKeys = [
+            "track", "timelineStartFrame", "inFrame", "outFrame",
+            "speed", "reverse", "disabled", "colorLabel", "text", "subtext", "effects"
+        ];
+
+        for (const [id, cur] of curById.entries()) {
+            const prev = baseById.get(id);
+            if (!prev) {
+                added.push(deepCloneSequenceValue(cur, cur));
+                continue;
+            }
+            const changedFields = [];
+            for (const k of compareKeys) {
+                if (JSON.stringify(prev[k] ?? null) !== JSON.stringify(cur[k] ?? null)) {
+                    changedFields.push(k);
+                }
+            }
+            if (changedFields.length > 0) {
+                modified.push({
+                    id,
+                    fields: changedFields,
+                    before: deepCloneSequenceValue(prev, prev),
+                    after: deepCloneSequenceValue(cur, cur)
+                });
+            }
+        }
+        for (const [id, prev] of baseById.entries()) {
+            if (!curById.has(id)) {
+                removed.push(deepCloneSequenceValue(prev, prev));
+            }
+        }
+
+        const baseTrackIds = new Set((base.tracks || []).map(t => t.id));
+        const curTrackIds = new Set((this.tracks || []).map(t => t.id));
+        const tracksAdded = (this.tracks || []).filter(t => !baseTrackIds.has(t.id)).map(t => t.id);
+        const tracksRemoved = (base.tracks || []).filter(t => !curTrackIds.has(t.id)).map(t => t.id);
+        const transitionsChanged = JSON.stringify(base.transitions || []) !== JSON.stringify(this.transitions || []);
+        const markersChanged = JSON.stringify(base.markers || []) !== JSON.stringify(this.markers || []);
+
+        return {
+            baseId: base.id || null,
+            baseRevision: base.revision ?? null,
+            targetId: this.id,
+            targetRevision: this.revision,
+            added,
+            removed,
+            modified,
+            tracksAdded,
+            tracksRemoved,
+            transitionsChanged,
+            markersChanged,
+            summary: {
+                added: added.length,
+                removed: removed.length,
+                modified: modified.length,
+                hasChanges: added.length > 0 || removed.length > 0 || modified.length > 0 ||
+                    tracksAdded.length > 0 || tracksRemoved.length > 0 || transitionsChanged || markersChanged
+            }
+        };
     }
 
     /** Carrega o estado das Margens de Segurança e Máscaras de Proporção do localStorage. */
@@ -755,6 +1075,7 @@ export class CapiauTimelineState {
             enabled: false,
             config: { ...DEFAULT_SAFE_MARGINS_CONFIG }
         };
+        if (this.headless) return fallback;
         try {
             if (typeof localStorage !== "undefined") {
                 const raw = localStorage.getItem(SAFE_MARGINS_STORAGE_KEY);
@@ -776,6 +1097,7 @@ export class CapiauTimelineState {
 
     /** Salva o estado das Margens de Segurança e Máscaras de Proporção no localStorage. */
     _saveSafeMarginsState() {
+        if (this.headless) return;
         try {
             if (typeof localStorage !== "undefined") {
                 localStorage.setItem(SAFE_MARGINS_STORAGE_KEY, JSON.stringify({
@@ -801,7 +1123,7 @@ export class CapiauTimelineState {
             : !this.safeMarginsEnabled;
         this._saveSafeMarginsState();
         const payload = this.getSafeMarginsState();
-        STATE.emit("safeMarginsChanged", payload);
+        this._emit("safeMarginsChanged", payload);
         return this.safeMarginsEnabled;
     }
 
@@ -818,7 +1140,7 @@ export class CapiauTimelineState {
         }
         this._saveSafeMarginsState();
         const payload = this.getSafeMarginsState();
-        STATE.emit("safeMarginsChanged", payload);
+        this._emit("safeMarginsChanged", payload);
         return payload;
     }
 
@@ -857,7 +1179,7 @@ export class CapiauTimelineState {
         this.safeMarginsConfig = next;
         this._saveSafeMarginsState();
         const payload = this.getSafeMarginsState();
-        STATE.emit("safeMarginsChanged", payload);
+        this._emit("safeMarginsChanged", payload);
         return payload;
     }
 
@@ -871,6 +1193,7 @@ export class CapiauTimelineState {
 
     /** Carrega a preferência de 'Timeline Segue a Agulha' do localStorage (default: true). */
     loadFollowPlayhead() {
+        if (this.headless) return true;
         try {
             if (typeof localStorage !== "undefined") {
                 const saved = localStorage.getItem("capiau_timeline_follow_playhead");
@@ -882,6 +1205,7 @@ export class CapiauTimelineState {
 
     /** Carrega o modo de rolagem da timeline do localStorage (default: 'page'). */
     loadFollowPlayheadMode() {
+        if (this.headless) return "page";
         try {
             if (typeof localStorage !== "undefined") {
                 const saved = localStorage.getItem("capiau_timeline_follow_playhead_mode");
@@ -893,6 +1217,7 @@ export class CapiauTimelineState {
 
     /** Carrega o percentual de âncora da agulha para o modo suave (default: 0.5 [50%]). */
     loadSmoothScrollAnchor() {
+        if (this.headless) return 0.5;
         try {
             if (typeof localStorage !== "undefined") {
                 const saved = localStorage.getItem("capiau_timeline_smooth_anchor");
@@ -910,12 +1235,14 @@ export class CapiauTimelineState {
     /** Alterna ou define a rolagem automática acompanhando a agulha. */
     toggleFollowPlayhead(enabled) {
         this.followPlayhead = (enabled !== undefined) ? !!enabled : !this.followPlayhead;
-        try {
-            if (typeof localStorage !== "undefined") {
-                localStorage.setItem("capiau_timeline_follow_playhead", String(this.followPlayhead));
-            }
-        } catch (_) {}
-        STATE.emit("timelineFollowPlayheadChanged", this.followPlayhead);
+        if (!this.headless) {
+            try {
+                if (typeof localStorage !== "undefined") {
+                    localStorage.setItem("capiau_timeline_follow_playhead", String(this.followPlayhead));
+                }
+            } catch (_) {}
+        }
+        this._emit("timelineFollowPlayheadChanged", this.followPlayhead);
         return this.followPlayhead;
     }
 
@@ -923,12 +1250,14 @@ export class CapiauTimelineState {
     setFollowPlayheadMode(mode) {
         if (!["page", "smooth"].includes(mode)) return;
         this.followPlayheadMode = mode;
-        try {
-            if (typeof localStorage !== "undefined") {
-                localStorage.setItem("capiau_timeline_follow_playhead_mode", mode);
-            }
-        } catch (_) {}
-        STATE.emit("timelineFollowPlayheadModeChanged", mode);
+        if (!this.headless) {
+            try {
+                if (typeof localStorage !== "undefined") {
+                    localStorage.setItem("capiau_timeline_follow_playhead_mode", mode);
+                }
+            } catch (_) {}
+        }
+        this._emit("timelineFollowPlayheadModeChanged", mode);
     }
 
     /** Define a posição de ancoragem (0.3 a 0.7) da agulha no modo suave. */
@@ -936,16 +1265,19 @@ export class CapiauTimelineState {
         const num = typeof fraction === "number" ? fraction : parseFloat(fraction);
         if (!Number.isFinite(num)) return;
         this.smoothScrollAnchor = Math.max(0.3, Math.min(0.7, num));
-        try {
-            if (typeof localStorage !== "undefined") {
-                localStorage.setItem("capiau_timeline_smooth_anchor", String(this.smoothScrollAnchor));
-            }
-        } catch (_) {}
-        STATE.emit("timelineSmoothAnchorChanged", this.smoothScrollAnchor);
+        if (!this.headless) {
+            try {
+                if (typeof localStorage !== "undefined") {
+                    localStorage.setItem("capiau_timeline_smooth_anchor", String(this.smoothScrollAnchor));
+                }
+            } catch (_) {}
+        }
+        this._emit("timelineSmoothAnchorChanged", this.smoothScrollAnchor);
     }
 
     /** Carrega a preferência de modo de colisão do localStorage (default: 'clamp'). */
     loadDragCollisionMode() {
+        if (this.headless) return "clamp";
         try {
             if (typeof localStorage !== "undefined") {
                 const saved = localStorage.getItem("capiau_collision_mode_v1");
@@ -966,16 +1298,19 @@ export class CapiauTimelineState {
     setDragCollisionMode(mode) {
         if (!["clamp", "overwrite", "ripple"].includes(mode)) return;
         this._dragCollisionMode = mode;
-        try {
-            if (typeof localStorage !== "undefined") {
-                localStorage.setItem("capiau_collision_mode_v1", mode);
-            }
-        } catch (_) {}
-        STATE.emit("timelineCollisionModeChanged", mode);
+        if (!this.headless) {
+            try {
+                if (typeof localStorage !== "undefined") {
+                    localStorage.setItem("capiau_collision_mode_v1", mode);
+                }
+            } catch (_) {}
+        }
+        this._emit("timelineCollisionModeChanged", mode);
     }
 
     /** Carrega a preferência de 'Alças de Transformação Automáticas ao Selecionar' do localStorage (default: false). */
     loadAutoTransformOverlay() {
+        if (this.headless) return false;
         try {
             if (typeof localStorage !== "undefined") {
                 const saved = localStorage.getItem("capiau_auto_transform_overlay");
@@ -988,24 +1323,30 @@ export class CapiauTimelineState {
     /** Alterna ou define a exibição automática das alças de transformação ao selecionar clipe na timeline. */
     toggleAutoTransformOverlay(enabled) {
         this.autoTransformOverlay = (enabled !== undefined) ? !!enabled : !this.autoTransformOverlay;
-        try {
-            if (typeof localStorage !== "undefined") {
-                localStorage.setItem("capiau_auto_transform_overlay", String(this.autoTransformOverlay));
-            }
-        } catch (_) {}
-        STATE.emit("timelineAutoTransformOverlayChanged", this.autoTransformOverlay);
+        if (!this.headless) {
+            try {
+                if (typeof localStorage !== "undefined") {
+                    localStorage.setItem("capiau_auto_transform_overlay", String(this.autoTransformOverlay));
+                }
+            } catch (_) {}
+        }
+        this._emit("timelineAutoTransformOverlayChanged", this.autoTransformOverlay);
         return this.autoTransformOverlay;
     }
 
     /** Define o ID do clipe ativo em modo de transformação manual no preview. */
     setManualTransformClipId(clipId) {
         this.manualTransformClipId = clipId ? String(clipId) : null;
-        STATE.emit("manualTransformClipIdChanged", this.manualTransformClipId);
+        this._emit("manualTransformClipIdChanged", this.manualTransformClipId);
     }
 
-    /** Atalho reativo para a lista ativa de cortes na timeline. */
+    /** Atalho reativo para a lista ativa de cortes desta sequência. */
     get cuts() {
-        return (STATE && STATE.activeTimelineCuts) || [];
+        return this._getCuts();
+    }
+
+    set cuts(val) {
+        this._setCuts(val);
     }
 
     // ── PONTOS DE ENTRADA E SAÍDA (IN / OUT / LOOP) ───────────────────────
@@ -1020,7 +1361,7 @@ export class CapiauTimelineState {
         if (this.outFrame !== null && this.outFrame <= this.inFrame) {
             this.outFrame = null;
         }
-        STATE.emit("timelineInOutChanged", { inFrame: this.inFrame, outFrame: this.outFrame });
+        this._emit("timelineInOutChanged", { inFrame: this.inFrame, outFrame: this.outFrame });
         return this.inFrame;
     }
 
@@ -1034,7 +1375,7 @@ export class CapiauTimelineState {
         if (this.inFrame !== null && this.inFrame >= this.outFrame) {
             this.inFrame = null;
         }
-        STATE.emit("timelineInOutChanged", { inFrame: this.inFrame, outFrame: this.outFrame });
+        this._emit("timelineInOutChanged", { inFrame: this.inFrame, outFrame: this.outFrame });
         return this.outFrame;
     }
 
@@ -1042,7 +1383,7 @@ export class CapiauTimelineState {
     clearInPoint() {
         if (this.inFrame !== null) {
             this.inFrame = null;
-            STATE.emit("timelineInOutChanged", { inFrame: this.inFrame, outFrame: this.outFrame });
+            this._emit("timelineInOutChanged", { inFrame: this.inFrame, outFrame: this.outFrame });
         }
     }
 
@@ -1050,7 +1391,7 @@ export class CapiauTimelineState {
     clearOutPoint() {
         if (this.outFrame !== null) {
             this.outFrame = null;
-            STATE.emit("timelineInOutChanged", { inFrame: this.inFrame, outFrame: this.outFrame });
+            this._emit("timelineInOutChanged", { inFrame: this.inFrame, outFrame: this.outFrame });
         }
     }
 
@@ -1059,7 +1400,7 @@ export class CapiauTimelineState {
         if (this.inFrame !== null || this.outFrame !== null) {
             this.inFrame = null;
             this.outFrame = null;
-            STATE.emit("timelineInOutChanged", { inFrame: this.inFrame, outFrame: this.outFrame });
+            this._emit("timelineInOutChanged", { inFrame: this.inFrame, outFrame: this.outFrame });
         }
     }
 
@@ -1068,7 +1409,7 @@ export class CapiauTimelineState {
      * @param {string} [clipId=null] ID do clipe (opcional).
      */
     markClip(clipId = null) {
-        const cuts = STATE.activeTimelineCuts || [];
+        const cuts = this._getCuts() || [];
         let targetCut = null;
         if (clipId) {
             targetCut = cuts.find(c => c.id === clipId);
@@ -1087,7 +1428,7 @@ export class CapiauTimelineState {
             const end = targetCut.timelineStartFrame + (targetCut.outFrame - targetCut.inFrame);
             this.inFrame = start;
             this.outFrame = end;
-            STATE.emit("timelineInOutChanged", { inFrame: this.inFrame, outFrame: this.outFrame });
+            this._emit("timelineInOutChanged", { inFrame: this.inFrame, outFrame: this.outFrame });
             return true;
         }
         return false;
@@ -1099,7 +1440,7 @@ export class CapiauTimelineState {
      */
     toggleLoop(forceState = null) {
         this.isLooping = (forceState !== null) ? Boolean(forceState) : !this.isLooping;
-        STATE.emit("timelineLoopChanged", this.isLooping);
+        this._emit("timelineLoopChanged", this.isLooping);
         return this.isLooping;
     }
 
@@ -1113,7 +1454,7 @@ export class CapiauTimelineState {
      * Se ambos null, retorna [0, maxDuration].
      */
     getEffectiveInOutFrames() {
-        const cuts = STATE.activeTimelineCuts || [];
+        const cuts = this._getCuts() || [];
         const maxDuration = cuts.reduce((max, c) => Math.max(max, (c.timelineStartFrame || 0) + ((c.outFrame || 0) - (c.inFrame || 0))), 0);
         const start = (this.inFrame !== null) ? this.inFrame : 0;
         const end = (this.outFrame !== null) ? this.outFrame : maxDuration;
@@ -1124,7 +1465,7 @@ export class CapiauTimelineState {
     seekToIn() {
         const target = (this.inFrame !== null) ? this.inFrame : 0;
         this.setPlayheadFrame(target);
-        if (window.timelineInteraction && typeof window.timelineInteraction.ensureFrameVisible === "function") {
+        if (typeof window !== "undefined" && window.timelineInteraction && typeof window.timelineInteraction.ensureFrameVisible === "function") {
             window.timelineInteraction.ensureFrameVisible(target);
         }
         return target;
@@ -1132,11 +1473,11 @@ export class CapiauTimelineState {
 
     /** Move a agulha para o ponto OUT (ou duração máxima). */
     seekToOut() {
-        const cuts = STATE.activeTimelineCuts || [];
+        const cuts = this._getCuts() || [];
         const maxDuration = cuts.reduce((max, c) => Math.max(max, (c.timelineStartFrame || 0) + ((c.outFrame || 0) - (c.inFrame || 0))), 0);
         const target = (this.outFrame !== null) ? this.outFrame : maxDuration;
         this.setPlayheadFrame(target);
-        if (window.timelineInteraction && typeof window.timelineInteraction.ensureFrameVisible === "function") {
+        if (typeof window !== "undefined" && window.timelineInteraction && typeof window.timelineInteraction.ensureFrameVisible === "function") {
             window.timelineInteraction.ensureFrameVisible(target);
         }
         return target;
@@ -1157,7 +1498,7 @@ export class CapiauTimelineState {
 
         if (startF >= endF) return false;
 
-        const cuts = STATE.activeTimelineCuts || [];
+        const cuts = this._getCuts() || [];
         if (cuts.length === 0) return false;
 
         const activeTrackIds = this.tracks
@@ -1166,7 +1507,7 @@ export class CapiauTimelineState {
 
         let modified = false;
 
-        TIMELINE_HISTORY.record(() => {
+        this.history.record(() => {
             const newCuts = [];
 
             for (const cut of cuts) {
@@ -1247,7 +1588,7 @@ export class CapiauTimelineState {
 
             if (modified) {
                 this.clearClipSelection();
-                STATE.activeTimelineCuts = newCuts;
+                this._setCuts(newCuts);
             }
         });
 
@@ -1269,7 +1610,7 @@ export class CapiauTimelineState {
 
         if (startF >= endF) return false;
 
-        const cuts = STATE.activeTimelineCuts || [];
+        const cuts = this._getCuts() || [];
         if (cuts.length === 0) return false;
 
         const durationFrames = endF - startF;
@@ -1280,7 +1621,7 @@ export class CapiauTimelineState {
 
         let modified = false;
 
-        TIMELINE_HISTORY.record(() => {
+        this.history.record(() => {
             const intermediateCuts = [];
 
             for (const cut of cuts) {
@@ -1362,8 +1703,8 @@ export class CapiauTimelineState {
             }
 
             this.clearClipSelection();
-            STATE.activeTimelineCuts = finalCuts;
-            STATE.emit("timelineInOutChanged", { inFrame: this.inFrame, outFrame: this.outFrame });
+            this._setCuts(finalCuts);
+            this._emit("timelineInOutChanged", { inFrame: this.inFrame, outFrame: this.outFrame });
         });
 
         return modified;
@@ -1375,7 +1716,7 @@ export class CapiauTimelineState {
      * Retorna a lista de marcadores ordenada por frame (atualizando posições de marcadores vinculados a clipes).
      */
     getMarkersSorted() {
-        const cuts = STATE.activeTimelineCuts || [];
+        const cuts = this._getCuts() || [];
         const fps = this.fps || 24;
         this.markers.forEach(m => {
             if (m.clipId) {
@@ -1418,7 +1759,7 @@ export class CapiauTimelineState {
                 this.selectedMarkerIds.add(id);
             }
         }
-        STATE.emit("timelineMarkersChanged", this.markers);
+        this._emit("timelineMarkersChanged", this.markers);
     }
 
     /**
@@ -1427,7 +1768,7 @@ export class CapiauTimelineState {
     clearSelectedMarkers() {
         if (this.selectedMarkerIds.size > 0) {
             this.selectedMarkerIds.clear();
-            STATE.emit("timelineMarkersChanged", this.markers);
+            this._emit("timelineMarkersChanged", this.markers);
         }
     }
 
@@ -1437,12 +1778,12 @@ export class CapiauTimelineState {
     removeSelectedMarkers() {
         if (this.selectedMarkerIds.size === 0) return 0;
         let count = 0;
-        TIMELINE_HISTORY.record(() => {
+        this.history.record(() => {
             count = this.selectedMarkerIds.size;
             const idsToRemove = new Set(this.selectedMarkerIds);
             this.markers = this.markers.filter(m => !idsToRemove.has(m.id));
             this.selectedMarkerIds.clear();
-            STATE.emit("timelineMarkersChanged", this.markers);
+            this._emit("timelineMarkersChanged", this.markers);
         });
         return count;
     }
@@ -1499,7 +1840,7 @@ export class CapiauTimelineState {
 
         // Se clipId não foi explicitamente passado, auto-vincula ao clipe sob o frame se houver
         if (finalClipId === undefined) {
-            const cuts = STATE.activeTimelineCuts || [];
+            const cuts = this._getCuts() || [];
             const fps = this.fps || 24;
             const videoCuts = cuts.filter(c => c.type !== "audio" && (!c.track || !String(c.track).toLowerCase().startsWith("a")));
             const searchCuts = videoCuts.length > 0 ? videoCuts : cuts;
@@ -1523,7 +1864,7 @@ export class CapiauTimelineState {
         }
 
         let marker = null;
-        TIMELINE_HISTORY.record(() => {
+        this.history.record(() => {
             marker = {
                 id,
                 frame: Math.max(0, Math.round(frame)),
@@ -1536,7 +1877,7 @@ export class CapiauTimelineState {
 
             this.markers.push(marker);
             this.selectMarker(id, false);
-            STATE.emit("timelineMarkersChanged", this.markers);
+            this._emit("timelineMarkersChanged", this.markers);
         });
         return marker;
     }
@@ -1548,11 +1889,11 @@ export class CapiauTimelineState {
         const marker = this.getMarker(id);
         if (!marker) return null;
 
-        TIMELINE_HISTORY.record(() => {
+        this.history.record(() => {
             if (updates.frame !== undefined) {
                 marker.frame = Math.max(0, Math.round(updates.frame));
                 if (marker.clipId) {
-                    const cuts = STATE.activeTimelineCuts || [];
+                    const cuts = this._getCuts() || [];
                     let cut = cuts.find(c => String(c.id) === String(marker.clipId));
                     if (!cut) {
                         cut = cuts.find(c => marker.frame >= c.timelineStartFrame && marker.frame <= c.timelineStartFrame + (c.outFrame - c.inFrame));
@@ -1570,7 +1911,7 @@ export class CapiauTimelineState {
             if (updates.clipId !== undefined) {
                 marker.clipId = updates.clipId;
                 if (updates.clipId) {
-                    const cuts = STATE.activeTimelineCuts || [];
+                    const cuts = this._getCuts() || [];
                     let cut = cuts.find(c => String(c.id) === String(updates.clipId));
                     if (!cut) {
                         const searchFrame = updates.frame !== undefined ? updates.frame : marker.frame;
@@ -1585,7 +1926,7 @@ export class CapiauTimelineState {
                 }
             }
 
-            STATE.emit("timelineMarkersChanged", this.markers);
+            this._emit("timelineMarkersChanged", this.markers);
         });
         return marker;
     }
@@ -1597,10 +1938,10 @@ export class CapiauTimelineState {
         const idx = this.markers.findIndex(m => m.id === id);
         if (idx !== -1) {
             let removed = null;
-            TIMELINE_HISTORY.record(() => {
+            this.history.record(() => {
                 removed = this.markers.splice(idx, 1)[0];
                 this.selectedMarkerIds.delete(id);
-                STATE.emit("timelineMarkersChanged", this.markers);
+                this._emit("timelineMarkersChanged", this.markers);
             });
             return removed;
         }
@@ -1624,7 +1965,7 @@ export class CapiauTimelineState {
                 offsetFrame: m.offsetFrame !== undefined ? m.offsetFrame : null
             }));
         }
-        STATE.emit("timelineMarkersChanged", this.markers);
+        this._emit("timelineMarkersChanged", this.markers);
     }
 
     // ── PISTAS ──────────────────────────────────────────────────────────
@@ -1706,7 +2047,7 @@ export class CapiauTimelineState {
         if (clamped === this.trackHeightScale) return;
         this.trackHeightScale = clamped;
         this.clampScrollTop();
-        STATE.emit("timelineTracksChanged", this.tracks);
+        this._emit("timelineTracksChanged", this.tracks);
     }
 
     /** Define a altura base (px em escala 1.0) de UMA pista específica (arraste individual ou Shift + Roda). */
@@ -1717,7 +2058,7 @@ export class CapiauTimelineState {
         const targetRendered = Math.min(240, Math.max(22, Math.round(px)));
         track.heightPx = Math.round(targetRendered / scale);
         this.clampScrollTop();
-        STATE.emit("timelineTracksChanged", this.tracks);
+        this._emit("timelineTracksChanged", this.tracks);
     }
 
     /** Restaura a altura padrão de uma pista específica removendo o override heightPx. */
@@ -1726,7 +2067,7 @@ export class CapiauTimelineState {
         if (!track) return;
         delete track.heightPx;
         this.clampScrollTop();
-        STATE.emit("timelineTracksChanged", this.tracks);
+        this._emit("timelineTracksChanged", this.tracks);
     }
 
     /** Altura total ocupada por todas as pistas (px). */
@@ -1757,7 +2098,7 @@ export class CapiauTimelineState {
                 this.tracks.unshift({ id: "AI", name: "IA — Sugestões", kind: "ai", volume: 1.0, muted: false, locked: true, syncLocked: false, hidden: false, thumbnailsEnabled: false });
             }
         }
-        STATE.emit("timelineTracksChanged", this.tracks);
+        this._emit("timelineTracksChanged", this.tracks);
     }
 
     /** Adiciona uma nova pista de texto/títulos (inserida no grupo de pistas de texto ou abaixo de IA). */
@@ -1776,7 +2117,7 @@ export class CapiauTimelineState {
             hidden: false,
             thumbnailsEnabled: false
         };
-        TIMELINE_HISTORY.record(() => {
+        this.history.record(() => {
             const textTracks = this.getTextTracks();
             let insertIdx = 0;
             if (textTracks.length > 0) {
@@ -1787,7 +2128,7 @@ export class CapiauTimelineState {
                 insertIdx = aiIdx >= 0 ? aiIdx + 1 : 0;
             }
             this.tracks.splice(insertIdx, 0, track);
-            STATE.emit("timelineTracksChanged", this.tracks);
+            this._emit("timelineTracksChanged", this.tracks);
         });
         return track;
     }
@@ -1808,11 +2149,11 @@ export class CapiauTimelineState {
             hidden: false,
             thumbnailsEnabled: true
         };
-        TIMELINE_HISTORY.record(() => {
+        this.history.record(() => {
             // Insere abaixo da pista de IA (índice 1) para ficar no topo das pistas de vídeo
             const aiIdx = this.tracks.findIndex(t => t.kind === "ai");
             this.tracks.splice(aiIdx >= 0 ? aiIdx + 1 : 0, 0, track);
-            STATE.emit("timelineTracksChanged", this.tracks);
+            this._emit("timelineTracksChanged", this.tracks);
         });
         return track;
     }
@@ -1833,9 +2174,9 @@ export class CapiauTimelineState {
             hidden: false,
             thumbnailsEnabled: false
         };
-        TIMELINE_HISTORY.record(() => {
+        this.history.record(() => {
             this.tracks.push(track);
-            STATE.emit("timelineTracksChanged", this.tracks);
+            this._emit("timelineTracksChanged", this.tracks);
         });
         return track;
     }
@@ -1851,18 +2192,18 @@ export class CapiauTimelineState {
 
         const remainingSameKind = this.tracks.filter((t, i) => i !== idx && t.kind === track.kind);
         const unlockedSameKind = remainingSameKind.filter(t => !t.locked);
-        const hasClipsOnTrack = (STATE.activeTimelineCuts || []).some(c => c.track === trackId);
+        const hasClipsOnTrack = (this._getCuts() || []).some(c => c.track === trackId);
         // Se houver clipes órfãos e todas as outras pistas do mesmo tipo estiverem travadas, aborta para não violar cadeado
         if (hasClipsOnTrack && remainingSameKind.length > 0 && unlockedSameKind.length === 0) {
             return false;
         }
 
-        TIMELINE_HISTORY.record(() => {
+        this.history.record(() => {
             this.tracks.splice(idx, 1);
             const sameKind = this.tracks.filter(t => t.kind === track.kind && !t.locked);
             const fallback = sameKind.length ? sameKind[sameKind.length - 1] : null;
 
-            let cuts = [...STATE.activeTimelineCuts];
+            let cuts = [...this._getCuts()];
             let changed = false;
             if (fallback) {
                 // Move os clipes órfãos para outra pista do mesmo tipo
@@ -1882,9 +2223,9 @@ export class CapiauTimelineState {
                     if (c.link_id && removedLinks.has(c.link_id)) c.link_id = null;
                 });
             }
-            STATE.emit("timelineTracksChanged", this.tracks);
-            if (changed) STATE.activeTimelineCuts = cuts;
-            else STATE.emit("timelineCutsUpdated", STATE.activeTimelineCuts);
+            this._emit("timelineTracksChanged", this.tracks);
+            if (changed) this._setCuts(cuts);
+            else this._emit("timelineCutsUpdated", this._getCuts());
         });
         return true;
     }
@@ -1893,9 +2234,9 @@ export class CapiauTimelineState {
         const track = this.getTrack(trackId);
         if (!track || !newName) return false;
         if (track.kind !== "ai" && track.locked) return false;
-        TIMELINE_HISTORY.record(() => {
+        this.history.record(() => {
             track.name = newName.trim();
-            STATE.emit("timelineTracksChanged", this.tracks);
+            this._emit("timelineTracksChanged", this.tracks);
         });
         return true;
     }
@@ -1904,19 +2245,19 @@ export class CapiauTimelineState {
         const track = this.getTrack(trackId);
         if (!track) return;
         track.volume = Math.max(0, Math.min(1, Number(volume)));
-        STATE.emit("timelineCutsUpdated", STATE.activeTimelineCuts);
+        this._emit("timelineCutsUpdated", this._getCuts());
     }
 
     toggleTrackMute(trackId) {
         const track = this.getTrack(trackId);
         if (!track) return;
         track.muted = !track.muted;
-        STATE.emit("timelineTracksChanged", this.tracks);
-        STATE.emit("timelineCutsUpdated", STATE.activeTimelineCuts);
+        this._emit("timelineTracksChanged", this.tracks);
+        this._emit("timelineCutsUpdated", this._getCuts());
     }
 
     _purgeSelectionOnLockedTrack(trackId) {
-        const cuts = STATE.activeTimelineCuts || [];
+        const cuts = this._getCuts() || [];
         let selectionMutated = false;
 
         if (this.selectedClipIds && this.selectedClipIds.size > 0) {
@@ -1944,7 +2285,7 @@ export class CapiauTimelineState {
 
         if (this.selectedGap && this.selectedGap.trackId === trackId) {
             this.selectedGap = null;
-            STATE.emit("timelineGapSelected", null);
+            this._emit("timelineGapSelected", null);
             selectionMutated = true;
         }
 
@@ -1970,7 +2311,7 @@ export class CapiauTimelineState {
         }
 
         if (selectionMutated) {
-            STATE.emit("timelineSelectionChanged", this.selectedClipId);
+            this._emit("timelineSelectionChanged", this.selectedClipId);
         }
     }
 
@@ -1978,7 +2319,7 @@ export class CapiauTimelineState {
         const track = this.getTrack(trackId);
         if (!track || track.kind === "ai") return null;
 
-        TIMELINE_HISTORY.record(() => {
+        this.history.record(() => {
             const liveTrack = this.getTrack(trackId);
             if (!liveTrack || liveTrack.kind === "ai") return;
             liveTrack.locked = !liveTrack.locked;
@@ -1988,8 +2329,8 @@ export class CapiauTimelineState {
         });
 
         const updated = this.getTrack(trackId);
-        STATE.emit("timelineTracksChanged", this.tracks);
-        STATE.emit("timelineCutsUpdated", STATE.activeTimelineCuts);
+        this._emit("timelineTracksChanged", this.tracks);
+        this._emit("timelineCutsUpdated", this._getCuts());
         return updated ? !!updated.locked : null;
     }
 
@@ -2025,7 +2366,7 @@ export class CapiauTimelineState {
 
         const shouldLockAll = nonAiTracks.some(t => !t.locked);
 
-        TIMELINE_HISTORY.record(() => {
+        this.history.record(() => {
             (this.tracks || []).forEach(t => {
                 if (t.kind === "ai") return;
                 t.locked = shouldLockAll;
@@ -2035,8 +2376,8 @@ export class CapiauTimelineState {
             });
         });
 
-        STATE.emit("timelineTracksChanged", this.tracks);
-        STATE.emit("timelineCutsUpdated", STATE.activeTimelineCuts);
+        this._emit("timelineTracksChanged", this.tracks);
+        this._emit("timelineCutsUpdated", this._getCuts());
         return { locked: shouldLockAll, count: nonAiTracks.length };
     }
 
@@ -2075,8 +2416,8 @@ export class CapiauTimelineState {
         const idSet = new Set(targetIds);
         let updatedCount = 0;
 
-        TIMELINE_HISTORY.record(() => {
-            const cuts = [...(STATE.activeTimelineCuts || [])];
+        this.history.record(() => {
+            const cuts = [...(this._getCuts() || [])];
             let changed = false;
             cuts.forEach(cut => {
                 if (!cut || !idSet.has(String(cut.id))) return;
@@ -2089,8 +2430,8 @@ export class CapiauTimelineState {
                 updatedCount++;
             });
             if (changed) {
-                STATE.activeTimelineCuts = cuts;
-                STATE.emit("timelineCutsUpdated", STATE.activeTimelineCuts);
+                this._setCuts(cuts);
+                this._emit("timelineCutsUpdated", this._getCuts());
             }
         });
 
@@ -2101,16 +2442,16 @@ export class CapiauTimelineState {
         const track = this.getTrack(trackId);
         if (!track) return;
         track.hidden = !track.hidden;
-        STATE.emit("timelineTracksChanged", this.tracks);
-        STATE.emit("timelineCutsUpdated", STATE.activeTimelineCuts);
+        this._emit("timelineTracksChanged", this.tracks);
+        this._emit("timelineCutsUpdated", this._getCuts());
     }
 
     toggleTrackThumbnails(trackId) {
         const track = this.getTrack(trackId);
         if (!track || track.kind !== "video") return;
         track.thumbnailsEnabled = !track.thumbnailsEnabled;
-        STATE.emit("timelineTracksChanged", this.tracks);
-        STATE.emit("timelineCutsUpdated", STATE.activeTimelineCuts);
+        this._emit("timelineTracksChanged", this.tracks);
+        this._emit("timelineCutsUpdated", this._getCuts());
     }
 
     toggleHoverPreview(enabled) {
@@ -2129,11 +2470,11 @@ export class CapiauTimelineState {
             const num = parseFloat(mode);
             this.globalThumbnailsInterval = (!isNaN(num) && num > 0) ? num : 1.0;
         }
-        const sel = document.getElementById("select-timeline-thumbs-density");
+        const sel = (typeof document !== "undefined") ? document.getElementById("select-timeline-thumbs-density") : null;
         if (sel && sel.value !== this.thumbnailMode) {
             sel.value = this.thumbnailMode;
         }
-        STATE.emit("timelineCutsUpdated", STATE.activeTimelineCuts);
+        this._emit("timelineCutsUpdated", this._getCuts());
     }
 
     setGlobalThumbnailsInterval(val) {
@@ -2142,10 +2483,11 @@ export class CapiauTimelineState {
 
     setMuteHiddenTracksPlayback(enabled) {
         this.muteHiddenTracksPlayback = !!enabled;
-        STATE.emit("timelineCutsUpdated", STATE.activeTimelineCuts);
+        this._emit("timelineCutsUpdated", this._getCuts());
     }
 
     loadShowInOutRulerBadge() {
+        if (this.headless) return false;
         try {
             return typeof localStorage !== "undefined" && localStorage.getItem("capiau_timeline_show_in_out_badge") === "1";
         } catch (_) {
@@ -2157,20 +2499,20 @@ export class CapiauTimelineState {
         this.showInOutRulerBadge = enabled !== undefined ? !!enabled : !this.showInOutRulerBadge;
         try {
             if (typeof localStorage !== "undefined") {
-                localStorage.setItem("capiau_timeline_show_in_out_badge", this.showInOutRulerBadge ? "1" : "0");
+                if (!this.headless) localStorage.setItem("capiau_timeline_show_in_out_badge", this.showInOutRulerBadge ? "1" : "0");
             }
         } catch (_) {}
-        STATE.emit("timelineShowInOutRulerBadgeChanged", this.showInOutRulerBadge);
-        STATE.emit("timelineStateChanged");
+        this._emit("timelineShowInOutRulerBadgeChanged", this.showInOutRulerBadge);
+        this._emit("timelineStateChanged");
         return this.showInOutRulerBadge;
     }
 
     toggleTrackSyncLock(trackId) {
         const track = this.getTrack(trackId);
         if (!track || track.kind === "ai") return;
-        TIMELINE_HISTORY.record(() => {
+        this.history.record(() => {
             track.syncLocked = track.syncLocked !== undefined ? !track.syncLocked : false;
-            STATE.emit("timelineTracksChanged", this.tracks);
+            this._emit("timelineTracksChanged", this.tracks);
         });
     }
 
@@ -2181,7 +2523,7 @@ export class CapiauTimelineState {
 
     toggleSnapping(enabled) {
         this.snappingEnabled = enabled !== undefined ? !!enabled : !this.snappingEnabled;
-        STATE.emit("timelineSnappingChanged", this.snappingEnabled);
+        this._emit("timelineSnappingChanged", this.snappingEnabled);
         return this.snappingEnabled;
     }
 
@@ -2213,7 +2555,7 @@ export class CapiauTimelineState {
      * @returns {Array<{ trackId: string, startFrame: number, endFrame: number, durationFrames: number }>}
      */
     getTrackGaps(trackId, ignoredClipIds = [], includeEndGap = false) {
-        const cuts = (STATE.activeTimelineCuts || [])
+        const cuts = (this._getCuts() || [])
             .filter(c => c.track === trackId && !ignoredClipIds.includes(c.id))
             .sort((a, b) => (a.timelineStartFrame || 0) - (b.timelineStartFrame || 0));
 
@@ -2289,7 +2631,7 @@ export class CapiauTimelineState {
      * @returns {{ prevClip: Object|null, nextClip: Object|null, prevEnd: number, nextStart: number }}
      */
     getTrackClipNeighbors(trackId, frame, ignoredClipIds = []) {
-        const cuts = (STATE.activeTimelineCuts || [])
+        const cuts = (this._getCuts() || [])
             .filter(c => c.track === trackId && !ignoredClipIds.includes(c.id))
             .sort((a, b) => (a.timelineStartFrame || 0) - (b.timelineStartFrame || 0));
 
@@ -2327,12 +2669,12 @@ export class CapiauTimelineState {
      * @param {number} startFrame - Frame inicial da sobrescrita.
      * @param {number} durationFrames - Duração em frames.
      * @param {string[]} [ignoredClipIds=[]] - IDs de clipes a ignorar.
-     * @param {Array<Object>|null} [sourceCuts=null] - Lista base de cortes (se omitida, usa STATE.activeTimelineCuts).
+     * @param {Array<Object>|null} [sourceCuts=null] - Lista base de cortes (se omitida, usa this._getCuts()).
      * @param {Map<string, string>|null} [splitLinkMap=null] - Mapa compartilhado para sincronizar link_id em splits A/V.
      * @returns {Array<Object>} Lista atualizada de cortes.
      */
     overwriteTimeRange(trackId, startFrame, durationFrames, ignoredClipIds = [], sourceCuts = null, splitLinkMap = null) {
-        const cuts = sourceCuts || STATE.activeTimelineCuts || [];
+        const cuts = sourceCuts || this._getCuts() || [];
         if (this.isTrackLocked(trackId)) return [...cuts];
         const endFrame = startFrame + durationFrames;
         const fps = this.fps || 24;
@@ -2430,7 +2772,7 @@ export class CapiauTimelineState {
      * @returns {{ simulatedCuts: Array<Object>, outgoingClip: Object|null, outgoingTime: number, incomingClip: Object|null, incomingTime: number }}
      */
     simulateOverwrite(draggedClipId, targetStartFrame, targetTrack = null, sourceCuts = null, isMovingBackwards = false) {
-        const base = (sourceCuts || STATE.activeTimelineCuts || []).map(c => ({ ...c }));
+        const base = (sourceCuts || this._getCuts() || []).map(c => ({ ...c }));
         const clip = base.find(c => c.id === draggedClipId);
         if (!clip || this.isTrackLocked(clip.track)) {
             return { simulatedCuts: base, outgoingClip: null, outgoingTime: 0, incomingClip: null, incomingTime: 0 };
@@ -2591,7 +2933,7 @@ export class CapiauTimelineState {
      * @returns {{ simulatedCuts: Array<Object>, outgoingClip: Object|null, outgoingTime: number, incomingClip: Object|null, incomingTime: number }}
      */
     simulateRipple(draggedClipId, targetStartFrame, targetTrack = null, sourceCuts = null, isMovingBackwards = false) {
-        const rawSource = sourceCuts || STATE.activeTimelineCuts || [];
+        const rawSource = sourceCuts || this._getCuts() || [];
         const base = rawSource.map(c => ({ ...c }));
         const clip = base.find(c => c.id === draggedClipId);
         if (!clip || this.isTrackLocked(clip.track)) {
@@ -2808,7 +3150,7 @@ export class CapiauTimelineState {
      * @returns {Array<Object>} Lista atualizada de cortes.
      */
     rippleInsertTimeRange(trackId, startFrame, durationFrames, ignoredClipIds = [], sourceCuts = null, splitLinkMap = null) {
-        const cuts = sourceCuts || STATE.activeTimelineCuts || [];
+        const cuts = sourceCuts || this._getCuts() || [];
         if (this.isTrackLocked(trackId)) return [...cuts];
         const fps = this.fps || 24;
         const newCuts = [];
@@ -2885,7 +3227,7 @@ export class CapiauTimelineState {
         ];
         if (!validTools.includes(tool)) return;
         this.activeTool = tool;
-        STATE.emit("timelineToolChanged", this.activeTool);
+        this._emit("timelineToolChanged", this.activeTool);
     }
 
     /**
@@ -2894,7 +3236,7 @@ export class CapiauTimelineState {
      * @param {string|null} targetTrackId Se especificado (Shift pressionado), filtra apenas nesta pista.
      */
     selectTracksForward(fromFrame, targetTrackId = null) {
-        const cuts = STATE.activeTimelineCuts || [];
+        const cuts = this._getCuts() || [];
         let activeTracks;
         if (targetTrackId) {
             const t = this.getTrack(targetTrackId);
@@ -2929,7 +3271,7 @@ export class CapiauTimelineState {
      * @param {string|null} targetTrackId Se especificado (Shift pressionado), filtra apenas nesta pista.
      */
     selectTracksBackward(fromFrame, targetTrackId = null) {
-        const cuts = STATE.activeTimelineCuts || [];
+        const cuts = this._getCuts() || [];
         let activeTracks;
         if (targetTrackId) {
             const t = this.getTrack(targetTrackId);
@@ -2962,7 +3304,7 @@ export class CapiauTimelineState {
      * Seleciona um clipe específico, substituindo a seleção ou adicionando em modo multi.
      */
     selectClip(clipId, multi = false) {
-        const cuts = STATE.activeTimelineCuts || [];
+        const cuts = this._getCuts() || [];
         if (clipId) {
             const cut = cuts.find(c => c.id === clipId);
             if (cut && this.isTrackLocked(cut.track)) {
@@ -2973,7 +3315,7 @@ export class CapiauTimelineState {
                 }
                 this.clearSelectedGap();
                 this.selectedGhostClipId = null;
-                STATE.emit("timelineSelectionChanged", this.selectedClipId);
+                this._emit("timelineSelectionChanged", this.selectedClipId);
                 return false;
             }
         }
@@ -2990,7 +3332,7 @@ export class CapiauTimelineState {
         }
         this.clearSelectedGap();
         this.selectedGhostClipId = null;
-        STATE.emit("timelineSelectionChanged", this.selectedClipId);
+        this._emit("timelineSelectionChanged", this.selectedClipId);
         return true;
     }
 
@@ -2998,7 +3340,7 @@ export class CapiauTimelineState {
      * Define uma lista de IDs de clipes selecionados (filtrando pistas travadas).
      */
     selectClips(clipIds) {
-        const cuts = STATE.activeTimelineCuts || [];
+        const cuts = this._getCuts() || [];
         const safeIds = (Array.isArray(clipIds) ? clipIds : Array.from(clipIds || [])).filter(id => {
             const cut = cuts.find(c => c.id === id);
             return !(cut && this.isTrackLocked(cut.track));
@@ -3011,7 +3353,7 @@ export class CapiauTimelineState {
         }
         this.clearSelectedGap();
         this.selectedGhostClipId = null;
-        STATE.emit("timelineSelectionChanged", this.selectedClipId);
+        this._emit("timelineSelectionChanged", this.selectedClipId);
     }
 
     /**
@@ -3019,7 +3361,7 @@ export class CapiauTimelineState {
      */
     addClipsToSelection(clipIds) {
         if (!this.selectedClipIds) this.selectedClipIds = new Set();
-        const cuts = STATE.activeTimelineCuts || [];
+        const cuts = this._getCuts() || [];
         if (Array.isArray(clipIds)) {
             const safeIds = clipIds.filter(id => {
                 const cut = cuts.find(c => c.id === id);
@@ -3032,7 +3374,7 @@ export class CapiauTimelineState {
         }
         this.clearSelectedGap();
         this.selectedGhostClipId = null;
-        STATE.emit("timelineSelectionChanged", this.selectedClipId);
+        this._emit("timelineSelectionChanged", this.selectedClipId);
     }
 
     /**
@@ -3042,7 +3384,7 @@ export class CapiauTimelineState {
         this.selectedClipIds.clear();
         this.selectedClipId = null;
         this.manualTransformClipId = null;
-        STATE.emit("timelineSelectionChanged", null);
+        this._emit("timelineSelectionChanged", null);
     }
 
     /**
@@ -3050,14 +3392,14 @@ export class CapiauTimelineState {
      */
     toggleClipSelection(clipId) {
         if (!clipId) return;
-        const cuts = STATE.activeTimelineCuts || [];
+        const cuts = this._getCuts() || [];
         const targetCut = cuts.find(c => c.id === clipId);
         if (targetCut && this.isTrackLocked(targetCut.track)) {
             this.selectedClipIds.delete(clipId);
             if (this.selectedClipId === clipId) {
                 this.selectedClipId = this.selectedClipIds.size > 0 ? Array.from(this.selectedClipIds)[0] : null;
             }
-            STATE.emit("timelineSelectionChanged", this.selectedClipId);
+            this._emit("timelineSelectionChanged", this.selectedClipId);
             return;
         }
         if (this.selectedClipIds.has(clipId)) {
@@ -3073,7 +3415,7 @@ export class CapiauTimelineState {
         }
         this.clearSelectedGap();
         this.selectedGhostClipId = null;
-        STATE.emit("timelineSelectionChanged", this.selectedClipId);
+        this._emit("timelineSelectionChanged", this.selectedClipId);
     }
 
     /**
@@ -3081,7 +3423,7 @@ export class CapiauTimelineState {
      * Clipes e marcadores vinculados a clipes em pistas travadas são estritamente ignorados.
      */
     applyMarqueeSelection(clipIds = [], markerIds = [], mode = "replace", initialClipIds = null, initialMarkerIds = null) {
-        const cuts = STATE.activeTimelineCuts || [];
+        const cuts = this._getCuts() || [];
         const isAllowedClipId = (cid) => {
             const cut = cuts.find(c => c.id === cid);
             return !(cut && this.isTrackLocked(cut.track));
@@ -3130,13 +3472,13 @@ export class CapiauTimelineState {
         this.selectedClipIds = nextClips;
         this.selectedClipId = nextClips.size > 0 ? Array.from(nextClips)[0] : null;
         if (this.selectedClipId) {
-            const cut = (STATE.activeTimelineCuts || []).find(c => c.id === this.selectedClipId);
+            const cut = (this._getCuts() || []).find(c => c.id === this.selectedClipId);
             if (cut && cut.track) this.selectedTrack = cut.track;
         }
         this.selectedMarkerIds = nextMarkers;
         this.clearSelectedGap();
         this.selectedGhostClipId = null;
-        STATE.emit("timelineSelectionChanged", this.selectedClipId);
+        this._emit("timelineSelectionChanged", this.selectedClipId);
 
         return {
             selectedClipIds: Array.from(nextClips),
@@ -3152,15 +3494,15 @@ export class CapiauTimelineState {
             if (this.selectedClipId) return this.liftDeleteClip(this.selectedClipId);
             return false;
         }
-        const checkCuts = STATE.activeTimelineCuts || [];
+        const checkCuts = this._getCuts() || [];
         const unlockedSelected = Array.from(this.selectedClipIds).filter(id => {
             const c = checkCuts.find(item => item.id === id);
             return c && !this.isTrackLocked(c.track);
         });
         if (unlockedSelected.length === 0) return false;
 
-        TIMELINE_HISTORY.record(() => {
-            const cuts = [...STATE.activeTimelineCuts];
+        this.history.record(() => {
+            const cuts = [...this._getCuts()];
             const toDeleteIds = new Set(unlockedSelected);
             const brokenLinks = new Set();
 
@@ -3186,7 +3528,7 @@ export class CapiauTimelineState {
                 });
             }
             this.clearClipSelection();
-            STATE.activeTimelineCuts = remaining;
+            this._setCuts(remaining);
         });
         return true;
     }
@@ -3199,15 +3541,15 @@ export class CapiauTimelineState {
             if (this.selectedClipId) return this.rippleDeleteClip(this.selectedClipId);
             return false;
         }
-        const checkCuts = STATE.activeTimelineCuts || [];
+        const checkCuts = this._getCuts() || [];
         const unlockedSelected = Array.from(this.selectedClipIds).filter(id => {
             const c = checkCuts.find(item => item.id === id);
             return c && !this.isTrackLocked(c.track);
         });
         if (unlockedSelected.length === 0) return false;
 
-        TIMELINE_HISTORY.record(() => {
-            const cuts = [...STATE.activeTimelineCuts];
+        this.history.record(() => {
+            const cuts = [...this._getCuts()];
             const toDeleteIds = new Set(unlockedSelected);
             const brokenLinks = new Set();
 
@@ -3249,7 +3591,7 @@ export class CapiauTimelineState {
             this.applyRippleShift(remaining, syncTracks, maxEnd, durationFrames, Array.from(toDeleteIds));
 
             this.clearClipSelection();
-            STATE.activeTimelineCuts = remaining;
+            this._setCuts(remaining);
         });
         return true;
     }
@@ -3260,14 +3602,14 @@ export class CapiauTimelineState {
     nudgeSelectedClips(deltaFrames) {
         if (!this.selectedClipIds || this.selectedClipIds.size === 0) {
             if (this.selectedClipId) {
-                const cut = STATE.activeTimelineCuts.find(c => c.id === this.selectedClipId);
+                const cut = this._getCuts().find(c => c.id === this.selectedClipId);
                 if (cut && !this.isTrackLocked(cut.track)) {
                     const newStart = Math.max(0, (cut.timelineStartFrame || 0) + deltaFrames);
-                    TIMELINE_HISTORY.record(() => {
+                    this.history.record(() => {
                         cut.timelineStartFrame = newStart;
                         cut.timeline_start = newStart / this.fps;
                         if (cut.link_id) {
-                            const partner = STATE.activeTimelineCuts.find(p => p.id !== cut.id && p.link_id === cut.link_id);
+                            const partner = this._getCuts().find(p => p.id !== cut.id && p.link_id === cut.link_id);
                             if (partner) {
                                 const v = this.trackKindOf(cut.track) === "video" ? cut : partner;
                                 const a = this.trackKindOf(cut.track) === "audio" ? cut : partner;
@@ -3276,7 +3618,7 @@ export class CapiauTimelineState {
                                 }
                             }
                         }
-                        STATE.activeTimelineCuts = [...STATE.activeTimelineCuts];
+                        this._setCuts([...this._getCuts()]);
                     });
                     return true;
                 }
@@ -3284,7 +3626,7 @@ export class CapiauTimelineState {
             return false;
         }
 
-        const cuts = STATE.activeTimelineCuts;
+        const cuts = this._getCuts();
         const selectedCuts = cuts.filter(c => this.selectedClipIds.has(c.id) && !this.isTrackLocked(c.track));
         if (selectedCuts.length === 0) return false;
 
@@ -3292,7 +3634,7 @@ export class CapiauTimelineState {
         const effectiveDelta = Math.max(-minStart, deltaFrames);
         if (effectiveDelta === 0 && deltaFrames < 0) return false;
 
-        TIMELINE_HISTORY.record(() => {
+        this.history.record(() => {
             selectedCuts.forEach(c => {
                 c.timelineStartFrame = Math.max(0, (c.timelineStartFrame || 0) + effectiveDelta);
                 c.timeline_start = c.timelineStartFrame / this.fps;
@@ -3309,7 +3651,7 @@ export class CapiauTimelineState {
                     }
                 }
             });
-            STATE.activeTimelineCuts = [...cuts];
+            this._setCuts([...cuts]);
         });
         return true;
     }
@@ -3320,7 +3662,7 @@ export class CapiauTimelineState {
      * @returns {Object|null} Status de sincronia ou null
      */
     getClipSyncStatus(clip) {
-        return getClipSyncStatus(clip, STATE.activeTimelineCuts);
+        return getClipSyncStatus(clip, this._getCuts(), this);
     }
 
     selectGap(gap) {
@@ -3333,13 +3675,13 @@ export class CapiauTimelineState {
             this.selectedClipIds.clear();
             this.selectedGhostClipId = null;
         }
-        STATE.emit("timelineGapSelected", this.selectedGap);
+        this._emit("timelineGapSelected", this.selectedGap);
     }
 
     clearSelectedGap() {
         if (this.selectedGap) {
             this.selectedGap = null;
-            STATE.emit("timelineGapSelected", null);
+            this._emit("timelineGapSelected", null);
         }
     }
 
@@ -3491,8 +3833,8 @@ export class CapiauTimelineState {
         if (!durationFrames || durationFrames <= 0) return { actualDelta: 0, blocked: false, fullyClosed: false };
         if (this.isTrackLocked(trackId)) return { actualDelta: 0, blocked: true, fullyClosed: false };
         let result = { actualDelta: 0, blocked: false, fullyClosed: false };
-        TIMELINE_HISTORY.record(() => {
-            const cuts = [...STATE.activeTimelineCuts];
+        this.history.record(() => {
+            const cuts = [...this._getCuts()];
             const syncTracks = this.getSyncLockedTrackIds();
             const targetTracks = Array.from(new Set([...syncTracks, trackId])).filter(tId => !this.isTrackLocked(tId));
             const boundaryFrame = startFrame + durationFrames;
@@ -3502,7 +3844,7 @@ export class CapiauTimelineState {
             if (result.actualDelta > 0 || !result.blocked) {
                 this.clearSelectedGap();
             }
-            STATE.activeTimelineCuts = cuts;
+            this._setCuts(cuts);
         });
         return result;
     }
@@ -3511,12 +3853,12 @@ export class CapiauTimelineState {
      * Lift Delete de um clipe: apaga o clipe (e áudio vinculado em pista destravada) deixando o espaço vazio intacto.
      */
     liftDeleteClip(clipId) {
-        const cuts = [...STATE.activeTimelineCuts];
+        const cuts = [...this._getCuts()];
         const idx = cuts.findIndex(c => c.id === clipId);
         if (idx === -1) return false;
         if (this.isTrackLocked(cuts[idx].track)) return false;
 
-        TIMELINE_HISTORY.record(() => {
+        this.history.record(() => {
             const clip = cuts[idx];
             const linkId = clip.link_id;
             if (linkId) {
@@ -3540,7 +3882,7 @@ export class CapiauTimelineState {
             }
             if (this.selectedClipId === clipId) this.selectedClipId = null;
             if (this.selectedClipIds) this.selectedClipIds.delete(clipId);
-            STATE.activeTimelineCuts = cuts;
+            this._setCuts(cuts);
         });
         return true;
     }
@@ -3550,11 +3892,11 @@ export class CapiauTimelineState {
      * preservando rigorosamente pistas travadas com cadeado e a sincronia A/V.
      */
     rippleDeleteClip(clipId) {
-        const cuts = [...STATE.activeTimelineCuts];
+        const cuts = [...this._getCuts()];
         const clip = cuts.find(c => c.id === clipId);
         if (!clip || this.isTrackLocked(clip.track)) return false;
 
-        TIMELINE_HISTORY.record(() => {
+        this.history.record(() => {
             const startFrame = clip.timelineStartFrame || 0;
             const durationFrames = clip.outFrame - clip.inFrame;
             const linkId = clip.link_id;
@@ -3591,7 +3933,7 @@ export class CapiauTimelineState {
 
             if (this.selectedClipId === clipId) this.selectedClipId = null;
             if (this.selectedClipIds) this.selectedClipIds.delete(clipId);
-            STATE.activeTimelineCuts = cuts;
+            this._setCuts(cuts);
         });
         return true;
     }
@@ -3602,7 +3944,7 @@ export class CapiauTimelineState {
     rippleTrimToPlayhead(side = "head", targetClipId = null) {
         const isHead = side === "head" || side === "left" || side === "prev";
         const playhead = this.playheadFrame;
-        const cuts = [...STATE.activeTimelineCuts];
+        const cuts = [...this._getCuts()];
         if (cuts.length === 0) return false;
 
         if (targetClipId) {
@@ -3665,7 +4007,7 @@ export class CapiauTimelineState {
         });
         const finalTargets = cuts.filter(c => targetIds.has(c.id));
 
-        TIMELINE_HISTORY.record(() => {
+        this.history.record(() => {
             const fps = this.fps;
             const syncTracks = this.getSyncLockedTrackIds();
 
@@ -3698,7 +4040,7 @@ export class CapiauTimelineState {
                 // Desloca todos os clipes subsequentes nas pistas com Sync Lock ativo com proteção A/V
                 this.applyRippleShift(cuts, syncTracks, minStart + maxTrimDuration, maxTrimDuration, Array.from(targetIds));
 
-                STATE.activeTimelineCuts = cuts;
+                this._setCuts(cuts);
 
                 // Posiciona a agulha no início do clipe resultante
                 if (minStart !== Infinity) {
@@ -3732,7 +4074,7 @@ export class CapiauTimelineState {
                 // Desloca todos os clipes subsequentes nas pistas com Sync Lock ativo com proteção A/V
                 this.applyRippleShift(cuts, syncTracks, playhead, maxTrimDuration, Array.from(targetIds));
 
-                STATE.activeTimelineCuts = cuts;
+                this._setCuts(cuts);
 
                 // A agulha permanece na posição do playhead
                 this.setPlayheadFrame(playhead);
@@ -3748,9 +4090,9 @@ export class CapiauTimelineState {
     insertClipWithRipple(clipData, targetFrame, targetTrackId) {
         if (this.isTrackLocked(targetTrackId)) return null;
         // Captura se a timeline estava vazia ANTES da inserção (Auto-Zoom Inteligente)
-        const wasEmptyTimeline = (STATE.activeTimelineCuts || []).length === 0;
-        TIMELINE_HISTORY.record(() => {
-            const cuts = this.conformCuts(STATE.activeTimelineCuts);
+        const wasEmptyTimeline = (this._getCuts() || []).length === 0;
+        this.history.record(() => {
+            const cuts = this.conformCuts(this._getCuts());
             const durationFrames = clipData.outFrame - clipData.inFrame;
             const syncTracks = this.getSyncLockedTrackIds();
 
@@ -3783,9 +4125,9 @@ export class CapiauTimelineState {
             let clipRot = clipData.rotation;
             if (clipRot === undefined) {
                 const media = isPhoto
-                    ? (STATE.allPhotos || []).find(p => String(p.id) === String(clipData.photo_id))
-                    : (STATE.allVideos || []).find(v => String(v.id) === String(clipData.video_id));
-                const activeMedia = isPhoto ? STATE.activePhoto : STATE.activeVideo;
+                    ? (this._getMediaCatalog().allPhotos || []).find(p => String(p.id) === String(clipData.photo_id))
+                    : (this._getMediaCatalog().allVideos || []).find(v => String(v.id) === String(clipData.video_id));
+                const activeMedia = isPhoto ? (this._getMediaCatalog().activePhoto || null) : (this._getMediaCatalog().activeVideo || null);
                 const mediaId = isPhoto ? clipData.photo_id : clipData.video_id;
                 const activeRot = (activeMedia && String(activeMedia.id) === String(mediaId)) ? activeMedia.rotation : 0;
                 clipRot = (media && media.rotation) ? media.rotation : (activeRot || 0);
@@ -3829,7 +4171,7 @@ export class CapiauTimelineState {
                 });
             }
 
-            STATE.activeTimelineCuts = cuts;
+            this._setCuts(cuts);
         });
 
         // Auto-Zoom Inteligente: o primeiro clipe de uma timeline vazia nasce legível
@@ -3843,7 +4185,7 @@ export class CapiauTimelineState {
      */
     setFps(val) {
         this.fps = Number(val) || 24;
-        STATE.emit("timelineFpsChanged", this.fps);
+        this._emit("timelineFpsChanged", this.fps);
     }
 
     /**
@@ -3858,7 +4200,7 @@ export class CapiauTimelineState {
             this._isFitted = false;
         }
         this.zoom = targetZoom;
-        STATE.emit("timelineZoomChanged", this.zoom);
+        this._emit("timelineZoomChanged", this.zoom);
     }
 
     /**
@@ -3913,7 +4255,7 @@ export class CapiauTimelineState {
             this._isFitted = true;
         }
 
-        STATE.emit("timelineZoomFitted", { isFitted: this._isFitted, zoom: this.zoom });
+        this._emit("timelineZoomFitted", { isFitted: this._isFitted, zoom: this.zoom });
         return true;
     }
 
@@ -3935,7 +4277,7 @@ export class CapiauTimelineState {
         const target = typeof val === "number" ? Math.max(0, val) : 0;
         if (Math.abs(this.scrollLeftFrame - target) < 0.0001) return;
         this.scrollLeftFrame = target;
-        STATE.emit("timelineScrollChanged", this.scrollLeftFrame);
+        this._emit("timelineScrollChanged", this.scrollLeftFrame);
     }
 
     /**
@@ -4044,7 +4386,7 @@ export class CapiauTimelineState {
         const clamped = Math.max(0, Math.min(maxScroll, this.scrollTop));
         if (clamped !== this.scrollTop) {
             this.scrollTop = clamped;
-            STATE.emit("timelineVScrollChanged", this.scrollTop);
+            this._emit("timelineVScrollChanged", this.scrollTop);
         }
     }
 
@@ -4056,8 +4398,8 @@ export class CapiauTimelineState {
         const vh = this.lastViewportHeight || 0;
         const maxScroll = Math.max(0, this.totalTracksHeight() - vh);
         this.scrollTop = Math.max(0, Math.min(maxScroll, val));
-        STATE.emit("timelineScrollChanged", this.scrollLeftFrame);
-        STATE.emit("timelineVScrollChanged", this.scrollTop);
+        this._emit("timelineScrollChanged", this.scrollLeftFrame);
+        this._emit("timelineVScrollChanged", this.scrollTop);
     }
 
     /**
@@ -4067,7 +4409,7 @@ export class CapiauTimelineState {
         const newFrame = Math.max(0, val);
         if (this.playheadFrame === newFrame) return;
         this.playheadFrame = newFrame;
-        STATE.emit("timelinePlayheadChanged", this.playheadFrame);
+        this._emit("timelinePlayheadChanged", this.playheadFrame);
         if (this.selectionFollowsPlayhead) {
             this.syncSelectionToPlayhead();
         }
@@ -4077,7 +4419,7 @@ export class CapiauTimelineState {
      * Localiza o clipe sob o playhead (respeitando pista ativa, V1 ou pistas destravadas).
      */
     getClipAtPlayhead(playhead = this.playheadFrame, preferredTrack = this.selectedTrack) {
-        const cuts = STATE.activeTimelineCuts || [];
+        const cuts = this._getCuts() || [];
         const fps = this.fps || 24;
         const coversPlayhead = (c) => {
             const start = c.timelineStartFrame !== undefined ? c.timelineStartFrame : Math.round((c.timeline_start || 0) * fps);
@@ -4115,7 +4457,7 @@ export class CapiauTimelineState {
      * Localiza todos os clipes sob o playhead em pistas destravadas.
      */
     getAllClipsAtPlayhead(playhead = this.playheadFrame) {
-        const cuts = STATE.activeTimelineCuts || [];
+        const cuts = this._getCuts() || [];
         const fps = this.fps || 24;
         const coversPlayhead = (c) => {
             const start = c.timelineStartFrame !== undefined ? c.timelineStartFrame : Math.round((c.timeline_start || 0) * fps);
@@ -4135,7 +4477,7 @@ export class CapiauTimelineState {
      * Localiza um gap (espaço vazio) sob o playhead na trilha alvo ou em V1.
      */
     getGapAtPlayhead(playhead = this.playheadFrame, preferredTrack = this.selectedTrack) {
-        const cuts = STATE.activeTimelineCuts || [];
+        const cuts = this._getCuts() || [];
         let trackId = null;
         if (preferredTrack && this.tracks.some(t => t.id === preferredTrack && !t.locked && t.kind !== "ai")) {
             trackId = preferredTrack;
@@ -4179,6 +4521,7 @@ export class CapiauTimelineState {
 
     /** Carrega a preferência de 'Seleção Acompanha a Agulha' do localStorage (default: true). */
     loadSelectionFollowsPlayhead() {
+        if (this.headless) return true;
         try {
             if (typeof localStorage !== "undefined") {
                 const saved = localStorage.getItem("capiau_timeline_selection_follows_playhead");
@@ -4197,13 +4540,13 @@ export class CapiauTimelineState {
         this.selectionFollowsPlayhead = (enabled !== undefined) ? !!enabled : !this.selectionFollowsPlayhead;
         try {
             if (typeof localStorage !== "undefined") {
-                localStorage.setItem("capiau_timeline_selection_follows_playhead", String(this.selectionFollowsPlayhead));
+                if (!this.headless) localStorage.setItem("capiau_timeline_selection_follows_playhead", String(this.selectionFollowsPlayhead));
             }
         } catch (_) {}
         if (this.selectionFollowsPlayhead) {
             this.syncSelectionToPlayhead();
         }
-        STATE.emit("timelineSelectionFollowsPlayheadChanged", this.selectionFollowsPlayhead);
+        this._emit("timelineSelectionFollowsPlayheadChanged", this.selectionFollowsPlayhead);
         return this.selectionFollowsPlayhead;
     }
 
@@ -4211,7 +4554,7 @@ export class CapiauTimelineState {
      * Alterna o estado ativo/desativado (disabled / mute / bypass) do clipe selecionado ou sob a agulha.
      */
     toggleClipDisabled(clipId) {
-        const cuts = STATE.activeTimelineCuts || [];
+        const cuts = this._getCuts() || [];
         let targetId = clipId || this.selectedClipId;
         if (!targetId && this.selectedClipIds && this.selectedClipIds.size > 0) {
             targetId = Array.from(this.selectedClipIds)[0];
@@ -4232,18 +4575,18 @@ export class CapiauTimelineState {
             if (partner && !this.isTrackLocked(partner.track)) targets.push(partner);
         }
 
-        const hist = (typeof TIMELINE_HISTORY !== "undefined" ? TIMELINE_HISTORY : (typeof window !== "undefined" ? window.TIMELINE_HISTORY : null));
+        const hist = this.history || (typeof TIMELINE_HISTORY !== "undefined" ? TIMELINE_HISTORY : (typeof window !== "undefined" ? window.TIMELINE_HISTORY : null));
         if (hist && typeof hist.record === "function") {
             hist.record(() => {
                 targets.forEach(t => { t.disabled = newState; });
-                STATE.activeTimelineCuts = cuts;
+                this._setCuts(cuts);
             });
         } else {
             targets.forEach(t => { t.disabled = newState; });
-            STATE.activeTimelineCuts = cuts;
+            this._setCuts(cuts);
         }
 
-        STATE.emit("timelineCutsUpdated", STATE.activeTimelineCuts);
+        this._emit("timelineCutsUpdated", this._getCuts());
         return { clip, newState };
     }
 
@@ -4252,7 +4595,7 @@ export class CapiauTimelineState {
      * @returns {number}
      */
     getDurationFrames() {
-        const cuts = STATE.activeTimelineCuts || [];
+        const cuts = this._getCuts() || [];
         let maxFrame = 0;
         cuts.forEach(cut => {
             const start = typeof cut.timelineStartFrame === "number" ? cut.timelineStartFrame : Math.round((cut.timeline_start || 0) * this.fps);
@@ -4271,7 +4614,7 @@ export class CapiauTimelineState {
      * @returns {number[]}
      */
     getAllEditPointFrames() {
-        const cuts = STATE.activeTimelineCuts || [];
+        const cuts = this._getCuts() || [];
         const points = new Set([0]);
         cuts.forEach(cut => {
             const start = typeof cut.timelineStartFrame === "number" ? cut.timelineStartFrame : Math.round((cut.timeline_start || 0) * this.fps);
@@ -4397,8 +4740,8 @@ export class CapiauTimelineState {
         if (clip.media_duration !== undefined && clip.media_duration !== null && Number.isFinite(clip.media_duration)) {
             return Math.round(clip.media_duration * fps);
         }
-        if (clip.video_id && typeof STATE !== "undefined" && Array.isArray(STATE.allVideos)) {
-            const v = STATE.allVideos.find(vid => String(vid.id) === String(clip.video_id));
+        if (clip.video_id && Array.isArray(this._getMediaCatalog().allVideos)) {
+            const v = this._getMediaCatalog().allVideos.find(vid => String(vid.id) === String(clip.video_id));
             if (v && v.duration && Number.isFinite(v.duration)) {
                 return Math.round(v.duration * fps);
             }
@@ -4600,7 +4943,7 @@ export class CapiauTimelineState {
      * numa timeline vazia (Fase 2.3).
      */
     _autoConfigureFromFirstVideo(video) {
-        if ((STATE.activeTimelineCuts || []).length !== 0 || !video) return false;
+        if ((this._getCuts() || []).length !== 0 || !video) return false;
         let w = 1920, h = 1080;
         if (video.resolution && typeof video.resolution === "string" && video.resolution.includes("x")) {
             const parts = video.resolution.split("x").map(Number);
@@ -4613,8 +4956,8 @@ export class CapiauTimelineState {
         this.width = w;
         this.height = h;
         this.fps = fps;
-        STATE.emit("timelineFpsChanged", this.fps);
-        STATE.emit("timelinePropertiesChanged", { width: w, height: h, fps });
+        this._emit("timelineFpsChanged", this.fps);
+        this._emit("timelinePropertiesChanged", { width: w, height: h, fps });
         return true;
     }
 
@@ -4667,15 +5010,15 @@ export class CapiauTimelineState {
         }
 
         const isVideo = type === "video";
-        const video = isVideo ? (STATE.allVideos || []).find(v => String(v.id) === String(realId)) : null;
-        const photo = !isVideo ? (STATE.allPhotos || []).find(p => String(p.id) === String(realId)) : null;
+        const video = isVideo ? (this._getMediaCatalog().allVideos || []).find(v => String(v.id) === String(realId)) : null;
+        const photo = !isVideo ? (this._getMediaCatalog().allPhotos || []).find(p => String(p.id) === String(realId)) : null;
         const mediaRot = isVideo
-            ? ((video && video.rotation) || (STATE.activeVideo && String(STATE.activeVideo.id) === String(realId) ? STATE.activeVideo.rotation : 0) || 0)
-            : ((photo && photo.rotation) || (STATE.activePhoto && String(STATE.activePhoto.id) === String(realId) ? STATE.activePhoto.rotation : 0) || 0);
+            ? ((video && video.rotation) || ((this._getMediaCatalog().activeVideo || null) && String((this._getMediaCatalog().activeVideo || null).id) === String(realId) ? (this._getMediaCatalog().activeVideo || null).rotation : 0) || 0)
+            : ((photo && photo.rotation) || ((this._getMediaCatalog().activePhoto || null) && String((this._getMediaCatalog().activePhoto || null).id) === String(realId) ? (this._getMediaCatalog().activePhoto || null).rotation : 0) || 0);
         const rotNorm = ((Math.round(Number(mediaRot) || 0) % 360) + 360) % 360;
 
         // Captura se a timeline estava vazia ANTES da inserção (Auto-Zoom Inteligente)
-        const wasEmptyTimeline = (STATE.activeTimelineCuts || []).length === 0;
+        const wasEmptyTimeline = (this._getCuts() || []).length === 0;
 
         // Auto-configuração no primeiro clipe de vídeo da timeline (Fase 2.3)
         this._autoConfigureFromFirstVideo(video);
@@ -4702,7 +5045,7 @@ export class CapiauTimelineState {
         const effDurSec = durFrames / fps;
 
         // 2. Determina Pista de Destino e Posição na Timeline
-        const currentCuts = this.conformCuts(STATE.activeTimelineCuts || []);
+        const currentCuts = this.conformCuts(this._getCuts() || []);
 
         const getTrackEndFrame = (trackId) => {
             const cutsOnTrack = currentCuts.filter(c => c.track === trackId);
@@ -4885,7 +5228,7 @@ export class CapiauTimelineState {
 
         let createdCut = null;
 
-        TIMELINE_HISTORY.record(() => {
+        this.history.record(() => {
             let workingCuts = [...currentCuts];
 
             // A) Modo Replace: Remove o clipe selecionado e parceiro de áudio
@@ -5013,7 +5356,7 @@ export class CapiauTimelineState {
                 workingCuts.push(createdCut);
             }
 
-            STATE.activeTimelineCuts = workingCuts;
+            this._setCuts(workingCuts);
         });
 
         // 5. Ajuste da Agulha (Playhead), Seleção e Centralização
@@ -5021,7 +5364,7 @@ export class CapiauTimelineState {
             this.selectedClipId = createdCut.id;
             this.selectedClipIds = new Set([createdCut.id]);
             this.selectedTrack = track;
-            STATE.emit("timelineClipSelected", createdCut.id);
+            this._emit("timelineClipSelected", createdCut.id);
         }
 
         if (typeof this.setPlayheadFrame === "function") {
@@ -5032,7 +5375,7 @@ export class CapiauTimelineState {
         }
 
         // 6. Foco e Notificação
-        window.activeFocusedPlayer = "program";
+        if (typeof window !== "undefined") window.activeFocusedPlayer = "program";
         const mediaTitle = isVideo ? (video?.title || video?.filename || "Vídeo") : (photo?.title || photo?.filename || "Foto");
         const modeLabels = {
             playhead: "na agulha",
@@ -5046,8 +5389,8 @@ export class CapiauTimelineState {
         };
         const label = modeLabels[mode] || "na timeline";
 
-        STATE.emit("statusChanged", { text: `"${mediaTitle}" inserido ${label}.`, active: true });
-        if (typeof window.showToast === "function") {
+        this._emit("statusChanged", { text: `"${mediaTitle}" inserido ${label}.`, active: true });
+        if (typeof window !== "undefined" && typeof window.showToast === "function") {
             window.showToast(`${isVideo ? 'Vídeo' : 'Foto'} inserido ${label}!`, "success");
         }
 
@@ -5068,8 +5411,8 @@ export class CapiauTimelineState {
      * @returns {Object|null} Objeto contendo o clipe criado e status da operação
      */
     insertSourceClipAtPlayhead(sourceData = null, isRipple = true) {
-        let mediaType = sourceData?.type || (STATE.activeVideo ? "video" : (STATE.activePhoto ? "photo" : null));
-        let mediaId = sourceData?.id || (mediaType === "video" ? STATE.activeVideo?.id : STATE.activePhoto?.id);
+        let mediaType = sourceData?.type || ((this._getMediaCatalog().activeVideo || null) ? "video" : ((this._getMediaCatalog().activePhoto || null) ? "photo" : null));
+        let mediaId = sourceData?.id || (mediaType === "video" ? (this._getMediaCatalog().activeVideo || null)?.id : (this._getMediaCatalog().activePhoto || null)?.id);
 
         if (!mediaType || !mediaId) {
             if (typeof window !== "undefined" && typeof window.showToast === "function") {
@@ -5079,8 +5422,8 @@ export class CapiauTimelineState {
         }
 
         const isVideo = mediaType === "video";
-        const videoObj = isVideo ? ((STATE.allVideos || []).find(v => String(v.id) === String(mediaId)) || STATE.activeVideo) : null;
-        const photoObj = !isVideo ? ((STATE.allPhotos || []).find(p => String(p.id) === String(mediaId)) || STATE.activePhoto) : null;
+        const videoObj = isVideo ? ((this._getMediaCatalog().allVideos || []).find(v => String(v.id) === String(mediaId)) || (this._getMediaCatalog().activeVideo || null)) : null;
+        const photoObj = !isVideo ? ((this._getMediaCatalog().allPhotos || []).find(p => String(p.id) === String(mediaId)) || (this._getMediaCatalog().activePhoto || null)) : null;
         let rotVal = 0;
         if (isVideo) {
             rotVal = (typeof videoObj?.rotation === "number") ? ((videoObj.rotation % 360) + 360) % 360 : 0;
@@ -5089,7 +5432,7 @@ export class CapiauTimelineState {
         }
 
         // Captura se a timeline estava vazia ANTES da inserção (Auto-Zoom Inteligente)
-        const wasEmptyTimeline = (STATE.activeTimelineCuts || []).length === 0;
+        const wasEmptyTimeline = (this._getCuts() || []).length === 0;
 
         // Auto-configuração no primeiro clipe da timeline se vazia
         this._autoConfigureFromFirstVideo(videoObj);
@@ -5111,9 +5454,9 @@ export class CapiauTimelineState {
                 inSec = sourceData.inSec !== undefined && sourceData.inSec !== null ? Number(sourceData.inSec) : 0.0;
                 outSec = sourceData.outSec !== undefined && sourceData.outSec !== null ? Number(sourceData.outSec) : (isVideo ? (videoObj?.duration || 5.0) : PHOTO_DEFAULT_DURATION);
             } else {
-                inSec = (STATE.markerIn !== null && STATE.markerIn !== undefined) ? Number(STATE.markerIn) : 0.0;
-                if (STATE.markerOut !== null && STATE.markerOut !== undefined) {
-                    outSec = Number(STATE.markerOut);
+                inSec = ((typeof STATE !== "undefined" && STATE ? STATE.markerIn : null) !== null && (typeof STATE !== "undefined" && STATE ? STATE.markerIn : null) !== undefined) ? Number((typeof STATE !== "undefined" && STATE ? STATE.markerIn : null)) : 0.0;
+                if ((typeof STATE !== "undefined" && STATE ? STATE.markerOut : null) !== null && (typeof STATE !== "undefined" && STATE ? STATE.markerOut : null) !== undefined) {
+                    outSec = Number((typeof STATE !== "undefined" && STATE ? STATE.markerOut : null));
                 } else if (isVideo) {
                     const srcVidEl = (typeof document !== "undefined") ? document.getElementById("source-video") : null;
                     outSec = (srcVidEl && srcVidEl.duration && !isNaN(srcVidEl.duration)) ? srcVidEl.duration : (videoObj?.duration || 5.0);
@@ -5214,8 +5557,8 @@ export class CapiauTimelineState {
         const linkId = (shouldInsertVideo && !isVidLocked && shouldInsertAudio && !isAudLocked) ? `link_${stamp}` : null;
         let createdCut = null;
 
-        TIMELINE_HISTORY.record(() => {
-            const currentCuts = this.conformCuts(STATE.activeTimelineCuts || []);
+        this.history.record(() => {
+            const currentCuts = this.conformCuts(this._getCuts() || []);
             let workingCuts = [...currentCuts];
             const splitLinkMap = new Map();
 
@@ -5321,7 +5664,7 @@ export class CapiauTimelineState {
                 }
             }
 
-            STATE.activeTimelineCuts = workingCuts;
+            this._setCuts(workingCuts);
 
             // 6. Avanço Automático da Agulha (Continuous Storytelling Edit)
             const newPlayheadFrame = startFrame + durFrames;
@@ -5332,7 +5675,7 @@ export class CapiauTimelineState {
                 this.selectedClipId = createdCut.id;
                 this.selectedClipIds = new Set([createdCut.id]);
                 this.selectedTrack = createdCut.track;
-                STATE.emit("timelineClipSelected", createdCut.id);
+                this._emit("timelineClipSelected", createdCut.id);
             }
         });
 
@@ -5343,11 +5686,11 @@ export class CapiauTimelineState {
 
         // Foco e Notificação
         if (typeof window !== "undefined") {
-            window.activeFocusedPlayer = "program";
+            if (typeof window !== "undefined") window.activeFocusedPlayer = "program";
         }
         const mediaTitle = isVideo ? (videoObj?.title || videoObj?.filename || "Vídeo") : (photoObj?.title || photoObj?.filename || "Foto");
         const modeLabel = isRipple ? "inserido com Ripple (,)" : "sobrescrito (.)";
-        STATE.emit("statusChanged", { text: `"${mediaTitle}" ${modeLabel} na agulha.`, active: true });
+        this._emit("statusChanged", { text: `"${mediaTitle}" ${modeLabel} na agulha.`, active: true });
         if (typeof window !== "undefined" && typeof window.showToast === "function") {
             window.showToast(`${isVideo ? 'Vídeo' : 'Foto'} ${modeLabel}!`, "success");
         }
@@ -5387,9 +5730,9 @@ export class CapiauTimelineState {
                 if (options.hard_boundaries === undefined) hardBounds = !!foundSub.hard_boundaries;
             }
         }
-        const video = (STATE.allVideos || []).find(v => String(v.id) === String(realVideoId));
+        const video = (this._getMediaCatalog().allVideos || []).find(v => String(v.id) === String(realVideoId));
         // Captura se a timeline estava vazia ANTES da inserção (Auto-Zoom Inteligente)
-        const wasEmptyTimeline = (STATE.activeTimelineCuts || []).length === 0;
+        const wasEmptyTimeline = (this._getCuts() || []).length === 0;
 
         // Pista inexistente/travada vira roteamento automático
         if (track) {
@@ -5430,7 +5773,7 @@ export class CapiauTimelineState {
 
         // Se timelineStartFrame não foi passado, anexa ao final dos clipes existentes na pista
         let startFrame = timelineStartFrame;
-        const trackCuts = (STATE.activeTimelineCuts || []).filter(c => c.track === track);
+        const trackCuts = (this._getCuts() || []).filter(c => c.track === track);
         const durFrames = outFrame - inFrame;
 
         if (startFrame === null || startFrame === undefined) {
@@ -5446,7 +5789,7 @@ export class CapiauTimelineState {
                 const videoTracks = this.getVideoTracks().filter(t => !t.locked);
                 let placed = false;
                 for (const alt of videoTracks) {
-                    const altCuts = (STATE.activeTimelineCuts || []).filter(c => c.track === alt.id);
+                    const altCuts = (this._getCuts() || []).filter(c => c.track === alt.id);
                     if (!altCuts.some(c => startFrame < (c.timelineStartFrame + (c.outFrame - c.inFrame)) && (startFrame + durFrames) > c.timelineStartFrame)) {
                         track = alt.id;
                         placed = true;
@@ -5468,8 +5811,8 @@ export class CapiauTimelineState {
         let rot = 0;
         if (video && typeof video.rotation === 'number') {
             rot = ((video.rotation % 360) + 360) % 360;
-        } else if (STATE.activeVideo && String(STATE.activeVideo.id) === String(videoId) && typeof STATE.activeVideo.rotation === 'number') {
-            rot = ((STATE.activeVideo.rotation % 360) + 360) % 360;
+        } else if ((this._getMediaCatalog().activeVideo || null) && String((this._getMediaCatalog().activeVideo || null).id) === String(videoId) && typeof (this._getMediaCatalog().activeVideo || null).rotation === 'number') {
+            rot = (((this._getMediaCatalog().activeVideo || null).rotation % 360) + 360) % 360;
         }
         const newCut = {
             id: `cut_${stamp}`,
@@ -5503,8 +5846,8 @@ export class CapiauTimelineState {
             newCut.subclip_out = outSec;
         }
 
-        TIMELINE_HISTORY.record(() => {
-            const currentCuts = this.conformCuts(STATE.activeTimelineCuts);
+        this.history.record(() => {
+            const currentCuts = this.conformCuts(this._getCuts());
             currentCuts.push(newCut);
             if (audioTrackId) {
                 const audioCut = {
@@ -5539,7 +5882,7 @@ export class CapiauTimelineState {
             }
 
             // Atualiza o estado global reativo
-            STATE.activeTimelineCuts = currentCuts;
+            this._setCuts(currentCuts);
             this.selectedClipId = newCut.id;
             this.selectedClipIds = new Set([newCut.id]);
             this.selectedTrack = track;
@@ -5625,7 +5968,7 @@ export class CapiauTimelineState {
      */
     addPhotoCut(photoId, { durationSec = PHOTO_DEFAULT_DURATION, track = null, timelineStartFrame = null } = {}) {
         // Captura se a timeline estava vazia ANTES da inserção (Auto-Zoom Inteligente)
-        const wasEmptyTimeline = (STATE.activeTimelineCuts || []).length === 0;
+        const wasEmptyTimeline = (this._getCuts() || []).length === 0;
         // Roteamento: fotos vão para uma pista de vídeo LIVRE (como B-roll V2); fallback = V1
         if (track) {
             const t = this.getTrack(track);
@@ -5650,16 +5993,16 @@ export class CapiauTimelineState {
 
         let startFrame = timelineStartFrame;
         if (startFrame === null || startFrame === undefined) {
-            const trackCuts = (STATE.activeTimelineCuts || []).filter(c => c.track === track);
+            const trackCuts = (this._getCuts() || []).filter(c => c.track === track);
             startFrame = trackCuts.reduce((max, c) => Math.max(max, (c.timelineStartFrame || 0) + (c.outFrame - c.inFrame)), 0);
         }
 
-        const photo = (STATE.allPhotos || []).find(p => String(p.id) === String(photoId));
+        const photo = (this._getMediaCatalog().allPhotos || []).find(p => String(p.id) === String(photoId));
         let rot = 0;
         if (photo && typeof photo.rotation === 'number') {
             rot = ((photo.rotation % 360) + 360) % 360;
-        } else if (STATE.activePhoto && String(STATE.activePhoto.id) === String(photoId) && typeof STATE.activePhoto.rotation === 'number') {
-            rot = ((STATE.activePhoto.rotation % 360) + 360) % 360;
+        } else if ((this._getMediaCatalog().activePhoto || null) && String((this._getMediaCatalog().activePhoto || null).id) === String(photoId) && typeof (this._getMediaCatalog().activePhoto || null).rotation === 'number') {
+            rot = (((this._getMediaCatalog().activePhoto || null).rotation % 360) + 360) % 360;
         }
         const newCut = {
             id: `cut_${stamp}`,
@@ -5680,10 +6023,10 @@ export class CapiauTimelineState {
                 : [{ type: "fit", mode: "fit" }]
         };
 
-        TIMELINE_HISTORY.record(() => {
-            const currentCuts = this.conformCuts(STATE.activeTimelineCuts);
+        this.history.record(() => {
+            const currentCuts = this.conformCuts(this._getCuts());
             currentCuts.push(newCut);
-            STATE.activeTimelineCuts = currentCuts;
+            this._setCuts(currentCuts);
         });
 
         // Auto-Zoom Inteligente: a primeira mídia de uma timeline vazia já nasce enquadrada
@@ -5761,14 +6104,14 @@ export class CapiauTimelineState {
             link_id: null
         };
 
-        TIMELINE_HISTORY.record(() => {
-            const currentCuts = this.conformCuts(STATE.activeTimelineCuts || []);
+        this.history.record(() => {
+            const currentCuts = this.conformCuts(this._getCuts() || []);
             currentCuts.push(newClip);
-            STATE.activeTimelineCuts = currentCuts;
+            this._setCuts(currentCuts);
             this.selectedClipId = newClip.id;
             this.selectedClipIds.clear();
             this.selectedClipIds.add(newClip.id);
-            STATE.emit("timelineSelectedClipChanged", newClip.id);
+            this._emit("timelineSelectedClipChanged", newClip.id);
         });
 
         return newClip;
@@ -5779,7 +6122,7 @@ export class CapiauTimelineState {
      * Utilizável em qualquer pista de vídeo (V1, V2, V3...).
      */
     addColorMatteCut({ color = "#000000", color_name = "Preto", name = null, durationSec = 5.0, track = null, timelineStartFrame = null, blend_mode = "normal", blendMode = null } = {}) {
-        const wasEmptyTimeline = (STATE.activeTimelineCuts || []).length === 0;
+        const wasEmptyTimeline = (this._getCuts() || []).length === 0;
         let targetTrack = track;
         if (targetTrack) {
             const t = this.getTrack(targetTrack);
@@ -5850,10 +6193,10 @@ export class CapiauTimelineState {
             ]
         };
 
-        TIMELINE_HISTORY.record(() => {
-            const currentCuts = this.conformCuts(STATE.activeTimelineCuts || []);
+        this.history.record(() => {
+            const currentCuts = this.conformCuts(this._getCuts() || []);
             currentCuts.push(newCut);
-            STATE.activeTimelineCuts = currentCuts;
+            this._setCuts(currentCuts);
         });
 
         if (wasEmptyTimeline) this.zoomToFit();
@@ -5866,7 +6209,7 @@ export class CapiauTimelineState {
      * efeitos propagam cumulativamente para todas as pistas inferiores.
      */
     addAdjustmentCut({ name = null, durationSec = 5.0, track = null, timelineStartFrame = null, effects = [] } = {}) {
-        const wasEmptyTimeline = (STATE.activeTimelineCuts || []).length === 0;
+        const wasEmptyTimeline = (this._getCuts() || []).length === 0;
         let targetTrack = track;
         if (targetTrack) {
             const t = this.getTrack(targetTrack);
@@ -5947,10 +6290,10 @@ export class CapiauTimelineState {
             effects: JSON.parse(JSON.stringify(defaultEffects))
         };
 
-        TIMELINE_HISTORY.record(() => {
-            const currentCuts = this.conformCuts(STATE.activeTimelineCuts || []);
+        this.history.record(() => {
+            const currentCuts = this.conformCuts(this._getCuts() || []);
             currentCuts.push(newCut);
-            STATE.activeTimelineCuts = currentCuts;
+            this._setCuts(currentCuts);
         });
 
         if (wasEmptyTimeline) this.zoomToFit();
@@ -5989,7 +6332,7 @@ export class CapiauTimelineState {
      * @returns {Array<Object>} Lista de efeitos ativos ordenados hierarquicamente
      */
     getCumulativeAdjustmentEffects(trackId, currentFrame) {
-        const cuts = STATE.activeTimelineCuts || [];
+        const cuts = this._getCuts() || [];
         const frame = (currentFrame !== undefined && currentFrame !== null) ? currentFrame : this.playheadFrame;
 
         const matchingCuts = cuts.filter(c => {
@@ -6064,7 +6407,7 @@ export class CapiauTimelineState {
                 { id: "A1", name: "Áudio Falas", kind: "audio", volume: 1.0, muted: false, locked: false, syncLocked: true, magnetic: false },
                 { id: "A2", name: "Áudio B-Roll", kind: "audio", volume: 1.0, muted: false, locked: false, syncLocked: true, magnetic: false }
             );
-            STATE.emit("timelineTracksChanged", this.tracks);
+            this._emit("timelineTracksChanged", this.tracks);
         }
 
         const result = [...cuts];
@@ -6127,7 +6470,7 @@ export class CapiauTimelineState {
                 alternatives: s.alternatives || []
             };
         });
-        STATE.emit("timelineGhostUpdated", this.ghostTrack);
+        this._emit("timelineGhostUpdated", this.ghostTrack);
     }
 
     /**
@@ -6145,7 +6488,7 @@ export class CapiauTimelineState {
             return false;
         }
         if (suggestion.targetClipId) {
-            const targetCut = (STATE.activeTimelineCuts || []).find(c => c.id === suggestion.targetClipId);
+            const targetCut = (this._getCuts() || []).find(c => c.id === suggestion.targetClipId);
             if (targetCut && this.isTrackLocked(targetCut.track)) {
                 if (typeof window !== "undefined" && typeof window.showToast === "function") {
                     window.showToast("A pista alvo está travada com cadeado", "warning");
@@ -6154,8 +6497,8 @@ export class CapiauTimelineState {
             }
         }
 
-        TIMELINE_HISTORY.record(() => {
-            const currentCuts = this.conformCuts(STATE.activeTimelineCuts);
+        this.history.record(() => {
+            const currentCuts = this.conformCuts(this._getCuts());
             const stamp = `${Date.now()}_${Math.floor(Math.random() * 1000)}`;
 
             // Monta o(s) clipe(s) da sugestão: foto = still único (sem áudio); vídeo = par A/V
@@ -6259,8 +6602,8 @@ export class CapiauTimelineState {
             });
 
             // Emite eventos
-            STATE.activeTimelineCuts = currentCuts;
-            STATE.emit("timelineGhostUpdated", this.ghostTrack);
+            this._setCuts(currentCuts);
+            this._emit("timelineGhostUpdated", this.ghostTrack);
         });
     }
 
@@ -6271,9 +6614,9 @@ export class CapiauTimelineState {
         const index = this.ghostTrack.findIndex(g => g.id === ghostId);
         if (index === -1) return;
 
-        TIMELINE_HISTORY.record(() => {
+        this.history.record(() => {
             this.ghostTrack.splice(index, 1);
-            STATE.emit("timelineGhostUpdated", this.ghostTrack);
+            this._emit("timelineGhostUpdated", this.ghostTrack);
         });
     }
 
@@ -6283,12 +6626,12 @@ export class CapiauTimelineState {
      */
     acceptAllGhostSuggestions() {
         if (!this.ghostTrack || this.ghostTrack.length === 0) {
-            return { acceptedCount: 0, finalCuts: STATE.activeTimelineCuts };
+            return { acceptedCount: 0, finalCuts: this._getCuts() };
         }
 
         const count = this.ghostTrack.length;
-        TIMELINE_HISTORY.record(() => {
-            const currentCuts = this.conformCuts(STATE.activeTimelineCuts);
+        this.history.record(() => {
+            const currentCuts = this.conformCuts(this._getCuts());
             const ghostsToProcess = [...this.ghostTrack];
 
             ghostsToProcess.forEach((suggestion) => {
@@ -6376,12 +6719,12 @@ export class CapiauTimelineState {
             });
 
             this.ghostTrack = [];
-            STATE.activeTimelineCuts = currentCuts;
-            STATE.emit("timelineGhostUpdated", this.ghostTrack);
-            STATE.emit("timelineCutsUpdated", currentCuts);
+            this._setCuts(currentCuts);
+            this._emit("timelineGhostUpdated", this.ghostTrack);
+            this._emit("timelineCutsUpdated", currentCuts);
         });
 
-        return { acceptedCount: count, finalCuts: STATE.activeTimelineCuts };
+        return { acceptedCount: count, finalCuts: this._getCuts() };
     }
 
     /**
@@ -6390,9 +6733,9 @@ export class CapiauTimelineState {
      */
     rejectAllGhostSuggestions() {
         const count = this.ghostTrack ? this.ghostTrack.length : 0;
-        TIMELINE_HISTORY.record(() => {
+        this.history.record(() => {
             this.ghostTrack = [];
-            STATE.emit("timelineGhostUpdated", this.ghostTrack);
+            this._emit("timelineGhostUpdated", this.ghostTrack);
         });
         return { rejectedCount: count };
     }
@@ -6434,7 +6777,7 @@ export class CapiauTimelineState {
         if (!Array.isArray(markersList) || markersList.length === 0) return [];
         const createdMarkers = [];
         
-        TIMELINE_HISTORY.record(() => {
+        this.history.record(() => {
             markersList.forEach((m, idx) => {
                 let frame = m.frame;
                 if (frame === undefined || frame === null) {
@@ -6455,7 +6798,7 @@ export class CapiauTimelineState {
                 });
                 if (marker) createdMarkers.push(marker);
             });
-            STATE.emit("timelineMarkersChanged", this.markers);
+            this._emit("timelineMarkersChanged", this.markers);
         });
 
         return createdMarkers;
@@ -6465,11 +6808,11 @@ export class CapiauTimelineState {
      * Substitui a mídia de um clipe na timeline por uma candidata do carrossel de alternativas.
      */
     replaceClipWithAlternative(clipId, alternativeVideoId, newIn, newOut, useIdealDuration) {
-        const preClip = (STATE.activeTimelineCuts || []).find(c => c.id === clipId);
+        const preClip = (this._getCuts() || []).find(c => c.id === clipId);
         if (!preClip || this.isTrackLocked(preClip.track)) return false;
 
-        TIMELINE_HISTORY.record(() => {
-            const currentCuts = this.conformCuts(STATE.activeTimelineCuts);
+        this.history.record(() => {
+            const currentCuts = this.conformCuts(this._getCuts());
             const targetIdx = currentCuts.findIndex(c => c.id === clipId);
             if (targetIdx === -1) return;
 
@@ -6544,7 +6887,7 @@ export class CapiauTimelineState {
             });
 
             // Atualiza os cortes
-            STATE.activeTimelineCuts = currentCuts;
+            this._setCuts(currentCuts);
         });
     }
 
@@ -6576,7 +6919,7 @@ export class CapiauTimelineState {
     replaceClip(targetClipId, newMediaId, alignMode = "in", options = {}) {
         const fail = (reason) => ({ success: false, reason, clip: null, removedPartnerId: null, durationAdjusted: false });
 
-        const cuts = this.conformCuts(STATE.activeTimelineCuts || []);
+        const cuts = this.conformCuts(this._getCuts() || []);
         const target = cuts.find(c => c.id === targetClipId);
         if (!target) return fail("target_not_found");
 
@@ -6592,8 +6935,8 @@ export class CapiauTimelineState {
         const requestedType = options.mediaType || options.type || null;
         let video = null;
         let photo = null;
-        if (requestedType !== "photo") video = (STATE.allVideos || []).find(v => String(v.id) === String(newMediaId)) || null;
-        if (requestedType !== "video") photo = (STATE.allPhotos || []).find(p => String(p.id) === String(newMediaId)) || null;
+        if (requestedType !== "photo") video = (this._getMediaCatalog().allVideos || []).find(v => String(v.id) === String(newMediaId)) || null;
+        if (requestedType !== "video") photo = (this._getMediaCatalog().allPhotos || []).find(p => String(p.id) === String(newMediaId)) || null;
         let isNewVideo;
         if (requestedType === "photo") isNewVideo = false;
         else if (requestedType === "video") isNewVideo = true;
@@ -6663,7 +7006,7 @@ export class CapiauTimelineState {
 
         let removedPartnerId = null;
 
-        TIMELINE_HISTORY.record(() => {
+        this.history.record(() => {
             const working = cuts.find(c => c.id === targetClipId);
             if (!working) return;
 
@@ -6706,13 +7049,13 @@ export class CapiauTimelineState {
 
             cuts.sort((a, b) => (a.timelineStartFrame || 0) - (b.timelineStartFrame || 0));
 
-            STATE.activeTimelineCuts = cuts;
+            this._setCuts(cuts);
             this.selectedClipId = working.id;
             this.selectedClipIds = new Set([working.id]);
             this.selectedTrack = working.track;
         });
 
-        const updated = (STATE.activeTimelineCuts || []).find(c => c.id === targetClipId) || null;
+        const updated = (this._getCuts() || []).find(c => c.id === targetClipId) || null;
         return { success: true, reason: null, clip: updated, removedPartnerId, durationAdjusted };
     }
 
@@ -6725,8 +7068,8 @@ export class CapiauTimelineState {
      */
     splitClipAtFrame(clipId, splitFrame, splitLinked = true) {
         let result = null;
-        TIMELINE_HISTORY.record(() => {
-            const currentCuts = [...STATE.activeTimelineCuts];
+        this.history.record(() => {
+            const currentCuts = [...this._getCuts()];
             const targetIdx = currentCuts.findIndex(c => c.id === clipId);
             if (targetIdx === -1) return;
 
@@ -6791,7 +7134,7 @@ export class CapiauTimelineState {
                 }
             }
 
-            STATE.activeTimelineCuts = currentCuts;
+            this._setCuts(currentCuts);
             result = {
                 leftClip: clip,
                 rightClip: rightTarget,
@@ -6808,8 +7151,8 @@ export class CapiauTimelineState {
      */
     splitAllTracksAtFrame(splitFrame) {
         let createdClips = [];
-        TIMELINE_HISTORY.record(() => {
-            const currentCuts = [...STATE.activeTimelineCuts];
+        this.history.record(() => {
+            const currentCuts = [...this._getCuts()];
             const fps = this.fps || 24;
 
             // Conjunto de IDs de pistas destravadas e ativas (não IA)
@@ -6857,7 +7200,7 @@ export class CapiauTimelineState {
                 createdClips.push(secondClip);
             }
 
-            STATE.activeTimelineCuts = currentCuts;
+            this._setCuts(currentCuts);
         });
         return createdClips;
     }
@@ -6887,7 +7230,7 @@ export class CapiauTimelineState {
      */
     splitAtPlayhead(splitLinked = true) {
         const playhead = this.playheadFrame || 0;
-        const cuts = STATE.activeTimelineCuts || [];
+        const cuts = this._getCuts() || [];
         if (cuts.length === 0) return null;
         const fps = this.fps || 24;
 
@@ -6986,9 +7329,9 @@ export class CapiauTimelineState {
         const fps = this.fps || 24;
         const targetFrame = (playheadFrame !== null && playheadFrame !== undefined)
             ? Math.round(playheadFrame)
-            : (this.playheadFrame !== undefined ? this.playheadFrame : Math.round((STATE.currentTime || 0) * fps));
+            : (this.playheadFrame !== undefined ? this.playheadFrame : Math.round(((typeof STATE !== "undefined" && STATE ? STATE.currentTime : 0) || 0) * fps));
 
-        const cuts = STATE.activeTimelineCuts || [];
+        const cuts = this._getCuts() || [];
         if (cuts.length === 0) return null;
 
         const durSec = Math.max(0.1, Number(durationSec) || 3.0);
@@ -7136,9 +7479,9 @@ export class CapiauTimelineState {
 
         let createdFreezeClip = null;
 
-        TIMELINE_HISTORY.record(() => {
+        this.history.record(() => {
             const splitLinkMap = new Map();
-            let currentCuts = this.conformCuts(STATE.activeTimelineCuts);
+            let currentCuts = this.conformCuts(this._getCuts());
 
             // Procura se tem clipe parceiro vinculado
             const partner = (targetClip.link_id)
@@ -7186,7 +7529,7 @@ export class CapiauTimelineState {
             };
 
             currentCuts.push(createdFreezeClip);
-            STATE.activeTimelineCuts = currentCuts;
+            this._setCuts(currentCuts);
 
             this.selectedClipId = createdFreezeClip.id;
             if (this.selectedClipIds) {
@@ -7196,8 +7539,8 @@ export class CapiauTimelineState {
         });
 
         if (createdFreezeClip) {
-            STATE.emit("timelineCutsChanged", STATE.activeTimelineCuts);
-            STATE.emit("timelineClipSelected", createdFreezeClip.id);
+            this._emit("timelineCutsChanged", this._getCuts());
+            this._emit("timelineClipSelected", createdFreezeClip.id);
         }
 
         return createdFreezeClip;
@@ -7212,7 +7555,7 @@ export class CapiauTimelineState {
      */
     changeClipSpeed(clipId, options = {}) {
         let targetId = clipId || this.selectedClipId;
-        const cuts = this.conformCuts(STATE.activeTimelineCuts || []);
+        const cuts = this.conformCuts(this._getCuts() || []);
         let targetClip = cuts.find(c => c.id === targetId);
 
         // Se nenhum clipe informado ou selecionado, busca o clipe sob a agulha
@@ -7293,8 +7636,8 @@ export class CapiauTimelineState {
             return null;
         }
 
-        TIMELINE_HISTORY.record(() => {
-            let currentCuts = this.conformCuts(STATE.activeTimelineCuts || []);
+        this.history.record(() => {
+            let currentCuts = this.conformCuts(this._getCuts() || []);
             const clipToUpdate = currentCuts.find(c => c.id === targetId);
             if (!clipToUpdate) return;
 
@@ -7397,15 +7740,15 @@ export class CapiauTimelineState {
                 } else {
                     this.playheadFrame = newPlayhead;
                     this.playheadSeconds = newPlayhead / fps;
-                    STATE.emit("timelinePlayheadChanged", this.playheadFrame);
+                    this._emit("timelinePlayheadChanged", this.playheadFrame);
                 }
             }
 
-            STATE.activeTimelineCuts = currentCuts;
+            this._setCuts(currentCuts);
         });
 
-        STATE.emit("timelineCutsChanged", STATE.activeTimelineCuts);
-        STATE.emit("timelineClipSelected", targetClip.id);
+        this._emit("timelineCutsChanged", this._getCuts());
+        this._emit("timelineClipSelected", targetClip.id);
 
         return {
             clipId: targetClip.id,
@@ -7428,7 +7771,7 @@ export class CapiauTimelineState {
      */
     fillTrackGap(clipId = null, direction = "auto") {
         let targetId = clipId || this.selectedClipId;
-        const cuts = this.conformCuts(STATE.activeTimelineCuts || []);
+        const cuts = this.conformCuts(this._getCuts() || []);
         let clip = cuts.find(c => c.id === targetId);
 
         if (!clip && typeof this.playheadFrame === "number") {
@@ -7555,10 +7898,10 @@ export class CapiauTimelineState {
                 window.showToast(`⚡ Espaço preenchido (${labelDir}): velocidade ${pct}% (+${addedFrames}f)`, "success");
             }
             if (typeof window !== "undefined") {
-                if (window.TIMELINE_INTERACTION && window.TIMELINE_INTERACTION.renderer) {
+                if (typeof window !== "undefined" && window.TIMELINE_INTERACTION && window.TIMELINE_INTERACTION.renderer) {
                     window.TIMELINE_INTERACTION.renderer.requestRedraw();
                 }
-                if (window.player && typeof window.player.syncVideoToPlayhead === "function") {
+                if (typeof window !== "undefined" && window.player && typeof window.player.syncVideoToPlayhead === "function") {
                     window.player.syncVideoToPlayhead();
                 }
             }
@@ -7642,7 +7985,7 @@ export class CapiauTimelineState {
      * @returns {Object|null} Objeto com { transition, clipA, clipB } ou null em caso de falha/bloqueio.
      */
     addAudioCrossfade(options = {}) {
-        const cuts = this.conformCuts(STATE.activeTimelineCuts || []);
+        const cuts = this.conformCuts(this._getCuts() || []);
         if (!cuts || cuts.length === 0) return null;
         const fps = this.fps || 24;
 
@@ -7769,8 +8112,8 @@ export class CapiauTimelineState {
                     const fadeDurS = Math.min(1.0, Math.max(0.1, curDurS * 0.4));
                     let appliedSide = "in";
 
-                    TIMELINE_HISTORY.record(() => {
-                        const cTarget = (STATE.activeTimelineCuts || []).find(c => c.id === target.id);
+                    this.history.record(() => {
+                        const cTarget = (this._getCuts() || []).find(c => c.id === target.id);
                         if (!cTarget) return;
                         if (!cTarget.effects) cTarget.effects = [];
 
@@ -7799,7 +8142,7 @@ export class CapiauTimelineState {
                         }
                     });
 
-                    STATE.emit("timelineCutsChanged", STATE.activeTimelineCuts);
+                    this._emit("timelineCutsChanged", this._getCuts());
                     return { clip: target, type: "edge_fade", side: appliedSide, duration_s: fadeDurS };
                 }
             }
@@ -7901,8 +8244,8 @@ export class CapiauTimelineState {
 
         let createdTransition = null;
 
-        TIMELINE_HISTORY.record(() => {
-            const currentCuts = STATE.activeTimelineCuts || [];
+        this.history.record(() => {
+            const currentCuts = this._getCuts() || [];
             const cA = currentCuts.find(c => c.id === clipA.id);
             const cB = currentCuts.find(c => c.id === clipB.id);
             if (!cA || !cB) return;
@@ -7955,15 +8298,15 @@ export class CapiauTimelineState {
             this.transitions.push(createdTransition);
             this.selectedTransitionId = createdTransition.id;
 
-            STATE.activeTimelineCuts = currentCuts;
+            this._setCuts(currentCuts);
         });
 
         if (createdTransition) {
-            STATE.emit("timelineCutsChanged", STATE.activeTimelineCuts);
-            STATE.emit("timelineTransitionsChanged", this.transitions);
+            this._emit("timelineCutsChanged", this._getCuts());
+            this._emit("timelineTransitionsChanged", this.transitions);
         }
 
-        const finalCuts = STATE.activeTimelineCuts || [];
+        const finalCuts = this._getCuts() || [];
         const finalClipA = finalCuts.find(c => c.id === clipA.id) || clipA;
         const finalClipB = finalCuts.find(c => c.id === clipB.id) || clipB;
 
@@ -7977,7 +8320,7 @@ export class CapiauTimelineState {
      * @returns {Object|null} Objeto com { transition, clipA, clipB } ou null em caso de falha/bloqueio.
      */
     addVideoTransition(options = {}) {
-        const cuts = this.conformCuts(STATE.activeTimelineCuts || []);
+        const cuts = this.conformCuts(this._getCuts() || []);
         if (!cuts || cuts.length === 0) return null;
         const fps = this.fps || 24;
 
@@ -8191,8 +8534,8 @@ export class CapiauTimelineState {
 
         let createdTransition = null;
 
-        TIMELINE_HISTORY.record(() => {
-            const currentCuts = STATE.activeTimelineCuts || [];
+        this.history.record(() => {
+            const currentCuts = this._getCuts() || [];
             const cA = currentCuts.find(c => c.id === clipA.id);
             const cB = currentCuts.find(c => c.id === clipB.id);
             if (!cA || !cB) return;
@@ -8240,15 +8583,15 @@ export class CapiauTimelineState {
             this.transitions.push(createdTransition);
             this.selectedTransitionId = createdTransition.id;
 
-            STATE.activeTimelineCuts = currentCuts;
+            this._setCuts(currentCuts);
         });
 
         if (createdTransition) {
-            STATE.emit("timelineCutsChanged", STATE.activeTimelineCuts);
-            STATE.emit("timelineTransitionsChanged", this.transitions);
+            this._emit("timelineCutsChanged", this._getCuts());
+            this._emit("timelineTransitionsChanged", this.transitions);
         }
 
-        const finalCuts = STATE.activeTimelineCuts || [];
+        const finalCuts = this._getCuts() || [];
         const finalClipA = finalCuts.find(c => c.id === clipA.id) || clipA;
         const finalClipB = finalCuts.find(c => c.id === clipB.id) || clipB;
 
@@ -8265,8 +8608,8 @@ export class CapiauTimelineState {
         const trans = this.transitions.find(t => t.id === transitionId);
         if (!trans || this.isTrackLocked(trans.track)) return false;
 
-        TIMELINE_HISTORY.record(() => {
-            const currentCuts = STATE.activeTimelineCuts || [];
+        this.history.record(() => {
+            const currentCuts = this._getCuts() || [];
             const cA = currentCuts.find(c => c.id === trans.clipAId);
             const cB = currentCuts.find(c => c.id === trans.clipBId);
 
@@ -8281,11 +8624,11 @@ export class CapiauTimelineState {
             if (this.selectedTransitionId === transitionId) {
                 this.selectedTransitionId = null;
             }
-            STATE.activeTimelineCuts = currentCuts;
+            this._setCuts(currentCuts);
         });
 
-        STATE.emit("timelineCutsChanged", STATE.activeTimelineCuts);
-        STATE.emit("timelineTransitionsChanged", this.transitions);
+        this._emit("timelineCutsChanged", this._getCuts());
+        this._emit("timelineTransitionsChanged", this.transitions);
         return true;
     }
 
@@ -8301,7 +8644,7 @@ export class CapiauTimelineState {
         const tr = this.transitions.find(t => t.id === transitionId);
         if (!tr) return null;
 
-        const cuts = STATE.activeTimelineCuts || [];
+        const cuts = this._getCuts() || [];
         const clipA = cuts.find(c => c.id === tr.clipAId);
         const clipB = cuts.find(c => c.id === tr.clipBId);
         if (!clipA || !clipB) return null;
@@ -8373,7 +8716,7 @@ export class CapiauTimelineState {
         const tr = this.transitions.find(t => t.id === transitionId);
         if (!tr || this.isTrackLocked(tr.track)) return null;
 
-        const cuts = STATE.activeTimelineCuts || [];
+        const cuts = this._getCuts() || [];
         const clipA = cuts.find(c => c.id === tr.clipAId);
         const clipB = cuts.find(c => c.id === tr.clipBId);
         if (!clipA || !clipB) return null;
@@ -8467,7 +8810,7 @@ export class CapiauTimelineState {
      */
     validateTransitions() {
         if (!this.transitions || this.transitions.length === 0) return false;
-        const cuts = STATE.activeTimelineCuts || [];
+        const cuts = this._getCuts() || [];
         const validTransitions = [];
         let changed = false;
 
@@ -8518,8 +8861,8 @@ export class CapiauTimelineState {
             if (this.selectedTransitionId && !validTransitions.some(t => t.id === this.selectedTransitionId)) {
                 this.selectedTransitionId = null;
             }
-            STATE.emit("timelineTransitionsChanged", this.transitions);
-            STATE.emit("timelineCutsChanged", cuts);
+            this._emit("timelineTransitionsChanged", this.transitions);
+            this._emit("timelineCutsChanged", cuts);
         }
 
         return changed;
@@ -8540,13 +8883,13 @@ export class CapiauTimelineState {
         const oldFps = this.fps;
         const fpsChanged = oldFps !== newFps;
 
-        TIMELINE_HISTORY.record(() => {
+        this.history.record(() => {
             this.width = newW;
             this.height = newH;
             this.fps = newFps;
 
-            if (fpsChanged && STATE.activeTimelineCuts.length > 0) {
-                const cuts = STATE.activeTimelineCuts.map(cut => {
+            if (fpsChanged && this._getCuts().length > 0) {
+                const cuts = this._getCuts().map(cut => {
                     return {
                         ...cut,
                         inFrame: Math.round(cut.in * newFps),
@@ -8554,11 +8897,11 @@ export class CapiauTimelineState {
                         timelineStartFrame: Math.round(cut.timeline_start * newFps)
                     };
                 });
-                STATE.activeTimelineCuts = cuts;
+                this._setCuts(cuts);
             }
 
-            STATE.emit("timelineFpsChanged", this.fps);
-            STATE.emit("timelinePropertiesChanged", { width: this.width, height: this.height, fps: this.fps });
+            this._emit("timelineFpsChanged", this.fps);
+            this._emit("timelinePropertiesChanged", { width: this.width, height: this.height, fps: this.fps });
         });
         return true;
     }
@@ -8581,7 +8924,7 @@ export class CapiauTimelineState {
 
         let result = null;
         const doSlip = () => {
-            const cuts = [...STATE.activeTimelineCuts];
+            const cuts = [...this._getCuts()];
             const clip = cuts.find(c => c.id === clipId);
             if (!clip) return;
 
@@ -8667,7 +9010,7 @@ export class CapiauTimelineState {
                 }
             }
 
-            STATE.activeTimelineCuts = cuts;
+            this._setCuts(cuts);
             result = {
                 clipId: clip.id,
                 appliedDelta: clampedDelta,
@@ -8681,10 +9024,10 @@ export class CapiauTimelineState {
             };
         };
 
-        if (TIMELINE_HISTORY.pending) {
+        if (this.history.pending) {
             doSlip();
         } else {
-            TIMELINE_HISTORY.record(doSlip);
+            this.history.record(doSlip);
         }
 
         return result;
@@ -8706,7 +9049,7 @@ export class CapiauTimelineState {
 
         let result = null;
         const doSlide = () => {
-            const cuts = [...STATE.activeTimelineCuts];
+            const cuts = [...this._getCuts()];
             const clip = cuts.find(c => c.id === clipId);
             if (!clip) return;
 
@@ -8873,7 +9216,7 @@ export class CapiauTimelineState {
                 }
             }
 
-            STATE.activeTimelineCuts = cuts;
+            this._setCuts(cuts);
             result = {
                 clipId: clip.id,
                 appliedDelta: clampedDelta,
@@ -8899,10 +9242,10 @@ export class CapiauTimelineState {
             };
         };
 
-        if (TIMELINE_HISTORY.pending) {
+        if (this.history.pending) {
             doSlide();
         } else {
-            TIMELINE_HISTORY.record(doSlide);
+            this.history.record(doSlide);
         }
 
         return result;
@@ -8925,7 +9268,7 @@ export class CapiauTimelineState {
 
         let result = null;
         const doRolling = () => {
-            const cuts = [...STATE.activeTimelineCuts];
+            const cuts = [...this._getCuts()];
             const leftClip = cuts.find(c => c.id === leftClipId);
             const rightClip = cuts.find(c => c.id === rightClipId);
             if (!leftClip || !rightClip) return;
@@ -9090,7 +9433,7 @@ export class CapiauTimelineState {
                 }
             }
 
-            STATE.activeTimelineCuts = cuts;
+            this._setCuts(cuts);
             result = {
                 leftClipId: leftClip.id,
                 leftClip: leftClip,
@@ -9107,73 +9450,24 @@ export class CapiauTimelineState {
             };
         };
 
-        if (TIMELINE_HISTORY.pending) {
+        if (this.history.pending) {
             doRolling();
         } else {
-            TIMELINE_HISTORY.record(doRolling);
+            this.history.record(doRolling);
         }
 
         return result;
     }
 }
 
-export const TIMELINE_STATE = new CapiauTimelineState();
-TIMELINE_STATE.computeAdjustmentFadeFactor = computeAdjustmentFadeFactor;
-TIMELINE_STATE.computeClipFadeFactor = computeClipFadeFactor;
-window.TIMELINE_STATE = TIMELINE_STATE;
-window.computeAdjustmentFadeFactor = computeAdjustmentFadeFactor;
-window.computeClipFadeFactor = computeClipFadeFactor;
+CapiauTimelineState.prototype.computeAdjustmentFadeFactor = computeAdjustmentFadeFactor;
+CapiauTimelineState.prototype.computeClipFadeFactor = computeClipFadeFactor;
 
-// Sincroniza rotação de mídia com clipes existentes na timeline e estado global
-STATE.on("mediaRotated", ({ mediaType, mediaId, rotation }) => {
-    const rotNorm = ((Math.round(Number(rotation) || 0) % 360) + 360) % 360;
-    if (mediaType === "video") {
-        const v = (STATE.allVideos || []).find(it => String(it.id) === String(mediaId));
-        if (v) v.rotation = rotNorm;
-        if (STATE.activeVideo && String(STATE.activeVideo.id) === String(mediaId)) {
-            STATE.activeVideo.rotation = rotNorm;
-        }
-    } else if (mediaType === "photo") {
-        const p = (STATE.allPhotos || []).find(it => String(it.id) === String(mediaId));
-        if (p) p.rotation = rotNorm;
-        if (STATE.activePhoto && String(STATE.activePhoto.id) === String(mediaId)) {
-            STATE.activePhoto.rotation = rotNorm;
-        }
+export class TimelineSequenceState extends CapiauTimelineState {
+    constructor(options = {}) {
+        super({ isolated: true, ...(options && typeof options === "object" ? options : {}) });
     }
-
-    let changed = false;
-    (STATE.activeTimelineCuts || []).forEach(cut => {
-        if (TIMELINE_STATE.isTrackLocked(cut.track)) return;
-        const matches = (mediaType === "video" && String(cut.video_id) === String(mediaId)) ||
-                        (mediaType === "photo" && String(cut.photo_id) === String(mediaId));
-        if (matches) {
-            cut.rotation = rotation;
-            if (!cut.effects) cut.effects = [];
-            let tf = cut.effects.find(e => e.type === "transform");
-            if (tf) {
-                tf.rotation = rotation;
-            } else if (rotation !== 0) {
-                cut.effects.push({ type: "transform", rotation: rotation, scale: 1, x: 0, y: 0 });
-            }
-            changed = true;
-        }
-    });
-    if (changed) {
-        STATE.emit("timelineCutsUpdated", STATE.activeTimelineCuts);
-        if (typeof window.player?.updateProgramView === "function") {
-            window.player.updateProgramView();
-        } else if (typeof window.player?.syncVideoToPlayhead === "function") {
-            window.player.syncVideoToPlayhead();
-        }
-    }
-});
-
-// Valida e limpa transições automaticamente quando os clipes mudam na timeline
-STATE.on("timelineCutsUpdated", () => {
-    if (typeof TIMELINE_STATE !== "undefined" && typeof TIMELINE_STATE.validateTransitions === "function") {
-        TIMELINE_STATE.validateTransitions();
-    }
-});
+}
 
 // --- HISTÓRICO DE UNDO/REDO (snapshots de clipes, pistas e sugestões) ---
 
@@ -9193,8 +9487,9 @@ const safeHistoryReplacer = (key, value) => {
     return value;
 };
 
-class TimelineHistory {
-    constructor() {
+export class TimelineHistory {
+    constructor(sequence = null) {
+        this._sequence = sequence;
         this.undoStack = [];
         this.redoStack = [];
         this.pending = null; // snapshot pré-transação (para drags contínuos)
@@ -9202,26 +9497,35 @@ class TimelineHistory {
         this.isRestoring = false; // Flag para suprimir invalidações espúrias durante Undo/Redo
     }
 
+    _getSequence() {
+        if (this._sequence) return this._sequence;
+        if (typeof SEQUENCE_MANAGER !== "undefined" && SEQUENCE_MANAGER) {
+            return SEQUENCE_MANAGER.getActiveSequence();
+        }
+        return null;
+    }
+
     _capture() {
-        const rc = getRenderCacheProvider();
+        const seq = this._getSequence();
+        const rc = (seq && seq._isActiveSequence()) ? getRenderCacheProvider() : null;
         return JSON.parse(JSON.stringify({
-            cuts: STATE.activeTimelineCuts,
-            tracks: TIMELINE_STATE.tracks,
-            ghosts: TIMELINE_STATE.ghostTrack,
-            fps: TIMELINE_STATE.fps || 24,
-            width: TIMELINE_STATE.width || 1920,
-            height: TIMELINE_STATE.height || 1080,
-            selectedClipId: TIMELINE_STATE.selectedClipId,
-            selectedClipIds: Array.from(TIMELINE_STATE.selectedClipIds || []),
-            activeTool: TIMELINE_STATE.activeTool || "select",
-            selectedGhostClipId: TIMELINE_STATE.selectedGhostClipId,
-            inFrame: TIMELINE_STATE.inFrame,
-            outFrame: TIMELINE_STATE.outFrame,
-            markers: TIMELINE_STATE.markers || [],
-            selectedMarkerIds: Array.from(TIMELINE_STATE.selectedMarkerIds || []),
-            transitions: (TIMELINE_STATE.transitions || []).map(t => ({ ...t })),
-            selectedTransitionId: TIMELINE_STATE.selectedTransitionId || null,
-            playheadFrame: (TIMELINE_STATE.playheadFrame !== undefined && TIMELINE_STATE.playheadFrame !== null) ? TIMELINE_STATE.playheadFrame : 0,
+            cuts: seq ? seq._getCuts() : ((typeof STATE !== "undefined" && STATE.activeTimelineCuts) || []),
+            tracks: seq ? seq.tracks : [],
+            ghosts: seq ? seq.ghostTrack : [],
+            fps: (seq && seq.fps) || 24,
+            width: (seq && seq.width) || 1920,
+            height: (seq && seq.height) || 1080,
+            selectedClipId: seq ? seq.selectedClipId : null,
+            selectedClipIds: Array.from((seq && seq.selectedClipIds) || []),
+            activeTool: (seq && seq.activeTool) || "select",
+            selectedGhostClipId: seq ? seq.selectedGhostClipId : null,
+            inFrame: seq ? seq.inFrame : null,
+            outFrame: seq ? seq.outFrame : null,
+            markers: (seq && seq.markers) || [],
+            selectedMarkerIds: Array.from((seq && seq.selectedMarkerIds) || []),
+            transitions: ((seq && seq.transitions) || []).map(t => ({ ...t })),
+            selectedTransitionId: (seq && seq.selectedTransitionId) || null,
+            playheadFrame: (seq && seq.playheadFrame !== undefined && seq.playheadFrame !== null) ? seq.playheadFrame : 0,
             renderCacheToken: (rc && typeof rc.getCurrentToken === "function") ? rc.getCurrentToken() : null
         }, safeHistoryReplacer));
     }
@@ -9234,8 +9538,9 @@ class TimelineHistory {
     /** Fecha a transação: empilha o estado anterior somente se algo mudou. */
     commit() {
         if (!this.pending) return;
-        if (typeof TIMELINE_STATE !== "undefined" && typeof TIMELINE_STATE.validateTransitions === "function") {
-            TIMELINE_STATE.validateTransitions();
+        const seq = this._getSequence();
+        if (seq && typeof seq.validateTransitions === "function") {
+            seq.validateTransitions();
         }
         const before = this.pending;
         this.pending = null;
@@ -9243,17 +9548,22 @@ class TimelineHistory {
         this.undoStack.push(before);
         if (this.undoStack.length > this.limit) this.undoStack.shift();
         this.redoStack = [];
+        if (seq && typeof seq.bumpRevision === "function") {
+            seq.bumpRevision();
+        }
         this._notify();
 
-        // Limpa snapshots órfãos de render cache
-        const rc = getRenderCacheProvider();
-        if (rc && typeof rc.pruneSnapshots === "function") {
-            const activeTokens = new Set();
-            for (const s of this.undoStack) if (s && s.renderCacheToken) activeTokens.add(s.renderCacheToken);
-            for (const s of this.redoStack) if (s && s.renderCacheToken) activeTokens.add(s.renderCacheToken);
-            if (this.pending && this.pending.renderCacheToken) activeTokens.add(this.pending.renderCacheToken);
-            if (rc.getCurrentToken && rc.getCurrentToken()) activeTokens.add(rc.getCurrentToken());
-            rc.pruneSnapshots(activeTokens);
+        // Limpa snapshots órfãos de render cache apenas para a sequência ativa na UI
+        if (!seq || seq._isActiveSequence()) {
+            const rc = getRenderCacheProvider();
+            if (rc && typeof rc.pruneSnapshots === "function") {
+                const activeTokens = new Set();
+                for (const s of this.undoStack) if (s && s.renderCacheToken) activeTokens.add(s.renderCacheToken);
+                for (const s of this.redoStack) if (s && s.renderCacheToken) activeTokens.add(s.renderCacheToken);
+                if (this.pending && this.pending.renderCacheToken) activeTokens.add(this.pending.renderCacheToken);
+                if (rc.getCurrentToken && rc.getCurrentToken()) activeTokens.add(rc.getCurrentToken());
+                rc.pruneSnapshots(activeTokens);
+            }
         }
     }
 
@@ -9272,63 +9582,71 @@ class TimelineHistory {
     }
 
     _restore(snap) {
+        const seq = this._getSequence();
+        if (!seq) return;
         this.isRestoring = true;
         try {
-            TIMELINE_STATE.selectedClipId = snap.selectedClipId !== undefined ? snap.selectedClipId : null;
-            TIMELINE_STATE.selectedClipIds = new Set(snap.selectedClipIds || (snap.selectedClipId ? [snap.selectedClipId] : []));
+            seq.selectedClipId = snap.selectedClipId !== undefined ? snap.selectedClipId : null;
+            seq.selectedClipIds = new Set(snap.selectedClipIds || (snap.selectedClipId ? [snap.selectedClipId] : []));
             if (snap.activeTool) {
-                TIMELINE_STATE.activeTool = snap.activeTool;
-                STATE.emit("timelineToolChanged", TIMELINE_STATE.activeTool);
+                seq.activeTool = snap.activeTool;
+                seq._emit("timelineToolChanged", seq.activeTool);
             }
-            TIMELINE_STATE.selectedGhostClipId = snap.selectedGhostClipId !== undefined ? snap.selectedGhostClipId : null;
-            const prevFps = TIMELINE_STATE.fps;
-            const prevWidth = TIMELINE_STATE.width;
-            const prevHeight = TIMELINE_STATE.height;
-            if (snap.fps !== undefined && snap.fps !== null) TIMELINE_STATE.fps = snap.fps;
-            if (snap.width !== undefined && snap.width !== null) TIMELINE_STATE.width = snap.width;
-            if (snap.height !== undefined && snap.height !== null) TIMELINE_STATE.height = snap.height;
-            const fpsChanged = TIMELINE_STATE.fps !== prevFps;
-            const propsChanged = fpsChanged || TIMELINE_STATE.width !== prevWidth || TIMELINE_STATE.height !== prevHeight;
-            TIMELINE_STATE.setTracks(snap.tracks);
-            STATE.activeTimelineCuts = snap.cuts || [];
-            TIMELINE_STATE.ghostTrack = snap.ghosts || [];
-            if (snap.inFrame !== undefined) TIMELINE_STATE.inFrame = snap.inFrame;
-            if (snap.outFrame !== undefined) TIMELINE_STATE.outFrame = snap.outFrame;
+            seq.selectedGhostClipId = snap.selectedGhostClipId !== undefined ? snap.selectedGhostClipId : null;
+            const prevFps = seq.fps;
+            const prevWidth = seq.width;
+            const prevHeight = seq.height;
+            if (snap.fps !== undefined && snap.fps !== null) seq.fps = snap.fps;
+            if (snap.width !== undefined && snap.width !== null) seq.width = snap.width;
+            if (snap.height !== undefined && snap.height !== null) seq.height = snap.height;
+            const fpsChanged = seq.fps !== prevFps;
+            const propsChanged = fpsChanged || seq.width !== prevWidth || seq.height !== prevHeight;
+            seq.setTracks(snap.tracks);
+            if (!seq.isolated) {
+                STATE.activeTimelineCuts = snap.cuts || [];
+            } else {
+                seq._setCuts(snap.cuts || [], { skipValidateTransitions: true });
+            }
+            seq.ghostTrack = snap.ghosts || [];
+            if (snap.inFrame !== undefined) seq.inFrame = snap.inFrame;
+            if (snap.outFrame !== undefined) seq.outFrame = snap.outFrame;
             if (snap.markers !== undefined) {
-                TIMELINE_STATE.markers = JSON.parse(JSON.stringify(snap.markers));
-                TIMELINE_STATE.selectedMarkerIds = new Set(snap.selectedMarkerIds || []);
-                STATE.emit("timelineMarkersChanged", TIMELINE_STATE.markers);
+                seq.markers = JSON.parse(JSON.stringify(snap.markers));
+                seq.selectedMarkerIds = new Set(snap.selectedMarkerIds || []);
+                seq._emit("timelineMarkersChanged", seq.markers);
             }
             if (snap.transitions !== undefined) {
-                TIMELINE_STATE.transitions = (snap.transitions || []).map(t => ({ ...t }));
-                TIMELINE_STATE.selectedTransitionId = snap.selectedTransitionId || null;
-                STATE.emit("timelineTransitionsChanged", TIMELINE_STATE.transitions);
+                seq.transitions = (snap.transitions || []).map(t => ({ ...t }));
+                seq.selectedTransitionId = snap.selectedTransitionId || null;
+                seq._emit("timelineTransitionsChanged", seq.transitions);
             }
             if (snap.playheadFrame !== undefined && snap.playheadFrame !== null) {
-                if (typeof TIMELINE_STATE.setPlayheadFrame === "function") {
-                    TIMELINE_STATE.setPlayheadFrame(snap.playheadFrame);
+                if (typeof seq.setPlayheadFrame === "function") {
+                    seq.setPlayheadFrame(snap.playheadFrame);
                 } else {
-                    TIMELINE_STATE.playheadFrame = snap.playheadFrame;
+                    seq.playheadFrame = snap.playheadFrame;
                 }
             }
 
-            // Restaura o snapshot de Render Cache correspondente ao momento histórico
-            const rc = getRenderCacheProvider();
-            if (rc && typeof rc.restoreSnapshot === "function") {
-                rc.restoreSnapshot(snap.renderCacheToken || null);
+            // Restaura o snapshot de Render Cache apenas quando esta é a sequência ativa
+            if (seq._isActiveSequence()) {
+                const rc = getRenderCacheProvider();
+                if (rc && typeof rc.restoreSnapshot === "function") {
+                    rc.restoreSnapshot(snap.renderCacheToken || null);
+                }
             }
 
-            if (fpsChanged) STATE.emit("timelineFpsChanged", TIMELINE_STATE.fps);
+            if (fpsChanged) seq._emit("timelineFpsChanged", seq.fps);
             if (propsChanged) {
-                STATE.emit("timelinePropertiesChanged", {
-                    width: TIMELINE_STATE.width,
-                    height: TIMELINE_STATE.height,
-                    fps: TIMELINE_STATE.fps,
+                seq._emit("timelinePropertiesChanged", {
+                    width: seq.width,
+                    height: seq.height,
+                    fps: seq.fps,
                 });
             }
-            STATE.emit("timelineInOutChanged", { inFrame: TIMELINE_STATE.inFrame, outFrame: TIMELINE_STATE.outFrame });
-            STATE.emit("timelineGhostUpdated", TIMELINE_STATE.ghostTrack);
-            STATE.emit("timelineRestored");
+            seq._emit("timelineInOutChanged", { inFrame: seq.inFrame, outFrame: seq.outFrame });
+            seq._emit("timelineGhostUpdated", seq.ghostTrack);
+            seq._emit("timelineRestored");
             this._notify();
         } finally {
             this.isRestoring = false;
@@ -9359,21 +9677,367 @@ class TimelineHistory {
         this.pending = null;
         this._notify();
 
-        const rc = getRenderCacheProvider();
-        if (rc && typeof rc.pruneSnapshots === "function") {
-            const activeTokens = new Set();
-            if (rc.getCurrentToken && rc.getCurrentToken()) activeTokens.add(rc.getCurrentToken());
-            rc.pruneSnapshots(activeTokens);
+        const seq = this._getSequence();
+        if (!seq || seq._isActiveSequence()) {
+            const rc = getRenderCacheProvider();
+            if (rc && typeof rc.pruneSnapshots === "function") {
+                const activeTokens = new Set();
+                if (rc.getCurrentToken && rc.getCurrentToken()) activeTokens.add(rc.getCurrentToken());
+                rc.pruneSnapshots(activeTokens);
+            }
         }
     }
 
     _notify() {
-        STATE.emit("timelineHistoryChanged", {
+        const seq = this._getSequence();
+        const payload = {
             canUndo: this.undoStack.length > 0,
             canRedo: this.redoStack.length > 0
-        });
+        };
+        if (seq && typeof seq._emit === "function") {
+            seq._emit("timelineHistoryChanged", payload);
+        } else if (typeof STATE !== "undefined" && STATE && typeof STATE.emit === "function") {
+            STATE.emit("timelineHistoryChanged", payload);
+        }
     }
 }
 
-export const TIMELINE_HISTORY = new TimelineHistory();
-window.TIMELINE_HISTORY = TIMELINE_HISTORY;
+export class TimelineSequenceManager {
+    constructor(options = {}) {
+        this._sequences = new Map();
+        this._activeSequenceId = null;
+        this._idCounter = 0;
+
+        const canBindGlobal = typeof STATE !== "undefined" && STATE && typeof STATE.registerActiveSequenceProvider === "function";
+        const defaultSeq = new TimelineSequenceState({
+            id: options.defaultId || "seq_default",
+            name: options.defaultName || "Sequência Principal",
+            kind: "edit",
+            isolated: canBindGlobal,
+            headless: Boolean(options.headless)
+        });
+        this._sequences.set(defaultSeq.id, defaultSeq);
+        this._activeSequenceId = defaultSeq.id;
+
+        if (canBindGlobal) {
+            STATE.registerActiveSequenceProvider(() => this.getActiveSequence());
+        }
+    }
+
+    getActiveSequence() {
+        return this._sequences.get(this._activeSequenceId) || this._sequences.values().next().value || null;
+    }
+
+    getActiveSequenceId() {
+        return this._activeSequenceId;
+    }
+
+    getSequence(id) {
+        if (!id) return null;
+        return this._sequences.get(String(id)) || null;
+    }
+
+    hasSequence(id) {
+        return Boolean(id && this._sequences.has(String(id)));
+    }
+
+    listSequences({ kind = null, baseSequenceId = null } = {}) {
+        const all = Array.from(this._sequences.values());
+        return all.filter(seq => {
+            if (kind && seq.kind !== kind) return false;
+            if (baseSequenceId && seq.baseSequenceId !== String(baseSequenceId)) return false;
+            return true;
+        });
+    }
+
+    getGhostClones(baseSequenceId = null) {
+        return this.listSequences({ kind: "ghost", baseSequenceId });
+    }
+
+    createSequence(options = {}) {
+        const opts = (options && typeof options === "object") ? options : {};
+        const id = opts.id ? String(opts.id) : `seq_${++this._idCounter}_${Date.now().toString(36)}`;
+        if (this._sequences.has(id)) {
+            throw new Error(`Sequência com id "${id}" já existe.`);
+        }
+        const seq = new TimelineSequenceState({
+            ...opts,
+            id,
+            isolated: opts.isolated !== undefined ? Boolean(opts.isolated) : true
+        });
+        this._sequences.set(seq.id, seq);
+        if (opts.activate) {
+            this.setActiveSequence(seq.id);
+        } else if (typeof STATE !== "undefined" && STATE && typeof STATE.emit === "function") {
+            STATE.emit("sequencesListChanged", this.listSequences());
+        }
+        return seq;
+    }
+
+    createSequenceFromSnapshot(snap, options = {}) {
+        const seq = this.createSequence({
+            ...(snap || {}),
+            ...(options || {}),
+            cuts: undefined
+        });
+        if (snap) {
+            seq.loadSnapshot(snap, { silent: true });
+        }
+        if (options && options.activate) {
+            this.setActiveSequence(seq.id);
+        }
+        return seq;
+    }
+
+    cloneSequence(sourceId = this._activeSequenceId, options = {}) {
+        const source = this.getSequence(sourceId) || this.getActiveSequence();
+        if (!source) return null;
+        const opts = (options && typeof options === "object") ? options : {};
+        const cloneId = opts.id ? String(opts.id) : `${source.id}_clone_${++this._idCounter}`;
+        if (this._sequences.has(cloneId)) {
+            throw new Error(`Sequência com id "${cloneId}" já existe.`);
+        }
+        const cloned = source.clone({ ...opts, id: cloneId });
+        this._sequences.set(cloned.id, cloned);
+        if (opts.activate) {
+            this.setActiveSequence(cloned.id);
+        } else if (typeof STATE !== "undefined" && STATE && typeof STATE.emit === "function") {
+            STATE.emit("sequencesListChanged", this.listSequences());
+        }
+        return cloned;
+    }
+
+    setActiveSequence(sequenceId) {
+        const id = String(sequenceId || "");
+        const nextSeq = this._sequences.get(id);
+        if (!nextSeq) return null;
+        const prevId = this._activeSequenceId;
+        if (prevId === id) return nextSeq;
+
+        this._activeSequenceId = id;
+        if (nextSeq.isolated && typeof STATE !== "undefined" && STATE) {
+            STATE._activeTimelineCuts = nextSeq.cuts;
+        }
+        this._emitActiveSequenceSwitchEvents(nextSeq, prevId);
+        return nextSeq;
+    }
+
+    removeSequence(sequenceId) {
+        const id = String(sequenceId || "");
+        const target = this._sequences.get(id);
+        if (!target) return false;
+        const nonGhostCount = Array.from(this._sequences.values()).filter(s => s.kind !== "ghost").length;
+        if (target.kind !== "ghost" && nonGhostCount <= 1) {
+            return false; // Protege a última sequência principal editável
+        }
+        this._sequences.delete(id);
+        if (this._activeSequenceId === id) {
+            const fallback = Array.from(this._sequences.values()).find(s => s.kind !== "ghost")
+                || this._sequences.values().next().value;
+            if (fallback) {
+                this.setActiveSequence(fallback.id);
+            }
+        } else if (typeof STATE !== "undefined" && STATE && typeof STATE.emit === "function") {
+            STATE.emit("sequencesListChanged", this.listSequences());
+        }
+        return true;
+    }
+
+    applyAtomicTurn(sequenceId, mutatorFn, meta = {}) {
+        const seq = this.getSequence(sequenceId) || this.getActiveSequence();
+        if (!seq || typeof mutatorFn !== "function") return null;
+        let result = null;
+        seq.history.record(() => {
+            result = mutatorFn(seq, meta);
+        });
+        return { sequence: seq, revision: seq.revision, result };
+    }
+
+    resetToSingleSequence(options = {}) {
+        const opts = (options && typeof options === "object") ? options : {};
+        const canBindGlobal = typeof STATE !== "undefined" && STATE && typeof STATE.registerActiveSequenceProvider === "function";
+        this._sequences.clear();
+        const fresh = new TimelineSequenceState({
+            id: opts.id || "seq_default",
+            name: opts.name || "Sequência Principal",
+            kind: opts.kind || "edit",
+            isolated: opts.isolated !== undefined ? Boolean(opts.isolated) : canBindGlobal,
+            headless: Boolean(opts.headless)
+        });
+        this._sequences.set(fresh.id, fresh);
+        this._activeSequenceId = fresh.id;
+        if (fresh.isolated && typeof STATE !== "undefined" && STATE) {
+            STATE._activeTimelineCuts = fresh.cuts;
+        }
+        this._emitActiveSequenceSwitchEvents(fresh, null);
+        return fresh;
+    }
+
+    _emitActiveSequenceSwitchEvents(seq, previousSequenceId) {
+        if (!seq || seq.headless || typeof STATE === "undefined" || !STATE || typeof STATE.emit !== "function") {
+            return;
+        }
+        STATE.emit("activeSequenceChanged", {
+            sequenceId: seq.id,
+            previousSequenceId,
+            kind: seq.kind,
+            name: seq.name,
+            baseSequenceId: seq.baseSequenceId
+        });
+        STATE.emit("sequencesListChanged", this.listSequences());
+        STATE.emit("timelineTracksChanged", seq.tracks);
+        STATE.emit("timelineFpsChanged", seq.fps);
+        STATE.emit("timelinePropertiesChanged", { width: seq.width, height: seq.height, fps: seq.fps });
+        STATE.emit("timelineCutsUpdated", seq.cuts);
+        STATE.emit("timelineMarkersChanged", seq.markers);
+        STATE.emit("timelineTransitionsChanged", seq.transitions);
+        STATE.emit("timelineGhostUpdated", seq.ghostTrack);
+        STATE.emit("timelineInOutChanged", { inFrame: seq.inFrame, outFrame: seq.outFrame });
+        STATE.emit("timelinePlayheadChanged", seq.playheadFrame);
+        STATE.emit("timelineToolChanged", seq.activeTool);
+        STATE.emit("timelineSelectionChanged", seq.selectedClipId);
+        STATE.emit("timelineHistoryChanged", {
+            canUndo: Boolean(seq.history && seq.history.undoStack.length > 0),
+            canRedo: Boolean(seq.history && seq.history.redoStack.length > 0)
+        });
+        STATE.emit("timelineRestored");
+    }
+}
+
+export const SEQUENCE_MANAGER = new TimelineSequenceManager();
+
+function createActiveFacadeProxy(resolveTarget, specialProps = {}) {
+    return new Proxy({}, {
+        get(_, prop) {
+            if (Object.prototype.hasOwnProperty.call(specialProps, prop)) {
+                return specialProps[prop];
+            }
+            const target = resolveTarget();
+            if (prop === "__target") return target;
+            if (!target) return undefined;
+            const val = Reflect.get(target, prop, target);
+            if (typeof val === "function") {
+                if (prop === "computeAdjustmentFadeFactor" || prop === "computeClipFadeFactor") {
+                    return val;
+                }
+                return val.bind(target);
+            }
+            return val;
+        },
+        set(_, prop, value) {
+            const target = resolveTarget();
+            if (!target) return false;
+            return Reflect.set(target, prop, value, target);
+        },
+        has(_, prop) {
+            if (Object.prototype.hasOwnProperty.call(specialProps, prop)) return true;
+            const target = resolveTarget();
+            return target ? Reflect.has(target, prop) : false;
+        },
+        deleteProperty(_, prop) {
+            const target = resolveTarget();
+            return target ? Reflect.deleteProperty(target, prop) : false;
+        },
+        ownKeys() {
+            const target = resolveTarget();
+            return target ? Reflect.ownKeys(target) : [];
+        },
+        getOwnPropertyDescriptor(_, prop) {
+            if (Object.prototype.hasOwnProperty.call(specialProps, prop)) {
+                return { enumerable: true, configurable: true, writable: true, value: specialProps[prop] };
+            }
+            const target = resolveTarget();
+            if (!target) return undefined;
+            const desc = Reflect.getOwnPropertyDescriptor(target, prop);
+            if (!desc) return undefined;
+            return { ...desc, configurable: true };
+        },
+        getPrototypeOf() {
+            const target = resolveTarget();
+            return target ? Reflect.getPrototypeOf(target) : Object.prototype;
+        }
+    });
+}
+
+export const TIMELINE_STATE = createActiveFacadeProxy(
+    () => SEQUENCE_MANAGER.getActiveSequence(),
+    {
+        __isTimelineFacade: true,
+        computeAdjustmentFadeFactor,
+        computeClipFadeFactor
+    }
+);
+
+export const TIMELINE_HISTORY = createActiveFacadeProxy(
+    () => {
+        const seq = SEQUENCE_MANAGER.getActiveSequence();
+        return seq ? seq.history : null;
+    },
+    { __isHistoryFacade: true }
+);
+
+if (typeof window !== "undefined") {
+    window.SEQUENCE_MANAGER = SEQUENCE_MANAGER;
+    window.TIMELINE_STATE = TIMELINE_STATE;
+    window.TIMELINE_HISTORY = TIMELINE_HISTORY;
+    window.computeAdjustmentFadeFactor = computeAdjustmentFadeFactor;
+    window.computeClipFadeFactor = computeClipFadeFactor;
+}
+
+if (typeof STATE !== "undefined" && STATE && typeof STATE.on === "function") {
+    // Sincroniza rotação de mídia com clipes existentes na timeline e estado global
+    STATE.on("mediaRotated", ({ mediaType, mediaId, rotation }) => {
+        const rotNorm = ((Math.round(Number(rotation) || 0) % 360) + 360) % 360;
+        if (mediaType === "video") {
+            const v = (STATE.allVideos || []).find(it => String(it.id) === String(mediaId));
+            if (v) v.rotation = rotNorm;
+            if (STATE.activeVideo && String(STATE.activeVideo.id) === String(mediaId)) {
+                STATE.activeVideo.rotation = rotNorm;
+            }
+        } else if (mediaType === "photo") {
+            const p = (STATE.allPhotos || []).find(it => String(it.id) === String(mediaId));
+            if (p) p.rotation = rotNorm;
+            if (STATE.activePhoto && String(STATE.activePhoto.id) === String(mediaId)) {
+                STATE.activePhoto.rotation = rotNorm;
+            }
+        }
+
+        let changed = false;
+        (STATE.activeTimelineCuts || []).forEach(cut => {
+            if (TIMELINE_STATE.isTrackLocked(cut.track)) return;
+            const matches = (mediaType === "video" && String(cut.video_id) === String(mediaId)) ||
+                            (mediaType === "photo" && String(cut.photo_id) === String(mediaId));
+            if (matches) {
+                cut.rotation = rotation;
+                if (!cut.effects) cut.effects = [];
+                let tf = cut.effects.find(e => e.type === "transform");
+                if (tf) {
+                    tf.rotation = rotation;
+                } else if (rotation !== 0) {
+                    cut.effects.push({ type: "transform", rotation: rotation, scale: 1, x: 0, y: 0 });
+                }
+                changed = true;
+            }
+        });
+        if (changed) {
+            STATE.emit("timelineCutsUpdated", STATE.activeTimelineCuts);
+            if (typeof window !== "undefined") {
+                if (typeof window.player?.updateProgramView === "function") {
+                    window.player.updateProgramView();
+                } else if (typeof window.player?.syncVideoToPlayhead === "function") {
+                    window.player.syncVideoToPlayhead();
+                }
+            }
+        }
+    });
+
+    // Valida e limpa transições automaticamente quando os clipes mudam na timeline
+    STATE.on("timelineCutsUpdated", () => {
+        if (typeof TIMELINE_HISTORY !== "undefined" && TIMELINE_HISTORY && TIMELINE_HISTORY.isRestoring) {
+            return;
+        }
+        if (typeof TIMELINE_STATE !== "undefined" && typeof TIMELINE_STATE.validateTransitions === "function") {
+            TIMELINE_STATE.validateTransitions();
+        }
+    });
+}

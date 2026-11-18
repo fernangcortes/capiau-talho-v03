@@ -30,11 +30,163 @@ class EventEmitter {
     }
 }
 
+/**
+ * Normaliza clipes da timeline e aplica o invariante de sincronia A/V.
+ * Extraído para compartilhamento único entre STATE.activeTimelineCuts e TimelineSequenceState.
+ */
+export function normalizeAndSyncTimelineCuts(val, timelineState = null, fallbackFps = 24) {
+    const fps = fallbackFps || 24;
+    const kindOf = (trackId) => {
+        if (timelineState && typeof timelineState.getTrack === "function") {
+            const t = timelineState.getTrack(trackId);
+            if (t) return t.kind || "video";
+        }
+        return "video";
+    };
+
+    const trackCursors = {}; // posição corrente por pista (para append quando sem posição)
+
+    // Frames SEMPRE em fps da timeline (nunca do vídeo fonte) — ver conformCuts
+    const timelineFps = (timelineState && timelineState.fps) ? timelineState.fps : fps;
+
+    const normalized = (val || []).map((cut, index) => {
+        const inFrame = cut.inFrame !== undefined ? cut.inFrame : Math.round(cut.in * timelineFps);
+        const outFrame = cut.outFrame !== undefined ? cut.outFrame : Math.round(cut.out * timelineFps);
+        const duration = Math.max(1, outFrame - inFrame);
+
+        const track = cut.track || "V1";
+        let timelineStartFrame = cut.timelineStartFrame;
+
+        // Compat: payloads do backend/agente posicionam em segundos (timeline_start)
+        if ((timelineStartFrame === undefined || timelineStartFrame === null) &&
+            cut.timeline_start !== undefined && cut.timeline_start !== null) {
+            timelineStartFrame = Math.round(cut.timeline_start * timelineFps);
+        }
+
+        if (trackCursors[track] === undefined) trackCursors[track] = 0;
+
+        // Se ainda não tem posição definida (ex: clipe novo adicionado sem coordenadas de drop),
+        // entra logo após o último clipe da pista
+        if (timelineStartFrame === undefined || timelineStartFrame === null) {
+            timelineStartFrame = trackCursors[track];
+        }
+
+        // Atualiza o cursor do fim da pista
+        trackCursors[track] = Math.max(trackCursors[track], timelineStartFrame + duration);
+
+        return {
+            ...cut,
+            id: cut.id || `cut_${index}_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+            type: cut.type || "video",
+            video_id: cut.video_id ?? null,
+            photo_id: cut.photo_id ?? null,
+            inFrame: Math.round(inFrame),
+            outFrame: Math.round(outFrame),
+            in: cut.in !== undefined ? cut.in : inFrame / timelineFps,
+            out: cut.out !== undefined ? cut.out : outFrame / timelineFps,
+            track: track,
+            timelineStartFrame: Math.max(0, Math.round(timelineStartFrame)),
+            // Mantém a chave em segundos sincronizada (evita valor obsoleto após drags)
+            timeline_start: Math.max(0, Math.round(timelineStartFrame)) / timelineFps,
+            link_id: cut.link_id || null,
+            syncOffset: typeof cut.syncOffset === "number" ? cut.syncOffset : null,
+            colorLabel: cut.colorLabel ?? cut.color_label ?? null
+        };
+    });
+
+    // ── Sincronia A/V: áudio vinculado é ancorado ao clipe de vídeo par ──
+    // Invariante: (timelineStartFrame - inFrame) do áudio == o do vídeo + syncOffset.
+    // Trims independentes do áudio produzem J/L-cuts sem perder o sync,
+    // slips independentes preservam suas posições na timeline via syncOffset, e o
+    // ripple de inserções/cortes arrasta o áudio junto do vídeo.
+    const isLocked = (trackId) => {
+        if (timelineState && typeof timelineState.getTrack === "function") {
+            const t = timelineState.getTrack(trackId);
+            return !!(t && t.locked);
+        }
+        return false;
+    };
+
+    const videoByLink = {};
+    normalized.forEach(c => {
+        if (c.link_id && kindOf(c.track) === "video") videoByLink[c.link_id] = c;
+    });
+    normalized.forEach(c => {
+        if (!c.link_id || kindOf(c.track) !== "audio") return;
+        const v = videoByLink[c.link_id];
+        if (!v) return;
+        // Proteção absoluta de pista travada com cadeado: áudio em pista travada jamais é movido ou aparado
+        if (isLocked(c.track)) {
+            if (typeof c.timelineStartFrame === "number" && !isNaN(c.timelineStartFrame)) {
+                c.syncOffset = (c.timelineStartFrame - c.inFrame) - (v.timelineStartFrame - v.inFrame);
+                c.timeline_start = c.timelineStartFrame / timelineFps;
+            }
+            return;
+        }
+        let syncOffset = typeof c.syncOffset === "number" ? c.syncOffset : null;
+        if (syncOffset === null) {
+            if (c.timelineStartFrame !== undefined && c.timelineStartFrame !== null) {
+                syncOffset = (c.timelineStartFrame - c.inFrame) - (v.timelineStartFrame - v.inFrame);
+            } else {
+                syncOffset = 0;
+            }
+        }
+        c.syncOffset = syncOffset;
+        let start = v.timelineStartFrame - v.inFrame + c.inFrame + syncOffset;
+        if (start < 0) {
+            // Não existe timeline antes do 0: encurta a extensão do áudio
+            c.inFrame -= start;
+            c.in = c.inFrame / timelineFps;
+            start = 0;
+        }
+        // Barreira física sólida contra invasão do clipe anterior na mesma pista (Bloqueio Físico NLE)
+        let prevEnd = 0;
+        normalized.forEach(other => {
+            if (other.id !== c.id && other.track === c.track) {
+                const otherStart = other.timelineStartFrame || 0;
+                const otherDur = (other.outFrame || 0) - (other.inFrame || 0);
+                const otherEnd = otherStart + otherDur;
+                if (otherEnd <= (c.timelineStartFrame || 0) || otherStart < start) {
+                    prevEnd = Math.max(prevEnd, otherEnd);
+                }
+            }
+        });
+
+        // Se o áudio já possui timelineStartFrame explícito e não invade o clipe anterior:
+        if (typeof c.timelineStartFrame === "number" && !isNaN(c.timelineStartFrame) && c.timelineStartFrame >= prevEnd) {
+            c.timeline_start = c.timelineStartFrame / timelineFps;
+            return;
+        }
+
+        if (start < prevEnd) {
+            const shortfall = prevEnd - start;
+            start = prevEnd;
+            // VÍDEO VINCULADO NÃO DEVE DESSINCRONIZAR se não houver syncOffset intencional (salvo se vídeo estiver em pista travada):
+            if (!c.syncOffset) {
+                if (isLocked(v.track)) {
+                    c.syncOffset = (start - c.inFrame) - (v.timelineStartFrame - v.inFrame);
+                } else {
+                    v.timelineStartFrame = Math.max(v.timelineStartFrame || 0, (v.timelineStartFrame || 0) + shortfall);
+                    v.timeline_start = v.timelineStartFrame / timelineFps;
+                }
+            }
+        }
+        c.timelineStartFrame = start;
+        c.timeline_start = start / timelineFps;
+    });
+
+    return normalized;
+}
+
 class AppState extends EventEmitter {
     constructor() {
         super();
-        const savedProj = localStorage.getItem("activeProjectId");
+        const savedProj = (typeof localStorage !== "undefined" && localStorage.getItem)
+            ? localStorage.getItem("activeProjectId")
+            : null;
         this._currentProjectId = savedProj ? Number(savedProj) : 1;
+        this._activeSequenceProvider = null;
+        this.normalizeCuts = normalizeAndSyncTimelineCuts;
         this._allProjects = [];
         this._activeVideo = null;
         this._activePhoto = null;
@@ -77,7 +229,9 @@ class AppState extends EventEmitter {
         const numVal = Number(val);
         if (this._currentProjectId !== numVal) {
             this._currentProjectId = numVal;
-            localStorage.setItem("activeProjectId", String(numVal));
+            if (typeof localStorage !== "undefined" && localStorage.setItem) {
+                localStorage.setItem("activeProjectId", String(numVal));
+            }
             this.emit("projectChanged", this._currentProjectId);
         }
     }
@@ -154,150 +308,29 @@ class AppState extends EventEmitter {
         this.emit("projectFpsChanged", this._projectFps);
     }
 
-    get activeTimelineCuts() { return this._activeTimelineCuts; }
+    registerActiveSequenceProvider(provider) {
+        this._activeSequenceProvider = typeof provider === "function" ? provider : null;
+    }
+
+    getActiveSequence() {
+        return this._activeSequenceProvider ? this._activeSequenceProvider() : null;
+    }
+
+    get activeTimelineCuts() {
+        const activeSeq = this.getActiveSequence();
+        if (activeSeq && activeSeq.isolated) {
+            return activeSeq.cuts;
+        }
+        return this._activeTimelineCuts;
+    }
     set activeTimelineCuts(val) {
-        const fps = this._projectFps || 24;
-
-        const timelineState = window.TIMELINE_STATE || null;
-        const kindOf = (trackId) => {
-            if (timelineState) {
-                const t = timelineState.getTrack(trackId);
-                if (t) return t.kind || "video";
-            }
-            return "video";
-        };
-
-        const trackCursors = {}; // posição corrente por pista (para append quando sem posição)
-
-        // Frames SEMPRE em fps da timeline (nunca do vídeo fonte) — ver conformCuts
-        const timelineFps = (timelineState && timelineState.fps) ? timelineState.fps : fps;
-
-        this._activeTimelineCuts = (val || []).map((cut, index) => {
-            const inFrame = cut.inFrame !== undefined ? cut.inFrame : Math.round(cut.in * timelineFps);
-            const outFrame = cut.outFrame !== undefined ? cut.outFrame : Math.round(cut.out * timelineFps);
-            const duration = Math.max(1, outFrame - inFrame);
-
-            const track = cut.track || "V1";
-            let timelineStartFrame = cut.timelineStartFrame;
-
-            // Compat: payloads do backend/agente posicionam em segundos (timeline_start)
-            if ((timelineStartFrame === undefined || timelineStartFrame === null) &&
-                cut.timeline_start !== undefined && cut.timeline_start !== null) {
-                timelineStartFrame = Math.round(cut.timeline_start * timelineFps);
-            }
-
-            if (trackCursors[track] === undefined) trackCursors[track] = 0;
-
-            // Se ainda não tem posição definida (ex: clipe novo adicionado sem coordenadas de drop),
-            // entra logo após o último clipe da pista
-            if (timelineStartFrame === undefined || timelineStartFrame === null) {
-                timelineStartFrame = trackCursors[track];
-            }
-
-            // Atualiza o cursor do fim da pista
-            trackCursors[track] = Math.max(trackCursors[track], timelineStartFrame + duration);
-
-            return {
-                ...cut,
-                id: cut.id || `cut_${index}_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
-                type: cut.type || "video",
-                video_id: cut.video_id ?? null,
-                photo_id: cut.photo_id ?? null,
-                inFrame: Math.round(inFrame),
-                outFrame: Math.round(outFrame),
-                in: cut.in !== undefined ? cut.in : inFrame / timelineFps,
-                out: cut.out !== undefined ? cut.out : outFrame / timelineFps,
-                track: track,
-                timelineStartFrame: Math.max(0, Math.round(timelineStartFrame)),
-                // Mantém a chave em segundos sincronizada (evita valor obsoleto após drags)
-                timeline_start: Math.max(0, Math.round(timelineStartFrame)) / timelineFps,
-                link_id: cut.link_id || null,
-                syncOffset: typeof cut.syncOffset === "number" ? cut.syncOffset : null,
-                colorLabel: cut.colorLabel ?? cut.color_label ?? null
-            };
-        });
-
-        // ── Sincronia A/V: áudio vinculado é ancorado ao clipe de vídeo par ──
-        // Invariante: (timelineStartFrame - inFrame) do áudio == o do vídeo + syncOffset.
-        // Trims independentes do áudio produzem J/L-cuts sem perder o sync,
-        // slips independentes preservam suas posições na timeline via syncOffset, e o
-        // ripple de inserções/cortes arrasta o áudio junto do vídeo.
-        const isLocked = (trackId) => {
-            if (timelineState && typeof timelineState.getTrack === "function") {
-                const t = timelineState.getTrack(trackId);
-                return !!(t && t.locked);
-            }
-            return false;
-        };
-
-        const videoByLink = {};
-        this._activeTimelineCuts.forEach(c => {
-            if (c.link_id && kindOf(c.track) === "video") videoByLink[c.link_id] = c;
-        });
-        this._activeTimelineCuts.forEach(c => {
-            if (!c.link_id || kindOf(c.track) !== "audio") return;
-            const v = videoByLink[c.link_id];
-            if (!v) return;
-            // Proteção absoluta de pista travada com cadeado: áudio em pista travada jamais é movido ou aparado
-            if (isLocked(c.track)) {
-                if (typeof c.timelineStartFrame === "number" && !isNaN(c.timelineStartFrame)) {
-                    c.syncOffset = (c.timelineStartFrame - c.inFrame) - (v.timelineStartFrame - v.inFrame);
-                    c.timeline_start = c.timelineStartFrame / timelineFps;
-                }
-                return;
-            }
-            let syncOffset = typeof c.syncOffset === "number" ? c.syncOffset : null;
-            if (syncOffset === null) {
-                if (c.timelineStartFrame !== undefined && c.timelineStartFrame !== null) {
-                    syncOffset = (c.timelineStartFrame - c.inFrame) - (v.timelineStartFrame - v.inFrame);
-                } else {
-                    syncOffset = 0;
-                }
-            }
-            c.syncOffset = syncOffset;
-            let start = v.timelineStartFrame - v.inFrame + c.inFrame + syncOffset;
-            if (start < 0) {
-                // Não existe timeline antes do 0: encurta a extensão do áudio
-                c.inFrame -= start;
-                c.in = c.inFrame / timelineFps;
-                start = 0;
-            }
-            // Barreira física sólida contra invasão do clipe anterior na mesma pista (Bloqueio Físico NLE)
-            let prevEnd = 0;
-            this._activeTimelineCuts.forEach(other => {
-                if (other.id !== c.id && other.track === c.track) {
-                    const otherStart = other.timelineStartFrame || 0;
-                    const otherDur = (other.outFrame || 0) - (other.inFrame || 0);
-                    const otherEnd = otherStart + otherDur;
-                    if (otherEnd <= (c.timelineStartFrame || 0) || otherStart < start) {
-                        prevEnd = Math.max(prevEnd, otherEnd);
-                    }
-                }
-            });
-
-            // Se o áudio já possui timelineStartFrame explícito e não invade o clipe anterior:
-            if (typeof c.timelineStartFrame === "number" && !isNaN(c.timelineStartFrame) && c.timelineStartFrame >= prevEnd) {
-                c.timeline_start = c.timelineStartFrame / timelineFps;
-                return;
-            }
-
-            if (start < prevEnd) {
-                const shortfall = prevEnd - start;
-                start = prevEnd;
-                // VÍDEO VINCULADO NÃO DEVE DESSINCRONIZAR se não houver syncOffset intencional (salvo se vídeo estiver em pista travada):
-                if (!c.syncOffset) {
-                    if (isLocked(v.track)) {
-                        c.syncOffset = (start - c.inFrame) - (v.timelineStartFrame - v.inFrame);
-                    } else {
-                        v.timelineStartFrame = Math.max(v.timelineStartFrame || 0, (v.timelineStartFrame || 0) + shortfall);
-                        v.timeline_start = v.timelineStartFrame / timelineFps;
-                    }
-                }
-            }
-            c.timelineStartFrame = start;
-            c.timeline_start = start / timelineFps;
-        });
-
+        const activeSeq = this.getActiveSequence();
+        if (activeSeq && activeSeq.isolated) {
+            activeSeq.setCuts(val);
+            return;
+        }
+        const timelineState = (typeof window !== "undefined" && window.TIMELINE_STATE) ? window.TIMELINE_STATE : null;
+        this._activeTimelineCuts = normalizeAndSyncTimelineCuts(val, timelineState, this._projectFps || 24);
         this.emit("timelineCutsUpdated", this._activeTimelineCuts);
     }
 
@@ -407,4 +440,6 @@ class AppState extends EventEmitter {
 }
 
 export const STATE = new AppState();
-window.STATE = STATE;
+if (typeof window !== "undefined") {
+    window.STATE = STATE;
+}
