@@ -11,6 +11,8 @@ sem fontes externas, no mesmo espírito do programa.
 | `index.html` | Início: o que é, recursos em destaque, grátis de verdade, privacidade, exportação, comunidade |
 | `recursos.html` | Catálogo dos recursos, com uma demo animada por grupo |
 | `como-funciona.html` | Camadas, o caminho da mídia do disco à timeline, privacidade, custos, tecnologia e princípios |
+| `plano.html` | Plano Vivo: acompanhamento didático do Grande Plano Unificado (leigo + código com tooltips) |
+| `GUIA_DIDATICO_GRANDE_PLANO.md` | Guia completo em Markdown com esquemas ASCII, metáforas, código comentado e diário |
 | `comecar.html` | Baixar, instalar (Docker ou Python local), chaves, modelos locais, primeiros passos e problemas comuns |
 | `contribuir.html` | Por que contribuir, formas de ajudar, roadmap, primeiro PR, ambiente, testes, padrões e licença |
 | `404.html` | "Corte perdido" — servida pelo GitHub Pages em endereços inexistentes |

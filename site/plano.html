@@ -1,0 +1,559 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Plano Vivo — CapIAu-Talho</title>
+    <meta name="description" content="Acompanhamento didático do Grande Plano Unificado do CapIAu-Talho (Estágios 0 a 7): metáforas da sala de corte, conexões de ordem, código com tooltips explicativos e diário do que mudou no caminho.">
+    <meta name="theme-color" content="#07060b">
+    <meta name="color-scheme" content="dark">
+    <meta property="og:type" content="website">
+    <meta property="og:locale" content="pt_BR">
+    <meta property="og:site_name" content="CapIAu-Talho">
+    <meta property="og:title" content="Plano Vivo — CapIAu-Talho">
+    <meta property="og:description" content="Entenda o plano completo de evolução do CapIAu-Talho em duas lentes: na sala de corte (leigo) e debaixo do capô (código explicado).">
+    <meta property="og:image" content="https://fernangcortes.github.io/capiau-talho-v03/assets/img/og-image.png">
+    <meta name="twitter:card" content="summary_large_image">
+    <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="assets/img/favicon-32x32.png" sizes="32x32" type="image/png">
+    <link rel="apple-touch-icon" href="assets/img/apple-touch-icon.png">
+    <link rel="preload" href="assets/fonts/inter-var.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="preload" href="assets/fonts/barlow-semi-condensed-700.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="stylesheet" href="assets/css/base.css">
+    <link rel="stylesheet" href="assets/css/plano.css">
+    <script>
+        (function (r) {
+            r.classList.add("js");
+            try {
+                var m = localStorage.getItem("talho-motion");
+                if (m === "off" || (!m && matchMedia("(prefers-reduced-motion: reduce)").matches)) r.dataset.motion = "off";
+            } catch (e) {}
+        })(document.documentElement);
+    </script>
+    <script src="assets/js/base.js" defer></script>
+    <script src="assets/js/plano.js" defer></script>
+</head>
+<body data-page="plano">
+    <a class="skip-link" href="#conteudo">Pular para o conteúdo</a>
+
+    <!-- ═══════════════ CABEÇALHO (idêntico em todas as páginas) ═══════════════ -->
+    <header class="site-header" data-header>
+        <div class="site-header__inner">
+            <a class="brand" href="index.html" aria-label="CapIAu-Talho — página inicial">
+                <img src="assets/img/logo.svg" width="34" height="34" alt="">
+                <span class="brand__name">CapIAu-<span class="brand__talho">Talho</span></span>
+            </a>
+            <nav class="site-nav" id="site-nav" aria-label="Principal">
+                <a href="index.html" data-nav-id="inicio">Início</a>
+                <a href="recursos.html" data-nav-id="recursos">Recursos</a>
+                <a href="como-funciona.html" data-nav-id="como-funciona">Como funciona</a>
+                <a href="plano.html" data-nav-id="plano">Plano Vivo</a>
+                <a href="comecar.html" data-nav-id="comecar">Começar</a>
+                <a href="contribuir.html" data-nav-id="contribuir">Contribuir</a>
+                <div class="site-nav__mobile-cta">
+                    <a class="btn btn--primary" href="comecar.html">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 20h14"/></svg>
+                        Baixar grátis
+                    </a>
+                </div>
+            </nav>
+            <div class="header-actions">
+                <span class="header-tc" aria-hidden="true" title="A página como uma sequência: o timecode acompanha a rolagem" data-scroll-timecode>00:00:00:00</span>
+                <button class="icon-btn" type="button" data-motion-toggle aria-label="Pausar animações">
+                    <svg class="motion-icon-pause" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 6v12M15 6v12"/></svg>
+                    <svg class="motion-icon-play" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M8 5.5v13l11-6.5z"/></svg>
+                </button>
+                <a class="icon-btn" data-github href="https://github.com/fernangcortes/capiau-talho-v03" aria-label="Código-fonte no GitHub">
+                    <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
+                </a>
+                <a class="btn btn--primary btn--sm header-cta" href="comecar.html">Baixar grátis</a>
+                <button class="icon-btn nav-toggle" type="button" aria-controls="site-nav" aria-expanded="false" aria-label="Abrir menu">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+                </button>
+            </div>
+        </div>
+        <div class="scroll-playhead" aria-hidden="true"><span></span></div>
+    </header>
+
+    <main id="conteudo" data-plano-app data-lens="both">
+        <!-- ═══════════════ TOPO: visão macro do Grande Plano Unificado ═══════════════ -->
+        <section class="page-hero pl-hero" aria-labelledby="plano-titulo">
+            <div class="container">
+                <div class="pl-hero__grid">
+                    <div>
+                        <p class="eyebrow eyebrow--rec" data-reveal>Plano Vivo · Novembro 2026 · Para Leigos e Devs</p>
+                        <h1 class="page-hero__title pl-hero__title" id="plano-titulo" data-reveal style="--d: 80ms">O que estamos construindo — <span class="text-gradient">e por que nessa ordem.</span></h1>
+                        <p class="lead page-hero__lead" data-reveal style="--d: 160ms">O CapIAu-Talho juntou mais de 15 cadernos técnicos em um único roteiro de 8 estágios (31 frentes, de <code class="inline">0A</code> a <code class="inline">7D</code>). Aqui você acompanha cada peça em duas linguagens: na prática da <strong>sala de corte</strong> e debaixo do capô no <strong>código explicado</strong>.</p>
+                        <div class="cluster page-hero__actions" data-reveal style="--d: 240ms">
+                            <a class="btn btn--primary btn--lg" href="#conexoes">Ver mapa de conexões
+                                <svg class="btn__arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                            </a>
+                            <a class="btn btn--ghost btn--lg" href="GUIA_DIDATICO_GRANDE_PLANO.md">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5z"/><path d="M4 20.5A2.5 2.5 0 0 1 6.5 18H20v3H6.5"/></svg>
+                                Guia Markdown (.md)
+                            </a>
+                            <a class="btn btn--ghost btn--lg" href="https://github.com/fernangcortes/capiau-talho-v03/blob/main/docs/planos/GRANDE_PLANO_UNIFICADO_2026-11.md">Plano técnico no GitHub</a>
+                        </div>
+                    </div>
+
+                    <aside class="pl-board" aria-label="Resumo do andamento atual" data-reveal="right" style="--d: 180ms">
+                        <div class="pl-board__head">
+                            <span class="pl-board__eyebrow">Status da obra · main @ d6d6f78</span>
+                            <span class="pl-board__ref">Último código: 11efef5</span>
+                        </div>
+                        <div class="pl-stats">
+                            <div class="pl-stat pl-stat--done">
+                                <span class="pl-stat__val" data-count-to="5">5</span>
+                                <span class="pl-stat__lbl">frentes concluídas (0A–1B)</span>
+                            </div>
+                            <div class="pl-stat pl-stat--wip">
+                                <span class="pl-stat__val" data-count-to="1">1</span>
+                                <span class="pl-stat__lbl">em andamento (1C parcial)</span>
+                            </div>
+                            <div class="pl-stat pl-stat--plan">
+                                <span class="pl-stat__val" data-count-to="25">25</span>
+                                <span class="pl-stat__lbl">frentes planejadas (2A–7D)</span>
+                            </div>
+                            <div class="pl-stat pl-stat--all">
+                                <span class="pl-stat__val" data-count-to="31">31</span>
+                                <span class="pl-stat__lbl">frentes totais (8 estágios)</span>
+                            </div>
+                        </div>
+
+                        <div class="pl-stagebar">
+                            <div class="pl-stagebar__label">
+                                <span>Progresso por estágio (0 → 7)</span>
+                                <span>Estágio 0 ✅ · Estágio 1 🟡</span>
+                            </div>
+                            <div class="pl-stagebar__segments" aria-label="Linha de progresso dos 8 estágios">
+                                <div class="pl-seg pl-seg--done" title="Estágio 0 (0A, 0B, 0C): 100% concluído"><span class="pl-seg__bar"><span class="pl-seg__fill"></span></span><span class="pl-seg__name">E0</span></div>
+                                <div class="pl-seg pl-seg--wip" title="Estágio 1 (1A e 1B concluídos; 1C com D1 E1-E2 pronto)"><span class="pl-seg__bar"><span class="pl-seg__fill"></span></span><span class="pl-seg__name">E1</span></div>
+                                <div class="pl-seg pl-seg--plan" title="Estágio 2: Ferramentas NLE e Áudio"><span class="pl-seg__bar"><span class="pl-seg__fill"></span></span><span class="pl-seg__name">E2</span></div>
+                                <div class="pl-seg pl-seg--plan" title="Estágio 3: MCP Multi-Harness e Clone IA"><span class="pl-seg__bar"><span class="pl-seg__fill"></span></span><span class="pl-seg__name">E3</span></div>
+                                <div class="pl-seg pl-seg--plan" title="Estágio 4: Cor Técnica, Legendas, Parakeet e Proofcut"><span class="pl-seg__bar"><span class="pl-seg__fill"></span></span><span class="pl-seg__name">E4</span></div>
+                                <div class="pl-seg pl-seg--plan" title="Estágio 5: Busca, OCR, Capítulos e Visualizações"><span class="pl-seg__bar"><span class="pl-seg__fill"></span></span><span class="pl-seg__name">E5</span></div>
+                                <div class="pl-seg pl-seg--plan" title="Estágio 6: Decisão Calibrada, Cor Criativa e Banco Casa"><span class="pl-seg__bar"><span class="pl-seg__fill"></span></span><span class="pl-seg__name">E6</span></div>
+                                <div class="pl-seg pl-seg--plan" title="Estágio 7: Nuvem, Editorial DNA e GPU Híbrida"><span class="pl-seg__bar"><span class="pl-seg__fill"></span></span><span class="pl-seg__name">E7</span></div>
+                            </div>
+                        </div>
+                    </aside>
+                </div>
+
+                <!-- Seletor de Lente (Leigo / Programador / Completa) -->
+                <div class="pl-lensbar" data-reveal style="--d: 260ms">
+                    <div class="pl-lensbar__info">
+                        <span class="pl-lensbar__title">Como você prefere ler esta página?</span>
+                        <span class="pl-lensbar__hint">Alterne quando quiser entre a visão de montagem e a técnica.</span>
+                    </div>
+                    <div class="pl-lens-group" role="group" aria-label="Seletor de lente didática" data-lens-switch>
+                        <button class="pl-lens-btn" type="button" data-lens-value="both" aria-pressed="true">Completa (Montador + Dev)</button>
+                        <button class="pl-lens-btn" type="button" data-lens-value="editor" aria-pressed="false">Só Sala de Corte (Leigo)</button>
+                        <button class="pl-lens-btn" type="button" data-lens-value="dev" aria-pressed="false">Só Debaixo do Capô (Código)</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <nav class="subnav" data-subnav aria-label="Seções desta página">
+            <ul class="subnav__list">
+                <li><a href="#visao-geral">Visão geral</a></li>
+                <li><a href="#conexoes">Mapa de conexões</a></li>
+                <li><a href="#diario">O que mudou (0A–1C)</a></li>
+                <li><a href="#explorador">Todos os estágios (0–7)</a></li>
+                <li><a href="#decisoes">Decisões visuais</a></li>
+                <li><a href="#tradutor">Tradutor de tecniquês</a></li>
+            </ul>
+        </nav>
+
+        <!-- ═══════════════ 01 — VISÃO GERAL ═══════════════ -->
+        <section class="section" id="visao-geral" aria-labelledby="vg-titulo">
+            <div class="container">
+                <header class="section-head">
+                    <p class="eyebrow" data-reveal>01 — O plano inteiro em 1 minuto</p>
+                    <h2 class="section-title" id="vg-titulo" data-reveal>Do conserto urgente até o <span class="text-gradient">assistente que aprende o seu corte</span></h2>
+                    <p class="lead" data-reveal>O objetivo do plano é simples: parar de emendar coisas soltas e construir o editor em camadas sólidas — primeiro garantindo que nada quebre o que já funciona hoje, depois fechando as ferramentas clássicas de montagem e só então conectando IAs externas, visão computacional e nuvem.</p>
+                </header>
+
+                <div class="pl-pillars" data-reveal-stagger="80">
+                    <article class="card pl-pillar" data-reveal data-glow>
+                        <p class="pl-pillar__tag text-emerald">Estágios 0 &amp; 1 · Fundação</p>
+                        <h3 class="card__title">Casa segura e mesa modular</h3>
+                        <p class="card__text">Tapa bugs diários (alças, crop, áudio mono, segurança), transforma a timeline única em bandejas independentes (<code class="inline">1A</code>), blinda o banco/sync (<code class="inline">1B</code>) e monta a prova matemática do export (<code class="inline">1C</code>).</p>
+                        <p class="pl-pillar__meta">Status: E0 ✅ · 1A ✅ · 1B ✅ · 1C 🟡</p>
+                    </article>
+
+                    <article class="card pl-pillar" data-reveal data-glow>
+                        <p class="pl-pillar__tag text-cyan">Estágios 2 &amp; 3 · Edição &amp; MCP</p>
+                        <h3 class="card__title">Suíte NLE + 5 IAs sem lock</h3>
+                        <p class="card__text">Entrega Índice de Sequência, VU Meter, Borracha de Volume, Auto-Ducking, 3+ pistas de vídeo e Abas de Timeline — e abre o Talho para 5 IAs externas editarem em clones isolados sem travar o Qdrant.</p>
+                        <p class="pl-pillar__meta">Status: Prioridades 1 e 2 (próximos blocos)</p>
+                    </article>
+
+                    <article class="card pl-pillar" data-reveal data-glow>
+                        <p class="pl-pillar__tag text-violet">Estágios 4 &amp; 5 · Olhos &amp; Ouvidos</p>
+                        <h3 class="card__title">Cor fiel, fala, OCR e mapas</h3>
+                        <p class="card__text">Padroniza HDR→SDR e BT.709, legendas completas, transcrição local Parakeet, checador final <code class="inline">proofcut</code>, leitura de claquetes por OCR, capítulos automáticos, 5 mapas do acervo e ArcFace real.</p>
+                        <p class="pl-pillar__meta">Status: Acervo + Entrega profissional</p>
+                    </article>
+
+                    <article class="card pl-pillar" data-reveal data-glow>
+                        <p class="pl-pillar__tag text-amber">Estágios 6 &amp; 7 · Calibração &amp; Futuro</p>
+                        <h3 class="card__title">Gabarito, cor criativa e nuvem</h3>
+                        <p class="card__text">Nenhuma decisão automática sem passar pelo gabarito <code class="inline">talho-bench</code>; cor criativa com LUTs e curvas; reconciliação com os ~506 vídeos do banco principal; nuvem R2 cifrada e aprendizado de estilo.</p>
+                        <p class="pl-pillar__meta">Status: Pós-calibração e sob demanda</p>
+                    </article>
+                </div>
+            </div>
+        </section>
+
+        <div class="container"><div class="talho-cut" data-inview></div></div>
+
+        <!-- ═══════════════ 02 — MAPA INTERATIVO DE CONEXÕES ═══════════════ -->
+        <section class="section section--alt" id="conexoes" aria-labelledby="cx-titulo">
+            <div class="container">
+                <header class="section-head">
+                    <p class="eyebrow eyebrow--violet" data-reveal>02 — Onde tudo se conecta</p>
+                    <h2 class="section-title" id="cx-titulo" data-reveal>As 4 pistas que explicam <span class="text-gradient">por que esta ordem é obrigatória</span></h2>
+                    <p class="lead" data-reveal>Clique ou selecione qualquer bloco abaixo — como se fossem clipes em 4 pistas da timeline — para acender os pré-requisitos que precisam nascer antes dele e tudo o que ele destrava logo depois.</p>
+                </header>
+
+                <div class="pl-map-wrap" data-reveal>
+                    <div class="pl-map-bar">
+                        <span class="pl-map-bar__title">Timeline de Dependências · Selecione um bloco (0A–7D)</span>
+                        <div class="pl-map-legend" aria-label="Legenda do mapa">
+                            <span><i class="pl-dot pl-dot--sel"></i>Selecionado</span>
+                            <span><i class="pl-dot pl-dot--dep"></i>Precisa antes (depende de)</span>
+                            <span><i class="pl-dot pl-dot--un"></i>Destrava depois</span>
+                            <span><i class="pl-dot pl-dot--done"></i>Já concluído</span>
+                        </div>
+                    </div>
+
+                    <div class="pl-tracks">
+                        <div class="pl-tracks__inner" id="pl-map-tracks" role="region" aria-label="Pistas de dependência entre estágios">
+                            <!-- Preenchido dinamicamente por plano.js -->
+                        </div>
+                    </div>
+
+                    <div class="pl-inspector" id="pl-map-inspector" aria-live="polite">
+                        <!-- Preenchido dinamicamente por plano.js -->
+                    </div>
+                </div>
+
+                <div class="pl-order-table" data-reveal>
+                    <h3 class="card__title" style="margin-bottom: 14px;">Resumo rápido: o que quebraria se invertêssemos a ordem?</h3>
+                    <div class="table-wrap">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Precisa vir antes</th>
+                                    <th>O que vem depois</th>
+                                    <th>Explicação simples para quem monta (e para quem programa)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><strong>1A · Timeline em Instância</strong></td>
+                                    <td><strong>2A</strong> (Índice), <strong>2D</strong> (Abas) e <strong>3B</strong> (Clone IA)</td>
+                                    <td>Hoje existem <strong>1.555 referências</strong> à timeline global em 21 arquivos. Sem transformá-la em "bandejas separadas" com um mordomo (<code class="inline">Proxy</code>), abrir uma segunda aba ou deixar a IA testar um corte sobrescreveria o trabalho do editor.</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>1C · Navegador 127.0.0.1 + FFV1</strong></td>
+                                    <td><strong>2B</strong> (Áudio), <strong>3B</strong> (Frente H), <strong>4B</strong> (Karaokê), <strong>6C</strong> (WAAPI)</td>
+                                    <td>Vários recursos usam um navegador invisível para processar áudio offline ou tirar foto de títulos/legendas. Criar antes o controlador único (<code class="inline">src/navegador/</code>) evita processos fantasma travando o Windows e garante a prova matemática (<code class="inline">ffv1</code>) antes de mexer no motor.</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>audioCadeia.js (no 2B)</strong></td>
+                                    <td><strong>Task 19</strong> (VU Meter) e <strong>Task 20/21</strong> (Frente F)</td>
+                                    <td>O navegador só deixa ligar um leitor de áudio por elemento de vídeo. Extrair primeiro a cadeia única impede som duplicado ou mudo; e seguir a Frente F garante que o volume desenhado na borracha soe igual no export FFmpeg.</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>1B (Token) + 3A (/mcp no FastAPI)</strong></td>
+                                    <td><strong>3B</strong> e <strong>3C</strong> (5 IAs via MCP)</td>
+                                    <td>O banco vetorial Qdrant embutido tranca o arquivo se dois programas tentarem abri-lo juntos. Colocar a rota <code class="inline">/mcp</code> dentro do próprio servidor do Talho permite que Claude Code, Antigravity, Cursor, Gemini CLI e Hermes trabalhem com a interface aberta sem erro de <em>lock</em>.</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>5C · scene_media + chaves estáveis</strong></td>
+                                    <td><strong>5D</strong> (Matriz Cena×Material e Storyline)</td>
+                                    <td>Não dá para desenhar gráficos ligando cenas do roteiro aos takes gravados enquanto não existir a tabela ponte e os IDs das cenas mudarem toda vez que o roteiro for reprocessado.</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>6A · talho-bench (gabarito humano)</strong></td>
+                                    <td>Automação de descartes/cortes</td>
+                                    <td>Regra sagrada da montagem: nenhuma IA tem permissão de descartar material bruto automaticamente antes de provar acurácia medida contra um gabarito revisado por humanos.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ═══════════════ 03 — DIÁRIO DE OBRA (O QUE MUDOU NO CAMINHO) ═══════════════ -->
+        <section class="section" id="diario" aria-labelledby="diario-titulo">
+            <div class="container">
+                <header class="section-head">
+                    <p class="eyebrow eyebrow--emerald" data-reveal>03 — Diário de obra (0A a 1C)</p>
+                    <h2 class="section-title" id="diario-titulo" data-reveal>O que já foi entregue — e <span class="text-gradient">o que mudou no caminho</span></h2>
+                    <p class="lead" data-reveal>Planos mudam quando encontram o código real. Aqui registramos cada bloco já executado até hoje (<code class="inline">0A</code>, <code class="inline">0B</code>, <code class="inline">0C</code>, <code class="inline">1A</code>, <code class="inline">1B</code> e a parcial do <code class="inline">1C</code>), comparando o previsto com o que foi descoberto, corrigido ou adiado de forma consciente.</p>
+                </header>
+
+                <div class="pl-diary-grid" id="pl-diary-grid">
+                    <!-- Preenchido dinamicamente por plano.js -->
+                </div>
+            </div>
+        </section>
+
+        <div class="container"><div class="talho-cut" data-inview></div></div>
+
+        <!-- ═══════════════ 04 — EXPLORADOR COMPLETO DOS 31 SUB-ESTÁGIOS ═══════════════ -->
+        <section class="section section--alt" id="explorador" aria-labelledby="exp-titulo">
+            <div class="container">
+                <header class="section-head">
+                    <p class="eyebrow eyebrow--amber" data-reveal>04 — Raio-X completo (Estágios 0 a 7)</p>
+                    <h2 class="section-title" id="exp-titulo" data-reveal>Cada etapa explicada <span class="text-gradient">por dentro e por fora</span></h2>
+                    <p class="lead" data-reveal>Filtre por estágio, status ou palavra-chave. Passe o mouse (ou toque/navegue com Tab) sobre os <strong class="text-cyan">trechos destacados nos blocos de código</strong> para abrir tooltips explicando o que aquela peça faz e por que importa.</p>
+                </header>
+
+                <div class="pl-controls" data-reveal>
+                    <div class="pl-controls__row">
+                        <div class="pl-filter-pills" role="group" aria-label="Filtrar por estágio" id="pl-stage-filters">
+                            <button class="pl-pill is-active" type="button" data-stage-filter="all">Todos (31)</button>
+                            <button class="pl-pill" type="button" data-stage-filter="0">E0 · Quick Wins (3)</button>
+                            <button class="pl-pill" type="button" data-stage-filter="1">E1 · Fundação (3)</button>
+                            <button class="pl-pill" type="button" data-stage-filter="2">E2 · NLE &amp; Áudio (5)</button>
+                            <button class="pl-pill" type="button" data-stage-filter="3">E3 · MCP &amp; Clone (3)</button>
+                            <button class="pl-pill" type="button" data-stage-filter="4">E4 · Cor, Legenda &amp; ASR (4)</button>
+                            <button class="pl-pill" type="button" data-stage-filter="5">E5 · Busca, OCR &amp; Mapas (5)</button>
+                            <button class="pl-pill" type="button" data-stage-filter="6">E6 · Bench &amp; Casa (4)</button>
+                            <button class="pl-pill" type="button" data-stage-filter="7">E7 · Nuvem &amp; DNA (4)</button>
+                        </div>
+                    </div>
+                    <div class="pl-controls__row">
+                        <div class="pl-filter-pills" role="group" aria-label="Filtrar por status" id="pl-status-filters">
+                            <button class="pl-pill is-active" type="button" data-status-filter="all">Qualquer status</button>
+                            <button class="pl-pill" type="button" data-status-filter="done">✅ Concluídos (5)</button>
+                            <button class="pl-pill" type="button" data-status-filter="wip">🟡 Em andamento (1)</button>
+                            <button class="pl-pill" type="button" data-status-filter="plan">⏳ Planejados (25)</button>
+                        </div>
+                        <label class="pl-search">
+                            <span class="sr-only">Buscar estágio por termo, arquivo ou ferramenta</span>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></svg>
+                            <input id="pl-search-input" type="search" placeholder="Buscar (ex: VU meter, Qdrant, proxy, OCR, crop...)">
+                        </label>
+                    </div>
+                    <div class="pl-controls__meta">
+                        <span id="pl-results-count">Mostrando 31 de 31 frentes</span>
+                        <div class="cluster" style="--cluster-gap: 8px;">
+                            <button class="pl-pill" type="button" id="pl-expand-all">Expandir todos</button>
+                            <button class="pl-pill" type="button" id="pl-collapse-all">Recolher todos</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="pl-cards" id="pl-cards-list">
+                    <!-- Preenchido dinamicamente por plano.js -->
+                </div>
+            </div>
+        </section>
+
+        <!-- ═══════════════ 05 — DECISÕES VISUAIS & PROTÓTIPOS ═══════════════ -->
+        <section class="section" id="decisoes" aria-labelledby="dec-titulo">
+            <div class="container">
+                <header class="section-head">
+                    <p class="eyebrow eyebrow--cyan" data-reveal>05 — Escolhas sem pressa</p>
+                    <h2 class="section-title" id="dec-titulo" data-reveal>Diretriz da IA e <span class="text-gradient">5 decisões com simulador visual</span></h2>
+                    <p class="lead" data-reveal>Para não travar os consertos rápidos do Estágio 0 nem chutar detalhes de experiência às cegas, cada dúvida de design ganhou um protótipo HTML interativo na pasta <code class="inline">docs/planos/explicativos/</code> do repositório.</p>
+                </header>
+
+                <div class="pl-decisions" data-reveal-stagger="80">
+                    <article class="card" data-reveal data-glow>
+                        <div class="pl-decision__head">
+                            <span class="chip chip--cyan">Diretriz Definida</span>
+                            <span class="pl-decision__stage">Estágios 1A · 2D · 3B</span>
+                        </div>
+                        <h3 class="card__title">Timeline "Clone" da IA (Múltiplas Fantasmas)</h3>
+                        <p class="card__text">Em vez de a IA alterar sua montagem principal diretamente, ela edita em uma cópia isolada ("clone"). O simulador permite comparar 3 formas visuais de revisão: Aba/Clone, Contracampo A/B e Sobreposição com aba <em>Changes</em> e Desfazer por turno.</p>
+                        <p class="pl-decision__meta">timeline-clone-ia.html · Base: TimelineSequenceState</p>
+                        <a class="link-arrow pl-decision__link" href="https://github.com/fernangcortes/capiau-talho-v03/blob/main/docs/planos/explicativos/timeline-clone-ia.html">Ver código do simulador no GitHub
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                        </a>
+                    </article>
+
+                    <article class="card" data-reveal data-glow>
+                        <div class="pl-decision__head">
+                            <span class="chip chip--amber">Decisão Adiada #1</span>
+                            <span class="pl-decision__stage">Antes da Frente F (2B)</span>
+                        </div>
+                        <h3 class="card__title">Curva <code class="inline">"bezier"</code> vs <code class="inline">"s_curve"</code></h3>
+                        <p class="card__text">Um teste antigo cita <code class="inline">"bezier"</code>, enquanto o motor real usa <code class="inline">s_curve</code> (Hermite Smoothstep). O comparador visual plota a diferença real de ganho e opacidade para escolher se implementamos Bezier no Python/JS ou padronizamos em <code class="inline">s_curve</code>.</p>
+                        <p class="pl-decision__meta">curvas-bezier-vs-s-curve.html · fade.py · timelineState.js</p>
+                        <a class="link-arrow pl-decision__link" href="https://github.com/fernangcortes/capiau-talho-v03/blob/main/docs/planos/explicativos/curvas-bezier-vs-s-curve.html">Ver código do comparador no GitHub
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                        </a>
+                    </article>
+
+                    <article class="card" data-reveal data-glow>
+                        <div class="pl-decision__head">
+                            <span class="chip chip--amber">Decisão Adiada #2</span>
+                            <span class="pl-decision__stage">Antes de retomar Tema</span>
+                        </div>
+                        <h3 class="card__title">Controle de Espaçamento <code class="inline">--space-scale</code></h3>
+                        <p class="card__text">Vale dar ao editor um controle deslizante para deixar os botões e painéis mais apertados ou arejados, ou manter a densidade fixa? O simulador aplica a escala ao vivo sobre um mini-editor NLE antes de decidir.</p>
+                        <p class="pl-decision__meta">espacamento-space-scale.html · theme.css · appearanceWindow.js</p>
+                        <a class="link-arrow pl-decision__link" href="https://github.com/fernangcortes/capiau-talho-v03/blob/main/docs/planos/explicativos/espacamento-space-scale.html">Ver simulador de densidade no GitHub
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                        </a>
+                    </article>
+
+                    <article class="card" data-reveal data-glow>
+                        <div class="pl-decision__head">
+                            <span class="chip chip--amber">Decisão Adiada #3</span>
+                            <span class="pl-decision__stage">Estágio 2C</span>
+                        </div>
+                        <h3 class="card__title">Política do Reverso (1 quadro)</h3>
+                        <p class="card__text">Ao rodar um clipe de trás para frente, o Player hoje mostra 1 quadro à frente do que o Export entrega. O inspetor quadro a quadro ajuda a decidir se o Player adota o padrão exato do Export (<code class="inline">out - 1</code>) ou se o Export muda.</p>
+                        <p class="pl-decision__meta">politica-reverso.html · player.js:4540 · modelo.py:172</p>
+                        <a class="link-arrow pl-decision__link" href="https://github.com/fernangcortes/capiau-talho-v03/blob/main/docs/planos/explicativos/politica-reverso.html">Ver inspetor quadro a quadro no GitHub
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                        </a>
+                    </article>
+
+                    <article class="card" data-reveal data-glow>
+                        <div class="pl-decision__head">
+                            <span class="chip chip--violet">Artefato Opcional</span>
+                            <span class="pl-decision__stage">Estágio 2E</span>
+                        </div>
+                        <h3 class="card__title">Onda Lateral da Biblioteca</h3>
+                        <p class="card__text">Ideia de gaveta lateral sanfonada (<code class="inline">onda-lateral.html</code>, 20 perguntas) para navegar no acervo sem tampar os outros painéis. Só será implementada após Task 25 se não quebrar o layout rígido da barra lateral (<code class="inline">panelRail.js</code>).</p>
+                        <p class="pl-decision__meta">Ref: NOVOS_PLANOS_IAS_2026-11.md (§3)</p>
+                        <a class="link-arrow pl-decision__link" href="https://github.com/fernangcortes/capiau-talho-v03/blob/main/docs/planos/NOVOS_PLANOS_IAS_2026-11.md">Ler contexto do estudo no GitHub
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                        </a>
+                    </article>
+
+                    <article class="card" data-reveal data-glow>
+                        <div class="pl-decision__head">
+                            <span class="chip chip--amber">Decisão Adiada #5</span>
+                            <span class="pl-decision__stage">Estágio 6D (E1.T9)</span>
+                        </div>
+                        <h3 class="card__title">Ponte Banco Local × Banco de Casa</h3>
+                        <p class="card__text">Como trazer com segurança os ~506 vídeos e anotações do banco principal para a versão nova? O comparativo visual mostra os prós e contras entre usar o <code class="inline">sync.py</code> já consertado no 1B vs merge direto de SQLite.</p>
+                        <p class="pl-decision__meta">ponte-banco-local-casa.html · sync.py · projects.py</p>
+                        <a class="link-arrow pl-decision__link" href="https://github.com/fernangcortes/capiau-talho-v03/blob/main/docs/planos/explicativos/ponte-banco-local-casa.html">Ver comparativo de fluxos no GitHub
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                        </a>
+                    </article>
+                </div>
+            </div>
+        </section>
+
+        <!-- ═══════════════ 06 — TRADUTOR DE TECNIQUÊS ═══════════════ -->
+        <section class="section section--alt" id="tradutor" aria-labelledby="tr-titulo">
+            <div class="container">
+                <header class="section-head">
+                    <p class="eyebrow eyebrow--emerald" data-reveal>06 — Glossário sem jargão difícil</p>
+                    <h2 class="section-title" id="tr-titulo" data-reveal>Tradutor de <span class="text-gradient">tecniquês</span></h2>
+                    <p class="lead" data-reveal>Esbarrou em alguma sigla estranha no plano (<code class="inline">MCP</code>, <code class="inline">FFV1</code>, <code class="inline">WAL</code>, <code class="inline">Proxy JS</code>, <code class="inline">GOP</code>, <code class="inline">LUFS</code>)? Digite abaixo e veja o equivalente na sala de montagem.</p>
+                </header>
+
+                <div class="pl-glossary-bar" data-reveal>
+                    <label class="pl-search">
+                        <span class="sr-only">Filtrar termos do glossário</span>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></svg>
+                        <input id="pl-glossary-input" type="search" placeholder="Filtrar termo (ex: Qdrant, LUFS, Proxy, WAL...)">
+                    </label>
+                    <span class="pl-controls__meta" id="pl-glossary-count">14 termos traduzidos</span>
+                </div>
+
+                <div class="pl-glossary-grid" id="pl-glossary-grid">
+                    <!-- Preenchido dinamicamente por plano.js -->
+                </div>
+            </div>
+        </section>
+
+        <!-- ═══════════════ CHAMADA FINAL ═══════════════ -->
+        <section class="section section--tight" aria-labelledby="cta-titulo">
+            <div class="container">
+                <div class="cta-band" data-reveal="scale">
+                    <p class="eyebrow eyebrow--rec">Software livre · grátis · em construção aberta</p>
+                    <h2 class="cta-band__title" id="cta-titulo">Quer acompanhar de perto ou puxar um estágio com a gente?</h2>
+                    <p class="lead cta-band__lead">Cada bloco concluído neste plano vira ferramenta real na sala de edição — com testes automatizados, código aberto e zero caixa-preta.</p>
+                    <div class="cluster cta-band__actions">
+                        <a class="btn btn--primary btn--lg" href="contribuir.html">Ver como contribuir
+                            <svg class="btn__arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                        </a>
+                        <a class="btn btn--ghost btn--lg" href="GUIA_DIDATICO_GRANDE_PLANO.md">Abrir guia em Markdown (.md)</a>
+                    </div>
+                    <p class="cta-band__note">Atualizado a partir de <a class="inline-link" href="https://github.com/fernangcortes/capiau-talho-v03/blob/main/docs/planos/GRANDE_PLANO_UNIFICADO_2026-11.md">GRANDE_PLANO_UNIFICADO_2026-11.md</a>.</p>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Tooltip flutuante compartilhado pelos tokens de código -->
+    <div class="pl-tooltip" id="pl-tooltip" role="tooltip" aria-hidden="true">
+        <div class="pl-tooltip__title" id="pl-tooltip-title"></div>
+        <div class="pl-tooltip__body" id="pl-tooltip-body"></div>
+    </div>
+
+    <!-- ═══════════════ RODAPÉ (idêntico em todas as páginas) ═══════════════ -->
+    <footer class="site-footer">
+        <div class="container">
+            <div class="site-footer__grid">
+                <div class="site-footer__brand">
+                    <a class="brand" href="index.html" aria-label="CapIAu-Talho — página inicial">
+                        <img src="assets/img/logo.svg" width="34" height="34" alt="">
+                        <span class="brand__name">CapIAu-<span class="brand__talho">Talho</span></span>
+                    </a>
+                    <p class="site-footer__about">Ilha de pré-edição, decupagem e assistência por IA para documentários e grandes acervos audiovisuais. Grátis, sem assinatura e de código aberto.</p>
+                    <div class="cluster site-footer__badges">
+                        <span class="chip chip--emerald"><span class="chip__dot"></span>Grátis</span>
+                        <span class="chip chip--violet">GPL-3.0</span>
+                        <span class="chip chip--cyan">Roda em CPU</span>
+                    </div>
+                </div>
+                <nav aria-labelledby="rodape-site">
+                    <h2 class="site-footer__title" id="rodape-site">Site</h2>
+                    <ul class="site-footer__links">
+                        <li><a href="index.html">Início</a></li>
+                        <li><a href="recursos.html">Recursos</a></li>
+                        <li><a href="como-funciona.html">Como funciona</a></li>
+                        <li><a href="plano.html">Plano Vivo</a></li>
+                        <li><a href="comecar.html">Começar</a></li>
+                        <li><a href="contribuir.html">Contribuir</a></li>
+                    </ul>
+                </nav>
+                <nav aria-labelledby="rodape-docs">
+                    <h2 class="site-footer__title" id="rodape-docs">Documentação</h2>
+                    <ul class="site-footer__links">
+                        <li><a href="https://github.com/fernangcortes/capiau-talho-v03/wiki">Wiki oficial</a></li>
+                        <li><a href="https://github.com/fernangcortes/capiau-talho-v03/blob/main/USER_MANUAL.md">Manual do usuário</a></li>
+                        <li><a href="https://github.com/fernangcortes/capiau-talho-v03/blob/main/docs/usuario/shortcuts.md">Atalhos de teclado</a></li>
+                        <li><a href="https://github.com/fernangcortes/capiau-talho-v03/blob/main/docs/usuario/costs_and_security.md">Custos e segurança</a></li>
+                    </ul>
+                </nav>
+                <nav aria-labelledby="rodape-comunidade">
+                    <h2 class="site-footer__title" id="rodape-comunidade">Comunidade</h2>
+                    <ul class="site-footer__links">
+                        <li><a href="https://github.com/fernangcortes/capiau-talho-v03">Código no GitHub</a></li>
+                        <li><a href="https://github.com/fernangcortes/capiau-talho-v03/issues">Relatar um problema</a></li>
+                        <li><a href="https://github.com/fernangcortes/capiau-talho-v03/blob/main/docs/planos/GRANDE_PLANO_UNIFICADO_2026-11.md">Plano e roadmap</a></li>
+                        <li><a href="https://github.com/fernangcortes/capiau-talho-v03/blob/main/LICENSE">Licença GPL-3.0</a></li>
+                    </ul>
+                </nav>
+            </div>
+            <div class="site-footer__bottom">
+                <p>© <span data-year>2026</span> CapIAu-Talho e colaboradores · Software livre sob a <a href="https://github.com/fernangcortes/capiau-talho-v03/blob/main/LICENSE">GPL-3.0</a>.</p>
+                <div class="cluster">
+                    <button class="text-btn" type="button" data-motion-toggle>
+                        <svg class="motion-icon-pause" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 6v12M15 6v12"/></svg>
+                        <svg class="motion-icon-play" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M8 5.5v13l11-6.5z"/></svg>
+                        <span data-motion-label>Pausar animações</span>
+                    </button>
+                    <a class="text-btn" href="#conteudo">Voltar ao topo ↑</a>
+                </div>
+            </div>
+        </div>
+    </footer>
+</body>
+</html>

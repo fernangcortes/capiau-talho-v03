@@ -243,9 +243,12 @@ body.nav-open .site-header {
 .site-nav { margin-left: auto; display: flex; align-items: center; gap: 2px; }
 .site-nav a:not(.btn) {
     position: relative;
-    padding: 8px 13px; border-radius: 999px;
-    color: var(--fg-2); font-size: 0.92rem; font-weight: 500;
+    padding: 8px 12px; border-radius: 999px;
+    color: var(--fg-2); font-size: 0.91rem; font-weight: 500; white-space: nowrap;
     transition: color var(--dur-1), background var(--dur-1);
+}
+@media (min-width: 981px) and (max-width: 1140px) {
+    .site-nav a:not(.btn) { padding: 8px 9px; font-size: 0.87rem; }
 }
 .site-nav a:not(.btn):hover { color: var(--fg-1); background: var(--tint-2); }
 .site-nav a[aria-current="page"] {
