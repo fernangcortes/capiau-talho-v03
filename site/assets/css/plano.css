@@ -940,3 +940,74 @@
     color: var(--fg-2);
     line-height: 1.55;
 }
+
+/* ── Bloco transversal: Evolução em 5 Ondas do Índice de Sequência ───────── */
+.pl-waves-wrap {
+    margin-top: clamp(44px, 6vw, 68px);
+    padding-top: clamp(32px, 4.5vw, 48px);
+    border-top: 1px solid var(--line-1);
+}
+.pl-waves-head {
+    max-width: 72ch;
+    margin-bottom: 22px;
+}
+.pl-waves-head .section-title {
+    margin-top: 12px;
+    font-size: clamp(1.55rem, 1.15rem + 1.4vw, 2.25rem);
+}
+.pl-waves-head .lead {
+    margin-top: 10px;
+    font-size: 1rem;
+}
+.pl-waves-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+    gap: 14px;
+}
+.pl-wave-card {
+    display: flex;
+    flex-direction: column;
+    padding: 18px;
+}
+.pl-wave-card__top {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    margin-bottom: 10px;
+}
+.pl-wave-card__stage {
+    font: 600 0.72rem/1 var(--font-mono);
+    color: var(--fg-3);
+}
+.pl-wave-card__title {
+    font-size: 1.12rem;
+    line-height: 1.25;
+}
+.pl-wave-card__text {
+    margin-top: 8px;
+    font-size: 0.88rem;
+    line-height: 1.5;
+    color: var(--fg-2);
+}
+.pl-wave-card__text strong {
+    color: var(--fg-1);
+    font-weight: 600;
+}
+.pl-wave-card__foot {
+    margin-top: auto;
+    padding-top: 12px;
+    font: 500 0.72rem/1.35 var(--font-mono);
+    color: var(--cyan-soft);
+}
+.pl-waves-link {
+    margin-top: 18px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px 16px;
+    font-size: 0.9rem;
+    color: var(--fg-3);
+}

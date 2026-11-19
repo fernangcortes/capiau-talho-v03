@@ -98,7 +98,7 @@
 
                     <aside class="pl-board" aria-label="Resumo do andamento atual" data-reveal="right" style="--d: 180ms">
                         <div class="pl-board__head">
-                            <span class="pl-board__eyebrow">Status da obra · main @ 2cac41f</span>
+                            <span class="pl-board__eyebrow">Status da obra · main @ 6203fe9</span>
                             <span class="pl-board__ref">E0–E1 ✅ · E2 iniciado (2A ✅)</span>
                         </div>
                         <div class="pl-stats">
@@ -160,6 +160,7 @@
                 <li><a href="#conexoes">Mapa de conexões</a></li>
                 <li><a href="#diario">O que mudou (0A–2A)</a></li>
                 <li><a href="#explorador">Todos os estágios (0–7)</a></li>
+                <li><a href="#evolucao-indice">Índice em 5 ondas</a></li>
                 <li><a href="#decisoes">Decisões visuais</a></li>
                 <li><a href="#tradutor">Tradutor de tecniquês</a></li>
             </ul>
@@ -353,6 +354,74 @@
                 <div class="pl-cards" id="pl-cards-list">
                     <!-- Preenchido dinamicamente por plano.js -->
                 </div>
+
+                <!-- Bloco transversal: Evolução em 5 Ondas do Índice de Sequência -->
+                <div class="pl-waves-wrap" id="evolucao-indice" aria-labelledby="waves-titulo">
+                    <div class="pl-waves-head" data-reveal>
+                        <p class="eyebrow eyebrow--cyan">Trilha transversal pós-2A · sem retrabalho</p>
+                        <h3 class="section-title" id="waves-titulo">Evolução em 5 Ondas do <span class="text-gradient">Índice de Sequência</span></h3>
+                        <p class="lead">Cada nova geração do Índice nasce apenas quando o estágio correspondente do Grande Plano já entregou os dados confiáveis de áudio, clones da IA, legendas, busca ou rostos.</p>
+                    </div>
+
+                    <div class="pl-waves-grid" data-reveal-stagger="60">
+                        <article class="card pl-wave-card" data-reveal data-glow>
+                            <div class="pl-wave-card__top">
+                                <span class="chip chip--cyan">Onda I · 2A.2</span>
+                                <span class="pl-wave-card__stage">Estágio 2 (100% front)</span>
+                            </div>
+                            <h4 class="pl-wave-card__title">QC Mecânico, Lote, To-Do &amp; Títulos</h4>
+                            <p class="pl-wave-card__text">Detecta <strong>micro-gaps</strong> (≤5f), <strong>through edits</strong> (unir corte inútil), <strong>duplicate frames</strong>, mismatch de FPS/resolução e <code class="inline">fora_do_projeto</code>. Soma <strong>seleção múltipla com ações em lote</strong> (1 único <kbd>Ctrl</kbd>+<kbd>Z</kbd>), checklist <strong>To-Do</strong> nos marcadores, revisão de títulos por setas, soma de duração filtrada e colunas configuráveis.</p>
+                            <p class="pl-wave-card__foot">Sem backend novo · lê direto de TIMELINE_STATE</p>
+                        </article>
+
+                        <article class="card pl-wave-card" data-reveal data-glow>
+                            <div class="pl-wave-card__top">
+                                <span class="chip chip--emerald">Onda II · 2B-idx</span>
+                                <span class="pl-wave-card__stage">Acoplada ao 2B</span>
+                            </div>
+                            <h4 class="pl-wave-card__title">Saúde Sonora &amp; Music Cue Sheet</h4>
+                            <p class="pl-wave-card__text">Após fechar <code class="inline">audioCadeia.js</code> e a Frente F (<code class="inline">2B</code>), inaugura a seção de áudio em <code class="inline">/api/timeline/index-enrich</code> para acender <strong>CLIPPING</strong>, <strong>SALTO LUFS</strong> entre falas vizinhas e <strong>FALA SEM TRAT.</strong>, além de exportar <strong>Music Cue Sheet</strong> (<code class="inline">.csv</code>).</p>
+                            <p class="pl-wave-card__foot">Depende de audio_render + keyframes.volume (2B)</p>
+                        </article>
+
+                        <article class="card pl-wave-card" data-reveal data-glow>
+                            <div class="pl-wave-card__top">
+                                <span class="chip chip--violet">Onda III · 3B-idx</span>
+                                <span class="pl-wave-card__stage">Junto a 3A + 3B</span>
+                            </div>
+                            <h4 class="pl-wave-card__title">Diff IA, Palavra Cortada &amp; HD Off</h4>
+                            <p class="pl-wave-card__text">Unifica a aba <em>Changes</em> do <code class="inline">3B</code> como modo <strong>Diff da IA</strong>, adiciona a tool MCP <code class="inline">get_sequence_index_alerts</code>, acusa <strong>PALAVRA CORTADA</strong> (<em>Mid-Word Cut</em> via <code class="inline">transcript</code>), checa <strong>ORIGINAL OFF</strong> no HD antes do render e exporta <strong>Roteiro Pós-Montagem</strong>.</p>
+                            <p class="pl-wave-card__foot">Depende de 2D (Abas) + 3A (MCP) + 3B (Clone)</p>
+                        </article>
+
+                        <article class="card pl-wave-card" data-reveal data-glow>
+                            <div class="pl-wave-card__top">
+                                <span class="chip chip--amber">Onda IV · 4A–4C</span>
+                                <span class="pl-wave-card__stage">Ganchos no Estágio 4</span>
+                            </div>
+                            <h4 class="pl-wave-card__title">Cor Técnica, Legendas &amp; Sobreposição</h4>
+                            <p class="pl-wave-card__text">Ganha três encaixes diretos conforme o Estágio 4 avança: alerta <strong>LOG SEM COR / HDR→SDR</strong> (<code class="inline">4A</code>), aba <strong>Legendas</strong> conferindo quebra 42×2 e ritmo de 17 cps (<code class="inline">4B</code>) e badge <strong>FALA SOBREPOSTA</strong> com precisão em ms de <code class="inline">fa-models</code> (<code class="inline">4C</code>).</p>
+                            <p class="pl-wave-card__foot">Depende de capacidades.py, Frente C e fa-models</p>
+                        </article>
+
+                        <article class="card pl-wave-card" data-reveal data-glow>
+                            <div class="pl-wave-card__top">
+                                <span class="chip chip--cyan">Onda V · 5A–5E</span>
+                                <span class="pl-wave-card__stage">Acoplada ao Estágio 5</span>
+                            </div>
+                            <h4 class="pl-wave-card__title">Busca Semântica, Ritmo &amp; Clearance</h4>
+                            <p class="pl-wave-card__text">Libera <strong>busca semântica dentro da sequência</strong> e repetição de falas (<code class="inline">5A</code>), coluna Cena/Capítulo, cenas sem cobertura e alerta de <strong>jump cuts</strong> (<code class="inline">5C</code>), e sub-visão <strong>Tempo de Tela + Planilha de Direitos de Imagem</strong> sobre ArcFace 512-d real (<code class="inline">5E</code>).</p>
+                            <p class="pl-wave-card__foot">Depende de Qdrant limpo, scene_media e ArcFace</p>
+                        </article>
+                    </div>
+
+                    <div class="pl-waves-link" data-reveal>
+                        <span>Especificação completa com contratos de API, pré-requisitos e critérios de teste em cada estágio:</span>
+                        <a class="link-arrow" href="https://github.com/fernangcortes/capiau-talho-v03/blob/main/docs/planos/PLANO_INDICE_SEQUENCIA_EVOLUCAO.md">Ler plano técnico das 5 ondas no GitHub
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                        </a>
+                    </div>
+                </div>
             </div>
         </section>
 
@@ -462,7 +531,7 @@
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></svg>
                         <input id="pl-glossary-input" type="search" placeholder="Filtrar termo (ex: Qdrant, LUFS, Proxy, WAL...)">
                     </label>
-                    <span class="pl-controls__meta" id="pl-glossary-count">14 termos traduzidos</span>
+                    <span class="pl-controls__meta" id="pl-glossary-count">16 termos traduzidos</span>
                 </div>
 
                 <div class="pl-glossary-grid" id="pl-glossary-grid">

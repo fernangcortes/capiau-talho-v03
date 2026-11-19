@@ -8,7 +8,7 @@
 
 **Versão interativa no site:** abra [`site/plano.html`](./plano.html) (ou *Plano Vivo* no site publicado) para explorar mapas clicáveis, diagramas SVG, seletor de lente (*Montador* vs *Programador*) e trechos de código com tooltips.
 
-**Data-base do acompanhamento:** 19/11/2026 (`main` @ `2cac41f`, Estágios 0 e 1 concluídos + Estágio 2A entregue).
+**Data-base do acompanhamento:** 19/11/2026 (`main` @ `6203fe9`, Estágios 0 e 1 concluídos + Estágio 2A entregue + plano de evolução em 5 ondas do Índice).
 
 ---
 
@@ -316,6 +316,15 @@ Porque existem **4 correntes físicas** dentro do código. Se você puxar um elo
   ```
 - 📓 **O que mudou pelo caminho:**
   - Durante a implementação, o painel foi enriquecido além da lista básica de cortes: entrou detecção integrada de **dessincronia A/V** via `getClipSyncStatus()`, diferenciação entre trilha mutada (`MUTADO`), trilha oculta (`OCULTA`) e clipe desativado (`DESAT.`), limiar prático de `<= 5` quadros para *flash frames*, modo **Seguir agulha**, filtros combinados por pista/cor/diagnóstico e layout adaptativo em container query (`@container seq-index`). Como virou a 7ª aba direita nativa (11 `tabpanel-*` no total), os autotestes `autoteste_dock_tabs.mjs` e `autoteste_dock_model.mjs` foram atualizados junto na entrega.
+- 🗺️ **Evolução planejada em 5 Ondas ([`PLANO_INDICE_SEQUENCIA_EVOLUCAO.md`](../docs/planos/PLANO_INDICE_SEQUENCIA_EVOLUCAO.md)):** para acoplar novos superpoderes sem antecipar backend nem gerar retrabalho:
+
+| Onda | Quando entra | O que acrescenta ao Índice |
+|---|---|---|
+| **Onda I (`2A.2`)** | Qualquer janela do Estágio 2 (100% frontend) | *Micro-gaps* (`≤5f`), *Through Edits* (unir corte), *Duplicate Frames*, mismatch FPS/resolução, `fora_do_projeto`, seleção múltipla + ações em lote (1 Undo), marcadores *To-Do*, revisão de títulos e soma de duração |
+| **Onda II (`2B-idx`)** | Acoplada ao `2B` (Áudio Completo) | Seção `"audio"` em `/api/timeline/index-enrich`: alertas `CLIPPING`, `SALTO LUFS`, `FALA SEM TRAT.` + preset **Music Cue Sheet (`.csv`)** |
+| **Onda III (`3B-idx`)** | Junto a `3A` + `3B` (MCP & Clone IA) | Modo **Diff da IA** (unifica *Changes*), tool MCP `get_sequence_index_alerts`, **`PALAVRA CORTADA`** (`transcript`), **`ORIGINAL OFF`** no HD e **Roteiro Pós-Montagem** |
+| **Onda IV (`4A–4C-idx`)** | Ganchos no Estágio `4` | `4A`: **`LOG SEM COR` / `HDR→SDR`** · `4B`: aba **Legendas** (`42×2 / 17 cps`) · `4C`: **`FALA SOBREPOSTA`** + precisão `fa-models` |
+| **Onda V (`5A–5E-idx`)** | Acoplada ao Estágio `5` | `5A`: busca semântica *dentro* da sequência + repetição · `5C`: cobertura de cenas + *jump cuts* · `5E`: **Tempo de Tela & Direitos de Imagem (`.csv`)** sobre ArcFace real |
 
 ### 2B — Áudio Completo com Paridade (`Frente A` + `Task 19` + `Task 20` + `Task 21`, `⏳ Planejado`)
 - 🎬 **Na Sala de Corte:** **Metáfora:** A mesa de som profissional com medidor de agulha ao vivo, lápis de borracha para desenhar o volume na pista e um operador automático que abaixa a música quando alguém fala (*auto-ducking*). **Na prática:** (1) Medidor estéreo ao vivo (**Task 19**), (2) Borracha de volume com pontos editáveis direto na waveform (`Ctrl+Clique`, **Task 20**), (3) Auto-ducking pela transcrição (**Task 21**), (4) Gate/compressor soando idênticos no Player e no MP4, e (5) trava impedindo que o redutor de ruído automático estrague trilhas musicais ou som ambiente (mais teste A/B com **DeepFilterNet 3**).
@@ -325,6 +334,7 @@ Porque existem **4 correntes físicas** dentro do código. Se você puxar um elo
                                                     └──► OfflineAudioContext via src/navegador/ ──► Null Test vs FFmpeg
   ```
 - 📓 **Cuidado de engenharia:** As especificações antigas das Tasks 20 e 21 foram **descartadas** porque criavam som diferente no WebAudio e no FFmpeg; seguir exclusivamente a `Frente F`.
+- 🔎 **Gancho no Índice de Sequência (Onda II / `2B-idx`):** ao concluir áudio medido + rampas, abre o endpoint em lote `POST /api/timeline/index-enrich` (`audio`) com alertas `CLIPPING`, `SALTO LUFS` e `FALA SEM TRAT.` + exportação **Music Cue Sheet (`.csv`)**.
 
 ### 2C — Paridade de Viewport & Multi-Track no Player (`⏳ Planejado`)
 - 🎬 **Na Sala de Corte:** **Metáfora:** Alinhar as lentes do projetor para que todas as camadas transparentes empilhadas apareçam de verdade e ninguém desapareça entre pistas. **Na prática:** Corrige o bug grave (**Defeito #8**) em que ter 3 ou mais pistas de vídeo ocupadas faz sumir a pista do meio no monitor Program; resolve o desvio de 1 frame ao rodar um clipe de trás para frente (**Defeito #6**, após você decidir no HTML [`politica-reverso.html`](../docs/planos/explicativos/politica-reverso.html)); consolida `computeContentRect()` e garante encaixe (`fit`) no Crop; e alinha o controle de volume do inspetor que hoje sobe até 200% no slider enquanto o player trava em 100%.
@@ -366,6 +376,7 @@ Porque existem **4 correntes físicas** dentro do código. Se você puxar um elo
   - Fecha **6 bugs antigos (`D1–D6`)** + **1 falha de segurança editorial**: `SET_AV_OFFSET` e `ADD_EFFECT` em `chat_agent.py:2275` hoje não estão na lista que exige `is_preview = True` (ou seja, se chamados sozinhos, alteram a timeline sem pedir confirmação!).
   - Corrige: `D1` (hit-test em todas as pistas, não só `"ai"`), `D2` (`in` vs `in_s` `NaN` e `suggestions_output`), `D3` (chamar `populateRoughCutMarkers`), `D4` (padrão `"V2"`), `D5` (aviso visível se offline) e `D6` (preservar campos de fotos/textos/mattes).
   - Expõe `get_editor_state`, `preview_compare`, Undo atômico por turno via `TIMELINE_HISTORY` (`1A`) e **Frente H (`E1–E4`)** usando `src/navegador/` (`1C`).
+  - 🔎 **Gancho no Índice de Sequência (Onda III / `3B-idx`):** unifica a aba *Changes* como modo **Diff da IA** dentro do Índice, expõe a tool MCP `get_sequence_index_alerts` (`3A`), acusa **`PALAVRA CORTADA`** (*Mid-Word Cut* via `transcript`), **`ORIGINAL OFF`** no HD (preflight) e exporta **Roteiro Pós-Montagem (As-Broadcast)**.
 
 ### 3C — Contratos entre Personas, Style Skills & Testes de Contrato MCP (`⏳ Planejado`)
 - 🎬 **Na Sala de Corte:** **Metáfora:** Definir o manual de passagem de bastão dentro da equipe de IA (a *Diretora* passa um roteiro estruturado para a *Montadora*, que passa marcas limpas para o *Designer de Som*), sem mensagens de recusa sem sentido.
@@ -378,14 +389,17 @@ Porque existem **4 correntes físicas** dentro do código. Se você puxar um elo
 ### 4A — Cor Técnica Unificada (`Frente G G0–G2c` + `OCIO §0.3/§1.2`, `⏳ Planejado`)
 - 🎬 **Na Sala de Corte:** Garantir que arquivos gravados em HDR no celular ou câmeras profissionais não saiam "lavados" ou estourados no proxy e no master, e impedir que fotos `.CR2` (1.092 no acervo) tenham o brilho esticado automaticamente à força.
 - ⚙️ **Debaixo do Capô:** Medição no Edge (`G0`), tags `bt709` e conversão `in_color_matrix=bt709`/`gbrp` (`G1a`/`G1b`), detector `capacidades.py` (`G2a`), função única `src/color/transformacao.py::filtro_entrada` assando HDR→SDR direto no proxy 720p (descartando a ideia antiga de criar um segundo proxy) e flag `color.raw_auto_bright` (`no_auto_bright` em `image_processing.py`).
+- 🔎 **Gancho no Índice (Onda IV / `4A-idx`):** badge **`LOG SEM COR` / `HDR→SDR`** quando clipes Log entrarem sem transformação técnica.
 
 ### 4B — Legendas Profissionais (`Frente C E0–E9`, `⏳ Planejado`)
 - 🎬 **Na Sala de Corte:** Legendas que respeitam padrão profissional (máximo 42 caracteres × 2 linhas e 17 caracteres por segundo), sem frases inventadas no silêncio, exportação confiável em `.srt`/`.vtt`/`.ass` direto do servidor e efeito karaokê palavra por palavra.
 - ⚙️ **Debaixo do Capô:** Reescrita de `subtitles_export.py` + rota `/export/{srt|vtt|ass}` substituindo o gerador client-side antigo em `panels.js:2631-2679`, mais render karaokê via `src/navegador/` (`D1`).
+- 🔎 **Gancho no Índice (Onda IV / `4B-idx`):** aba/filtro **Legendas** revisando quebras `> 42×2` e velocidade `> 17 cps` pelo teclado.
 
 ### 4C — Parakeet Local + Alinhamento Forçado (`Frente E` + `fa-models`, `⏳ Planejado`)
 - 🎬 **Na Sala de Corte:** Transcrição local super-rápida em português com **Parakeet TDT v3** e sincronia exata até a última sílaba quando você editar o texto da legenda ou aplicar auto-ducking.
 - ⚙️ **Debaixo do Capô:** Subprocesso isolado `sherpa_worker.py` (fatias de ~60 s ±5 s + **gate obrigatório PT-BR M1..M14**), exploração de `sherpa-onnx fa-models` para *forced alignment* e decisão definitiva sobre gravar ou unificar as tabelas mortas `dialogue_utterance`/`dialogue_word` com `transcript`.
+- 🔎 **Gancho no Índice (Onda IV / `4C-idx`):** badge **`FALA SOBREPOSTA`** (`is_overlapping`) e precisão em ms para **`PALAVRA CORTADA`**.
 
 ### 4D — Verificação Pós-Render (`proofcut`) & Smart Cut (`⏳ Planejado`)
 - 🎬 **Na Sala de Corte:** Um inspetor automático que assiste ao MP4 acabado antes de dizer "Pronto!": confere se tem exatamente o número certo de quadros, a duração exata, o volume LUFS combinado e (opcionalmente) se as falas estão audíveis — além de um modo turbo (*Smart Cut*) que só recodifica as beiradas do corte quando não há efeitos nem cor.
@@ -398,6 +412,7 @@ Porque existem **4 correntes físicas** dentro do código. Se você puxar um elo
 ### 5A — Saneamento de Busca, Prompts & Busca por Objetos (`⏳ Planejado`)
 - 🎬 **Na Sala de Corte:** Corrigir buscas que cortavam após 100 resultados ou só achavam nomes exatos de pessoa se você digitasse a frase inteira igual; cortar automaticamente barras pretas antes da IA analisar o quadro (*VideoSeek*) para o enquadramento não enganar a busca visual; e ativar botões/chips de filtro rápido e busca por objetos sem depender de API paga.
 - ⚙️ **Debaixo do Capô:** Paginação em `semantic.py:513` (hoje trava em `limit=100`), inclusão de `video.title` no payload Qdrant, reconstrução de `capiau_images`, pré-recorte **VideoSeek**, troca do `LIKE '%query inteira%'` em `rag.py` por tokens/entidades, integração de `intent_router.py` + `E2.D3-UI`, e resolução dos 2 prompts mortos (`photo_vision`, `triage_batch_title`) no `PROMPT_REGISTRY`.
+- 🔎 **Gancho no Índice (Onda V / `5A-idx`):** ativa a **Busca Semântica *dentro* da Sequência** e alertas de **Repetição Semântica** entre falas distantes.
 
 ### 5B — OCR Local (`PP-OCRv6`) + `visual_memory` Cacheado (`⏳ Planejado`)
 - 🎬 **Na Sala de Corte:** **Metáfora:** Um assistente que lê cada claquete, placa de rua ou letreiro que aparece na câmera e já anota sozinho a qual cena do roteiro aquele take pertence.
@@ -406,6 +421,7 @@ Porque existem **4 correntes físicas** dentro do código. Se você puxar um elo
 ### 5C — Capitularização Multimodal & Cobertura de Roteiro (`⏳ Planejado`)
 - 🎬 **Na Sala de Corte:** Dividir automaticamente entrevistas longas em "capítulos" por assunto e cruzar o roteiro com o acervo para responder: *"Quais cenas já têm material gravado e quais ainda estão descobertas?"*
 - ⚙️ **Debaixo do Capô:** Nova tabela `media_chapter` (silêncio + falante + queda semântica MiniLM + salto visual CLIP + TF-IDF + título curto), persistência em marcadores/OTIO/`PySceneDetect save-chapters`, e criação da tabela **`scene_media`** com chaves estáveis em `replace_scenes_for_doc` para não perder vínculos ao reprocessar o roteiro.
+- 🔎 **Gancho no Índice (Onda V / `5C-idx`):** adiciona coluna **Cena / Capítulo**, card *"Cenas sem cobertura"* e diagnóstico de **Ritmo Visual / *Jump Cuts*** (`shot_scale` + `motion_label`).
 
 ### 5D — 5 Visualizações Operacionais & Knowledge Graph (`⏳ Planejado`)
 - 🎬 **Na Sala de Corte:** Cinco painéis visuais para enxergar o filme de helicóptero: **Swimlane** (linha do tempo de tudo), **Treemap** (proporção por categoria e confiança), **Mapa 2D CLIP** (agrupando planos visualmente parecidos), **Matriz Cena × Material** e **Storyline** (arco narrativo dos personagens).
@@ -414,6 +430,7 @@ Porque existem **4 correntes físicas** dentro do código. Se você puxar um elo
 ### 5E — Embeddings Int8, ArcFace Real & Separação de Falantes (`⏳ Quando priorizar`)
 - 🎬 **Na Sala de Corte:** Trocar o "quebra-galho" antigo de reconhecimento facial por um identificador facial de cinema (SCRFD + ArcFace 512-d) que realmente reconhece a mesma pessoa em ângulos e luzes diferentes, melhorar a busca de texto com `EmbeddingGemma 2 int8` e testar separação de falantes (`VoxLock`) em entrevistas com gente falando por cima.
 - ⚙️ **Debaixo do Capô:** Substituir de verdade `pipeline.py`/`face_engine.py`/`local_backend.py` (que ainda caem em YuNet+SFace 128-d e fallback silencioso Sobel+histograma 512-d!) por **SCRFD + ArcFace 512-d** real, testar `jinqiu193/trace` (`EmbeddingGemma 2 int8 ONNX`) e corrigir a documentação enganosa anterior.
+- 🔎 **Gancho no Índice (Onda V / `5E-idx`):** libera sub-visão **Pessoas no Corte & Tempo de Tela**, badge **`ROSTO SEM NOME`** e preset **`Planilha de Elenco e Direitos de Imagem (.csv)`**.
 
 ---
 
@@ -477,3 +494,5 @@ Nenhuma decisão abaixo trava o trabalho imediato; cada uma ganhou um protótipo
 | **BT.709 / OCIO / LUT `.cube`** | BT.709 é o padrão de cores de vídeo HD; OCIO é o sistema de gerenciamento de cor de cinema; LUT `.cube` é uma tabela pronta de conversão de cores/visual. |
 | **Forced Alignment (`fa-models`)** | Pegar uma transcrição que você já tem e encaixar o milissegundo exato de entrada e saída de cada palavra falada no áudio. |
 | **WAAPI (`6C`)** | Sistema nativo de animações dos navegadores modernos (*Web Animations API*), usado para mover títulos sem depender de bibliotecas externas com restrições de licença (como GSAP). |
+| **Índice de Sequência & *Flash Frame* (`2A`)** | Tabela viva da timeline atual que acende erros antes do render — incluindo *flash frames*, sobras acidentais de 1 a 5 quadros difíceis de enxergar no zoom distante. |
+| ***Through Edit*, *Micro-Gap* & Palavra Cortada (`Ondas I–III`)** | *Through Edit* é um corte acidental dividindo um clipe contínuo ao meio; *Micro-Gap* é um buraco de 1–5 frames entre clipes; e *Palavra Cortada* detecta quando um corte mordeu o meio de uma palavra na fala (`transcript`). |

@@ -267,7 +267,7 @@
         {
             id: "2A", stage: 2, track: "v1", status: "done", statusLabel: "✅ Concluído",
             meta: "Commit 2cac41f",
-            origin: "NOVOS_PLANOS_IAS_2026-11.md (§3)",
+            origin: "NOVOS_PLANOS_IAS_2026-11.md (§3) · PLANO_INDICE_SEQUENCIA_EVOLUCAO.md",
             title: "Índice de Sequência (Sequence Index)",
             deps: ["1A"], unlocks: ["2D"],
             whyOrder: "Precisa do TIMELINE_STATE do 1A para ler os cortes da sequência ativa em formato de tabela e já ficar pronto para trocar de aba na Task 25.",
@@ -292,7 +292,7 @@
                 ],
             },
             files: ["src/ui/js/sequenceIndex.js", "src/ui/js/tabPanels.js", "src/ui/js/dockModel.js", "src/ui/styles.css", "tests/autoteste_sequence_index.mjs"],
-            journey: "Entregue com leitor puro sobre TIMELINE_STATE, container query (@container seq-index), suporte a janela destacada (pop-out), modo Seguir agulha e cobertura completa por autoteste_sequence_index.mjs.",
+            journey: "Entregue com leitor puro sobre TIMELINE_STATE, container query (@container seq-index), suporte a janela destacada (pop-out), modo Seguir agulha e cobertura completa por autoteste_sequence_index.mjs. Evolução futura já mapeada em 5 ondas (Onda I / 2A.2 até Onda V / 5E-idx) acopladas aos Estágios 2B–5E em PLANO_INDICE_SEQUENCIA_EVOLUCAO.md.",
         },
         {
             id: "2B", stage: 2, track: "v2", status: "plan", statusLabel: "⏳ Planejado (Prioridade 1)",
@@ -303,7 +303,7 @@
             whyOrder: "O VU Meter (Task 19) só pode ser ligado depois de extrair audioCadeia.js, e o compressor offline depende de src/navegador/ (1C) + Frente B.",
             whatBreaks: "Ligar AnalyserNode antes de unificar audioCadeia.js causa conflito de createMediaElementSource; usar specs antigas de Task 20/21 quebra a paridade com o FFmpeg.",
             metaphor: "Instalar medidores de agulha precisos, lápis de borracha na waveform e um operador automático que abaixa a música na fala.",
-            practical: "VU Meter estéreo ao vivo (Task 19), borracha de volume editável com Ctrl+Clique na waveform (Task 20 / F0–F3), auto-ducking pela transcrição (Task 21 / F4–F5), trava anti-denoise em música/ambiente e teste A/B de DeepFilterNet 3.",
+            practical: "VU Meter estéreo ao vivo (Task 19), borracha de volume editável com Ctrl+Clique na waveform (Task 20 / F0–F3), auto-ducking pela transcrição (Task 21 / F4–F5), trava anti-denoise em música/ambiente, teste A/B de DeepFilterNet 3 e Onda II do Índice (alertas CLIPPING/SALTO LUFS/FALA SEM TRAT. via POST /api/timeline/index-enrich + preset Music Cue Sheet .csv).",
             importance: "Garante que todo desenho de volume e dinâmica soe idêntico na caixa de som do editor e no MP4 final.",
             diagram: [
                 { t: "audioCadeia.js", s: "1 fonte → VU Meter (Task 19)", c: "cyan" },
@@ -320,7 +320,7 @@
                 ],
             },
             files: ["src/ui/js/audioCadeia.js", "src/ui/js/automacaoFaixa.js", "src/export/video_render/automacao.py", "src/audio/audio_denoise.py"],
-            journey: "Conflito resolvido na auditoria: especificações antigas das Tasks 20 e 21 foram substituídas integralmente pela Frente F.",
+            journey: "Conflito resolvido na auditoria: especificações antigas das Tasks 20 e 21 foram substituídas integralmente pela Frente F. Gancho Índice (Onda II / 2B-idx): após fechar áudio medido + rampas F0–F5, o Índice ganha saúde sonora (CLIPPING, SALTO LUFS, FALA SEM TRAT.) e exportação Music Cue Sheet (.csv).",
         },
         {
             id: "2C", stage: 2, track: "v2", status: "plan", statusLabel: "⏳ Planejado (Prioridade 1)",
@@ -440,7 +440,7 @@
             whyOrder: "Usa o TimelineSequenceState (1A), as abas (2D), a portaria MCP (3A) e o navegador único (1C) para revisar títulos visualmente.",
             whatBreaks: "Hoje D1–D6 estão 100% quebrados e há um bypass grave em chat_agent.py:2275 onde SET_AV_OFFSET e ADD_EFFECT aplicam edições sem confirmação!",
             metaphor: "Dar à IA uma cópia da sua mesa ('Clone') onde ela testa cortes, mostra a lista de alterações e nunca toca no seu original sem OK.",
-            practical: "A IA enxerga sua agulha e seleção (get_editor_state), edita numa sequência clone, mostra Changes + comparação A/B + Desfazer em 1 clique por turno, e tira foto dos títulos para revisar erros visuais (Frente H).",
+            practical: "A IA enxerga sua agulha e seleção (get_editor_state), edita numa sequência clone, mostra Diff/Changes + comparação A/B + Desfazer em 1 clique por turno, e tira foto dos títulos para revisar erros visuais (Frente H). Gancho Onda III do Índice: Changes vira modo Diff integrado, com PALAVRA CORTADA, ORIGINAL OFF no HD e Roteiro Pós-Montagem.",
             importance: "Fecha 6 bugs antigos de sugestão fantasma, tapa o bypass de edição sem confirmação e cria UX segura de co-edição com IA.",
             diagram: [
                 { t: "Fix Bypass + D1–D6", s: "is_preview em todas ações", c: "rose" },
@@ -457,7 +457,7 @@
                 ],
             },
             files: ["src/ai/chat_agent.py", "src/ui/js/timelineInteraction.js", "src/ui/js/chat.js", "src/ui/js/api.js", "src/export/video_render/modelo.py"],
-            journey: "UX fina da comparação Clone vs Original detalhada no protótipo docs/planos/explicativos/timeline-clone-ia.html.",
+            journey: "UX fina da comparação Clone vs Original detalhada em timeline-clone-ia.html. Gancho Índice (Onda III / 3B-idx): integra Changes como modo Diff da IA no Índice e adiciona tool MCP get_sequence_index_alerts, PALAVRA CORTADA (transcript), ORIGINAL OFF (preflight) e preset Roteiro Pós-Montagem.",
         },
         {
             id: "3C", stage: 3, track: "a1", status: "plan", statusLabel: "⏳ Planejado",
@@ -513,7 +513,7 @@
                 ],
             },
             files: ["src/color/transformacao.py", "src/media/capacidades.py", "src/media/image_processing.py", "src/config/settings_registry.py"],
-            journey: "Conflito de planos resolvido: descarta cadeia.py (segundo proxy) do PLANO_COR_OCIO e adota filtro_entrada da Frente G.",
+            journey: "Conflito de planos resolvido: descarta cadeia.py (segundo proxy) do PLANO_COR_OCIO e adota filtro_entrada da Frente G. Gancho Índice (Onda IV / 4A-idx): seção 'color' passa a sinalizar LOG SEM COR / HDR→SDR em clipes Log sem ajuste.",
         },
         {
             id: "4B", stage: 4, track: "v2", status: "plan", statusLabel: "⏳ Planejado",
@@ -541,7 +541,7 @@
                 ],
             },
             files: ["src/export/subtitles_export.py", "src/ui/js/panels.js"],
-            journey: "Elimina o gerador client-side morto em panels.js:2631-2679.",
+            journey: "Elimina o gerador client-side morto em panels.js:2631-2679. Gancho Índice (Onda IV / 4B-idx): aba/filtro Legendas revisa quebras >42×2 e velocidade >17 cps direto pelo teclado.",
         },
         {
             id: "4C", stage: 4, track: "a2", status: "plan", statusLabel: "⏳ Planejado",
@@ -568,7 +568,7 @@
                 ],
             },
             files: ["src/audio/sherpa_worker.py", "src/db/schema.py"],
-            journey: "Decidir na implementação o destino único de dialogue_utterance/dialogue_word (hoje nunca gravadas) vs tabela transcript.",
+            journey: "Decidir na implementação o destino único de dialogue_utterance/dialogue_word (hoje nunca gravadas) vs tabela transcript. Gancho Índice (Onda IV / 4C-idx): badge FALA SOBREPOSTA (is_overlapping) e precisão em ms para PALAVRA CORTADA via fa-models.",
         },
         {
             id: "4D", stage: 4, track: "v2", status: "plan", statusLabel: "⏳ Planejado",
@@ -622,7 +622,7 @@
                 ],
             },
             files: ["src/search/semantic.py", "src/search/rag.py", "src/search/intent_router.py", "src/ai/prompt_registry.py"],
-            journey: "Resolver também os 2 prompts mortos detectados pela auditoria no PROMPT_REGISTRY (photo_vision e triage_batch_title).",
+            journey: "Resolver também os 2 prompts mortos detectados pela auditoria no PROMPT_REGISTRY (photo_vision e triage_batch_title). Gancho Índice (Onda V / 5A-idx): busca semântica filtrada só aos clipes já montados na sequência e alerta de Repetição Semântica.",
         },
         {
             id: "5B", stage: 5, track: "a2", status: "plan", statusLabel: "⏳ Planejado",
@@ -676,7 +676,7 @@
                 ],
             },
             files: ["src/db/schema.py", "src/narrative/chapters.py", "src/narrative/script_extract.py"],
-            journey: "Integrar também PySceneDetect save-chapters / FFmetadata e os 5 scripts de 08_plano_sequencia.",
+            journey: "Integrar também PySceneDetect save-chapters / FFmetadata e os 5 scripts de 08_plano_sequencia. Gancho Índice (Onda V / 5C-idx): coluna Cena/Capítulo, alerta de cenas sem cobertura e diagnóstico de Ritmo Visual / Jump Cuts (shot_scale + motion_label).",
         },
         {
             id: "5D", stage: 5, track: "a2", status: "plan", statusLabel: "⏳ Planejado",
@@ -731,7 +731,7 @@
                 ],
             },
             files: ["src/vision/face_engine.py", "src/vision/face_pipeline.py", "src/search/local_backend.py"],
-            journey: "Auditoria expôs 5 divergências graves no PLANO_MODERNIZACAO_ANALISES_IA_2026.md que serão saneadas aqui.",
+            journey: "Auditoria expôs 5 divergências graves no PLANO_MODERNIZACAO_ANALISES_IA_2026.md que serão saneadas aqui. Gancho Índice (Onda V / 5E-idx): após ArcFace 512-d real, libera sub-visão Tempo de Tela por pessoa, badge ROSTO SEM NOME e Planilha de Elenco/Direitos de Imagem (.csv).",
         },
         {
             id: "6A", stage: 6, track: "a2", status: "plan", statusLabel: "⏳ Planejado",
@@ -963,6 +963,7 @@
         { term: "SCRFD + ArcFace 512-d", aka: "Estágio 5E (Faces)", def: "Dupla moderna de detecção e assinatura facial (512 números únicos por rosto) que reconhece a mesma pessoa sob iluminação e ângulos difíceis." },
         { term: "Timeline Clone / Sequência Fantasma", aka: "Estágios 1A, 2D e 3B", def: "Cópia isolada da sua timeline onde a IA testa edições sem tocar na sequência original. Você compara A/B, revisa a aba Changes e aceita ou desfaz tudo em 1 clique." },
         { term: "Índice de Sequência & Flash Frame", aka: "Estágio 2A · sequenceIndex.js", def: "Tabela viva com cada corte, transição e marcador da sequência ativa. Também acusa 'flash frames' — sobras minúsculas de 1 a 5 quadros deixadas por engano entre dois clipes e difíceis de enxergar no zoom aberto." },
+        { term: "Through Edit, Micro-Gap & Palavra Cortada", aka: "Evolução do Índice (Ondas I–V)", def: "Through Edit é um corte acidental bem no meio de um clipe contínuo; Micro-Gap é um buraco preto de 1 a 5 quadros entre clipes; e Palavra Cortada avisa na Onda III quando a ponta de um clipe cortou no meio de uma sílaba falada." },
     ];
 
     /* ── Helpers ──────────────────────────────────────────────────────────── */
