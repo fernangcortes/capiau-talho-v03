@@ -1454,6 +1454,7 @@
                         <button class="tab-btn" id="btn-tab-search" data-right-tab="search" style="flex: 1;" title="Busca"><i class="fa-solid fa-magnifying-glass"></i> <span class="tab-text">Busca</span></button>
                         <button class="tab-btn" id="btn-tab-tasks" data-right-tab="tasks" style="flex: 1;" title="Tarefas"><i class="fa-solid fa-list-check"></i> <span class="tab-text">Tarefas</span></button>
                         <button class="tab-btn" id="btn-tab-logs" data-right-tab="logs" style="flex: 1;" title="Logs do Sistema"><i class="fa-solid fa-terminal"></i> <span class="tab-text">Logs</span></button>
+                        <button class="tab-btn" id="btn-tab-index" data-right-tab="index" style="flex: 1;" title="Índice de Sequência"><i class="fa-solid fa-table-list"></i> <span class="tab-text">Índice</span></button>
                     </div>
                 </div>
 
@@ -1709,6 +1710,48 @@
                                 </button>
                             </div>
                         </div>
+                    </div>
+
+                    <!-- Tab: Índice de Sequência (Sequence Index — Estágio 2A) -->
+                    <div id="sequence-index-container" class="sequence-index-container" style="display: none; flex-direction: column; height: 100%; overflow: hidden; padding: 0;">
+                        <div class="panel-sub-actions" style="display: flex; align-items: center; justify-content: space-between; padding: var(--sp-6) var(--sp-12); border-bottom: 1px solid var(--border-glass); background: rgba(0, 0, 0, 0.12); flex-shrink: 0;">
+                            <span style="font-size: var(--fs-10); color: var(--text-secondary); text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px; display: flex; align-items: center; gap: var(--sp-4);">
+                                <i class="fa-solid fa-table-list" style="color: var(--accent);"></i> <span class="header-title-text">Índice de Sequência</span>
+                            </span>
+                            <div style="display: flex; gap: var(--sp-4); align-items: center;">
+                                <button id="btn-seq-index-follow" class="flat-sub-btn cyan-btn toggle-on" data-tooltip="Acompanhar agulha de reprodução automaticamente">
+                                    <i class="fa-solid fa-crosshairs"></i> <span class="btn-text">Agulha</span>
+                                </button>
+                                <button id="btn-seq-index-refresh" class="flat-sub-btn violet-btn" data-tooltip="Atualizar Índice de Sequência">
+                                    <i class="fa-solid fa-arrows-rotate"></i> <span class="btn-text">Atualizar</span>
+                                </button>
+                                <button id="btn-seq-index-export-csv" class="flat-sub-btn emerald-btn" data-tooltip="Exportar Índice de Sequência para CSV">
+                                    <i class="fa-solid fa-file-csv"></i> <span class="btn-text">CSV</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="seq-index-toolbar">
+                            <div class="seq-index-search-row">
+                                <div class="seq-index-search-box">
+                                    <i class="fa-solid fa-magnifying-glass seq-index-search-icon"></i>
+                                    <input type="text" id="seq-index-search" class="seq-index-search-input" placeholder="Buscar clipe, pista, marcador, TC..." autocomplete="off">
+                                    <button type="button" id="btn-seq-index-clear-search" class="seq-index-clear-btn" data-tooltip="Limpar busca" style="display: none;"><i class="fa-solid fa-xmark"></i></button>
+                                </div>
+                                <select id="seq-index-track-filter" class="nle-select seq-index-select" data-tooltip="Filtrar por pista">
+                                    <option value="all">Todas as pistas</option>
+                                </select>
+                                <select id="seq-index-color-filter" class="nle-select seq-index-select" data-tooltip="Filtrar por cor do rótulo ou marcador">
+                                    <option value="all">Todas as cores</option>
+                                </select>
+                            </div>
+
+                            <div id="seq-index-filter-chips" class="seq-index-filter-chips"></div>
+
+                            <div id="seq-index-meta-bar" class="seq-index-meta-bar"></div>
+                        </div>
+
+                        <div id="seq-index-table-wrapper" class="seq-index-table-wrapper scrollable"></div>
                     </div>
                 </div>
             </aside>

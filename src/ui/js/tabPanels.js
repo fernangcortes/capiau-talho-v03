@@ -32,7 +32,8 @@ export const RIGHT_TABS = {
     chat: { title: "Chat IA", icon: "fa-comments", container: "chat-container" },
     search: { title: "Busca", icon: "fa-magnifying-glass", container: "search-container" },
     tasks: { title: "Tarefas", icon: "fa-list-check", container: "tasks-container" },
-    logs: { title: "Logs", icon: "fa-terminal", container: "logs-container" }
+    logs: { title: "Logs", icon: "fa-terminal", container: "logs-container" },
+    index: { title: "Índice", icon: "fa-table-list", container: "sequence-index-container" }
 };
 
 // search: a aba destacada ganha campo de busca próprio (a busca da Biblioteca fica com a Mídias).
@@ -485,7 +486,7 @@ export class TabPanels {
         wrapper.classList.add("dock-guest-active");
         const body = stripBody(side);
         if (body) body.scrollTop = 0;
-        if (TABS[tab].side === "left") this.render(tab);
+        if (TABS[tab].side === "left" || tab === "index") this.render(tab);
         window.dispatchEvent(new Event("resize"));
     }
 
@@ -557,6 +558,8 @@ export class TabPanels {
             } else if (tab === "docs") {
                 const lib = window.libraryInstance;
                 if (lib?.allDocuments) lib.renderDocuments(lib.allDocuments);
+            } else if (tab === "index") {
+                window.SEQUENCE_INDEX?.render?.({ force: true });
             }
         } catch (err) {
             console.warn(`[TabPanels] Falha ao renderizar ${tab}:`, err);
@@ -570,6 +573,7 @@ export class TabPanels {
             if (tab === "faces") window.FaceManager?.onPopoutReady?.(win);
             else if (tab === "titles") window.TITLES_TAB?.onPopoutReady?.(win);
             else if (tab === "themes") window.panelsManager?.onLibraryPopoutReady?.(win);
+            else if (tab === "index") window.SEQUENCE_INDEX?.onPopoutReady?.(win);
         } catch (err) {
             console.warn(`[TabPanels] Gancho de janela de ${tab} falhou:`, err);
         }

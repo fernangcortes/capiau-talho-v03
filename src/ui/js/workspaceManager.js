@@ -187,6 +187,7 @@ export class WorkspaceManager {
             "tabpanel-search": { title: "Busca", icon: "fa-magnifying-glass", desc: "Resultados da busca semântica como coluna" },
             "tabpanel-tasks": { title: "Tarefas", icon: "fa-list-check", desc: "Fila de processamento em segundo plano como coluna" },
             "tabpanel-logs": { title: "Logs", icon: "fa-terminal", desc: "Registro de eventos e terminal como coluna" },
+            "tabpanel-index": { title: "Índice", icon: "fa-table-list", desc: "Índice tabular da sequência (clipes, transições e marcadores) como coluna" },
             "tabpanel-themes": { title: "Temas", icon: "fa-tags", desc: "Organização por temas e tags como coluna" },
             "tabpanel-faces": { title: "Rostos", icon: "fa-user-friends", desc: "Galeria e clusters faciais como coluna" },
             "tabpanel-titles": { title: "Títulos", icon: "fa-font", desc: "Modelos e edição de títulos como coluna" },

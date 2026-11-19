@@ -26,6 +26,7 @@ import { TITLES_TAB } from "./titlesTab.js";
 import { carregarFontesDoProjeto } from "./fontManager.js";
 import { RENDER_CACHE_MANAGER } from "./renderCache.js";
 import { showPromptDialog, showConfirmModal } from "./dialogs.js";
+import { initSequenceIndex } from "./sequenceIndex.js";
 
 // Função para destacar os termos da busca com <mark>
 function highlightTerms(text, query) {
@@ -1907,6 +1908,7 @@ window.addEventListener("DOMContentLoaded", () => {
     TEXT_AI_ENGINE.init();
     window.TITLES_TAB = TITLES_TAB;
     TITLES_TAB.init();
+    initSequenceIndex();
 
     const btnToolAddText = document.getElementById("btn-tool-add-text");
     if (btnToolAddText) {
@@ -3075,6 +3077,7 @@ window.addEventListener("DOMContentLoaded", () => {
         chat: document.getElementById("chat-container"),
         logs: document.getElementById("logs-container"),
         search: document.getElementById("search-container"),
+        index: document.getElementById("sequence-index-container"),
     };
 
     rightTabs.forEach(btn => {
@@ -3125,7 +3128,10 @@ window.addEventListener("DOMContentLoaded", () => {
         // pelo overflow:hidden), fazendo parecer que ele "não abre" após trocar de aba.
         const activeContainer = rightContainers[tab];
         if (activeContainer) {
-            activeContainer.style.display = (tab === "chat" || tab === "transcript" || tab === "logs" || tab === "vision" || tab === "tasks" || tab === "search") ? "flex" : "block";
+            activeContainer.style.display = (tab === "chat" || tab === "transcript" || tab === "logs" || tab === "vision" || tab === "tasks" || tab === "search" || tab === "index") ? "flex" : "block";
+        }
+        if (tab === "index") {
+            window.SEQUENCE_INDEX?.render?.({ force: true });
         }
         
         // Manter destaque no botão ativo

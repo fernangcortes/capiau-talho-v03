@@ -261,7 +261,7 @@ console.log("✔ 1.3 passou: Janela Dupla (lado a lado/empilhada) é uma janela 
     // F2c parte 2c: abas (F5) numa faixa ou como coluna; ausentes da árvore = estão no menu.
     const L = "sidebar-left", I = "inspector-panel", R = "sidebar-right", T = "timeline-panel";
     const CHAT = "tabpanel-chat", TEMAS = "tabpanel-themes", FALAS = "tabpanel-transcript";
-    assert.equal(model.TAB_PANEL_IDS.length, 10);
+    assert.equal(model.TAB_PANEL_IDS.length, 11);
     for (const extra of [
         { columnOrder: [L, I, CENTER_STAGE, R], bands: { top: [], bottom: [CHAT] }, bandCorners: { bl: "band", br: "band" } },
         { columnOrder: [L, I, CENTER_STAGE, TEMAS, R] },

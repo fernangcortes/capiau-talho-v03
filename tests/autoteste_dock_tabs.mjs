@@ -22,13 +22,13 @@ console.log("=== INICIANDO AUTOTESTE: DOCK TABS (F5a) ===\n");
 
 // 1. Cada aba do Painel Lateral aponta para um contêiner e um botão que existem
 const ids = [...tabs.matchAll(/^\s{4}(\w+): \{ title: "[^"]+", icon: "[^"]+", container: "([\w-]+)" \}/gm)].filter(([, , c]) => !c.startsWith("tab-"));
-assert.equal(ids.length, 6, "6 abas do Painel Lateral");
+assert.equal(ids.length, 7, "7 abas do Painel Lateral");
 for (const [, tab, container] of ids) {
     assert.ok(indexHtml.includes(`id="${container}"`), `contêiner ${container} existe`);
     assert.ok(indexHtml.includes(`data-right-tab="${tab}"`), `botão da aba ${tab} existe`);
     assert.ok(groupHtml.includes(`"tabpanel-${tab}":`) && panelHtml.includes(`"tabpanel-${tab}":`), `título da aba ${tab} nas janelas`);
 }
-console.log("✔ 1 passou: 6 abas com contêiner, botão e título nas janelas.");
+console.log("✔ 1 passou: 7 abas com contêiner, botão e título nas janelas.");
 
 // 2. Máquina existente reaproveitada: invólucro montado em qualquer caminho, conteúdo volta à faixa
 assert.ok(/this\.wm\.attachPanelToPopout = \(panelId, win, \.\.\.rest\) => \{[\s\S]{0,120}if \(tab\) this\.prepare\(tab\);/.test(tabs), "attach monta o invólucro (janela, grupo, desfazer, restaurar)");

@@ -37,7 +37,7 @@ export const CENTER_STAGE = "center-stage";
  * ou Painel Lateral) e só aparecem na árvore quando estão numa janela destacada, numa faixa ou como
  * coluna do editor (F2c parte 2c).
  */
-export const TAB_NAMES = ["transcript", "vision", "chat", "search", "tasks", "logs", "themes", "faces", "titles", "docs"];
+export const TAB_NAMES = ["transcript", "vision", "chat", "search", "tasks", "logs", "index", "themes", "faces", "titles", "docs"];
 export const TAB_PANEL_IDS = TAB_NAMES.map(tab => `tabpanel-${tab}`);
 
 const MONITOR_LAYOUTS = ["auto", "side-by-side", "stacked"];
