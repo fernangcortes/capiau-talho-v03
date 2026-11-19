@@ -137,7 +137,7 @@
     box-shadow: 0 0 10px rgba(26, 230, 128, 0.45);
 }
 .pl-seg--wip .pl-seg__fill {
-    width: 78%;
+    width: var(--seg-p, 20%);
     background: linear-gradient(90deg, var(--emerald) 0%, var(--emerald) 72%, var(--cyan) 72%, var(--cyan) 100%);
 }
 .pl-seg--plan .pl-seg__fill {

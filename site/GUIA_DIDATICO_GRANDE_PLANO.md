@@ -8,7 +8,7 @@
 
 **Versão interativa no site:** abra [`site/plano.html`](./plano.html) (ou *Plano Vivo* no site publicado) para explorar mapas clicáveis, diagramas SVG, seletor de lente (*Montador* vs *Programador*) e trechos de código com tooltips.
 
-**Data-base do acompanhamento:** 18/11/2026 (`main` @ `da91a0c`, Estágios 0 e 1 concluídos).
+**Data-base do acompanhamento:** 19/11/2026 (`main` @ `2cac41f`, Estágios 0 e 1 concluídos + Estágio 2A entregue).
 
 ---
 
@@ -25,11 +25,11 @@ Se tentássemos construir tudo ao mesmo tempo ou na ordem errada, um recurso que
 
 ### O que o CapIAu-Talho entrega ao final do plano
 
-| Bloco da Obra | O que muda para quem edita (Sala de Corte) | Status em 18/11/2026 |
+| Bloco da Obra | O que muda para quem edita (Sala de Corte) | Status em 19/11/2026 |
 |---|---|---|
 | **Estágio 0 (`0A`–`0C`)** | Conserta bugs que atrapalham hoje (arraste de alças, Crop seguro, cores nos clipes, áudio mono/EQ no export, segurança XSS e preflight real). | ✅ **100% Concluído** |
 | **Estágio 1 (`1A`–`1C`)** | Prepara o chassi: transforma a timeline única em várias "bandejas" independentes, blinda o banco/sync/segurança local e entrega o navegador único, Video Receipts e a suíte de regressão do render (18 cenários). | ✅ **100% Concluído** (`1A`, `1B` e `1C`) |
-| **Estágio 2 (`2A`–`2E`)** | Fecha a **Suíte NLE Clássica**: Índice de Sequência pesquisável, VU Meter, Borracha de Volume e Auto-Ducking com som idêntico no export, composição de 3+ pistas de vídeo e **Abas de Múltiplas Timelines**. | ⏳ **Planejado (Prioridade 1)** |
+| **Estágio 2 (`2A`–`2E`)** | Fecha a **Suíte NLE Clássica**: Índice de Sequência pesquisável (`2A` ✅), VU Meter, Borracha de Volume e Auto-Ducking com som idêntico no export, composição de 3+ pistas de vídeo e **Abas de Múltiplas Timelines**. | 🟡 **Em andamento** (`2A` ✅; próximos: `2B`–`2E`) |
 | **Estágio 3 (`3A`–`3C`)** | Abre o Talho para **5 IAs externas via MCP** sem travar o banco, com a IA editando em uma **Timeline "Clone" isolada**, painel de *Changes*, *Undo* em 1 clique e revisão visual de títulos. | ⏳ **Planejado (Prioridade 2)** |
 | **Estágio 4 (`4A`–`4D`)** | Cor técnica fiel (`BT.709` e HDR→SDR no proxy), legendas completas (`.srt`/`.vtt`/`.ass` e karaokê), transcrição local **Parakeet** + alinhamento palavra a palavra e prova final do vídeo (**Proofcut** + *Smart Cut*). | ⏳ **Planejado** |
 | **Estágio 5 (`5A`–`5E`)** | Busca por objetos e barras pretas corrigida, leitura de **claquetes por OCR local**, capítulos automáticos de cena, **5 mapas visuais do acervo**, busca com Gemma 2 int8 e reconhecimento facial real (**ArcFace 512-d**). | ⏳ **Planejado** |
@@ -59,8 +59,8 @@ Porque existem **4 correntes físicas** dentro do código. Se você puxar um elo
          ├──────────────────────────┬────────────────────────────┐
          ▼                          ▼                            ▼
   (2A) Índice de Sequência   (2D) Task 25: Abas          (3B) IA edita em Timeline
-       lê via fachada Proxy       de Sequência + Escopo       "Clone" isolada + Undo
-                                  do renderCache por aba      atômico por turno
+       ✅ FEITO (2cac41f)         de Sequência + Escopo       "Clone" isolada + Undo
+       (sequenceIndex.js)         do renderCache por aba      atômico por turno
                                           │                      ▲
                                           └──────────────────────┘
 
@@ -295,17 +295,27 @@ Porque existem **4 correntes físicas** dentro do código. Se você puxar um elo
 
 ## 5. Estágio 2 — Prioridade 1: Ferramentas NLE Restantes & Fluxo de Áudio/Sequência
 
-### 2A — Índice de Sequência (*Sequence Index*, `⏳ Planejado`)
-- 🎬 **Na Sala de Corte:** **Metáfora:** O *índice remissivo* de um livro gigante. **Na prática:** Uma tabela pesquisável e filtrável mostrando todos os clipes da timeline atual, arquivos offline, "flash frames" (cortes curtos demais por acidente), transições, trilhas mutadas e marcadores. Um clique na linha pula a agulha direto para aquele segundo — e ainda exporta tudo para CSV (planilha de decupagem/relatório de entrega). **Por que importa:** Em documentários longos com centenas de cortes, procurar um clipe offline ou um marcador na mão leva minutos.
-- ⚙️ **Debaixo do Capô:** Nova aba nativa em `tabPanels.js` / `dockModel.js`, alimentada **somente leitura** pela fachada `TIMELINE_STATE` (para já funcionar automático quando trocarmos de aba na Task 25).
+### 2A — Índice de Sequência (*Sequence Index*, `✅ Concluído: 2cac41f`)
+- 🎬 **Na Sala de Corte:**
+  - **Metáfora:** O *índice remissivo* vivo de um livro gigante de edição — você abre a folha lateral ou destaca num segundo monitor e enxerga o filme inteiro em linhas pesquisáveis.
+  - **Uso prático no editor:** Uma tabela viva com todos os **clipes, transições e marcadores** da sequência atual, facilitando o dia a dia na ilha: em vez de dar zoom e varrer pista por pista procurando erro antes do export, o painel acende automaticamente **mídias offline**, ***flash frames* (`≤ 5` quadros)**, **trilhas mutadas ou ocultas**, **clipes desativados** e **dessincronia A/V** (`SYNC ±Nf`). Tem filtro rápido por diagnóstico/categoria (`Alertas`, `Offline`, `Flash`, `Sync`, `Silêncio/Desat.`), filtro por pista e por rótulo de cor, busca instantânea por nome/timecode/nota, **salto para o corte em 1 clique**, modo **Seguir agulha** acompanhando o player ao vivo, destaque em janela própria (*pop-out*) e exportação direta para planilha **`.csv`** (UTF-8 com BOM).
+  - **Por que importa para o programa:** Em documentários longos com centenas de cortes, revisar continuidade, direitos, áudio mudo e *flash frames* escondidos no zoom distante caía na tentativa e erro — agora vira conferência técnica de segundos, já plugada na fachada `TIMELINE_STATE` para acompanhar cada aba de sequência quando entrar a Task 25 (`2D`).
+- ⚙️ **Debaixo do Capô:**
+  - `src/ui/js/sequenceIndex.js`: funções puras (`FLASH_FRAME_MAX_FRAMES = 5`, `isCutOffline`, `buildSequenceIndexRows`, `computeSequenceIndexSummary`, `filterSequenceIndexRows`, `exportSequenceIndexToCSV`, `jumpToSequenceIndexRow`) + classe controladora `SequenceIndex` e `initSequenceIndex()`, lendo estritamente via fachada `TIMELINE_STATE` e `STATE` (sem duplicar estado mutável).
+  - Registrado como **aba nativa `"Índice"` (`tabpanel-index` / `#sequence-index-container`)** em `src/ui/index.html`, `src/ui/js/main.js`, `src/ui/js/dockModel.js`, `src/ui/js/tabPanels.js`, `src/ui/js/workspaceManager.js`, `src/ui/panel.html` e `src/ui/panel-group.html`, com layout responsivo via `@container seq-index` em `src/ui/styles.css` e suíte `tests/autoteste_sequence_index.mjs`.
   ```js
-  // Arquitetura prevista (leitura limpa via fachada 1A)
-  const rows = TIMELINE_STATE.cuts.map(c => ({
-      id: c.id, track: c.trackId, startFrame: c.timelineStart,
-      durFrames: c.durationFrames, offline: Boolean(c.offline),
-  }));
+  // src/ui/js/sequenceIndex.js (trecho real entregue em 2cac41f)
+  export const FLASH_FRAME_MAX_FRAMES = 5;
+
+  const offline = isCutOffline(cut, mediaCatalog);
+  const flashFrame = durationFrames >= 1 && durationFrames <= FLASH_FRAME_MAX_FRAMES;
+  const mutedTrack = Boolean(trackObj && (trackObj.muted || trackObj.hidden));
+  const syncInfo = getClipSyncStatus(cut, cuts, syncSeqAdapter);
+  const outOfSync = Boolean(syncInfo && syncInfo.offset !== 0);
+  // 1 clique na linha chama jumpToSequenceIndexRow() e exportSequenceIndexToCSV() gera CSV UTF-8 BOM
   ```
-- 📓 **Cuidado de engenharia:** Nunca guardar cópia própria dos cortes; ler direto de `TIMELINE_STATE` e registrar como aba nativa do `tabPanels.js`.
+- 📓 **O que mudou pelo caminho:**
+  - Durante a implementação, o painel foi enriquecido além da lista básica de cortes: entrou detecção integrada de **dessincronia A/V** via `getClipSyncStatus()`, diferenciação entre trilha mutada (`MUTADO`), trilha oculta (`OCULTA`) e clipe desativado (`DESAT.`), limiar prático de `<= 5` quadros para *flash frames*, modo **Seguir agulha**, filtros combinados por pista/cor/diagnóstico e layout adaptativo em container query (`@container seq-index`). Como virou a 7ª aba direita nativa (11 `tabpanel-*` no total), os autotestes `autoteste_dock_tabs.mjs` e `autoteste_dock_model.mjs` foram atualizados junto na entrega.
 
 ### 2B — Áudio Completo com Paridade (`Frente A` + `Task 19` + `Task 20` + `Task 21`, `⏳ Planejado`)
 - 🎬 **Na Sala de Corte:** **Metáfora:** A mesa de som profissional com medidor de agulha ao vivo, lápis de borracha para desenhar o volume na pista e um operador automático que abaixa a música quando alguém fala (*auto-ducking*). **Na prática:** (1) Medidor estéreo ao vivo (**Task 19**), (2) Borracha de volume com pontos editáveis direto na waveform (`Ctrl+Clique`, **Task 20**), (3) Auto-ducking pela transcrição (**Task 21**), (4) Gate/compressor soando idênticos no Player e no MP4, e (5) trava impedindo que o redutor de ruído automático estrague trilhas musicais ou som ambiente (mais teste A/B com **DeepFilterNet 3**).

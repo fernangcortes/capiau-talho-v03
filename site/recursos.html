@@ -363,7 +363,7 @@
                             <li data-reveal><strong>J/L-cuts nativos:</strong> o som entra antes da imagem, ou continua depois dela.</li>
                             <li data-reveal><strong>Precisão:</strong> zoom até 80 px por frame, snapping magnético, Sync Lock e cadeado por pista.</li>
                             <li data-reveal><strong>Áudio levado a sério:</strong> formas de onda reais, com picos mínimo e máximo a cada 10 ms, e crossfade de potência constante.</li>
-                            <li data-reveal><strong>E mais:</strong> velocidade e reverso, freeze frame, subclipes, Replace Edit, Match Frame e marcadores com <kbd>M</kbd>.</li>
+                            <li data-reveal><strong>E mais:</strong> velocidade e reverso, freeze frame, subclipes, Replace Edit, Match Frame, marcadores com <kbd>M</kbd> e o <a class="inline-link" href="#indice-sequencia">Índice de Sequência</a> para revisar tudo em tabela.</li>
                         </ul>
                         <div class="cluster rc-where" data-reveal>
                             <span class="chip chip--emerald"><span class="chip__dot"></span>Local, no navegador (Canvas 2D)</span>
@@ -440,6 +440,95 @@
                         </div>
                         <figcaption class="rc-cap">Demonstração interativa: cada botão anima numa mini-timeline o que a ferramenta faz com os clipes; o texto abaixo dela descreve a operação. A tabela mostra as teclas do perfil escolhido.</figcaption>
                     </figure>
+                </div>
+
+                <!-- ─── Destaque: Índice de Sequência ─── -->
+                <div class="rc-idx-spot" id="indice-sequencia" aria-labelledby="indice-titulo">
+                    <div class="split rc-split rc-idx-grid">
+                        <div class="rc-idx-spot__copy">
+                            <p class="eyebrow" data-reveal>Índice de Sequência · revisão sem garimpo no dia a dia</p>
+                            <h3 class="rc-idx-spot__title" id="indice-titulo" data-reveal>A timeline inteira em tabela — para achar problemas em segundos, não no zoom</h3>
+                            <p class="rc-idx-spot__lead" data-reveal>Num corte longo com dezenas ou centenas de clipes, caçar um arquivo offline, uma trilha esquecida no mudo, um áudio fora de sincronia ou um <em>flash frame</em> de 2 quadros escondido no zoom aberto faz perder minutos — ou só aparece na hora da exibição. A aba <strong>Índice</strong> coloca a sequência inteira numa tabela viva ao lado da timeline.</p>
+                            <ul class="rc-points" role="list" data-reveal-stagger="70">
+                                <li data-reveal><strong>Checagem técnica em 1 clique:</strong> acende automaticamente mídias <strong>offline</strong>, <em>flash frames</em> acidentais (<code class="inline">≤ 5</code> quadros), <strong>dessincronia A/V</strong>, trilhas mutadas ou ocultas e clipes desativados — filtre só os <em>Alertas</em> antes de renderizar.</li>
+                                <li data-reveal><strong>Clicou na linha, a agulha chega lá:</strong> busque por nome do clipe, pista, marcador, cor ou nota; um clique leva o playhead e centraliza a timeline exatamente naquele corte.</li>
+                                <li data-reveal><strong>Acompanha você enquanto assiste:</strong> ligue <em>Seguir agulha</em> para a lista rolar junto com o player, ou destaque a aba num segundo monitor como folha de revisão sempre aberta.</li>
+                                <li data-reveal><strong>Planilha pronta em <code class="inline">.csv</code>:</strong> exporte a lista filtrada (timecodes de entrada/saída, duração, fonte, alertas e notas) para decupagem, conferência com a direção ou checagem de direitos.</li>
+                            </ul>
+                            <div class="cluster rc-idx-actions" data-reveal>
+                                <span class="chip chip--emerald"><span class="chip__dot"></span>Local · aba nativa destacável</span>
+                                <span class="chip chip--cyan">Exporta .csv</span>
+                                <a class="link-arrow" href="plano.html#diario">Acompanhar no Plano Vivo (2A)<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+                            </div>
+                        </div>
+
+                        <figure class="rc-demo idx-demo" data-reveal="right">
+                            <div class="rc-panel idx-panel">
+                                <div class="rc-panel__bar" aria-hidden="true">
+                                    <span class="rc-panel__title"><span class="rc-led rc-led--cyan"></span>Índice · Sequência 01</span>
+                                    <span class="rc-panel__meta">5 itens · 3 alertas</span>
+                                </div>
+                                <div class="rc-idx-filters" aria-hidden="true">
+                                    <span class="idx-pill">Todos</span>
+                                    <span class="idx-pill is-alert">Alertas (3)</span>
+                                    <span class="idx-pill">Offline</span>
+                                    <span class="idx-pill">Flash ≤5f</span>
+                                    <span class="idx-pill">Sync</span>
+                                    <span class="idx-pill">Marcadores</span>
+                                </div>
+                                <div class="table-wrap idx-table-wrap">
+                                    <table class="idx-table">
+                                        <caption class="sr-only">Exemplo ilustrativo do Índice de Sequência com destaque para alertas técnicos</caption>
+                                        <thead>
+                                            <tr><th scope="col">Pista</th><th scope="col">Item</th><th scope="col">Entrada</th><th scope="col">Duração</th><th scope="col">Status</th></tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr class="is-now">
+                                                <td><span class="idx-track idx-track--v">V1</span></td>
+                                                <td class="idx-name">Entrevista_Ana_04</td>
+                                                <td class="idx-tc">00:02:14:08</td>
+                                                <td class="idx-tc">00:18:12</td>
+                                                <td><span class="idx-badge idx-badge--now">NA AGULHA</span></td>
+                                            </tr>
+                                            <tr>
+                                                <td><span class="idx-track idx-track--v">V1</span></td>
+                                                <td class="idx-name">Broll_Oficina_12</td>
+                                                <td class="idx-tc">00:02:32:20</td>
+                                                <td class="idx-tc">00:00:03</td>
+                                                <td><span class="idx-badge idx-badge--amber">FLASH 3f</span></td>
+                                            </tr>
+                                            <tr>
+                                                <td><span class="idx-track idx-track--v">V2</span></td>
+                                                <td class="idx-name">Arquivo_HD_Externo</td>
+                                                <td class="idx-tc">00:04:01:02</td>
+                                                <td class="idx-tc">00:09:15</td>
+                                                <td><span class="idx-badge idx-badge--rose">OFFLINE</span></td>
+                                            </tr>
+                                            <tr>
+                                                <td><span class="idx-track idx-track--a">A1</span></td>
+                                                <td class="idx-name">Entrevista_Ana_04</td>
+                                                <td class="idx-tc">00:05:19:00</td>
+                                                <td class="idx-tc">00:24:00</td>
+                                                <td><span class="idx-badge idx-badge--rose">SYNC +4f</span></td>
+                                            </tr>
+                                            <tr>
+                                                <td><span class="idx-track idx-track--m">M</span></td>
+                                                <td class="idx-name">Revisar corte c/ diretora</td>
+                                                <td class="idx-tc">00:06:08:10</td>
+                                                <td class="idx-tc">—</td>
+                                                <td><span class="idx-badge idx-badge--violet">MARCADOR</span></td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <div class="idx-foot" aria-hidden="true">
+                                    <span class="idx-follow"><i></i>Seguir agulha</span>
+                                    <span class="idx-csv">Exportar .csv</span>
+                                </div>
+                            </div>
+                            <figcaption class="rc-cap">Ilustração do painel Índice de Sequência: os filtros isolam alertas técnicos e um clique em qualquer linha move a agulha direto para o corte.</figcaption>
+                        </figure>
+                    </div>
                 </div>
             </div>
         </section>
@@ -729,7 +818,7 @@
                         <ul class="rc-points" role="list" data-reveal-stagger="70">
                             <li data-reveal><strong>OpenTimelineIO (<code class="inline">.otio</code>):</strong> o Kdenlive 25.04+ abre nativamente; a wiki do projeto lista também o DaVinci Resolve.</li>
                             <li data-reveal><strong>XML do Final Cut Pro 7 (<code class="inline">.xml</code>):</strong> Premiere, Resolve e Final Cut importam.</li>
-                            <li data-reveal><strong>EDL</strong> para suítes de pós e de cor mais antigas (pista única), <strong>MP4</strong> renderizado pelo FFmpeg e legendas em <strong>SRT</strong> e <strong>VTT</strong>.</li>
+                            <li data-reveal><strong>EDL</strong> para suítes de pós e de cor mais antigas (pista única), <strong>MP4</strong> renderizado pelo FFmpeg, legendas em <strong>SRT</strong> e <strong>VTT</strong> e relatório do <a class="inline-link" href="#indice-sequencia">Índice de Sequência</a> em <strong>CSV</strong>.</li>
                             <li data-reveal><strong>Usar proxies locais:</strong> uma opção na exportação aponta para os proxies, para montar offline em outra máquina.</li>
                         </ul>
                     </div>
@@ -785,7 +874,7 @@
                     <article class="card if-card" data-reveal data-glow>
                         <div class="if-mini if-mini--mon" aria-hidden="true"><span class="if-scr"></span><span class="if-scr"></span><i></i></div>
                         <h3 class="if-t">Vários monitores</h3>
-                        <p class="if-p">Destaque biblioteca, monitores, inspetor ou timeline em janelas próprias. A posição fica lembrada, e um clique reanexa.</p>
+                        <p class="if-p">Destaque biblioteca, monitores, inspetor, <a class="inline-link" href="#indice-sequencia">Índice de Sequência</a> ou timeline em janelas próprias. A posição fica lembrada, e um clique reanexa.</p>
                     </article>
                     <article class="card if-card" data-reveal data-glow>
                         <div class="if-mini if-mini--ws" aria-hidden="true"><span class="if-lay"><i></i><i></i><i></i></span><span class="if-slots"><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd></span></div>

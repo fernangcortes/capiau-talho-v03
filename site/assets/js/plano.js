@@ -3,7 +3,7 @@
    plano.js: dados didáticos e interatividade do Plano Vivo (Estágios 0 a 7):
    - Seletor de lente global (Completa · Montador · Programador)
    - Mapa interativo de dependências em 4 pistas estilo timeline NLE
-   - Diário de obra (Planejado × Realizado × Mudanças pelo caminho em 0A–1C)
+   - Diário de obra (Planejado × Realizado × Mudanças pelo caminho em 0A–2A)
    - Raio-X completo das 31 frentes (0A–7D) com esquemas SVG e código com tooltips
    - Tradutor de tecniquês filtrável
    ========================================================================== */
@@ -77,6 +77,16 @@
             planned: "Criar navegador headless centralizado em 127.0.0.1 (Frente D1 E0–E3), montar suíte de regressão de render sem perdas (Frente B Nível 1 com ffv1) e registrar Video Receipts por exportação.",
             delivered: "Frente D1 E0–E3 completa (src/navegador/ em 127.0.0.1 + migração bit-a-bit de titulos.py/execucao.py/fidelidade.py com abort imediato no cancelamento e diagnostico_barato em 16,24 ms); Video Receipts em src/export/video_render/recibo.py (<destino>.receipt.json + GET /api/timeline/{id}/render/ultimo); e suíte tests/render_regressao/ (FFV1 + PCM s16le, mídias sintéticas com código de barras 11 bits, oráculos NumPy e 18 cenários Nível 1).",
             changed: "A entrega foi fatiada em 4 commits verificados, comprovou paridade bit-a-bit dos títulos contra o legado (ImageChops.difference == None), contornou proxies locais com --proxy-bypass-list=127.0.0.1;localhost;<-loopback>, e isolou 2 divergências já conhecidas (REVERSO_UM_QUADRO para o 2C e HD_SEM_ETIQUETA_BT709 para o 4A) via @pytest.mark.xfail(strict=True) para manter a suíte 100% verde como guarda-costas do render.",
+        },
+        {
+            id: "2A",
+            title: "Estágio 2A — Índice de Sequência (Sequence Index)",
+            status: "done",
+            statusLabel: "✅ Concluído",
+            commits: "2cac41f",
+            planned: "Criar nova aba nativa somente leitura sobre a fachada TIMELINE_STATE (1A) listando clipes, mídias offline, flash frames, transições, trilhas mutadas e marcadores, com filtros, salto direto ao corte e exportação CSV.",
+            delivered: "Módulo src/ui/js/sequenceIndex.js integrado como aba nativa 'Índice' (tabpanel-index) em dockModel.js, tabPanels.js e workspaceManager.js; tabela com busca textual, chips de resumo e filtros combinados (categoria/alerta, pista e rótulo de cor), badges automáticos (OFFLINE, FLASH <=5f, MUTADO/OCULTA, DESAT., SYNC ±Nf), modo Seguir agulha, destaque em janela própria, layout responsivo @container seq-index e exportação CSV UTF-8 BOM + suíte autoteste_sequence_index.mjs.",
+            changed: "O painel foi além da listagem básica prevista: incluiu detecção de dessincronia A/V via getClipSyncStatus(), diferenciação entre trilha mutada/oculta e clipe desativado, limiar prático de 5 quadros para flash frames, acompanhamento da agulha em tempo real (Seguir agulha) e atualização das contagens de abas nativas nos testes de dock.",
         },
     ];
 
@@ -255,34 +265,34 @@
             journey: "Concluído em 4 commits: D1 E1–E2 (11efef5), D1 E0/E3 com bypass de proxy local e 16,24 ms no diagnostico_barato (3fe1d6b), Video Receipts + abort no cancelamento (916cf27) e suíte Frente B Nível 1 com 18 cenários + 2 xfail explícitos para 2C/4A (da91a0c).",
         },
         {
-            id: "2A", stage: 2, track: "v1", status: "plan", statusLabel: "⏳ Planejado (Prioridade 1)",
-            meta: "Estimativa: ~2–3 dias",
+            id: "2A", stage: 2, track: "v1", status: "done", statusLabel: "✅ Concluído",
+            meta: "Commit 2cac41f",
             origin: "NOVOS_PLANOS_IAS_2026-11.md (§3)",
             title: "Índice de Sequência (Sequence Index)",
             deps: ["1A"], unlocks: ["2D"],
             whyOrder: "Precisa do TIMELINE_STATE do 1A para ler os cortes da sequência ativa em formato de tabela e já ficar pronto para trocar de aba na Task 25.",
             whatBreaks: "Se fosse ligado direto a arrays soltos antes do 1A, mostraria a lista da sequência errada ao abrir múltiplas abas.",
-            metaphor: "O índice remissivo vivo de um livro gigante de edição.",
-            practical: "Painel em forma de tabela listando clipes, mídias offline, flash frames, transições, pistas mutadas e marcadores — clique para saltar até lá ou exporte CSV.",
-            importance: "Acelera conferência técnica e decupagem em montagens longas.",
+            metaphor: "O índice remissivo vivo de um livro gigante de edição — pesquisável, destacável e sempre apontando a página certa.",
+            practical: "Aba nativa pesquisável com todos os clipes, transições e marcadores: acende mídias offline, flash frames (≤5 quadros), trilhas mutadas/ocultas, clipes desativados e dessincronia A/V; filtra por pista, cor ou alertas; salta a agulha em 1 clique, segue a reprodução e exporta CSV.",
+            importance: "Transforma a revisão técnica antes de renderizar num trabalho de segundos em vez de ficar dando zoom por dezenas de minutos.",
             diagram: [
-                { t: "TIMELINE_STATE", s: "leitura somente via fachada", c: "cyan" },
-                { t: "Sequence Index", s: "filtro + flash frames + offline", c: "violet" },
-                { t: "Salto / CSV", s: "playhead ou planilha", c: "emerald" },
+                { t: "TIMELINE_STATE", s: "leitura pura via fachada 1A", c: "cyan" },
+                { t: "sequenceIndex.js", s: "alertas + filtros + sync", c: "violet" },
+                { t: "Salto / .csv", s: "playhead, seguir ou planilha", c: "emerald" },
             ],
             code: {
-                lang: "JavaScript", label: "Arquitetura prevista (aba nativa em tabPanels.js)",
+                lang: "JavaScript", label: "src/ui/js/sequenceIndex.js (código real entregue em 2cac41f)",
                 lines: [
-                    "function buildSequenceIndexRows() {",
-                    "    const cuts = {{TIMELINE_STATE.cuts::Lê via fachada Proxy (1A): se o usuário mudar de aba na Task 25, o Índice atualiza para a sequência nova automaticamente.}} || [];",
-                    "    return cuts.filter(c => matchesSearch(c)).map(c => ({",
-                    "        id: c.id, frame: c.timelineStart, {{isFlash: c.durationFrames <= 2::Detecta 'flash frames' — cortes acidentais de 1 ou 2 quadros invisíveis no zoom distante.}}",
-                    "    }));",
+                    "export const {{FLASH_FRAME_MAX_FRAMES = 5::Detecta cortes acidentais de 1 a 5 quadros que passam despercebidos quando o editor está com zoom aberto.}};",
+                    "export function buildSequenceIndexRows(timelineState = {{TIMELINE_STATE::Lê estritamente pela fachada Proxy do Estágio 1A — ao alternar abas ou clones, o Índice muda junto automaticamente.}}, mediaCatalog = STATE) {",
+                    "    const offline = {{isCutOffline(cut, mediaCatalog)::Confere flags e existência da mídia no catálogo (sem marcar texto, ajuste ou cor sólida como offline).}};",
+                    "    const syncInfo = {{getClipSyncStatus(cut, cuts, syncSeqAdapter)::Detecta deslocamento A/V em frames entre imagem e som vinculados antes do export.}};",
+                    "    // {{exportSequenceIndexToCSV()::Gera CSV UTF-8 com BOM pronto para Excel/Sheets com timecodes, fonte, alertas e notas.}} & {{jumpToSequenceIndexRow()::Move a agulha e seleciona o item na timeline em 1 clique.}}",
                     "}",
                 ],
             },
-            files: ["src/ui/js/tabPanels.js", "src/ui/js/dockModel.js", "src/ui/js/timelineState.js"],
-            journey: "Regra do plano: manter estritamente somente leitura via TIMELINE_STATE e registrar como aba nativa no gerenciador de abas.",
+            files: ["src/ui/js/sequenceIndex.js", "src/ui/js/tabPanels.js", "src/ui/js/dockModel.js", "src/ui/styles.css", "tests/autoteste_sequence_index.mjs"],
+            journey: "Entregue com leitor puro sobre TIMELINE_STATE, container query (@container seq-index), suporte a janela destacada (pop-out), modo Seguir agulha e cobertura completa por autoteste_sequence_index.mjs.",
         },
         {
             id: "2B", stage: 2, track: "v2", status: "plan", statusLabel: "⏳ Planejado (Prioridade 1)",
@@ -952,6 +962,7 @@
         { term: "WAAPI", aka: "Estágio 6C (Frente D2)", def: "Sistema nativo de animação do navegador (Web Animations API). Permite animar títulos HTML frame a frame sem usar bibliotecas como GSAP que trazem conflito de licença GPL." },
         { term: "SCRFD + ArcFace 512-d", aka: "Estágio 5E (Faces)", def: "Dupla moderna de detecção e assinatura facial (512 números únicos por rosto) que reconhece a mesma pessoa sob iluminação e ângulos difíceis." },
         { term: "Timeline Clone / Sequência Fantasma", aka: "Estágios 1A, 2D e 3B", def: "Cópia isolada da sua timeline onde a IA testa edições sem tocar na sequência original. Você compara A/B, revisa a aba Changes e aceita ou desfaz tudo em 1 clique." },
+        { term: "Índice de Sequência & Flash Frame", aka: "Estágio 2A · sequenceIndex.js", def: "Tabela viva com cada corte, transição e marcador da sequência ativa. Também acusa 'flash frames' — sobras minúsculas de 1 a 5 quadros deixadas por engano entre dois clipes e difíceis de enxergar no zoom aberto." },
     ];
 
     /* ── Helpers ──────────────────────────────────────────────────────────── */
@@ -964,7 +975,7 @@
     const stageMap = new Map(STAGES.map((s) => [s.id, s]));
 
     let activeLens = "both";
-    let selectedMapId = "1A";
+    let selectedMapId = "2A";
     let filterStage = "all";
     let filterStatus = "all";
     let filterQuery = "";
@@ -1085,7 +1096,7 @@
         });
     }
 
-    /* ── 3. Diário de Obra (0A–1C) ────────────────────────────────────────── */
+    /* ── 3. Diário de Obra (0A–2A) ────────────────────────────────────────── */
     function renderDiary() {
         const grid = document.getElementById("pl-diary-grid");
         if (!grid) return;
